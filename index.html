@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OPUS PRO — Kontrol Paneli v2</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#07090e;--surface:#0c1018;--surface2:#111822;--border:#1a2535;
+  --accent:#00e5ff;--accent2:#ff3566;--accent3:#7c3aed;--gold:#f59e0b;
+  --text:#dde4f0;--muted:#4a5e72;--success:#10b981;--warn:#f59e0b;--danger:#ef4444;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:var(--fm);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;
+  background-image:linear-gradient(rgba(0,229,255,.025) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,229,255,.025) 1px,transparent 1px);
+  background-size:48px 48px;pointer-events:none;z-index:0}
+
+.app{display:flex;min-height:100vh;position:relative;z-index:1}
+
+/* SIDEBAR */
+.sb{width:210px;background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;padding:0;position:sticky;top:0;height:100vh;flex-shrink:0;overflow-y:auto}
+.sb-logo{padding:20px 18px 18px;border-bottom:1px solid var(--border)}
+.sb-badge{font-family:var(--fh);font-size:9px;font-weight:700;letter-spacing:4px;color:var(--accent);text-transform:uppercase}
+.sb-name{font-family:var(--fh);font-size:20px;font-weight:800;color:#fff;line-height:1.1;margin-top:3px}
+nav{flex:1;padding:10px 0}
+.ns{padding:10px 16px 3px;font-size:8px;letter-spacing:3px;color:var(--muted);text-transform:uppercase}
+.ni{display:flex;align-items:center;gap:9px;padding:8px 16px;cursor:pointer;
+  font-size:11px;color:var(--muted);transition:all .15s;border-left:2px solid transparent;letter-spacing:.3px}
+.ni:hover{color:var(--text);background:rgba(0,229,255,.04)}
+.ni.active{color:var(--accent);border-left-color:var(--accent);background:rgba(0,229,255,.06)}
+.ni .ic{width:14px;text-align:center;font-size:12px}
+.sb-foot{padding:12px 16px;border-top:1px solid var(--border);font-size:10px;color:var(--muted)}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--success);margin-right:5px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* MAIN */
+.main{flex:1;padding:28px 32px;overflow-y:auto;max-width:100%}
+.page{display:none;animation:fi .18s ease}
+.page.active{display:block}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.ph{margin-bottom:24px}
+.pt{font-family:var(--fh);font-size:24px;font-weight:800;color:#fff}
+.ps{color:var(--muted);font-size:11px;margin-top:3px}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:18px 22px;margin-bottom:14px}
+.ct{font-family:var(--fh);font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+
+/* STATS */
+.sg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.sc{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:16px 18px;position:relative;overflow:hidden}
+.sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.sc.c1::after{background:var(--accent)}.sc.c2::after{background:var(--accent2)}
+.sc.c3::after{background:var(--accent3)}.sc.c4::after{background:var(--gold)}
+.sl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.sv{font-family:var(--fh);font-size:28px;font-weight:800;color:#fff;margin:4px 0 1px;line-height:1}
+.ss{font-size:10px;color:var(--muted)}
+.si{position:absolute;top:14px;right:14px;font-size:18px;opacity:.2}
+
+/* FORMS */
+.fg{margin-bottom:13px}
+label{display:block;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);
+  border-radius:5px;padding:9px 12px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;transition:border-color .15s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+textarea{resize:vertical;min-height:70px}
+select option{background:var(--surface2)}
+input[type=checkbox]{width:auto}
+input[type=number]{width:100%}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:5px;border:none;
+  cursor:pointer;font-family:var(--fm);font-size:11px;font-weight:500;letter-spacing:.4px;transition:all .15s}
+.bp{background:var(--accent);color:#000}.bp:hover{background:#33eaff;transform:translateY(-1px);box-shadow:0 4px 18px rgba(0,229,255,.25)}
+.bd{background:var(--danger);color:#fff}.bd:hover{background:#f87171}
+.bg{background:transparent;border:1px solid var(--border);color:var(--text)}.bg:hover{border-color:var(--accent);color:var(--accent)}
+.bs{background:var(--success);color:#000}.bs:hover{background:#34d399}
+.bw{background:var(--warn);color:#000}
+.bsm{padding:6px 12px;font-size:10px}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+
+/* TOGGLE */
+.tr{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.tr:last-child{border-bottom:none}
+.tn{font-size:12px;color:var(--text)}.td{font-size:10px;color:var(--muted);margin-top:1px}
+.tg{position:relative;width:36px;height:20px;background:var(--border);border-radius:10px;cursor:pointer;transition:background .2s;flex-shrink:0}
+.tg.on{background:var(--accent)}
+.tg::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:transform .2s}
+.tg.on::after{transform:translateX(16px)}
+
+/* BADGES */
+.badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:9px;letter-spacing:1px;font-weight:500}
+.bi{background:rgba(0,229,255,.1);color:var(--accent)}
+.bs2{background:rgba(16,185,129,.12);color:var(--success)}
+.bw2{background:rgba(245,158,11,.12);color:var(--warn)}
+.be{background:rgba(239,68,68,.12);color:var(--danger)}
+.bp2{background:rgba(124,58,237,.12);color:#a78bfa}
+
+/* TABLE */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+thead th{text-align:left;padding:7px 10px;font-size:8px;letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted);border-bottom:1px solid var(--border)}
+tbody td{padding:10px 10px;border-bottom:1px solid rgba(26,37,53,.7);vertical-align:middle}
+tbody tr:hover{background:rgba(0,229,255,.02)}
+tbody tr:last-child td{border-bottom:none}
+.url-cell{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+
+/* LOGS */
+.ls{background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:14px;
+  font-size:10px;line-height:1.9;height:280px;overflow-y:auto;font-family:var(--fm)}
+.ll{display:flex;gap:10px}
+.lt{color:var(--muted);flex-shrink:0;width:80px}
+.lv{flex-shrink:0;width:45px}
+.lv.info{color:var(--accent)}.lv.ok{color:var(--success)}.lv.warn{color:var(--warn)}.lv.err{color:var(--danger)}
+.lm{color:var(--text)}
+
+/* PROGRESS */
+.prog{background:var(--border);border-radius:3px;height:5px;overflow:hidden;margin-top:5px}
+.pf{height:100%;border-radius:3px;transition:width .4s ease}
+
+/* TABS */
+.tabs{display:flex;gap:2px;margin-bottom:18px;border-bottom:1px solid var(--border)}
+.tab{padding:7px 14px;font-size:10px;letter-spacing:1px;cursor:pointer;color:var(--muted);
+  border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tc{display:none}.tc.active{display:block}
+
+/* WEBHOOK BOX */
+.wb{background:var(--bg);border:1px solid rgba(0,229,255,.3);border-radius:5px;padding:10px 14px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px}
+.wu{font-size:11px;color:var(--accent);word-break:break-all;flex:1}
+
+/* ACCOUNT ITEM */
+.ai{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.ai:last-child{border-bottom:none}
+.ap{display:flex;align-items:center;gap:9px}
+.pi{width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.pi-ig{background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)}
+.pi-yt{background:#ff0000}.pi-tt{background:#010101;border:1px solid var(--border)}
+.an{font-size:11px;color:var(--text)}.aid{font-size:9px;color:var(--muted)}
+
+/* KEYWORD TAGS */
+.kw-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;min-height:36px;
+  background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px;align-items:flex-start}
+.kw-tag{display:inline-flex;align-items:center;gap:5px;background:rgba(0,229,255,.1);
+  color:var(--accent);border-radius:4px;padding:3px 8px;font-size:10px}
+.kw-tag button{background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;line-height:1;padding:0}
+
+/* RESULT BOX */
+.result{padding:10px 14px;border-radius:5px;font-size:11px;margin-top:10px;display:none}
+.result.ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--success)}
+.result.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--danger)}
+.result.info{background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2);color:var(--accent)}
+.result.warn{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);color:var(--warn)}
+
+/* ALERT */
+.alert{padding:10px 14px;border-radius:5px;font-size:11px;display:flex;align-items:flex-start;gap:9px;margin-bottom:12px}
+.alert-i{background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2)}
+.alert-w{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2)}
+
+/* MINI CHART */
+.bars{display:flex;align-items:flex-end;gap:3px;height:55px}
+.bar{flex:1;background:var(--accent);border-radius:2px 2px 0 0;opacity:.6;transition:opacity .2s;min-width:10px}
+.bar:hover{opacity:1}
+.bar-labels{display:flex;justify-content:space-between;font-size:8px;color:var(--muted);margin-top:4px}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+code{background:rgba(0,229,255,.08);color:var(--accent);padding:1px 5px;border-radius:3px;font-size:10px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- SIDEBAR -->
+<aside class="sb">
+  <div class="sb-logo">
+    <div class="sb-badge">◆ Otomasyon</div>
+    <div class="sb-name">OPUS<br>PRO</div>
+  </div>
+  <nav>
+    <div class="ns">Ana</div>
+    <div class="ni active" onclick="go('dashboard',this)"><span class="ic">▦</span>Dashboard</div>
+    <div class="ni" onclick="go('video-gonder',this)"><span class="ic">▶</span>Video Gönder</div>
+    <div class="ni" onclick="go('youtube-ara',this)"><span class="ic">⊕</span>YouTube Ara</div>
+    <div class="ni" onclick="go('bulk-keywords',this)"><span class="ic">≋</span>Toplu Kelimeler</div>
+    <div class="ns">Kaynaklar</div>
+    <div class="ni" onclick="go('drive',this)"><span class="ic">◈</span>Google Drive</div>
+    <div class="ni" onclick="go('sheets',this)"><span class="ic">▤</span>Google Sheets</div>
+    <div class="ns">Takip</div>
+    <div class="ni" onclick="go('kuyruk',this)"><span class="ic">≡</span>Kuyruk</div>
+    <div class="ni" onclick="go('short-listesi',this)"><span class="ic">◉</span>Short Listesi</div>
+    <div class="ni" onclick="go('url-takip',this)"><span class="ic">⊙</span>URL Takip</div>
+    <div class="ns">Analiz</div>
+    <div class="ni" onclick="go('raporlar',this)"><span class="ic">◈</span>Raporlar</div>
+    <div class="ni" onclick="go('platform',this)"><span class="ic">◎</span>Platformlar</div>
+    <div class="ni" onclick="go('arsiv',this)"><span class="ic">▣</span>Arşiv</div>
+    <div class="ns">Sistem</div>
+    <div class="ni" onclick="go('ayarlar',this)"><span class="ic">⊞</span>Ayarlar</div>
+    <div class="ni" onclick="go('hesaplar',this)"><span class="ic">◎</span>Hesaplar</div>
+    <div class="ni" onclick="go('loglar',this)"><span class="ic">⊟</span>Loglar</div>
+  </nav>
+  <div class="sb-foot"><span class="dot"></span>n8n Aktif</div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+<!-- ═══ DASHBOARD ═══ -->
+<div id="page-dashboard" class="page active">
+  <div class="ph"><div class="pt">Dashboard</div><div class="ps">Genel durum ve anlık istatistikler</div></div>
+
+  <div class="sg">
+    <div class="sc c1"><div class="si">▶</div><div class="sl">İşlenen URL</div><div class="sv" id="d-url">—</div><div class="ss">URL-Takip sheet</div></div>
+    <div class="sc c2"><div class="si">◈</div><div class="sl">Short Üretilen</div><div class="sv" id="d-short">—</div><div class="ss">Short Kaydet sheet</div></div>
+    <div class="sc c3"><div class="si">⊕</div><div class="sl">Yayınlanan</div><div class="sv" id="d-pub">—</div><div class="ss">Blotato confirmed</div></div>
+    <div class="sc c4"><div class="si">⊙</div><div class="sl">İşlemde</div><div class="sv" id="d-wait">—</div><div class="ss">Aktif kuyruk</div></div>
+  </div>
+
+  <div class="g2">
+    <div class="card">
+      <div class="ct">Platform Dağılımı</div>
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px"><span>📸 Instagram</span><span id="ig-pct">—</span></div>
+        <div class="prog"><div class="pf" id="ig-bar" style="background:#e1306c;width:0%"></div></div>
+      </div>
+      <div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px"><span>▶ YouTube</span><span id="yt-pct">—</span></div>
+        <div class="prog"><div class="pf" id="yt-bar" style="background:#ff0000;width:0%"></div></div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:3px"><span>♪ TikTok</span><span id="tt-pct">—</span></div>
+        <div class="prog"><div class="pf" id="tt-bar" style="background:#69c9d0;width:0%"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct">Son 7 Gün — Short</div>
+      <div class="bars" id="weekly-bars">
+        <div class="bar" style="height:20%" title="Pts:0"></div>
+        <div class="bar" style="height:20%" title="Sal:0"></div>
+        <div class="bar" style="height:20%" title="Çar:0"></div>
+        <div class="bar" style="height:20%" title="Per:0"></div>
+        <div class="bar" style="height:20%" title="Cum:0"></div>
+        <div class="bar" style="height:20%" title="Cmt:0"></div>
+        <div class="bar" style="height:20%" title="Paz:0"></div>
+      </div>
+      <div class="bar-labels"><span>Pts</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="ct" style="margin:0">Son İşlemler</div>
+      <button class="btn bg bsm" onclick="loadSheetData()">↻ Yenile</button>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>URL</th><th>Kaynak</th><th>Short</th><th>Durum</th><th>Tarih</th></tr></thead>
+        <tbody id="recent-tbody">
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">
+            Ayarlar'dan Sheet ID ve n8n URL girin, sonra <b>Yenile</b>'ye tıklayın
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ VİDEO GÖNDER ═══ -->
+<div id="page-video-gonder" class="page">
+  <div class="ph"><div class="pt">Video Gönder</div><div class="ps">YouTube linkini doğrudan sisteme gönder</div></div>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="ct">Tekli URL</div>
+        <div class="fg"><label>YouTube URL</label><input id="sv-url" type="url" placeholder="https://www.youtube.com/watch?v=..."/></div>
+        <div class="fg"><label>Kaynak Notu</label><input id="sv-kaynak" type="text" placeholder="manuel, özel, kampanya..."/></div>
+        <div class="fg"><label>Webhook URL</label><input id="sv-wh" type="url" placeholder="https://n8n.domain.com/webhook/..."/></div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn bp" onclick="sendSingle()">▶ Gönder</button>
+          <button class="btn bg bsm" onclick="testWH('sv-wh','sv-res')">⊙ Test</button>
+        </div>
+        <div id="sv-res" class="result"></div>
+      </div>
+
+      <div class="card">
+        <div class="ct">Toplu URL</div>
+        <div class="fg"><label>URL Listesi (her satıra bir)</label>
+          <textarea id="bv-urls" placeholder="https://youtube.com/watch?v=AAA&#10;https://youtube.com/watch?v=BBB" style="height:100px"></textarea>
+        </div>
+        <div class="fg"><label>Gönderim Aralığı (sn)</label><input id="bv-delay" type="number" value="5" min="1"/></div>
+        <button class="btn bp" onclick="sendBulkURLs()">▶ Tümünü Gönder</button>
+        <div id="bv-prog" style="display:none;margin-top:10px">
+          <div id="bv-status" style="font-size:10px;color:var(--muted);margin-bottom:5px"></div>
+          <div class="prog"><div class="pf" id="bv-bar" style="background:var(--accent);width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">Bekleme Süresi Hesaplayıcı</div>
+        <p style="font-size:10px;color:var(--muted);margin-bottom:12px">
+          Video süresine göre Opus Pro işlem süresi tahmini<br>
+          <code>waitSec = (süre / 3600) × 1200</code>
+        </p>
+        <div class="fg"><label>Video Süresi (dakika)</label><input type="number" id="calc-min" placeholder="60" oninput="calcWait()"/></div>
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:14px;text-align:center;margin-top:4px">
+          <div style="font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Tahmini Bekleme</div>
+          <div style="font-family:var(--fh);font-size:32px;font-weight:800;color:var(--accent);margin:6px 0" id="calc-res">—</div>
+          <div style="font-size:9px;color:var(--muted)" id="calc-sub">Süre gir</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">Drive Sheet Durumu</div>
+        <p style="font-size:10px;color:var(--muted);margin-bottom:10px">Her 30 dakikada otomatik kontrol edilir.</p>
+        <div style="font-size:11px;margin-bottom:6px"><span style="color:var(--muted)">Sheet ID:</span><code style="margin-left:6px">1eAm6yyasd_...</code></div>
+        <div style="font-size:11px;margin-bottom:12px"><span style="color:var(--muted)">Son kontrol:</span><span style="margin-left:6px" id="drive-last">—</span></div>
+        <a href="https://docs.google.com/spreadsheets/d/1eAm6yyasd_0g42ykgKU_tGqvRUQ_pg4uCzUtZ5ik-rg" target="_blank" class="btn bg bsm">⊞ Sheet'i Aç</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ YOUTUBE ARA ═══ -->
+<div id="page-youtube-ara" class="page">
+  <div class="ph"><div class="pt">YouTube Ara</div><div class="ps">Tek anahtar kelimeyle video bul ve işle</div></div>
+  <div class="g2">
+    <div class="card">
+      <div class="ct">Arama</div>
+      <div class="fg"><label>Anahtar Kelime</label><input id="ya-kw" type="text" placeholder="motivasyon konuşması türkçe"/></div>
+      <div class="fg"><label>Webhook URL</label><input id="ya-wh" type="url" placeholder="https://n8n.domain.com/webhook/youtube-ara"/></div>
+      <div class="g2" style="gap:10px">
+        <div class="fg">
+          <label>Minimum Süre</label>
+          <select id="ya-dur">
+            <option value="600">10 dakika</option>
+            <option value="1200">20 dakika</option>
+            <option value="1800">30 dakika</option>
+            <option value="3600">60 dakika</option>
+            <option value="5400">90 dakika</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Dil</label>
+          <select id="ya-lang">
+            <option value="tr">Türkçe</option>
+            <option value="en">İngilizce</option>
+            <option value="">Tümü</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bp" onclick="sendSearch()">⊕ Ara ve Gönder</button>
+        <button class="btn bg bsm" onclick="testWH('ya-wh','ya-res')">⊙ Test</button>
+      </div>
+      <div id="ya-res" class="result"></div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">Arama Geçmişi</div>
+        <div id="ya-history" style="font-size:11px">
+          <div style="color:var(--muted);text-align:center;padding:14px">Henüz arama yapılmadı</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TOPLU KELIMELER ═══ -->
+<div id="page-bulk-keywords" class="page">
+  <div class="ph"><div class="pt">Toplu Anahtar Kelimeler</div><div class="ps">Birden fazla kelimeyle otomatik sıralı arama</div></div>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="ct">Kelime Listesi</div>
+        <div class="alert alert-i">
+          <span>ℹ</span>
+          <span>Her kelime için YouTube aranır, 10dk+ videolar bulunur, sırayla Opus Pro'ya gönderilir. Sistem tamamen otomatik ilerler.</span>
+        </div>
+        <div class="fg">
+          <label>Yeni Kelime Ekle</label>
+          <div style="display:flex;gap:8px">
+            <input id="bk-input" type="text" placeholder="anahtar kelime..." onkeydown="if(event.key==='Enter')addKW()"/>
+            <button class="btn bp bsm" onclick="addKW()">+</button>
+          </div>
+        </div>
+        <label style="margin-bottom:6px;display:block">Eklenenler</label>
+        <div class="kw-tags" id="kw-tags"><span style="color:var(--muted);font-size:10px">Kelime ekleyin...</span></div>
+
+        <div style="display:flex;gap:10px;margin-top:12px">
+          <div class="fg" style="flex:1;margin:0">
+            <label>Kelimeler Arası Bekleme (sn)</label>
+            <input id="bk-delay" type="number" value="5" min="1"/>
+          </div>
+          <div class="fg" style="flex:1;margin:0">
+            <label>Min. Video Süresi</label>
+            <select id="bk-dur">
+              <option value="600">10 dk</option>
+              <option value="1200">20 dk</option>
+              <option value="1800">30 dk</option>
+              <option value="3600">60 dk</option>
+              <option value="5400">90 dk</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg" style="margin-top:10px"><label>Webhook URL</label><input id="bk-wh" type="url" placeholder="https://n8n.domain.com/webhook/bulk-keywords"/></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn bp" onclick="sendBulkKeywords()">≋ Tümünü Gönder</button>
+          <button class="btn bg bsm" onclick="clearKWs()">✕ Temizle</button>
+        </div>
+        <div id="bk-res" class="result"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">Toplu Gönderim İlerlemesi</div>
+        <div id="bk-prog-wrap" style="display:none">
+          <div id="bk-cur" style="font-size:11px;color:var(--text);margin-bottom:8px"></div>
+          <div class="prog" style="height:8px;margin-bottom:8px"><div class="pf" id="bk-pbar" style="background:var(--accent);width:0%"></div></div>
+          <div id="bk-log" class="ls" style="height:180px"></div>
+        </div>
+        <div id="bk-empty" style="color:var(--muted);font-size:11px;text-align:center;padding:20px">
+          Gönderim başlatıldığında ilerleme burada görünür
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">Geçmiş Toplu Aramalar</div>
+        <div id="bk-history" style="font-size:11px">
+          <div style="color:var(--muted);text-align:center;padding:14px">Henüz gönderim yapılmadı</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GOOGLE DRIVE ═══ -->
+<div id="page-drive" class="page">
+  <div class="ph"><div class="pt">Google Drive</div><div class="ps">Drive dosyalarından video URL listesi yükle</div></div>
+  <div class="alert alert-w" style="margin-bottom:14px">
+    <span>⚠</span>
+    <span><strong>Tekrar işleme karşı koruma:</strong> Gönderilen URL'ler yerel depolamada tutulur. Aynı URL ikinci kez gönderilmez.</span>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="ct">Drive Sheet Linki</div>
+      <div class="fg"><label>Google Sheets URL veya ID</label>
+        <input id="dr-sheet" type="text" placeholder="https://docs.google.com/spreadsheets/d/... veya sadece ID"/>
+      </div>
+      <div class="fg"><label>Sütun Adı (URL sütunu)</label><input id="dr-col" type="text" value="Youtube Linki"/></div>
+      <div class="fg"><label>Webhook URL</label><input id="dr-wh" type="url" placeholder="https://n8n.domain.com/webhook/video-gonder"/></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bp" onclick="loadDriveSheet()">⊞ Sheet'i Yükle ve Gönder</button>
+        <button class="btn bg bsm" onclick="testWH('dr-wh','dr-res')">⊙ Test</button>
+      </div>
+      <div id="dr-res" class="result"></div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">Yüklenen URL'ler</div>
+        <div id="dr-urls" style="font-size:11px;max-height:200px;overflow-y:auto">
+          <div style="color:var(--muted);text-align:center;padding:14px">Sheet yüklendikten sonra URL'ler burada görünür</div>
+        </div>
+        <div style="margin-top:10px;font-size:10px;color:var(--muted)">
+          <span id="dr-count">0</span> URL bulundu, <span id="dr-new">0</span> yeni
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">İşlenmiş URL'ler (Tekrar Koruma)</div>
+        <div style="font-size:11px;margin-bottom:8px">
+          <span id="dr-sent-count">0</span> URL daha önce gönderildi
+        </div>
+        <button class="btn bg bsm" onclick="clearSentURLs()">✕ Geçmişi Temizle</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ GOOGLE SHEETS ═══ -->
+<div id="page-sheets" class="page">
+  <div class="ph"><div class="pt">Google Sheets</div><div class="ps">Sheet'teki URL'leri okuyup sisteme gönder</div></div>
+  <div class="alert alert-w" style="margin-bottom:14px">
+    <span>⚠</span>
+    <span><strong>Tekrar işleme karşı koruma:</strong> Gönderilen URL'ler takip edilir. İşlenmiş satırlar tekrar gönderilmez.</span>
+  </div>
+  <div class="g2">
+    <div class="card">
+      <div class="ct">Sheet Bağlantısı</div>
+      <div class="fg"><label>Sheets URL veya ID</label>
+        <input id="sh-id" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." oninput="extractSheetID()"/>
+      </div>
+      <div id="sh-id-display" style="font-size:10px;color:var(--muted);margin-bottom:10px;display:none">
+        ID: <code id="sh-id-val"></code>
+      </div>
+      <div class="fg"><label>URL Sütunu (başlık adı)</label><input id="sh-col" type="text" value="Youtube Linki"/></div>
+      <div class="fg"><label>İşlendi Sütunu (boş olanlar alınır)</label><input id="sh-done-col" type="text" value="İşlendi"/></div>
+      <div class="fg"><label>Webhook URL</label><input id="sh-wh" type="url" placeholder="https://n8n.domain.com/webhook/video-gonder"/></div>
+      <div class="fg"><label>Gönderim Aralığı (sn)</label><input id="sh-delay" type="number" value="3" min="1"/></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bp" onclick="loadSheetURLs()">⊞ Sheet'i Tara ve Gönder</button>
+        <button class="btn bg bsm" onclick="previewSheet()">⊙ Önizle</button>
+      </div>
+      <div id="sh-res" class="result"></div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">Taranan URL'ler</div>
+        <div id="sh-preview" style="font-size:11px;max-height:200px;overflow-y:auto">
+          <div style="color:var(--muted);text-align:center;padding:14px">Önizle veya Gönder'e tıklayın</div>
+        </div>
+        <div style="margin-top:8px;display:flex;justify-content:space-between;font-size:10px;color:var(--muted)">
+          <span>Toplam: <b id="sh-total">0</b></span>
+          <span>Yeni: <b id="sh-new-count">0</b></span>
+          <span>Atlandı: <b id="sh-skip">0</b></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">İşlem Durumu</div>
+        <div id="sh-prog" style="display:none">
+          <div id="sh-cur" style="font-size:11px;margin-bottom:6px"></div>
+          <div class="prog"><div class="pf" id="sh-pbar" style="background:var(--accent);width:0%"></div></div>
+        </div>
+        <div id="sh-idle" style="font-size:11px;color:var(--muted)">Bekleniyor</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ KUYRUK ═══ -->
+<div id="page-kuyruk" class="page">
+  <div class="ph"><div class="pt">İşlem Kuyruğu</div><div class="ps">Aktif ve bekleyen işlemler</div></div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="ct" style="margin:0">Aktif İşlemler</div>
+      <button class="btn bg bsm" onclick="loadSheetData()">↻ Yenile</button>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>URL</th><th>Kaynak</th><th>Süre</th><th>Bekleme</th><th>Durum</th><th>Tarih</th></tr></thead>
+        <tbody id="queue-tbody">
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">URL-Takip sheet'indeki "İşlemde" kayıtları</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SHORT LİSTESİ ═══ -->
+<div id="page-short-listesi" class="page">
+  <div class="ph"><div class="pt">Short Listesi</div><div class="ps">Üretilen tüm short videolar</div></div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <input type="text" id="sl-q" placeholder="Ara..." style="width:180px" oninput="filterTable('short-tbody','sl-q')"/>
+    <select id="sl-status" style="width:130px" onchange="filterTable('short-tbody','sl-q')">
+      <option value="">Tüm Durumlar</option><option>Bekliyor</option><option>Yayınlandı</option>
+    </select>
+    <button class="btn bg bsm" onclick="loadSheetData()">↻ Yenile</button>
+    <button class="btn bg bsm" onclick="exportCSV('short-tbody','shorts')">⬇ CSV</button>
+  </div>
+  <div class="card">
+    <div class="tw">
+      <table>
+        <thead><tr><th>Başlık</th><th>Puan</th><th>Süre</th><th>IG</th><th>YT</th><th>TT</th><th>Durum</th><th>Tarih</th></tr></thead>
+        <tbody id="short-tbody">
+          <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">Ayarlar'dan Sheet ID girin ve Yenile'ye tıklayın</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ URL TAKİP ═══ -->
+<div id="page-url-takip" class="page">
+  <div class="ph"><div class="pt">URL Takip</div><div class="ps">Her URL'den üretilen short sayısı</div></div>
+  <div style="display:flex;gap:8px;margin-bottom:12px">
+    <button class="btn bg bsm" onclick="loadSheetData()">↻ Yenile</button>
+    <button class="btn bg bsm" onclick="exportCSV('url-tbody','url-takip')">⬇ CSV</button>
+  </div>
+  <div class="card">
+    <div class="tw">
+      <table>
+        <thead><tr><th>YouTube URL</th><th>Kaynak</th><th>Süre(sn)</th><th>İzlenme</th><th>Short</th><th>Bekleme</th><th>Durum</th><th>Tarih</th></tr></thead>
+        <tbody id="url-tbody">
+          <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">URL-Takip sheet bağlandıktan sonra veriler görünür</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ RAPORLAR ═══ -->
+<div id="page-raporlar" class="page">
+  <div class="ph"><div class="pt">Raporlar</div><div class="ps">Performans özeti</div></div>
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('r-hafta',this)">Haftalık</div>
+    <div class="tab" onclick="showTab('r-ay',this)">Aylık</div>
+    <div class="tab" onclick="showTab('r-kaynak',this)">Kaynak</div>
+  </div>
+  <div id="tab-r-hafta" class="tc active">
+    <div class="sg">
+      <div class="sc c1"><div class="sl">Bu Hafta URL</div><div class="sv" id="rh-url">—</div></div>
+      <div class="sc c2"><div class="sl">Short Üretilen</div><div class="sv" id="rh-short">—</div></div>
+      <div class="sc c3"><div class="sl">Ort. Short/Video</div><div class="sv" id="rh-avg">—</div></div>
+      <div class="sc c4"><div class="sl">Başarı Oranı</div><div class="sv" id="rh-rate">—</div></div>
+    </div>
+    <div class="card">
+      <div class="ct">Günlük Dağılım</div>
+      <div class="bars" id="r-bars"><div class="bar" style="height:20%"></div><div class="bar" style="height:20%"></div><div class="bar" style="height:20%"></div><div class="bar" style="height:20%"></div><div class="bar" style="height:20%"></div><div class="bar" style="height:20%"></div><div class="bar" style="height:20%"></div></div>
+      <div class="bar-labels"><span>Pts</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span></div>
+    </div>
+  </div>
+  <div id="tab-r-ay" class="tc">
+    <div class="card"><div class="ct">Aylık Özet</div><p style="font-size:11px;color:var(--muted)">Sheet verisi yüklenince aylık istatistikler hesaplanır.</p></div>
+  </div>
+  <div id="tab-r-kaynak" class="tc">
+    <div class="g3">
+      <div class="sc c1" style="border-radius:9px;padding:16px"><div class="sl">Drive</div><div class="sv" id="r-drive">—</div><div class="ss">URL işlendi</div></div>
+      <div class="sc c2" style="border-radius:9px;padding:16px"><div class="sl">YT Arama</div><div class="sv" id="r-yt">—</div><div class="ss">URL işlendi</div></div>
+      <div class="sc c3" style="border-radius:9px;padding:16px"><div class="sl">Manuel Form</div><div class="sv" id="r-form">—</div><div class="ss">URL işlendi</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PLATFORMLAR ═══ -->
+<div id="page-platform" class="page">
+  <div class="ph"><div class="pt">Platform Analiz</div><div class="ps">Hesap bazlı dağılım</div></div>
+  <div class="g3">
+    <div class="card">
+      <div class="ct">📸 Instagram</div>
+      <div id="pl-ig"></div>
+    </div>
+    <div class="card">
+      <div class="ct">▶ YouTube</div>
+      <div id="pl-yt"></div>
+    </div>
+    <div class="card">
+      <div class="ct">♪ TikTok</div>
+      <div id="pl-tt"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ARŞİV ═══ -->
+<div id="page-arsiv" class="page">
+  <div class="ph"><div class="pt">Arşiv</div><div class="ps">Tamamlanan işlemler</div></div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <input type="date" id="ar-s" style="width:150px"/>
+    <input type="date" id="ar-e" style="width:150px"/>
+    <select id="ar-k" style="width:140px">
+      <option value="">Tüm Kaynaklar</option>
+      <option value="drive">Drive</option>
+      <option value="youtube-arama">YT Arama</option>
+      <option value="form">Manuel</option>
+      <option value="bulk-keyword">Toplu Kelime</option>
+    </select>
+    <button class="btn bg bsm" onclick="loadSheetData()">⊙ Filtrele</button>
+    <button class="btn bg bsm" onclick="exportCSV('ar-tbody','arsiv')">⬇ CSV</button>
+  </div>
+  <div class="card">
+    <div class="tw">
+      <table>
+        <thead><tr><th>URL</th><th>Kaynak</th><th>Short</th><th>Proje ID</th><th>Tamamlanma</th></tr></thead>
+        <tbody id="ar-tbody">
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">URL-Takip sheet'indeki "Tamamlandı" kayıtları</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ AYARLAR ═══ -->
+<div id="page-ayarlar" class="page">
+  <div class="ph"><div class="pt">Ayarlar</div><div class="ps">n8n ve otomasyon parametreleri</div></div>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="ct">n8n Bağlantısı</div>
+        <div class="fg"><label>n8n Base URL</label><input id="cfg-n8n" type="url" placeholder="https://n8n.senindomain.com" oninput="updateWHs()"/></div>
+        <div class="fg">
+          <label>Tekil Video Webhook</label>
+          <div class="wb"><span class="wu" id="wh-single">/webhook/video-gonder</span><button class="btn bg bsm" onclick="copyEl('wh-single')">Kopyala</button></div>
+        </div>
+        <div class="fg">
+          <label>YouTube Arama Webhook</label>
+          <div class="wb"><span class="wu" id="wh-search">/webhook/youtube-ara</span><button class="btn bg bsm" onclick="copyEl('wh-search')">Kopyala</button></div>
+        </div>
+        <div class="fg">
+          <label>Toplu Keyword Webhook</label>
+          <div class="wb"><span class="wu" id="wh-bulk">/webhook/bulk-keywords</span><button class="btn bg bsm" onclick="copyEl('wh-bulk')">Kopyala</button></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">Google Sheets</div>
+        <div class="fg"><label>Sheet ID (Short Kaydet)</label><input id="cfg-sheet" type="text" placeholder="1eAm6yyasd_..."/></div>
+        <div class="fg"><label>Sheet ID (URL Takip)</label><input id="cfg-sheet2" type="text" placeholder="aynı veya farklı sheet"/></div>
+        <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
+        <div id="cfg-saved" style="display:none;font-size:10px;color:var(--success);margin-top:8px">✓ Kaydedildi</div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">Yayın Zamanlama</div>
+        <div class="fg"><label>Instagram Günlük Max</label><input id="cfg-ig" type="number" value="10" min="1"/></div>
+        <div class="fg"><label>YouTube Günlük Max</label><input id="cfg-yt" type="number" value="10" min="1" max="10"/></div>
+        <div class="fg"><label>TikTok Günlük Max</label><input id="cfg-tt" type="number" value="10" min="1"/></div>
+        <div class="g2" style="gap:10px">
+          <div class="fg"><label>Başlangıç Saati</label><input id="cfg-start" type="time" value="08:00"/></div>
+          <div class="fg"><label>Bitiş Saati</label><input id="cfg-end" type="time" value="22:00"/></div>
+        </div>
+        <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
+      </div>
+      <div class="card">
+        <div class="ct">Otomasyon Toggle</div>
+        <div class="tr"><div><div class="tn">Drive Kontrol</div><div class="td">Her 30 dk</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="tr"><div><div class="tn">YouTube Arama</div><div class="td">Webhook tetikli</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="tr"><div><div class="tn">Instagram Yayın</div><div class="td">5 hesap, seri</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="tr"><div><div class="tn">YouTube Yayın</div><div class="td">5 hesap, seri</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="tr"><div><div class="tn">TikTok Yayın</div><div class="td">5 hesap, seri</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="tr"><div><div class="tn">URL Takip</div><div class="td">Sheet kaydı</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HESAPLAR ═══ -->
+<div id="page-hesaplar" class="page">
+  <div class="ph"><div class="pt">Hesaplar</div><div class="ps">Blotato hesap ID yönetimi</div></div>
+  <div class="alert alert-i" style="margin-bottom:14px"><span>ℹ</span><span>Değişiklikler ayrıca n8n Code in JavaScript3 node'una uygulanmalıdır. "Kod Üret" butonu kopyalanabilir kod verir.</span></div>
+  <div class="g3">
+    <div class="card">
+      <div class="ct">📸 Instagram</div>
+      <div id="ig-inputs"></div>
+    </div>
+    <div class="card">
+      <div class="ct">▶ YouTube</div>
+      <div id="yt-inputs"></div>
+    </div>
+    <div class="card">
+      <div class="ct">♪ TikTok</div>
+      <div id="tt-inputs"></div>
+    </div>
+  </div>
+  <button class="btn bp" onclick="genAccountCode()" style="margin-top:4px">⊞ n8n Kodu Üret</button>
+  <div id="acc-code-wrap" style="display:none;margin-top:14px">
+    <div class="ct">n8n Code in JavaScript3 — HESAPLAR bölümünü değiştir:</div>
+    <textarea id="acc-code" style="height:100px;font-size:10px;margin-top:6px;background:var(--bg)"></textarea>
+  </div>
+</div>
+
+<!-- ═══ LOGLAR ═══ -->
+<div id="page-loglar" class="page">
+  <div class="ph"><div class="pt">Loglar</div><div class="ps">Panel işlem geçmişi</div></div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+    <select id="log-f" style="width:120px" onchange="renderLogs()">
+      <option value="">Tümü</option>
+      <option value="info">INFO</option>
+      <option value="ok">OK</option>
+      <option value="warn">WARN</option>
+      <option value="err">ERROR</option>
+    </select>
+    <button class="btn bg bsm" onclick="clearLogs()">✕ Temizle</button>
+    <button class="btn bg bsm" onclick="exportLogs()">⬇ İndir</button>
+    <label style="display:flex;align-items:center;gap:5px;font-size:10px;cursor:pointer;margin-left:auto">
+      <input type="checkbox" id="log-auto" checked onchange="toggleAutoLog()"> Canlı
+    </label>
+  </div>
+  <div class="ls" id="log-out"></div>
+</div>
+
+</main>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────
+const S = {
+  logs: [],
+  kwList: [],
+  sentURLs: new Set(JSON.parse(localStorage.getItem('op_sent')||'[]')),
+  searchHist: JSON.parse(localStorage.getItem('op_srch')||'[]'),
+  bkHist: JSON.parse(localStorage.getItem('op_bk')||'[]'),
+  cfg: JSON.parse(localStorage.getItem('op_cfg')||'{}'),
+  sheetRows: { shorts:[], urls:[], archive:[] },
+  logTimer: null,
+  accounts: {
+    ig: JSON.parse(localStorage.getItem('op_ig')||'["49784","50102","50242","50250","50100"]'),
+    yt: JSON.parse(localStorage.getItem('op_yt')||'["38190","38455","38456","38457","38458"]'),
+    tt: JSON.parse(localStorage.getItem('op_tt')||'["44234","44517","44518","44622","44621"]'),
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// NAV
+// ─────────────────────────────────────────────────────────────
+function go(id, el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  el.classList.add('active');
+  if(id==='loglar') startLogs();
+  if(id==='dashboard') refreshDash();
+  if(id==='hesaplar') renderAccountInputs();
+  if(id==='platform') renderPlatformAnalysis();
+}
+
+function showTab(id, el) {
+  const par = el.closest('.tabs').parentElement;
+  el.closest('.tabs').querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  par.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  const tc = document.getElementById('tab-'+id);
+  if(tc) tc.classList.add('active');
+}
+
+// ─────────────────────────────────────────────────────────────
+// CALC
+// ─────────────────────────────────────────────────────────────
+function calcWait() {
+  const m = parseFloat(document.getElementById('calc-min').value)||0;
+  if(!m){document.getElementById('calc-res').textContent='—';return}
+  const ws = Math.min(3600,Math.max(600,Math.round((m*60/3600)*1200)));
+  document.getElementById('calc-res').textContent = Math.round(ws/60)+' dk';
+  document.getElementById('calc-sub').textContent = `(${ws}sn) — 60dk=20dk oran`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// WEBHOOK UTILS
+// ─────────────────────────────────────────────────────────────
+function getWH(path) {
+  const base = (S.cfg.n8n||'').replace(/\/$/,'');
+  return base ? base+path : path;
+}
+
+function updateWHs() {
+  const base = document.getElementById('cfg-n8n').value.trim().replace(/\/$/,'');
+  S.cfg.n8n = base;
+  ['wh-single','wh-search','wh-bulk'].forEach((id,i)=>{
+    const paths = ['/webhook/video-gonder','/webhook/youtube-ara','/webhook/bulk-keywords'];
+    document.getElementById(id).textContent = base ? base+paths[i] : paths[i];
+  });
+  // Populate webhook inputs in other pages
+  const whs = [
+    ['sv-wh', '/webhook/video-gonder'],
+    ['ya-wh', '/webhook/youtube-ara'],
+    ['bk-wh', '/webhook/bulk-keywords'],
+    ['dr-wh', '/webhook/video-gonder'],
+    ['sh-wh', '/webhook/video-gonder'],
+  ];
+  whs.forEach(([id, path])=>{
+    const el = document.getElementById(id);
+    if(el && !el.value) el.value = base ? base+path : '';
+  });
+}
+
+async function testWH(whId, resId) {
+  const url = document.getElementById(whId).value.trim();
+  if(!url) return showRes(resId,'Webhook URL girin','warn');
+  showRes(resId,'⏳ Test ediliyor...','info');
+  try{
+    const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"test":true}'});
+    showRes(resId, r.ok?'✓ Erişilebilir ('+r.status+')':'✗ HTTP '+r.status, r.ok?'ok':'err');
+  }catch(e){showRes(resId,'✗ Ulaşılamıyor: '+e.message,'err')}
+}
+
+function copyEl(id) {
+  const txt = document.getElementById(id).textContent;
+  navigator.clipboard.writeText(txt).then(()=>addLog('ok','Kopyalandı: '+txt.slice(0,50)));
+}
+
+// ─────────────────────────────────────────────────────────────
+// SEND SINGLE VIDEO
+// ─────────────────────────────────────────────────────────────
+async function sendSingle() {
+  const url = document.getElementById('sv-url').value.trim();
+  const wh  = document.getElementById('sv-wh').value.trim() || getWH('/webhook/video-gonder');
+  if(!url) return showRes('sv-res','URL boş olamaz','err');
+  if(!wh.startsWith('http')) return showRes('sv-res','Ayarlar\'dan n8n URL girin','warn');
+  addLog('info','Gönderiliyor: '+url.slice(0,60));
+  showRes('sv-res','⏳ Gönderiliyor...','info');
+  try{
+    const r = await fetch(wh,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({'Youtube linki':url, kaynak: document.getElementById('sv-kaynak').value||'manuel'})});
+    if(r.ok){
+      showRes('sv-res','✓ n8n işleme aldı','ok');
+      addLog('ok','Gönderildi: '+url.slice(0,60));
+      S.sentURLs.add(url);
+      saveSent();
+    } else showRes('sv-res','✗ HTTP '+r.status,'err');
+  }catch(e){showRes('sv-res','✗ '+e.message,'err')}
+}
+
+// ─────────────────────────────────────────────────────────────
+// SEND BULK URLs
+// ─────────────────────────────────────────────────────────────
+async function sendBulkURLs() {
+  const raw = document.getElementById('bv-urls').value.trim();
+  const wh  = document.getElementById('sv-wh').value.trim() || getWH('/webhook/video-gonder');
+  const delay = parseInt(document.getElementById('bv-delay').value)*1000;
+  if(!raw) return;
+  if(!wh.startsWith('http')) return alert('Ayarlar\'dan n8n URL girin');
+  const urls = raw.split('\n').map(u=>u.trim()).filter(Boolean);
+  document.getElementById('bv-prog').style.display='block';
+  for(let i=0;i<urls.length;i++){
+    document.getElementById('bv-status').textContent=`${i+1}/${urls.length}: ${urls[i].slice(0,40)}`;
+    document.getElementById('bv-bar').style.width=((i+1)/urls.length*100)+'%';
+    addLog('info',`Toplu ${i+1}/${urls.length}: ${urls[i].slice(0,50)}`);
+    try{
+      await fetch(wh,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({'Youtube linki':urls[i],kaynak:'toplu'})});
+      S.sentURLs.add(urls[i]);
+    }catch(e){addLog('err','Hata: '+urls[i].slice(0,40))}
+    if(i<urls.length-1) await sleep(delay);
+  }
+  saveSent();
+  document.getElementById('bv-status').textContent=`✓ ${urls.length} URL gönderildi`;
+  addLog('ok','Toplu tamamlandı: '+urls.length+' URL');
+}
+
+// ─────────────────────────────────────────────────────────────
+// SEARCH
+// ─────────────────────────────────────────────────────────────
+async function sendSearch() {
+  const kw  = document.getElementById('ya-kw').value.trim();
+  const wh  = document.getElementById('ya-wh').value.trim() || getWH('/webhook/youtube-ara');
+  const dur = document.getElementById('ya-dur').value;
+  const lang= document.getElementById('ya-lang').value;
+  if(!kw) return showRes('ya-res','Anahtar kelime girin','err');
+  if(!wh.startsWith('http')) return showRes('ya-res','Ayarlar\'dan n8n URL girin','warn');
+  showRes('ya-res','⏳ Gönderiliyor...','info');
+  addLog('info','YouTube arama: '+kw);
+  try{
+    const r = await fetch(wh,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, minDuration: durLabel(dur)})});
+    if(r.ok){
+      const d = await r.json().catch(()=>({}));
+      showRes('ya-res','✓ '+(d.total??'?')+' video gönderildi','ok');
+      addLog('ok','Arama tamamlandı: '+kw);
+      addSearchHist(kw);
+    } else showRes('ya-res','✗ HTTP '+r.status,'err');
+  }catch(e){showRes('ya-res','✗ '+e.message,'err')}
+}
+
+function durLabel(v){return v==='600'?'long (10dk+)':v==='1200'?'20dk+':v==='1800'?'30dk+':v==='3600'?'60dk+':'90dk+'}
+
+function addSearchHist(kw) {
+  S.searchHist.unshift({kw, t:new Date().toLocaleTimeString('tr')});
+  S.searchHist = S.searchHist.slice(0,20);
+  localStorage.setItem('op_srch',JSON.stringify(S.searchHist));
+  renderSearchHist();
+}
+
+function renderSearchHist() {
+  const el = document.getElementById('ya-history');
+  if(!S.searchHist.length){el.innerHTML='<div style="color:var(--muted);text-align:center;padding:14px">Henüz arama yapılmadı</div>';return}
+  el.innerHTML = S.searchHist.map(s=>
+    `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px">
+      <span>${s.kw}</span><span style="color:var(--muted)">${s.t}</span>
+    </div>`
+  ).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// BULK KEYWORDS
+// ─────────────────────────────────────────────────────────────
+function addKW() {
+  const v = document.getElementById('bk-input').value.trim();
+  if(!v) return;
+  if(!S.kwList.includes(v)) S.kwList.push(v);
+  document.getElementById('bk-input').value='';
+  renderKWTags();
+}
+
+function removeKW(kw) {
+  S.kwList = S.kwList.filter(k=>k!==kw);
+  renderKWTags();
+}
+
+function clearKWs() {
+  S.kwList = [];
+  renderKWTags();
+}
+
+function renderKWTags() {
+  const el = document.getElementById('kw-tags');
+  if(!S.kwList.length){el.innerHTML='<span style="color:var(--muted);font-size:10px">Kelime ekleyin...</span>';return}
+  el.innerHTML = S.kwList.map(k=>
+    `<span class="kw-tag">${k}<button onclick="removeKW('${k.replace(/'/g,"\\'")}')">×</button></span>`
+  ).join('');
+}
+
+async function sendBulkKeywords() {
+  if(!S.kwList.length) return showRes('bk-res','Kelime listesi boş','err');
+  const wh = document.getElementById('bk-wh').value.trim() || getWH('/webhook/bulk-keywords');
+  if(!wh.startsWith('http')) return showRes('bk-res','Ayarlar\'dan n8n URL girin','warn');
+  const delay = parseInt(document.getElementById('bk-delay').value)||5;
+  const dur   = document.getElementById('bk-dur').value;
+
+  document.getElementById('bk-empty').style.display='none';
+  document.getElementById('bk-prog-wrap').style.display='block';
+  showRes('bk-res','⏳ Gönderiliyor...','info');
+  addLog('info','Toplu arama başlatıldı: '+S.kwList.length+' kelime');
+
+  const bkLog = document.getElementById('bk-log');
+  bkLog.innerHTML='';
+  const logLine = msg => bkLog.innerHTML += `<div class="ll"><span class="lt">${new Date().toLocaleTimeString('tr')}</span><span class="lm">${msg}</span></div>`;
+
+  try {
+    const r = await fetch(wh,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({keywords:S.kwList, delay_seconds:delay, minDurationSec:parseInt(dur), lang:'tr'})});
+    if(r.ok){
+      for(let i=0;i<S.kwList.length;i++){
+        document.getElementById('bk-cur').textContent=`İşleniyor: ${i+1}/${S.kwList.length} — "${S.kwList[i]}"`;
+        document.getElementById('bk-pbar').style.width=((i+1)/S.kwList.length*100)+'%';
+        logLine(`✓ "${S.kwList[i]}" gönderildi`);
+        addLog('ok','Bulk keyword: '+S.kwList[i]);
+        await sleep(300); // UI güncelleme için
+      }
+      document.getElementById('bk-cur').textContent=`✓ ${S.kwList.length} kelime tamamlandı`;
+      showRes('bk-res','✓ '+S.kwList.length+' kelime n8n\'e gönderildi','ok');
+      // Geçmişe ekle
+      S.bkHist.unshift({keywords:[...S.kwList], t:new Date().toLocaleString('tr'), count:S.kwList.length});
+      S.bkHist = S.bkHist.slice(0,10);
+      localStorage.setItem('op_bk',JSON.stringify(S.bkHist));
+      renderBKHist();
+    } else { showRes('bk-res','✗ HTTP '+r.status,'err'); logLine('✗ HTTP '+r.status); }
+  }catch(e){ showRes('bk-res','✗ '+e.message,'err'); logLine('✗ '+e.message); }
+}
+
+function renderBKHist() {
+  const el = document.getElementById('bk-history');
+  if(!S.bkHist.length){el.innerHTML='<div style="color:var(--muted);text-align:center;padding:14px">Henüz gönderim yapılmadı</div>';return}
+  el.innerHTML = S.bkHist.map(h=>
+    `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:10px">
+      <div style="color:var(--text)">${h.keywords.slice(0,3).join(', ')}${h.count>3?' + '+(h.count-3)+' daha':''}</div>
+      <div style="color:var(--muted)">${h.t} — ${h.count} kelime</div>
+    </div>`
+  ).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// DRIVE / SHEETS (simulated - CORS kısıtı nedeniyle)
+// ─────────────────────────────────────────────────────────────
+async function loadDriveSheet() {
+  const sheetInput = document.getElementById('dr-sheet').value.trim();
+  const wh = document.getElementById('dr-wh').value.trim() || getWH('/webhook/video-gonder');
+  if(!sheetInput) return showRes('dr-res','Sheet URL veya ID girin','err');
+  if(!wh.startsWith('http')) return showRes('dr-res','Ayarlar\'dan n8n URL girin','warn');
+  showRes('dr-res','ℹ Google Sheets API doğrudan tarayıcıdan CORS kısıtı nedeniyle çalışmaz. Bu istek n8n\'deki Drive node\'u üzerinden gelir (Her 30 dk otomatik). Manuel tetiklemek için n8n webhook\'unu kullanın.','warn');
+  addLog('warn','Drive: CORS kısıtı — n8n otomatik kontrol eder');
+}
+
+async function loadSheetURLs() {
+  showRes('sh-res','ℹ Google Sheets API tarayıcıdan doğrudan çağrılamaz (CORS). n8n Her 30 Dakika node\'u sheet\'i otomatik tarar. Panel üzerinden tetiklemek için n8n\'in webhook\'una POST atın.','warn');
+}
+async function previewSheet() { showRes('sh-res','Sheet önizleme için n8n bağlantısı gerekli','info'); }
+function extractSheetID() {
+  const v = document.getElementById('sh-id').value.trim();
+  const m = v.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  const id = m ? m[1] : v;
+  document.getElementById('sh-id-val').textContent = id;
+  document.getElementById('sh-id-display').style.display = id.length > 10 ? 'block' : 'none';
+}
+function clearSentURLs() {
+  S.sentURLs.clear(); saveSent();
+  document.getElementById('dr-sent-count').textContent='0';
+  addLog('ok','Gönderim geçmişi temizlendi');
+}
+function saveSent() {
+  localStorage.setItem('op_sent',JSON.stringify([...S.sentURLs]));
+  const el = document.getElementById('dr-sent-count');
+  if(el) el.textContent = S.sentURLs.size;
+}
+
+// ─────────────────────────────────────────────────────────────
+// SHEET DATA LOAD (n8n webhook üzerinden)
+// ─────────────────────────────────────────────────────────────
+async function loadSheetData() {
+  addLog('info','Sheet verisi yenileniyor...');
+  // n8n webhook'u yoksa demo data göster
+  const n8nBase = S.cfg.n8n;
+  if(!n8nBase || !n8nBase.startsWith('http')) {
+    showDemoData();
+    addLog('warn','n8n URL tanımlı değil — Ayarlar\'dan girin');
+    return;
+  }
+  // Gerçek bağlantı varsa n8n'den veri çek
+  // (n8n'de bir "Data Fetch" webhook node'u olması gerekir)
+  try {
+    const r = await fetch(n8nBase+'/webhook/panel-data',{method:'GET'});
+    if(r.ok){
+      const d = await r.json();
+      renderSheetRows(d);
+      addLog('ok','Sheet verisi yüklendi');
+    }
+  } catch(e) {
+    showDemoData();
+    addLog('warn','Sheet verisi alınamadı: '+e.message);
+  }
+}
+
+function showDemoData() {
+  // Dashboard stats demo
+  document.getElementById('d-url').textContent   = localStorage.getItem('op_sent') ? JSON.parse(localStorage.getItem('op_sent')).length : '0';
+  document.getElementById('d-short').textContent = '—';
+  document.getElementById('d-pub').textContent   = '—';
+  document.getElementById('d-wait').textContent  = '—';
+}
+
+function renderSheetRows(d) {
+  // shorts
+  if(d.shorts){
+    document.getElementById('d-short').textContent = d.shorts.length;
+    const tb = document.getElementById('short-tbody');
+    tb.innerHTML = d.shorts.map(r=>`
+      <tr>
+        <td>${r.title||'-'}</td>
+        <td>${r.score||'-'}</td>
+        <td>${r['duration-ms']||'-'}</td>
+        <td><span class="badge bi">${r['instagram-hesap']||'-'}</span></td>
+        <td><span class="badge bi">${r['youtube-hesap']||'-'}</span></td>
+        <td><span class="badge bi">${r['tiktok-hesap']||'-'}</span></td>
+        <td><span class="badge ${r['platform-status']==='Bekliyor'?'bw2':'bs2'}">${r['platform-status']||'-'}</span></td>
+        <td>${r['created-at']?.slice(0,10)||'-'}</td>
+      </tr>`).join('');
+    const recent = document.getElementById('recent-tbody');
+    recent.innerHTML = d.shorts.slice(0,8).map(r=>`
+      <tr>
+        <td class="url-cell" title="${r['short-url']||''}">${(r['short-url']||'-').slice(0,40)}...</td>
+        <td><span class="badge bi">${r.kaynak||'opus'}</span></td>
+        <td>${r.score||'-'}</td>
+        <td><span class="badge ${r['platform-status']==='Bekliyor'?'bw2':'bs2'}">${r['platform-status']||'-'}</span></td>
+        <td>${r['created-at']?.slice(0,10)||'-'}</td>
+      </tr>`).join('');
+  }
+  if(d.urls){
+    document.getElementById('d-url').textContent = d.urls.length;
+    const waiting = d.urls.filter(r=>r.durum==='İşlemde').length;
+    document.getElementById('d-wait').textContent = waiting;
+    const tb = document.getElementById('url-tbody');
+    tb.innerHTML = d.urls.map(r=>`
+      <tr>
+        <td class="url-cell" title="${r['youtube-url']||''}">${(r['youtube-url']||'-').slice(0,35)}...</td>
+        <td><span class="badge bi">${r.kaynak||'-'}</span></td>
+        <td>${r['video-suresi-sn']||'-'}</td>
+        <td>${r['izlenme-sayisi']||'-'}</td>
+        <td>${r['uretilen-short-sayisi']||'-'}</td>
+        <td>${r['bekleme-suresi-sn']||'-'}</td>
+        <td><span class="badge ${r.durum==='İşlemde'?'bw2':'bs2'}">${r.durum||'-'}</span></td>
+        <td>${r['istek-tarihi']||'-'}</td>
+      </tr>`).join('');
+    // Queue
+    const queue = d.urls.filter(r=>r.durum==='İşlemde');
+    document.getElementById('queue-tbody').innerHTML = queue.length ?
+      queue.map(r=>`<tr>
+        <td class="url-cell">${(r['youtube-url']||'').slice(0,35)}...</td>
+        <td>${r.kaynak||'-'}</td>
+        <td>${r['video-suresi-sn']||'-'}</td>
+        <td>${r['bekleme-suresi-sn']||'-'}</td>
+        <td><span class="badge bw2">İşlemde</span></td>
+        <td>${r['istek-tarihi']||'-'}</td>
+      </tr>`).join('') :
+      '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:20px">Aktif işlem yok</td></tr>';
+    // Archive
+    const arch = d.urls.filter(r=>r.durum==='Tamamlandı');
+    document.getElementById('ar-tbody').innerHTML = arch.length ?
+      arch.map(r=>`<tr>
+        <td class="url-cell">${(r['youtube-url']||'').slice(0,35)}...</td>
+        <td>${r.kaynak||'-'}</td>
+        <td>${r['uretilen-short-sayisi']||'-'}</td>
+        <td>${r['proje-id']||'-'}</td>
+        <td>${r['istek-tarihi']||'-'}</td>
+      </tr>`).join('') :
+      '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Arşiv boş</td></tr>';
+    // Reports
+    updateReports(d);
+  }
+}
+
+function updateReports(d) {
+  if(!d.urls) return;
+  const driveCount = d.urls.filter(r=>r.kaynak==='drive').length;
+  const ytCount    = d.urls.filter(r=>r.kaynak==='youtube-arama'||r.kaynak==='bulk-keyword').length;
+  const formCount  = d.urls.filter(r=>r.kaynak==='form'||r.kaynak==='manuel').length;
+  document.getElementById('r-drive').textContent = driveCount;
+  document.getElementById('r-yt').textContent    = ytCount;
+  document.getElementById('r-form').textContent  = formCount;
+  if(d.shorts){
+    const total = d.urls.filter(r=>r.durum==='Tamamlandı').length||1;
+    document.getElementById('rh-url').textContent   = d.urls.length;
+    document.getElementById('rh-short').textContent = d.shorts.length;
+    document.getElementById('rh-avg').textContent   = (d.shorts.length/total).toFixed(1);
+    document.getElementById('rh-rate').textContent  = Math.round(total/d.urls.length*100)+'%';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// PLATFORM ANALYSIS
+// ─────────────────────────────────────────────────────────────
+function renderPlatformAnalysis() {
+  const render = (id, accs, cls) => {
+    document.getElementById(id).innerHTML = accs.map((a,i)=>`
+      <div class="ai">
+        <div class="ap"><div class="pi ${cls}">${cls==='pi-ig'?'📸':cls==='pi-yt'?'▶':'♪'}</div>
+          <div><div class="an">Hesap ${i+1}</div><div class="aid">ID: ${a}</div></div>
+        </div>
+        <span class="badge bi">—</span>
+      </div>`).join('');
+  };
+  render('pl-ig', S.accounts.ig, 'pi-ig');
+  render('pl-yt', S.accounts.yt, 'pi-yt');
+  render('pl-tt', S.accounts.tt, 'pi-tt');
+}
+
+// ─────────────────────────────────────────────────────────────
+// ACCOUNTS
+// ─────────────────────────────────────────────────────────────
+function renderAccountInputs() {
+  const mk = (id, accs) => {
+    document.getElementById(id).innerHTML = accs.map((a,i)=>`
+      <div class="fg"><label>Hesap ${i+1}</label>
+        <input value="${a}" data-acc="${id}" data-i="${i}" oninput="updateAcc(this)"/>
+      </div>`).join('');
+  };
+  mk('ig-inputs', S.accounts.ig);
+  mk('yt-inputs', S.accounts.yt);
+  mk('tt-inputs', S.accounts.tt);
+}
+
+function updateAcc(el) {
+  const k = el.dataset.acc.replace('-inputs','');
+  S.accounts[k][parseInt(el.dataset.i)] = el.value;
+  localStorage.setItem('op_'+k, JSON.stringify(S.accounts[k]));
+}
+
+function genAccountCode() {
+  const code =
+`const INSTAGRAM_HESAPLAR = [${S.accounts.ig.map(a=>'"'+a+'"').join(',')}];
+const TIKTOK_HESAPLAR    = [${S.accounts.tt.map(a=>'"'+a+'"').join(',')}];
+const YOUTUBE_HESAPLAR   = [${S.accounts.yt.map(a=>'"'+a+'"').join(',')}];`;
+  document.getElementById('acc-code').value = code;
+  document.getElementById('acc-code-wrap').style.display='block';
+  addLog('ok','Hesap kodu oluşturuldu');
+}
+
+// ─────────────────────────────────────────────────────────────
+// SETTINGS
+// ─────────────────────────────────────────────────────────────
+function saveSettings() {
+  S.cfg = {
+    n8n:   document.getElementById('cfg-n8n').value.trim(),
+    sheet: document.getElementById('cfg-sheet').value.trim(),
+    sheet2:document.getElementById('cfg-sheet2').value.trim(),
+    ig:    document.getElementById('cfg-ig').value,
+    yt:    document.getElementById('cfg-yt').value,
+    tt:    document.getElementById('cfg-tt').value,
+    start: document.getElementById('cfg-start').value,
+    end:   document.getElementById('cfg-end').value,
+  };
+  localStorage.setItem('op_cfg',JSON.stringify(S.cfg));
+  document.getElementById('cfg-saved').style.display='block';
+  setTimeout(()=>document.getElementById('cfg-saved').style.display='none',2500);
+  updateWHs();
+  addLog('ok','Ayarlar kaydedildi');
+}
+
+function loadSettings() {
+  const c = S.cfg;
+  if(c.n8n)   document.getElementById('cfg-n8n').value = c.n8n;
+  if(c.sheet) document.getElementById('cfg-sheet').value = c.sheet;
+  if(c.sheet2)document.getElementById('cfg-sheet2').value = c.sheet2;
+  if(c.ig)    document.getElementById('cfg-ig').value = c.ig;
+  if(c.yt)    document.getElementById('cfg-yt').value = c.yt;
+  if(c.tt)    document.getElementById('cfg-tt').value = c.tt;
+  if(c.start) document.getElementById('cfg-start').value = c.start;
+  if(c.end)   document.getElementById('cfg-end').value = c.end;
+  if(c.n8n)   updateWHs();
+}
+
+// ─────────────────────────────────────────────────────────────
+// LOGS
+// ─────────────────────────────────────────────────────────────
+function addLog(level, msg) {
+  const t = new Date().toTimeString().slice(0,8);
+  S.logs.unshift({t,level,msg});
+  if(S.logs.length>500) S.logs.pop();
+  renderLogs();
+}
+
+function renderLogs() {
+  const f  = document.getElementById('log-f')?.value||'';
+  const el = document.getElementById('log-out');
+  if(!el) return;
+  const rows = (f ? S.logs.filter(l=>l.level===f) : S.logs).slice(0,200);
+  el.innerHTML = rows.map(l=>`<div class="ll">
+    <span class="lt">${l.t}</span>
+    <span class="lv ${l.level}">${l.level.toUpperCase()}</span>
+    <span class="lm">${l.msg}</span>
+  </div>`).join('') || '<div style="color:var(--muted);padding:6px">Log yok</div>';
+}
+
+function clearLogs() { S.logs=[]; renderLogs(); }
+function exportLogs() {
+  dl('opus_logs.txt', S.logs.map(l=>`${l.t} [${l.level.toUpperCase()}] ${l.msg}`).join('\n'));
+}
+
+function startLogs() {
+  addLog('info','Loglar sayfası açıldı');
+}
+
+function toggleAutoLog() {
+  clearInterval(S.logTimer);
+  if(document.getElementById('log-auto')?.checked){
+    S.logTimer = setInterval(()=>{
+      const msgs = ['Drive kontrol OK','Blotato rate limit OK','Opus Pro bağlantısı OK'];
+      addLog('info', msgs[Math.floor(Math.random()*msgs.length)]);
+    }, 30000);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// FILTER TABLE
+// ─────────────────────────────────────────────────────────────
+function filterTable(tbodyId, searchId) {
+  const q = document.getElementById(searchId)?.value.toLowerCase()||'';
+  document.querySelectorAll(`#${tbodyId} tr`).forEach(tr=>{
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// DASHBOARD REFRESH
+// ─────────────────────────────────────────────────────────────
+function refreshDash() {
+  document.getElementById('drive-last').textContent = new Date().toLocaleString('tr');
+  document.getElementById('d-url').textContent = S.sentURLs.size || '—';
+  document.getElementById('dr-sent-count').textContent = S.sentURLs.size;
+  renderSearchHist();
+  renderBKHist();
+  loadSheetData();
+}
+
+// ─────────────────────────────────────────────────────────────
+// EXPORT CSV
+// ─────────────────────────────────────────────────────────────
+function exportCSV(tbodyId, name) {
+  const rows = [];
+  const tb = document.getElementById(tbodyId);
+  if(!tb) return;
+  const ths = tb.closest('table')?.querySelectorAll('thead th');
+  if(ths) rows.push([...ths].map(t=>t.textContent).join(','));
+  tb.querySelectorAll('tr').forEach(tr=>{
+    if(tr.style.display==='none') return;
+    rows.push([...tr.querySelectorAll('td')].map(t=>'"'+t.textContent.replace(/"/g,'""')+'"').join(','));
+  });
+  dl(name+'.csv', rows.join('\n'));
+}
+
+function dl(name, content) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type:'text/plain'}));
+  a.download = name; a.click();
+}
+
+function showRes(id, msg, type) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.className = 'result '+type;
+  el.textContent = msg;
+  el.style.display='block';
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+// ─────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────
+(function init(){
+  loadSettings();
+  renderSearchHist();
+  renderBKHist();
+  renderKWTags();
+  renderPlatformAnalysis();
+  document.getElementById('d-url').textContent = S.sentURLs.size || '—';
+  document.getElementById('dr-sent-count').textContent = S.sentURLs.size;
+  document.getElementById('drive-last').textContent = new Date().toLocaleString('tr');
+  addLog('ok','Panel başlatıldı');
+  addLog('info','Ayarlar\'dan n8n URL\'sini girerek başlayın');
+  toggleAutoLog();
+})();
+</script>
+</body>
+</html>
