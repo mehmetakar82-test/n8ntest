@@ -868,7 +868,7 @@ async function testWH(whId, resId) {
   if(!url) return showRes(resId,'Webhook URL girin','warn');
   showRes(resId,'⏳ Test ediliyor...','info');
   try{
-    const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"test":true}'});
+    const r = await fetch(url, {method:'POST', mode:'cors',headers:{'Content-Type':'application/json'},body:'{"test":true}'});
     showRes(resId, r.ok?'✓ Erişilebilir ('+r.status+')':'✗ HTTP '+r.status, r.ok?'ok':'err');
   }catch(e){showRes(resId,'✗ Ulaşılamıyor: '+e.message,'err')}
 }
@@ -889,7 +889,7 @@ async function sendSingle() {
   addLog('info','Gönderiliyor: '+url.slice(0,60));
   showRes('sv-res','⏳ Gönderiliyor...','info');
   try{
-    const r = await fetch(wh,{method:'POST',headers:{'Content-Type':'application/json'},
+    const r = await fetch(wh,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({'Youtube linki':url, kaynak: document.getElementById('sv-kaynak').value||'manuel'})});
     if(r.ok){
       showRes('sv-res','✓ n8n işleme aldı','ok');
@@ -916,7 +916,7 @@ async function sendBulkURLs() {
     document.getElementById('bv-bar').style.width=((i+1)/urls.length*100)+'%';
     addLog('info',`Toplu ${i+1}/${urls.length}: ${urls[i].slice(0,50)}`);
     try{
-      await fetch(wh,{method:'POST',headers:{'Content-Type':'application/json'},
+      await fetch(wh, {method:'POST', mode:'cors',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({'Youtube linki':urls[i],kaynak:'toplu'})});
       S.sentURLs.add(urls[i]);
     }catch(e){addLog('err','Hata: '+urls[i].slice(0,40))}
@@ -940,7 +940,7 @@ async function sendSearch() {
   showRes('ya-res','⏳ Gönderiliyor...','info');
   addLog('info','YouTube arama: '+kw);
   try{
-    const r = await fetch(wh,{method:'POST',headers:{'Content-Type':'application/json'},
+    const r = await fetch(wh,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, minDuration: durLabel(dur)})});
     if(r.ok){
       const d = await r.json().catch(()=>({}));
@@ -1016,7 +1016,7 @@ async function sendBulkKeywords() {
   const logLine = msg => bkLog.innerHTML += `<div class="ll"><span class="lt">${new Date().toLocaleTimeString('tr')}</span><span class="lm">${msg}</span></div>`;
 
   try {
-    const r = await fetch(wh,{method:'POST',headers:{'Content-Type':'application/json'},
+    const r = await fetch(wh,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({keywords:S.kwList, delay_seconds:delay, minDurationSec:parseInt(dur), lang:'tr'})});
     if(r.ok){
       for(let i=0;i<S.kwList.length;i++){
