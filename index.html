@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v3.1</title>
+<title>OPUS PRO v3.2</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -724,1161 +724,798 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // STATE
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 const S = {
-  cfg: JSON.parse(localStorage.getItem('op_cfg') || '{}'),
+  cfg: JSON.parse(localStorage.getItem('op_cfg')||'{}'),
   accounts: {
-    ig: JSON.parse(localStorage.getItem('op_ig') || '["50613","50102","50242","50250","50100"]'),
-    yt: JSON.parse(localStorage.getItem('op_yt') || '["38190","38455","38456","38457","38458"]'),
-    tt: JSON.parse(localStorage.getItem('op_tt') || '["44234","44517","44518","44622","44621"]'),
+    ig: JSON.parse(localStorage.getItem('op_ig')||'["50613","50102","50242","50250","50100"]'),
+    yt: JSON.parse(localStorage.getItem('op_yt')||'["38190","38455","38456","38457","38458"]'),
+    tt: JSON.parse(localStorage.getItem('op_tt')||'["44234","44517","44518","44622","44621"]'),
   },
-  cats: JSON.parse(localStorage.getItem('op_cats') || '{}'),
-  limits: JSON.parse(localStorage.getItem('op_lim') || '{"ig":10,"yt":10,"tt":10,"start":"08:00","end":"22:00"}'),
-  logs: JSON.parse(localStorage.getItem('op_logs') || '[]'),
-  kwList: [],
-  sentURLs: new Set(JSON.parse(localStorage.getItem('op_sent') || '[]')),
-  driveURLs: [],
-  sheetURLs: [],
-  sheetData: { shorts: [], urls: [] },
-  blotatoAccounts: null,
-  logTimer: null,
-  searchHist: JSON.parse(localStorage.getItem('op_srch') || '[]'),
-  bkHist: JSON.parse(localStorage.getItem('op_bkh') || '[]'),
+  cats:       JSON.parse(localStorage.getItem('op_cats')||'{}'),
+  limits:     JSON.parse(localStorage.getItem('op_lim')||'{"ig":10,"yt":10,"tt":10,"start":"08:00","end":"22:00"}'),
+  logs:       JSON.parse(localStorage.getItem('op_logs')||'[]'),
+  kwList:     [],
+  sentURLs:   new Set(JSON.parse(localStorage.getItem('op_sent')||'[]')),
+  driveURLs:  [],
+  sheetURLs:  [],
+  sheetData:  {shorts:[],urls:[]},
+  _panelCache:null,
+  logTimer:   null,
+  searchHist: JSON.parse(localStorage.getItem('op_srch')||'[]'),
+  bkHist:     JSON.parse(localStorage.getItem('op_bkh')||'[]'),
 };
 
 const DEFAULT_CATS = {
-  oyun:    { label: 'Oyun 🎮',             sel_ig: [], sel_yt: [], sel_tt: [] },
-  eglence: { label: 'Eğlence 🎉',          sel_ig: [], sel_yt: [], sel_tt: [] },
-  bilim:   { label: 'Bilim 🔬',            sel_ig: [], sel_yt: [], sel_tt: [] },
-  vlog:    { label: 'Vlog 📹',             sel_ig: [], sel_yt: [], sel_tt: [] },
-  komedi:  { label: 'Komedi 😂',           sel_ig: [], sel_yt: [], sel_tt: [] },
-  film:    { label: 'Film & Animasyon 🎬', sel_ig: [], sel_yt: [], sel_tt: [] },
-  spor:    { label: 'Spor ⚽',             sel_ig: [], sel_yt: [], sel_tt: [] },
-  muzik:   { label: 'Müzik 🎵',           sel_ig: [], sel_yt: [], sel_tt: [] },
+  oyun:    {label:'Oyun 🎮',            sel_ig:[],sel_yt:[],sel_tt:[]},
+  eglence: {label:'Eglence 🎉',         sel_ig:[],sel_yt:[],sel_tt:[]},
+  bilim:   {label:'Bilim 🔬',           sel_ig:[],sel_yt:[],sel_tt:[]},
+  vlog:    {label:'Vlog 📹',            sel_ig:[],sel_yt:[],sel_tt:[]},
+  komedi:  {label:'Komedi 😂',          sel_ig:[],sel_yt:[],sel_tt:[]},
+  film:    {label:'Film & Animasyon 🎬',sel_ig:[],sel_yt:[],sel_tt:[]},
+  spor:    {label:'Spor ⚽',            sel_ig:[],sel_yt:[],sel_tt:[]},
+  muzik:   {label:'Muzik 🎵',           sel_ig:[],sel_yt:[],sel_tt:[]},
 };
+function getCats(){ return Object.keys(S.cats).length ? S.cats : DEFAULT_CATS; }
 
-function getCats() {
-  return Object.keys(S.cats).length ? S.cats : DEFAULT_CATS;
-}
-
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // NAV
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function go(id, el) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
-  document.getElementById('page-' + id).classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
+  const page = document.getElementById('page-'+id);
+  if (!page) { console.error('Page not found: page-'+id); return; }
+  page.classList.add('active');
   el.classList.add('active');
-  const handlers = {
-    dashboard:  refreshDash,
-    loglar:     () => renderLogs(),
-    hesaplar:   renderAccInputs,
-    platformlar:loadPlatforms,
-    kategoriler:renderCatGrid,
-    kuyruk:     () => loadAllSheetData('kuyruk'),
-    shortlist:  () => loadAllSheetData('shortlist'),
-    urltakip:   () => loadAllSheetData('urltakip'),
-    arsiv:      () => loadAllSheetData('arsiv'),
+  const h = {
+    dashboard: refreshDash, loglar: renderLogs, hesaplar: renderAccInputs,
+    platformlar: loadPlatforms, kategoriler: renderCatGrid,
+    kuyruk:     ()=>loadSheetPage('kuyruk'),
+    shortlist:  ()=>loadSheetPage('shortlist'),
+    urltakip:   ()=>loadSheetPage('urltakip'),
+    arsiv:      ()=>loadSheetPage('arsiv'),
     raporlar:   loadReports,
   };
-  if (handlers[id]) handlers[id]();
+  if (h[id]) try { h[id](); } catch(e) { console.error(id, e); }
 }
 
 function showTab(id, el) {
-  el.closest('.tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  const p = el.closest('.page');
+  el.closest('.tabs').querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  el.closest('.page').querySelectorAll('.tc').forEach(c => c.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
+  p.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
+  const tc = document.getElementById('tab-'+id);
+  if (tc) tc.classList.add('active');
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // API HELPERS
-// ═══════════════════════════════════════════════════════════════
-function getN8N() { return (S.cfg.n8n || '').replace(/\/$/, ''); }
-function getWH(path) { const b = getN8N(); return b ? b + path : path; }
+// ═══════════════════════════════════════════════════════════
+function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
+function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
-// Fire-and-forget — 524 sorununu çözer
 async function faf(url, body) {
-  return new Promise(resolve => {
-    const tid = setTimeout(() => resolve({ ok: true, timeout: true }), 5000);
-    fetch(url, {
-      method: 'POST', mode: 'cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }).then(r => { clearTimeout(tid); resolve(r); })
-      .catch(() => { clearTimeout(tid); resolve({ ok: true, timeout: true }); });
+  return new Promise(resolve=>{
+    const tid = setTimeout(()=>resolve({ok:true,timeout:true}),5000);
+    fetch(url,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(r=>{clearTimeout(tid);resolve(r);})
+      .catch(()=>{clearTimeout(tid);resolve({ok:true,timeout:true});});
   });
 }
 
-// Google Sheets API — önce n8n proxy, yoksa doğrudan
-async function sheetsGet(sheetId, range) {
-  // Önce n8n panel-data cache'ini dene
-  if (S._panelCache) {
-    const rangeUpper = range.toLowerCase();
-    if (rangeUpper.includes('url-takip')) return objToValues(S._panelCache.urls);
-    if (rangeUpper.includes('sheet1'))   return objToValues(S._panelCache.shorts);
-    return null;
-  }
-  // Doğrudan Sheets API
-  const key = S.cfg.shkey;
-  if (!key || !sheetId) return null;
+async function n8nGet(path) {
+  const base = getN8N();
+  if (!base) return null;
   try {
-    const r = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${key}`
-    );
-    if (r.status === 403) {
-      addLog('err','sheets','HTTP 403: Tabloyu "Herkes görüntüleyebilir" yapın veya API Key kısıtını kaldırın');
-      showSheetsHint();
+    const r = await fetch(base+path,{method:'GET',mode:'cors'});
+    if (!r.ok) { addLog('warn','webhook','GET '+path+': HTTP '+r.status); return null; }
+    return await r.json();
+  } catch(e) { addLog('warn','webhook','GET '+path+': '+e.message); return null; }
+}
+
+async function sheetsGet(sheetId, range) {
+  if (S._panelCache) {
+    const rl = range.toLowerCase();
+    if (rl.includes('url-takip')) return arrToValues(S._panelCache.urls||[]);
+    return arrToValues(S._panelCache.shorts||[]);
+  }
+  const key = S.cfg.shkey;
+  if (!key||!sheetId) return null;
+  try {
+    const r = await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'/values/'+encodeURIComponent(range)+'?key='+key);
+    if (r.status===403) {
+      addLog('err','sheets','HTTP 403 — Tabloyu herkese ac veya n8n URL gir');
+      const h = document.getElementById('sheets-hint');
+      if (h) h.style.display='block';
       return null;
     }
-    if (!r.ok) { addLog('err','sheets','Sheets API: HTTP ' + r.status); return null; }
+    if (!r.ok) { addLog('err','sheets','Sheets HTTP '+r.status); return null; }
     const d = await r.json();
-    return d.values || [];
-  } catch(e) { addLog('err','sheets','Sheets API: ' + e.message); return null; }
+    return d.values||[];
+  } catch(e) { addLog('err','sheets',e.message); return null; }
 }
 
-function objToValues(arr) {
-  if (!arr || !arr.length) return null;
-  const headers = Object.keys(arr[0]);
-  return [headers, ...arr.map(row => headers.map(h => row[h] || ''))];
-}
-
-function showSheetsHint() {
-  const hint = document.getElementById('sheets-hint');
-  if (hint) hint.style.display = 'block';
+function arrToValues(arr) {
+  if (!arr||!arr.length) return null;
+  const h = Object.keys(arr[0]);
+  return [h, ...arr.map(row=>h.map(k=>row[k]||''))];
 }
 
 function parseSheet(values) {
-  if (!values || values.length < 2) return [];
+  if (!values||values.length<2) return [];
   const h = values[0];
-  return values.slice(1).map(row => {
-    const o = {};
-    h.forEach((k, i) => o[k] = row[i] || '');
-    return o;
-  });
+  return values.slice(1).map(row=>{const o={};h.forEach((k,i)=>o[k]=row[i]||'');return o;});
 }
 
-// Blotato API — n8n proxy üzerinden
-async function blotatoGet(path) {
-  const n8n = getN8N();
-  if (!n8n) { addLog('warn','blotato','n8n URL girilmemiş'); return null; }
-  try {
-    // Blotato accounts için özel endpoint
-    const proxyPath = path.includes('accounts') ? '/webhook/blotato-accounts' : '/webhook/panel-data';
-    const r = await fetch(n8n + proxyPath, { method: 'GET', mode: 'cors' });
-    if (!r.ok) { addLog('warn','blotato','Blotato proxy: HTTP ' + r.status); return null; }
-    return await r.json();
-  } catch(e) { addLog('warn','blotato','Blotato proxy: ' + e.message); return null; }
-}
-
-async function testWH(whId, resId) {
-  const url = document.getElementById(whId)?.textContent?.trim() || getWH('/webhook/video-gonder');
-  if (!url.startsWith('http')) return showRes(resId, 'n8n URL Ayarlar\'dan girin', 'warn');
-  showRes(resId, '⏳ Test...', 'info');
-  const r = await faf(url, { test: true });
-  showRes(resId, r.timeout ? '✓ Webhook aktif (yanıt bekleniyor)' : '✓ HTTP ' + (r.status||'?'), 'ok');
-}
-
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // DASHBOARD
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 async function refreshDash() {
-  document.getElementById('dash-last').textContent = 'Güncelleniyor...';
+  const lastEl = document.getElementById('dash-last');
+  if (lastEl) lastEl.textContent = 'Guncelleniyor...';
   addLog('info','sistem','Dashboard yenileniyor');
 
-  const n8n  = getN8N();
-  let shorts = [], urls = [], sched = [], accounts = {};
-
-  if (n8n) {
-    // n8n panel-data proxy kullan
-    try {
-      addLog('info','webhook','Panel data çekiliyor: ' + n8n + '/webhook/panel-data');
-      const r = await fetch(n8n + '/webhook/panel-data', { method: 'GET', mode: 'cors' });
-      if (r.ok) {
-        const d   = await r.json();
-        shorts    = d.shorts   || [];
-        urls      = d.urls     || [];
-        sched     = d.scheduled|| [];
-        accounts  = d.accounts || {};
-        S._panelCache = d;
-        addLog('ok','webhook',`Panel data alındı: ${shorts.length} short, ${urls.length} URL`);
-      } else {
-        addLog('warn','webhook','Panel data: HTTP ' + r.status + ' — Sheets API'ye geçiliyor');
-        await loadFromSheetsDirectly();
-        return;
-      }
-    } catch(e) {
-      addLog('warn','webhook','Panel data proxy hatası: ' + e.message + ' — Sheets API'ye geçiliyor');
-      await loadFromSheetsDirectly();
-      return;
-    }
-  } else {
-    await loadFromSheetsDirectly();
-    return;
-  }
-
-  S.sheetData = { shorts, urls };
-  updateDashUI(shorts, urls, sched);
-}
-
-async function loadFromSheetsDirectly() {
-  addLog('info','sheets','Sheets API üzerinden çekiliyor...');
-  const sid  = S.cfg.sheet  || '';
-  const sid2 = S.cfg.sheet2 || sid;
-  const [sv, uv] = await Promise.all([
-    sheetsGet(sid,  'Sheet1!A:Z'),
-    sheetsGet(sid2, 'URL-Takip!A:Z'),
-  ]);
-  const shorts = parseSheet(sv);
-  const urls   = parseSheet(uv);
-  S.sheetData  = { shorts, urls };
-  updateDashUI(shorts, urls, [], {});
-}
-
-async function refreshDash_inner() {
-  document.getElementById('dash-last').textContent = 'Güncelleniyor...';
-  addLog('info','sistem','Dashboard yenileniyor');
-  await refreshDash();
-}
-
-async function refreshDash() {
-  document.getElementById('dash-last').textContent = 'Güncelleniyor...';
-  addLog('info','sistem','Dashboard yenileniyor');
+  let shorts=[], urls=[], sched=[];
   const n8n = getN8N();
-  let shorts = [], urls = [], sched = [];
 
   if (n8n) {
-    try {
-      const r = await fetch(n8n + '/webhook/panel-data', { method: 'GET', mode: 'cors' });
-      if (r.ok) {
-        const d = await r.json();
-        shorts = d.shorts || []; urls = d.urls || []; sched = d.scheduled || [];
-        S._panelCache = d;
-        addLog('ok','webhook',`Panel data: ${shorts.length} short, ${urls.length} URL`);
-      } else {
-        addLog('warn','webhook','n8n panel-data: HTTP ' + r.status);
-        const sid = S.cfg.sheet || '';
-        const [sv, uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'), sheetsGet(sid,'URL-Takip!A:Z')]);
-        shorts = parseSheet(sv); urls = parseSheet(uv);
-      }
-    } catch(e) {
-      addLog('warn','webhook', e.message);
-      const sid = S.cfg.sheet || '';
-      const [sv, uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'), sheetsGet(sid,'URL-Takip!A:Z')]);
+    const d = await n8nGet('/webhook/panel-data');
+    if (d) {
+      shorts = d.shorts||[]; urls = d.urls||[]; sched = d.scheduled||[];
+      S._panelCache = d;
+      addLog('ok','webhook','Panel data: '+shorts.length+' short, '+urls.length+' URL');
+    } else {
+      const sid = S.cfg.sheet||'';
+      const [sv,uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid,'URL-Takip!A:Z')]);
       shorts = parseSheet(sv); urls = parseSheet(uv);
     }
   } else {
-    const sid = S.cfg.sheet || '';
-    const [sv, uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'), sheetsGet(sid,'URL-Takip!A:Z')]);
+    const sid = S.cfg.sheet||'';
+    const [sv,uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid,'URL-Takip!A:Z')]);
     shorts = parseSheet(sv); urls = parseSheet(uv);
   }
 
-  S.sheetData = { shorts, urls };
+  S.sheetData = {shorts, urls};
 
-  // Stats
-  document.getElementById('d-url').textContent   = urls.length   || S.sentURLs.size || '—';
-  document.getElementById('d-short').textContent = shorts.length || '—';
-  document.getElementById('d-proc').textContent  = urls.filter(r => r['durum'] === 'İşlemde').length || '—';
+  setEl('d-url',   urls.length || S.sentURLs.size || '—');
+  setEl('d-short', shorts.length || '—');
+  setEl('d-proc',  urls.filter(r=>r['durum']==='Islemde').length || '—');
+  setEl('d-sched', Array.isArray(sched) ? sched.length : '—');
 
-  const schedPosts = sched;
-  document.getElementById('d-sched').textContent = Array.isArray(schedPosts) ? schedPosts.length : '—';
+  const igC = shorts.filter(r=>r['instagram-hesap']).length;
+  const ytC = shorts.filter(r=>r['youtube-hesap']).length;
+  const ttC = shorts.filter(r=>r['tiktok-hesap']).length;
+  const tot = Math.max(igC+ytC+ttC, 1);
+  setEl('ig-cnt', igC); setEl('yt-cnt', ytC); setEl('tt-cnt', ttC);
+  setStyle('ig-bar','width',(igC/tot*100)+'%');
+  setStyle('yt-bar','width',(ytC/tot*100)+'%');
+  setStyle('tt-bar','width',(ttC/tot*100)+'%');
 
-  // Platform counts
-  const igC = shorts.filter(r => r['instagram-hesap']).length;
-  const ytC = shorts.filter(r => r['youtube-hesap']).length;
-  const ttC = shorts.filter(r => r['tiktok-hesap']).length;
-  const tot = Math.max(igC + ytC + ttC, 1);
-  document.getElementById('ig-cnt').textContent = igC;
-  document.getElementById('yt-cnt').textContent = ytC;
-  document.getElementById('tt-cnt').textContent = ttC;
-  document.getElementById('ig-bar').style.width = (igC/tot*100) + '%';
-  document.getElementById('yt-bar').style.width = (ytC/tot*100) + '%';
-  document.getElementById('tt-bar').style.width = (ttC/tot*100) + '%';
-
-  // Recent table
   const tbody = document.getElementById('dash-tbody');
-  const src   = sid ? 'Google Sheets' : 'localStorage';
-  document.getElementById('dash-src').textContent = 'Kaynak: ' + src;
-
-  if (urls.length) {
-    tbody.innerHTML = urls.slice(0,8).map(r => `
-      <tr>
-        <td class="uc" title="${r['youtube-url']||''}">${(r['youtube-url']||'-').slice(0,40)}...</td>
-        <td><span class="badge bi">${r['kaynak']||'-'}</span></td>
-        <td>${r['uretilen-short-sayisi']||'-'}</td>
-        <td><span class="badge ${r['durum']==='İşlemde'?'bw2':'bs2'}">${r['durum']||'-'}</span></td>
-        <td>${(r['istek-tarihi']||'-').slice(0,16)}</td>
-      </tr>`).join('');
-  } else if (S.cfg.shkey) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">URL-Takip sayfası boş veya Sheet ID yanlış</td></tr>';
-  } else {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">Ayarlar\'dan Google Sheets API Key ve Sheet ID girin</td></tr>';
+  if (tbody) {
+    if (urls.length) {
+      tbody.innerHTML = urls.slice(0,8).map(r=>'<tr>'+
+        '<td class="uc" title="'+(r['youtube-url']||'')+'">'+(r['youtube-url']||'-').slice(0,40)+'...</td>'+
+        '<td><span class="badge bi">'+(r['kaynak']||'-')+'</span></td>'+
+        '<td>'+(r['uretilen-short-sayisi']||'-')+'</td>'+
+        '<td><span class="badge '+(r['durum']==='Islemde'?'bw2':'bs2')+'">'+(r['durum']||'-')+'</span></td>'+
+        '<td>'+(r['istek-tarihi']||'-').slice(0,16)+'</td>'+
+        '</tr>').join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">'+(S.cfg.shkey?'Veri bulunamadi':'Ayarlar\'dan API Key ve Sheet ID girin')+'</td></tr>';
+    }
   }
 
   // Weekly bars
-  const now  = new Date();
+  const now = new Date();
   const bars = document.querySelectorAll('#weekly-bars .bar');
-  const days = [0,1,2,3,4,5,6].map(i => {
-    const d = new Date(now); d.setDate(d.getDate() - 6 + i);
-    return d.toISOString().slice(0,10);
-  });
-  const dayCounts = {};
-  urls.forEach(r => { const d = (r['istek-tarihi']||'').slice(0,10); if(d) dayCounts[d] = (dayCounts[d]||0)+1; });
-  const maxC = Math.max(...days.map(d => dayCounts[d]||0), 1);
-  days.forEach((d, i) => {
-    const c = dayCounts[d] || 0;
-    if (bars[i]) bars[i].style.height = Math.max(10, (c/maxC*100)) + '%';
-    if (bars[i]) bars[i].title = `${d}: ${c}`;
+  const dc = {};
+  urls.forEach(r=>{const d=(r['istek-tarihi']||'').slice(0,10);if(d)dc[d]=(dc[d]||0)+1;});
+  const maxC = Math.max(...[0,1,2,3,4,5,6].map(i=>{const d=new Date(now);d.setDate(d.getDate()-6+i);return dc[d.toISOString().slice(0,10)]||0;}),1);
+  [0,1,2,3,4,5,6].forEach((i,idx)=>{
+    const d=new Date(now); d.setDate(d.getDate()-6+i);
+    const c=dc[d.toISOString().slice(0,10)]||0;
+    if(bars[idx]) bars[idx].style.height=Math.max(10,c/maxC*100)+'%';
   });
 
-  document.getElementById('dash-last').textContent = 'Son güncelleme: ' + new Date().toLocaleTimeString('tr');
-  addLog('ok','sistem',`Dashboard güncellendi: ${shorts.length} short, ${urls.length} URL`);
+  if (lastEl) lastEl.textContent = 'Son: '+new Date().toLocaleTimeString('tr');
+  addLog('ok','sistem','Dashboard guncellendi');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// VIDEO GÖNDER
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// VIDEO GONDER
+// ═══════════════════════════════════════════════════════════
 function calcWait() {
-  const m = parseFloat(document.getElementById('calc-m').value) || 0;
-  if (!m) { document.getElementById('calc-res').textContent = '—'; return; }
-  const ws = Math.min(3600, Math.max(600, Math.round((m*60/3600)*1200)));
-  document.getElementById('calc-res').textContent = Math.round(ws/60) + ' dk';
-  document.getElementById('calc-sub').textContent = `(${ws}sn)`;
+  const m = parseFloat(document.getElementById('calc-m').value)||0;
+  if (!m){setEl('calc-res','—');return;}
+  const ws=Math.min(3600,Math.max(600,Math.round((m*60/3600)*1200)));
+  setEl('calc-res',Math.round(ws/60)+' dk');
+  setEl('calc-sub','('+ws+'sn)');
 }
 
 function getSelCats(prefix) {
-  return [...document.querySelectorAll(`#${prefix}-cats .cat-chip.sel`)].map(c => c.dataset.cat);
+  return [...document.querySelectorAll('#'+prefix+'-cats .cat-chip.sel')].map(c=>c.dataset.cat);
 }
 
 async function sendSingle() {
-  const url = document.getElementById('sv-url').value.trim();
+  const url = (document.getElementById('sv-url')||{}).value||'';
   const wh  = getWH('/webhook/video-gonder');
-  if (!url) return showRes('sv-res', 'URL boş olamaz', 'err');
-  if (!wh.startsWith('http')) return showRes('sv-res', 'Ayarlar\'dan n8n URL girin', 'warn');
-  showRes('sv-res', '⏳ Gönderiliyor...', 'info');
+  if (!url.trim()) return showRes('sv-res','URL bos olamaz','err');
+  if (!wh.startsWith('http')) return showRes('sv-res','Ayarlar\'dan n8n URL girin','warn');
+  showRes('sv-res','⏳ Gonderiliyor...','info');
   const cats = getSelCats('sv');
-  addLog('info','webhook','Video gönderiliyor: ' + url.slice(0,60));
-  const r = await faf(wh, { 'Youtube linki': url, kaynak: document.getElementById('sv-note').value||'panel', categories: cats });
-  showRes('sv-res', '✓ n8n\'e gönderildi (arka planda işleniyor)', 'ok');
-  S.sentURLs.add(url); saveSent();
-  addLog('ok','webhook','Video gönderildi: ' + url.slice(0,60));
+  addLog('info','webhook','Video gonderiliyor: '+url.slice(0,60));
+  await faf(wh,{'Youtube linki':url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', categories:cats});
+  showRes('sv-res','✓ n8n\'e gonderildi (arka planda islenecek)','ok');
+  S.sentURLs.add(url.trim()); saveSent();
+  addLog('ok','webhook','Video gonderildi');
 }
 
 async function sendBulkURLs() {
-  const raw   = document.getElementById('bv-urls').value.trim();
+  const raw   = (document.getElementById('bv-urls')||{}).value||'';
   const wh    = getWH('/webhook/video-gonder');
-  const delay = parseInt(document.getElementById('bv-delay').value) * 60 * 1000;
+  const delay = parseInt((document.getElementById('bv-delay')||{}).value||1)*60*1000;
   if (!raw) return;
   if (!wh.startsWith('http')) return alert('Ayarlar\'dan n8n URL girin');
-  const urls = raw.split('\n').map(u => u.trim()).filter(Boolean);
-  document.getElementById('bv-prog').style.display = 'block';
-  for (let i = 0; i < urls.length; i++) {
-    document.getElementById('bv-st').textContent = `${i+1}/${urls.length}: ${urls[i].slice(0,40)}`;
-    document.getElementById('bv-bar').style.width = ((i+1)/urls.length*100) + '%';
-    addLog('info','webhook',`Toplu ${i+1}/${urls.length}: ${urls[i].slice(0,50)}`);
-    await faf(wh, { 'Youtube linki': urls[i], kaynak: 'toplu' });
+  const urls = raw.split('\n').map(u=>u.trim()).filter(Boolean);
+  setStyle('bv-prog','display','block');
+  for (let i=0;i<urls.length;i++) {
+    setEl('bv-st',(i+1)+'/'+urls.length+': '+urls[i].slice(0,40));
+    setStyle('bv-bar','width',((i+1)/urls.length*100)+'%');
+    await faf(wh,{'Youtube linki':urls[i],kaynak:'toplu'});
     S.sentURLs.add(urls[i]); saveSent();
-    if (i < urls.length-1) await sleep(delay);
+    if (i<urls.length-1) await sleep(delay);
   }
-  document.getElementById('bv-st').textContent = `✓ ${urls.length} URL gönderildi`;
-  addLog('ok','webhook','Toplu gönderim tamamlandı: ' + urls.length);
+  setEl('bv-st','✓ '+urls.length+' URL gonderildi');
+  addLog('ok','webhook','Toplu tamamlandi: '+urls.length);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// YOUTUBE ARA — fire-and-forget (524 yok)
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// YOUTUBE ARA — fire-and-forget (524 cozumlendi)
+// ═══════════════════════════════════════════════════════════
 async function sendSearch() {
-  const kw   = document.getElementById('ya-kw').value.trim();
+  const kw   = (document.getElementById('ya-kw')||{}).value||'';
   const wh   = getWH('/webhook/youtube-ara');
-  const dur  = document.getElementById('ya-dur').value;
-  const lang = document.getElementById('ya-lang').value;
+  const dur  = (document.getElementById('ya-dur')||{}).value||'600';
+  const lang = (document.getElementById('ya-lang')||{}).value||'tr';
   const cats = getSelCats('ya');
-  if (!kw) return showRes('ya-res', 'Anahtar kelime girin', 'err');
-  if (!wh.startsWith('http')) return showRes('ya-res', 'Ayarlar\'dan n8n URL girin', 'warn');
-  showRes('ya-res', '⏳ Gönderiliyor...', 'info');
-  addLog('info','webhook','YouTube arama: ' + kw);
-  // Fire-and-forget: n8n'in uzun süren yanıtını beklemez
-  faf(wh, { anahtar_kelime: kw, minDurationSec: parseInt(dur), lang, categories: cats })
-    .then(() => addLog('ok','webhook','YT arama tamamlandı: ' + kw));
-  // 1.5sn sonra başarı göster
-  setTimeout(() => {
-    showRes('ya-res', '✓ Arama başlatıldı — n8n arka planda çalışıyor', 'ok');
-  }, 1500);
-  // Geçmişe ekle
-  S.searchHist.unshift({ kw, t: new Date().toLocaleString('tr') });
-  S.searchHist = S.searchHist.slice(0, 20);
-  localStorage.setItem('op_srch', JSON.stringify(S.searchHist));
+  if (!kw.trim()) return showRes('ya-res','Anahtar kelime girin','err');
+  if (!wh.startsWith('http')) return showRes('ya-res','Ayarlar\'dan n8n URL girin','warn');
+  showRes('ya-res','⏳ Gonderiliyor...','info');
+  addLog('info','webhook','YouTube arama: '+kw);
+  faf(wh,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, categories:cats});
+  setTimeout(()=>showRes('ya-res','✓ Arama baslatildi — n8n arka planda calisiyor','ok'), 1500);
+  S.searchHist.unshift({kw, t:new Date().toLocaleString('tr')});
+  S.searchHist = S.searchHist.slice(0,20);
+  localStorage.setItem('op_srch',JSON.stringify(S.searchHist));
   renderSearchHist();
 }
 
 function addSearchHist() {
-  const kw = document.getElementById('ya-kw').value.trim();
+  const kw = (document.getElementById('ya-kw')||{}).value||'';
   if (!kw) return;
-  S.searchHist.unshift({ kw, t: new Date().toLocaleString('tr') });
-  localStorage.setItem('op_srch', JSON.stringify(S.searchHist));
+  S.searchHist.unshift({kw, t:new Date().toLocaleString('tr')});
+  localStorage.setItem('op_srch',JSON.stringify(S.searchHist));
   renderSearchHist();
 }
 
 function renderSearchHist() {
   const el = document.getElementById('ya-hist');
-  if (!S.searchHist.length) { el.innerHTML = '<div style="color:var(--mt);text-align:center;padding:12px">Henüz arama yapılmadı</div>'; return; }
-  el.innerHTML = S.searchHist.map(s => `
-    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--brd);font-size:9px">
-      <span style="cursor:pointer;color:var(--acc)" onclick="document.getElementById('ya-kw').value='${s.kw.replace(/'/g,"\\'")}'">${s.kw}</span>
-      <span style="color:var(--mt)">${s.t}</span>
-    </div>`).join('');
+  if (!el) return;
+  if (!S.searchHist.length) { el.innerHTML='<div style="color:var(--mt);text-align:center;padding:12px">Henuz arama yapilmadi</div>'; return; }
+  el.innerHTML = S.searchHist.map(s=>'<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--brd);font-size:9px"><span style="cursor:pointer;color:var(--acc)" onclick="document.getElementById(\'ya-kw\').value=\''+s.kw.replace(/'/g,"\\'")+'\'">'+s.kw+'</span><span style="color:var(--mt)">'+s.t+'</span></div>').join('');
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // TOPLU KELIMELER
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function toggleBKMode() {
-  const v = document.getElementById('bk-mode')?.value;
+  const v = (document.getElementById('bk-mode')||{}).value;
   const el = document.getElementById('bk-delay-wrap');
-  if (el) el.style.display = v === 'time' ? 'block' : 'none';
+  if (el) el.style.display = v==='time'?'block':'none';
 }
 
 function addKW() {
-  const v = document.getElementById('bk-in').value.trim();
-  if (!v || S.kwList.includes(v)) return;
-  S.kwList.push(v);
-  document.getElementById('bk-in').value = '';
+  const v = (document.getElementById('bk-in')||{}).value||'';
+  if (!v.trim()||S.kwList.includes(v.trim())) return;
+  S.kwList.push(v.trim());
+  document.getElementById('bk-in').value='';
   renderKWTags();
 }
 
-function removeKW(kw) { S.kwList = S.kwList.filter(k => k !== kw); renderKWTags(); }
+function removeKW(kw){ S.kwList=S.kwList.filter(k=>k!==kw); renderKWTags(); }
 
 function renderKWTags() {
-  const el = document.getElementById('kw-tags');
-  if (!S.kwList.length) { el.innerHTML = '<span style="color:var(--mt);font-size:9px">Kelime ekleyin...</span>'; return; }
-  el.innerHTML = S.kwList.map(k => `<span class="kw-tag">${k}<button onclick="removeKW('${k.replace(/'/g,"\\'")}')">×</button></span>`).join('');
+  const el=document.getElementById('kw-tags');
+  if(!el)return;
+  el.innerHTML=S.kwList.length
+    ?S.kwList.map(k=>'<span class="kw-tag">'+k+'<button onclick="removeKW(\''+k.replace(/'/g,"\\'")+'\')">x</button></span>').join('')
+    :'<span style="color:var(--mt);font-size:9px">Kelime ekleyin...</span>';
 }
 
 async function sendBulkKW() {
-  if (!S.kwList.length) return showRes('bk-res', 'Kelime listesi boş', 'err');
-  const wh    = getWH('/webhook/bulk-keywords');
-  const dur   = document.getElementById('bk-dur').value;
-  const mode  = document.getElementById('bk-mode').value;
-  const delay = parseInt(document.getElementById('bk-delay')?.value || 30) * 60 * 1000;
-  if (!wh.startsWith('http')) return showRes('bk-res', 'Ayarlar\'dan n8n URL girin', 'warn');
-
-  document.getElementById('bk-prog-empty').style.display = 'none';
-  document.getElementById('bk-prog-wrap').style.display = 'block';
-  const logEl = document.getElementById('bk-log');
-  const bkLog = msg => { logEl.innerHTML += `<div style="color:var(--mt)">${new Date().toLocaleTimeString('tr')} — ${msg}</div>`; logEl.scrollTop = 9999; };
-
-  showRes('bk-res', '⏳ Toplu gönderim başlatıldı...', 'info');
-  addLog('info','bulk',`Toplu arama: ${S.kwList.length} kelime`);
-
-  const kws = [...S.kwList];
-  for (let i = 0; i < kws.length; i++) {
-    const kw = kws[i];
-    document.getElementById('bk-cur').textContent = `${i+1}/${kws.length}: "${kw}"`;
-    document.getElementById('bk-pbar').style.width = ((i+1)/kws.length*100) + '%';
-    bkLog(`Gönderiliyor: "${kw}"`);
-
-    await faf(wh, { keywords: [kw], minDurationSec: parseInt(dur), lang: 'tr' });
-    bkLog(`✓ "${kw}" gönderildi`);
-    addLog('ok','bulk',`Bulk keyword: ${kw}`);
-
-    if (i < kws.length - 1) {
-      if (mode === 'status') {
-        bkLog(`⏳ n8n işlem bekleniyor...`);
-        await waitForN8NCompletion(kw, bkLog);
-      } else {
-        bkLog(`⏳ ${delay/60000} dk bekleniyor...`);
-        await sleep(delay);
-      }
+  if (!S.kwList.length) return showRes('bk-res','Kelime listesi bos','err');
+  const wh   = getWH('/webhook/bulk-keywords');
+  const dur  = (document.getElementById('bk-dur')||{}).value||'600';
+  const mode = (document.getElementById('bk-mode')||{}).value||'time';
+  const delay= parseInt((document.getElementById('bk-delay')||{}).value||30)*60*1000;
+  if (!wh.startsWith('http')) return showRes('bk-res','Ayarlar\'dan n8n URL girin','warn');
+  setStyle('bk-prog-empty','display','none');
+  setStyle('bk-prog-wrap','display','block');
+  showRes('bk-res','⏳ Toplu gonderim...','info');
+  const logEl=document.getElementById('bk-log');
+  const bLog=msg=>{if(logEl)logEl.innerHTML+='<div>'+new Date().toLocaleTimeString('tr')+' — '+msg+'</div>';};
+  const kws=[...S.kwList];
+  for(let i=0;i<kws.length;i++){
+    setEl('bk-cur',(i+1)+'/'+kws.length+': "'+kws[i]+'"');
+    setStyle('bk-pbar','width',((i+1)/kws.length*100)+'%');
+    bLog('Gonderiliyor: "'+kws[i]+'"');
+    await faf(wh,{keywords:[kws[i]], minDurationSec:parseInt(dur), lang:'tr'});
+    bLog('✓ "'+kws[i]+'" gonderildi');
+    addLog('ok','bulk','Keyword: '+kws[i]);
+    if (i<kws.length-1) {
+      if (mode==='status') { bLog('n8n bekleniyor (3dk)...'); await sleep(3*60*1000); }
+      else { bLog(delay/60000+'dk bekleniyor...'); await sleep(delay); }
     }
   }
-
-  document.getElementById('bk-cur').textContent = `✓ ${kws.length} kelime tamamlandı`;
-  showRes('bk-res', `✓ ${kws.length} kelime gönderildi`, 'ok');
-  S.bkHist.unshift({ kws, t: new Date().toLocaleString('tr') });
-  localStorage.setItem('op_bkh', JSON.stringify(S.bkHist.slice(0,10)));
+  setEl('bk-cur','✓ '+kws.length+' kelime tamamlandi');
+  showRes('bk-res','✓ '+kws.length+' kelime gonderildi','ok');
+  S.bkHist.unshift({kws, t:new Date().toLocaleString('tr')});
+  localStorage.setItem('op_bkh',JSON.stringify(S.bkHist.slice(0,10)));
 }
 
-async function waitForN8NCompletion(kw, logFn) {
-  const sid  = S.cfg.sheet2 || S.cfg.sheet;
-  const skey = S.cfg.shkey;
-  if (!sid || !skey) { await sleep(30 * 60 * 1000); return; }
-  // Poll URL-Takip sheet 3 dakikada bir, max 60 dakika
-  const maxTries = 20; const interval = 3 * 60 * 1000;
-  for (let i = 0; i < maxTries; i++) {
-    await sleep(interval);
-    const vals = await sheetsGet(sid, 'URL-Takip!A:Z');
-    const rows = parseSheet(vals);
-    const done = rows.filter(r => r['durum'] === 'Tamamlandı' && r['kaynak'] === 'bulk-keyword').length;
-    if (logFn) logFn(`Kontrol ${i+1}: ${done} tamamlandı`);
-    if (done > 0) return;
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // KATEGORİLER
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function renderCatGrid() {
   const cats = getCats();
   const grid = document.getElementById('cat-grid');
-  const platforms = [
-    { key: 'sel_ig', label: 'Instagram', accs: S.accounts.ig },
-    { key: 'sel_yt', label: 'YouTube',   accs: S.accounts.yt },
-    { key: 'sel_tt', label: 'TikTok',    accs: S.accounts.tt },
+  if (!grid) return;
+  const platforms=[
+    {key:'sel_ig',label:'Instagram',accs:S.accounts.ig},
+    {key:'sel_yt',label:'YouTube',  accs:S.accounts.yt},
+    {key:'sel_tt',label:'TikTok',   accs:S.accounts.tt},
   ];
-  grid.innerHTML = Object.entries(cats).map(([catKey, cat]) => `
-    <div class="card">
-      <div class="ct">${cat.label}</div>
-      ${platforms.map(p => `
-        <div style="margin-bottom:8px">
-          <div style="font-size:8px;color:var(--mt);margin-bottom:4px;letter-spacing:1px">${p.label}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">
-            ${p.accs.map((accId, i) => {
-              const sel = (cat[p.key]||[]).includes(accId);
-              return `<span class="cat-chip ${sel?'sel':''}" data-cat="${catKey}" data-pk="${p.key}" data-acc="${accId}" onclick="toggleCatAcc(this)">${i+1}</span>`;
-            }).join('')}
-          </div>
-        </div>`).join('')}
-    </div>`).join('');
-
-  // Kategori seçici chip'lerini diğer sayfalara da render et
+  grid.innerHTML=Object.entries(cats).map(([ck,cat])=>'<div class="card"><div class="ct">'+cat.label+'</div>'+
+    platforms.map(p=>'<div style="margin-bottom:8px"><div style="font-size:8px;color:var(--mt);margin-bottom:4px">'+p.label+'</div><div style="display:flex;flex-wrap:wrap;gap:4px">'+
+      p.accs.map((a,i)=>'<span class="cat-chip '+ ((cat[p.key]||[]).includes(a)?'sel':'')+'" data-cat="'+ck+'" data-pk="'+p.key+'" data-acc="'+a+'" onclick="this.classList.toggle(\'sel\')">'+(i+1)+'</span>').join('')+
+      '</div></div>').join('')+'</div>').join('');
   renderCatChips('sv-cats');
   renderCatChips('ya-cats');
 }
 
-function toggleCatAcc(el) {
-  el.classList.toggle('sel');
-}
-
-function renderCatChips(containerId) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  const cats = getCats();
-  el.innerHTML = Object.entries(cats).map(([k, c]) =>
-    `<span class="cat-chip" data-cat="${k}" onclick="this.classList.toggle('sel')">${c.label}</span>`
-  ).join('');
+function renderCatChips(id) {
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.innerHTML=Object.entries(getCats()).map(([k,c])=>'<span class="cat-chip" data-cat="'+k+'" onclick="this.classList.toggle(\'sel\')">'+c.label+'</span>').join('');
 }
 
 function saveCats() {
-  const cats = getCats();
-  document.querySelectorAll('#cat-grid .cat-chip').forEach(el => {
-    const { cat, pk, acc } = el.dataset;
-    if (!cats[cat]) return;
-    if (!cats[cat][pk]) cats[cat][pk] = [];
-    const idx = cats[cat][pk].indexOf(acc);
-    if (el.classList.contains('sel') && idx < 0) cats[cat][pk].push(acc);
-    else if (!el.classList.contains('sel') && idx >= 0) cats[cat][pk].splice(idx, 1);
+  const cats=getCats();
+  document.querySelectorAll('#cat-grid .cat-chip').forEach(el=>{
+    const {cat,pk,acc}=el.dataset;
+    if(!cats[cat])return;
+    if(!cats[cat][pk])cats[cat][pk]=[];
+    const idx=cats[cat][pk].indexOf(acc);
+    if(el.classList.contains('sel')&&idx<0)cats[cat][pk].push(acc);
+    else if(!el.classList.contains('sel')&&idx>=0)cats[cat][pk].splice(idx,1);
   });
-  S.cats = cats;
-  localStorage.setItem('op_cats', JSON.stringify(cats));
-  document.getElementById('cat-save-ok').style.display = 'block';
-  setTimeout(() => document.getElementById('cat-save-ok').style.display='none', 2000);
+  S.cats=cats;
+  localStorage.setItem('op_cats',JSON.stringify(cats));
+  setStyle('cat-save-ok','display','block');
+  setTimeout(()=>setStyle('cat-save-ok','display','none'),2000);
   addLog('ok','sistem','Kategoriler kaydedildi');
 }
 
 function addCustomCat() {
-  const name = prompt('Kategori adı:');
-  if (!name) return;
-  const key = name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
-  const cats = getCats();
-  cats[key] = { label: name, sel_ig: [], sel_yt: [], sel_tt: [] };
-  S.cats = cats;
-  localStorage.setItem('op_cats', JSON.stringify(cats));
+  const name=prompt('Kategori adi:');
+  if(!name)return;
+  const key=name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+  const cats=getCats();
+  cats[key]={label:name,sel_ig:[],sel_yt:[],sel_tt:[]};
+  S.cats=cats;
+  localStorage.setItem('op_cats',JSON.stringify(cats));
   renderCatGrid();
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // GOOGLE DRIVE
-// ═══════════════════════════════════════════════════════════════
-function parseDriveSheet() {
-  const v = document.getElementById('dr-sheet').value.trim();
-  const m = v.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return m ? m[1] : v;
+// ═══════════════════════════════════════════════════════════
+function parseDriveSheetID() {
+  const v=(document.getElementById('dr-sheet')||{}).value||'';
+  const m=v.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  return m?m[1]:v;
 }
 
 async function loadDriveSheet() {
-  const sheetId = parseDriveSheet();
-  const col     = document.getElementById('dr-col').value || 'Youtube Linki';
-  showRes('dr-res', '⏳ Taranıyor...', 'info');
-  addLog('info','drive','Drive sheet taranıyor: ' + sheetId);
-
-  const vals = await sheetsGet(sheetId, 'Sheet1!A:Z');
-  if (!vals) return showRes('dr-res', '✗ Sheet okunamadı — API Key ve Sheet ID kontrol edin', 'err');
-
-  const rows   = parseSheet(vals);
-  const allURL = rows.map(r => r[col]).filter(Boolean);
-  const newURL = allURL.filter(u => !S.sentURLs.has(u));
-
-  S.driveURLs = allURL;
-  document.getElementById('dr-sent-cnt').textContent = S.sentURLs.size;
-  document.getElementById('dr-new-cnt').textContent  = newURL.length;
-
-  // Tüm URL'leri göster (işlenmiş ve yeni)
-  const listEl = document.getElementById('dr-url-list');
-  listEl.innerHTML = allURL.map(u => {
-    const done = S.sentURLs.has(u);
-    return `<div class="url-item ${done?'done':''}">
-      <span class="url-text" title="${u}">${u}</span>
-      <span class="badge ${done?'bgr':'bi'}">${done?'İşlendi':'Yeni'}</span>
-    </div>`;
-  }).join('') || '<div style="padding:10px;color:var(--mt);font-size:9px">URL bulunamadı</div>';
-
-  // İşlenmiş URL'leri göster
+  const sid=parseDriveSheetID();
+  const col=(document.getElementById('dr-col')||{}).value||'Youtube Linki';
+  showRes('dr-res','⏳ Taranıyor...','info');
+  addLog('info','drive','Drive sheet taranıyor');
+  const vals = await sheetsGet(sid,'Sheet1!A:Z');
+  if (!vals) return showRes('dr-res','Tablo okunamadi — API Key ve Sheet ID kontrol edin','err');
+  const rows=parseSheet(vals);
+  const allU=rows.map(r=>r[col]).filter(Boolean);
+  const newU=allU.filter(u=>!S.sentURLs.has(u));
+  S.driveURLs=allU;
+  setEl('dr-sent-cnt',S.sentURLs.size);
+  setEl('dr-new-cnt',newU.length);
+  const listEl=document.getElementById('dr-url-list');
+  if(listEl)listEl.innerHTML=allU.map(u=>'<div class="url-item '+(S.sentURLs.has(u)?'done':'')+'"><span class="url-text" title="'+u+'">'+u+'</span><span class="badge '+(S.sentURLs.has(u)?'bgr':'bi')+'">'+(S.sentURLs.has(u)?'Islendi':'Yeni')+'</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:9px">URL bulunamadi</div>';
   renderSentURLs();
-  showRes('dr-res', `✓ ${allURL.length} URL bulundu (${newURL.length} yeni)`, 'ok');
-  addLog('ok','drive',`Drive: ${allURL.length} URL, ${newURL.length} yeni`);
+  showRes('dr-res','✓ '+allU.length+' URL ('+newU.length+' yeni)','ok');
+  addLog('ok','drive',allU.length+' URL, '+newU.length+' yeni');
 }
 
 function renderSentURLs() {
-  const el = document.getElementById('dr-sent-list');
-  const arr = [...S.sentURLs];
-  el.innerHTML = arr.slice(0,50).map(u => `
-    <div class="url-item">
-      <span class="url-text" title="${u}">${u}</span>
-      <span class="badge bgr">İşlendi</span>
-    </div>`).join('') || '<div style="padding:10px;color:var(--mt);font-size:9px">Henüz işlenmiş URL yok</div>';
+  const el=document.getElementById('dr-sent-list');
+  if(!el)return;
+  const arr=[...S.sentURLs];
+  el.innerHTML=arr.slice(0,50).map(u=>'<div class="url-item"><span class="url-text" title="'+u+'">'+u+'</span><span class="badge bgr">Islendi</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:9px">Islenmis URL yok</div>';
 }
 
 async function sendDriveURLs() {
-  const wh   = getWH('/webhook/video-gonder');
-  const col  = document.getElementById('dr-col').value || 'Youtube Linki';
-  const newU = S.driveURLs.filter(u => !S.sentURLs.has(u));
-  if (!newU.length) return showRes('dr-res', 'Gönderilecek yeni URL yok', 'warn');
-  if (!wh.startsWith('http')) return showRes('dr-res', 'Ayarlar\'dan n8n URL girin', 'warn');
-  showRes('dr-res', `⏳ ${newU.length} URL gönderiliyor...`, 'info');
-  for (const u of newU) {
-    await faf(wh, { 'Youtube linki': u, kaynak: 'drive' });
+  const wh=getWH('/webhook/video-gonder');
+  const newU=S.driveURLs.filter(u=>!S.sentURLs.has(u));
+  if(!newU.length)return showRes('dr-res','Yeni URL yok','warn');
+  if(!wh.startsWith('http'))return showRes('dr-res','n8n URL girin','warn');
+  showRes('dr-res','⏳ '+newU.length+' URL gonderiliyor...','info');
+  for(const u of newU){
+    await faf(wh,{'Youtube linki':u,kaynak:'drive'});
     S.sentURLs.add(u);
-    addLog('ok','drive','Drive URL gönderildi: ' + u.slice(0,60));
+    addLog('ok','drive','Drive: '+u.slice(0,60));
   }
-  saveSent();
-  renderSentURLs();
-  loadDriveSheet();
-  showRes('dr-res', `✓ ${newU.length} URL gönderildi`, 'ok');
+  saveSent(); renderSentURLs(); loadDriveSheet();
+  showRes('dr-res','✓ '+newU.length+' URL gonderildi','ok');
 }
 
 function clearSentURLs() {
-  if (!confirm('İşlenmiş URL geçmişi silinsin mi?')) return;
-  S.sentURLs.clear(); saveSent();
-  document.getElementById('dr-sent-cnt').textContent = '0';
-  renderSentURLs();
-  addLog('ok','drive','Sent URL geçmişi temizlendi');
+  if(!confirm('Islenmis URL gecmisi silinsin mi?'))return;
+  S.sentURLs.clear(); saveSent(); renderSentURLs();
+  setEl('dr-sent-cnt','0');
+  addLog('ok','drive','Sent URL gecmisi temizlendi');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// GOOGLE SHEETS (Scan + Send separate)
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// GOOGLE SHEETS
+// ═══════════════════════════════════════════════════════════
 async function scanSheet() {
-  const sid  = document.getElementById('sh-id').value.trim().match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1] || document.getElementById('sh-id').value.trim();
-  const col  = document.getElementById('sh-col').value || 'Youtube Linki';
-  const done = document.getElementById('sh-done').value || 'İşlendi';
-  showRes('sh-res', '⏳ Taranıyor...', 'info');
-  const vals = await sheetsGet(sid, 'Sheet1!A:Z');
-  if (!vals) return showRes('sh-res', '✗ Sheet okunamadı', 'err');
-  const rows   = parseSheet(vals);
-  const allU   = rows.map(r => r[col]).filter(Boolean);
-  const newU   = allU.filter(r => !S.sentURLs.has(r));
-  S.sheetURLs  = newU;
-  document.getElementById('sh-total').textContent = allU.length;
-  document.getElementById('sh-new').textContent   = newU.length;
-  document.getElementById('sh-skip').textContent  = allU.length - newU.length;
-
-  const listEl = document.getElementById('sh-url-list');
-  listEl.innerHTML = allU.map(u => {
-    const isNew = !S.sentURLs.has(u);
-    return `<div class="url-item ${isNew?'':'done'}">
-      <span class="url-text">${u}</span>
-      <span class="badge ${isNew?'bi':'bgr'}">${isNew?'Yeni':'Atlandı'}</span>
-    </div>`;
-  }).join('');
-  showRes('sh-res', `✓ ${newU.length} yeni URL bulundu`, 'ok');
+  const v=(document.getElementById('sh-id')||{}).value||'';
+  const sid=v.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]||v;
+  const col=(document.getElementById('sh-col')||{}).value||'Youtube Linki';
+  showRes('sh-res','⏳ Taranıyor...','info');
+  const vals=await sheetsGet(sid,'Sheet1!A:Z');
+  if(!vals)return showRes('sh-res','Tablo okunamadi','err');
+  const rows=parseSheet(vals);
+  const allU=rows.map(r=>r[col]).filter(Boolean);
+  const newU=allU.filter(u=>!S.sentURLs.has(u));
+  S.sheetURLs=newU;
+  setEl('sh-total',allU.length); setEl('sh-new',newU.length); setEl('sh-skip',allU.length-newU.length);
+  const listEl=document.getElementById('sh-url-list');
+  if(listEl)listEl.innerHTML=allU.map(u=>'<div class="url-item '+(S.sentURLs.has(u)?'done':'')+'"><span class="url-text">'+u+'</span><span class="badge '+(S.sentURLs.has(u)?'bgr':'bi')+'">'+(S.sentURLs.has(u)?'Atlandi':'Yeni')+'</span></div>').join('');
+  showRes('sh-res','✓ '+newU.length+' yeni URL','ok');
 }
 
 async function sendSheetURLs() {
-  if (!S.sheetURLs.length) return showRes('sh-res', 'Önce Tara\'ya tıklayın', 'warn');
-  const wh    = getWH('/webhook/video-gonder');
-  const mode  = document.getElementById('sh-mode').value;
-  const delay = parseInt(document.getElementById('sh-delay')?.value || 30) * 60 * 1000;
-  if (!wh.startsWith('http')) return showRes('sh-res', 'Ayarlar\'dan n8n URL girin', 'warn');
-  document.getElementById('sh-prog').style.display = 'block';
-  for (let i = 0; i < S.sheetURLs.length; i++) {
-    const u = S.sheetURLs[i];
-    document.getElementById('sh-cur').textContent = `${i+1}/${S.sheetURLs.length}: ${u.slice(0,40)}`;
-    document.getElementById('sh-pbar').style.width = ((i+1)/S.sheetURLs.length*100) + '%';
-    await faf(wh, { 'Youtube linki': u, kaynak: 'sheets' });
+  if(!S.sheetURLs.length)return showRes('sh-res','Once Tara\'ya tiklayin','warn');
+  const wh=getWH('/webhook/video-gonder');
+  const mode=(document.getElementById('sh-mode')||{}).value||'time';
+  const delay=parseInt((document.getElementById('sh-delay')||{}).value||30)*60*1000;
+  if(!wh.startsWith('http'))return showRes('sh-res','n8n URL girin','warn');
+  setStyle('sh-prog','display','block');
+  for(let i=0;i<S.sheetURLs.length;i++){
+    const u=S.sheetURLs[i];
+    setEl('sh-cur',(i+1)+'/'+S.sheetURLs.length+': '+u.slice(0,40));
+    setStyle('sh-pbar','width',((i+1)/S.sheetURLs.length*100)+'%');
+    await faf(wh,{'Youtube linki':u,kaynak:'sheets'});
     S.sentURLs.add(u); saveSent();
-    addLog('ok','sheets','Sheet URL gönderildi: ' + u.slice(0,60));
-    if (i < S.sheetURLs.length-1) {
-      if (mode === 'status') await waitForN8NCompletion(u, null);
-      else await sleep(delay);
-    }
+    if(i<S.sheetURLs.length-1) await sleep(mode==='time'?delay:3*60*1000);
   }
-  document.getElementById('sh-cur').textContent = '✓ Tamamlandı';
-  showRes('sh-res', `✓ ${S.sheetURLs.length} URL gönderildi`, 'ok');
+  setEl('sh-cur','✓ Tamamlandi');
+  showRes('sh-res','✓ '+S.sheetURLs.length+' URL gonderildi','ok');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// SHEET DATA (Kuyruk, Short Listesi, URL Takip, Arşiv)
-// ═══════════════════════════════════════════════════════════════
-async function loadAllSheetData(page) {
+// ═══════════════════════════════════════════════════════════
+// SHEET PAGES
+// ═══════════════════════════════════════════════════════════
+async function loadSheetPage(page) {
   const sid  = S.cfg.sheet  || '';
   const sid2 = S.cfg.sheet2 || sid;
-  if (!sid) {
-    addLog('warn','sheets','Sheet ID girilmemiş');
-    return;
-  }
-  addLog('info','sheets',`${page} verileri yükleniyor`);
-  const [shortVals, urlVals] = await Promise.all([
-    sheetsGet(sid,  'Sheet1!A:Z'),
-    sheetsGet(sid2, 'URL-Takip!A:Z'),
-  ]);
-  const shorts = parseSheet(shortVals);
-  const urls   = parseSheet(urlVals);
-  S.sheetData  = { shorts, urls };
+  if (!sid && !S._panelCache) { addLog('warn','sheets','Sheet ID girilmemis'); return; }
 
-  if (page === 'kuyruk') {
-    const proc = urls.filter(r => r['durum'] === 'İşlemde');
-    document.getElementById('kuyruk-last').textContent = new Date().toLocaleTimeString('tr');
-    document.getElementById('kuyruk-tbody').innerHTML = proc.length
-      ? proc.map(r => `<tr>
-          <td class="uc" title="${r['youtube-url']||''}">${(r['youtube-url']||'').slice(0,35)}...</td>
-          <td><span class="badge bi">${r['kaynak']||'-'}</span></td>
-          <td>${r['video-suresi-sn']||'-'}</td>
-          <td>${r['bekleme-suresi-sn']||'-'}</td>
-          <td><span class="badge bw2">İşlemde</span></td>
-          <td>${(r['istek-tarihi']||'-').slice(0,16)}</td>
-        </tr>`).join('')
-      : '<tr><td colspan="6" style="text-align:center;color:var(--mt);padding:16px">Aktif işlem yok</td></tr>';
-  }
+  addLog('info','sheets',page+' yukleniyor');
+  let shorts=[],urls=[];
 
-  if (page === 'shortlist') {
-    document.getElementById('sl-tbody').innerHTML = shorts.length
-      ? shorts.map(r => `<tr>
-          <td class="uc" title="${r['title']||''}">${(r['title']||'-').slice(0,30)}</td>
-          <td>${r['score']||'-'}</td>
-          <td>${r['duration-ms']? Math.round(parseInt(r['duration-ms'])/60000)+'dk' :'-'}</td>
-          <td><span class="badge bi">${r['instagram-hesap']||'-'}</span></td>
-          <td><span class="badge bi">${r['youtube-hesap']||'-'}</span></td>
-          <td><span class="badge bi">${r['tiktok-hesap']||'-'}</span></td>
-          <td><span class="badge ${r['platform-status']==='Bekliyor'?'bw2':'bs2'}">${r['platform-status']||'-'}</span></td>
-          <td>${(r['created-at']||'-').slice(0,10)}</td>
-        </tr>`).join('')
-      : '<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">Short bulunamadı</td></tr>';
-  }
-
-  if (page === 'urltakip') {
-    document.getElementById('url-tbody').innerHTML = urls.length
-      ? urls.map(r => `<tr>
-          <td class="uc" title="${r['youtube-url']||''}">${(r['youtube-url']||'').slice(0,35)}...</td>
-          <td><span class="badge bi">${r['kaynak']||'-'}</span></td>
-          <td>${r['video-suresi-sn']||'-'}</td>
-          <td>${r['izlenme-sayisi']||'-'}</td>
-          <td>${r['uretilen-short-sayisi']||'-'}</td>
-          <td>${r['bekleme-suresi-sn']||'-'}</td>
-          <td><span class="badge ${r['durum']==='İşlemde'?'bw2':'bs2'}">${r['durum']||'-'}</span></td>
-          <td>${(r['istek-tarihi']||'-').slice(0,16)}</td>
-        </tr>`).join('')
-      : '<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">URL bulunamadı</td></tr>';
-  }
-
-  if (page === 'arsiv') {
-    const ks   = document.getElementById('ar-k').value;
-    const ds   = document.getElementById('ar-s').value;
-    const de   = document.getElementById('ar-e').value;
-    let arch   = urls.filter(r => r['durum'] === 'Tamamlandı');
-    if (ks) arch = arch.filter(r => r['kaynak'] === ks);
-    if (ds) arch = arch.filter(r => r['istek-tarihi'] >= ds);
-    if (de) arch = arch.filter(r => r['istek-tarihi'] <= de + 'Z');
-    document.getElementById('ar-tbody').innerHTML = arch.length
-      ? arch.map(r => `<tr>
-          <td class="uc" title="${r['youtube-url']||''}">${(r['youtube-url']||'').slice(0,35)}...</td>
-          <td><span class="badge bi">${r['kaynak']||'-'}</span></td>
-          <td>${r['uretilen-short-sayisi']||'-'}</td>
-          <td>${r['proje-id']||'-'}</td>
-          <td>${(r['istek-tarihi']||'-').slice(0,16)}</td>
-        </tr>`).join('')
-      : '<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">Arşiv boş</td></tr>';
-  }
-
-  addLog('ok','sheets',`${page}: ${shorts.length} short, ${urls.length} URL`);
-}
-
-// ═══════════════════════════════════════════════════════════════
-// RAPORLAR
-// ═══════════════════════════════════════════════════════════════
-async function loadReports() {
-  const sid  = S.cfg.sheet || '';
-  const sid2 = S.cfg.sheet2 || sid;
-  addLog('info','sheets','Raporlar yükleniyor');
-  const [sv, uv] = await Promise.all([
-    sheetsGet(sid,  'Sheet1!A:Z'),
-    sheetsGet(sid2, 'URL-Takip!A:Z'),
-  ]);
-  const shorts = parseSheet(sv);
-  const urls   = parseSheet(uv);
-  const now    = new Date();
-  const weekAgo= new Date(now - 7*24*3600*1000);
-  const monAgo = new Date(now - 30*24*3600*1000);
-
-  const weekURLs   = urls.filter(r => new Date(r['istek-tarihi']) >= weekAgo);
-  const weekShorts = shorts.filter(r => new Date(r['created-at']) >= weekAgo);
-  const monURLs    = urls.filter(r => new Date(r['istek-tarihi']) >= monAgo);
-  const monShorts  = shorts.filter(r => new Date(r['created-at']) >= monAgo);
-
-  document.getElementById('rh-url').textContent   = weekURLs.length;
-  document.getElementById('rh-short').textContent = weekShorts.length;
-  document.getElementById('rh-avg').textContent   = weekURLs.length ? (weekShorts.length/weekURLs.length).toFixed(1) : '—';
-  document.getElementById('rh-rate').textContent  = weekURLs.length ? Math.round(weekURLs.filter(r=>r['durum']==='Tamamlandı').length/weekURLs.length*100)+'%' : '—';
-  document.getElementById('ra-url').textContent   = monURLs.length;
-  document.getElementById('ra-short').textContent = monShorts.length;
-
-  const kaynak = (k) => urls.filter(r=>r['kaynak']===k).length;
-  document.getElementById('r-drive').textContent = kaynak('drive');
-  document.getElementById('r-yt').textContent    = kaynak('youtube-arama') + kaynak('bulk-keyword');
-  document.getElementById('r-form').textContent  = kaynak('panel') + kaynak('manuel');
-
-  // Platform raporu
-  const igC = shorts.filter(r=>r['instagram-hesap']).length;
-  const ytC = shorts.filter(r=>r['youtube-hesap']).length;
-  const ttC = shorts.filter(r=>r['tiktok-hesap']).length;
-  document.getElementById('rp-content').innerHTML = `
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <div style="text-align:center;padding:8px 16px;background:rgba(225,48,108,.1);border-radius:6px">
-        <div style="font-size:24px;font-weight:800;color:#e1306c">${igC}</div>
-        <div style="font-size:9px;color:var(--mt)">Instagram</div>
-      </div>
-      <div style="text-align:center;padding:8px 16px;background:rgba(255,0,0,.1);border-radius:6px">
-        <div style="font-size:24px;font-weight:800;color:#ff0000">${ytC}</div>
-        <div style="font-size:9px;color:var(--mt)">YouTube</div>
-      </div>
-      <div style="text-align:center;padding:8px 16px;background:rgba(105,201,208,.1);border-radius:6px">
-        <div style="font-size:24px;font-weight:800;color:#69c9d0">${ttC}</div>
-        <div style="font-size:9px;color:var(--mt)">TikTok</div>
-      </div>
-    </div>`;
-
-  // Weekly bars rapor
-  const days = [0,1,2,3,4,5,6].map(i => { const d=new Date(now); d.setDate(d.getDate()-6+i); return d.toISOString().slice(0,10); });
-  const dc   = {}; urls.forEach(r => { const d=(r['istek-tarihi']||'').slice(0,10); if(d) dc[d]=(dc[d]||0)+1; });
-  const maxC = Math.max(...days.map(d=>dc[d]||0),1);
-  const rbars= document.querySelectorAll('#r-bars .bar');
-  days.forEach((d,i)=>{ if(rbars[i]) rbars[i].style.height=Math.max(10,(dc[d]||0)/maxC*100)+'%'; });
-
-  addLog('ok','sheets','Raporlar güncellendi');
-}
-
-// ═══════════════════════════════════════════════════════════════
-// PLATFORMLAR — Blotato'dan
-// ═══════════════════════════════════════════════════════════════
-const PLATFORM_LINKS = {
-  instagram: 'https://instagram.com/',
-  youtube:   'https://youtube.com/channel/',
-  tiktok:    'https://tiktok.com/@',
-};
-
-async function loadPlatforms() {
-  document.getElementById('plat-last').textContent = 'Yükleniyor...';
-  addLog('info','blotato','Platform bilgileri çekiliyor');
-
-  // Blotato'dan hesap bilgilerini çek
-  // Önce panel-data cache'inden bak
-  let d = S._panelCache?.accounts || null;
-  if (!d || !Object.keys(d).length) {
-    // n8n proxy üzerinden çek
-    const n8n = getN8N();
-    if (n8n) {
-      try {
-        const r = await fetch(n8n + '/webhook/blotato-accounts', { method: 'GET', mode: 'cors' });
-        if (r.ok) d = await r.json();
-      } catch(e) {}
-    }
-  }
-
-  S.blotatoAccounts = d;
-
-  const renderPlatform = (elId, accounts, platform, emoji, linkBase) => {
-    const el = document.getElementById(elId);
-    if (!accounts.length) { el.innerHTML = '<div style="color:var(--mt);font-size:10px;padding:8px">Hesap bulunamadı</div>'; return; }
-    el.innerHTML = accounts.map((acc, i) => {
-      const name    = acc.username || acc.name || acc.displayName || `Hesap ${i+1}`;
-      const accId   = acc.id || acc.accountId || acc._id || S.accounts[platform.slice(0,2).toLowerCase()][i] || '?';
-      const link    = acc.profileUrl || acc.url || (linkBase + (acc.username || ''));
-      const avatar  = acc.avatarUrl || acc.profilePicture || '';
-      return `
-        <div class="acc-card" onclick="window.open('${link}','_blank')" title="Sosyal medya hesabına git">
-          <div class="acc-info">
-            <div class="acc-icon pi-${platform.slice(0,2).toLowerCase()}">${emoji}</div>
-            <div>
-              <div class="acc-name">${name}</div>
-              <div class="acc-id">ID: ${accId}</div>
-            </div>
-          </div>
-          <span class="badge bi" style="font-size:8px">↗ Git</span>
-        </div>`;
-    }).join('');
-  };
-
-  // Blotato'dan geliyorsa categorize et
-  if (d) {
-    const allAccs = Array.isArray(d) ? d : (d.accounts || d.data || d.items || []);
-    const ig = allAccs.filter(a => a.platform === 'instagram' || a.type === 'INSTAGRAM');
-    const yt = allAccs.filter(a => a.platform === 'youtube'   || a.type === 'YOUTUBE');
-    const tt = allAccs.filter(a => a.platform === 'tiktok'    || a.type === 'TIKTOK');
-
-    if (ig.length) renderPlatform('pl-ig', ig, 'instagram', '📸', 'https://instagram.com/');
-    else renderFallbackPlatform('pl-ig', 'ig', '📸', 'pi-ig', 'https://instagram.com/');
-    if (yt.length) renderPlatform('pl-yt', yt, 'youtube', '▶', 'https://youtube.com/channel/');
-    else renderFallbackPlatform('pl-yt', 'yt', '▶', 'pi-yt', 'https://youtube.com/channel/');
-    if (tt.length) renderPlatform('pl-tt', tt, 'tiktok', '♪', 'https://tiktok.com/@');
-    else renderFallbackPlatform('pl-tt', 'tt', '♪', 'pi-tt', 'https://tiktok.com/@');
+  if (S._panelCache) {
+    shorts = S._panelCache.shorts||[];
+    urls   = S._panelCache.urls||[];
   } else {
-    renderFallbackPlatform('pl-ig', 'ig', '📸', 'pi-ig', 'https://instagram.com/');
-    renderFallbackPlatform('pl-yt', 'yt', '▶', 'pi-yt', 'https://youtube.com/channel/');
-    renderFallbackPlatform('pl-tt', 'tt', '♪', 'pi-tt', 'https://tiktok.com/@');
-    addLog('warn','blotato','Blotato API\'den hesap alınamadı — kayıtlı ID\'ler kullanılıyor');
+    const [sv,uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid2,'URL-Takip!A:Z')]);
+    shorts = parseSheet(sv); urls = parseSheet(uv);
   }
 
-  document.getElementById('plat-last').textContent = 'Son: ' + new Date().toLocaleTimeString('tr');
+  if (page==='kuyruk') {
+    const proc=urls.filter(r=>r['durum']==='Islemde'||r['durum']==='İşlemde');
+    setEl('kuyruk-last',new Date().toLocaleTimeString('tr'));
+    const tb=document.getElementById('kuyruk-tbody');
+    if(tb)tb.innerHTML=proc.length?proc.map(r=>'<tr><td class="uc" title="'+(r['youtube-url']||'')+'">'+(r['youtube-url']||'').slice(0,35)+'...</td><td><span class="badge bi">'+(r['kaynak']||'-')+'</span></td><td>'+(r['video-suresi-sn']||'-')+'</td><td>'+(r['bekleme-suresi-sn']||'-')+'</td><td><span class="badge bw2">Islemde</span></td><td>'+(r['istek-tarihi']||'-').slice(0,16)+'</td></tr>').join(''):'<tr><td colspan="6" style="text-align:center;color:var(--mt);padding:16px">Aktif islem yok</td></tr>';
+  }
+
+  if (page==='shortlist') {
+    const tb=document.getElementById('sl-tbody');
+    if(tb)tb.innerHTML=shorts.length?shorts.map(r=>'<tr><td class="uc" title="'+(r['title']||'')+'">'+(r['title']||'-').slice(0,30)+'</td><td>'+(r['score']||'-')+'</td><td>'+(r['duration-ms']?Math.round(parseInt(r['duration-ms'])/60000)+'dk':'-')+'</td><td><span class="badge bi">'+(r['instagram-hesap']||'-')+'</span></td><td><span class="badge bi">'+(r['youtube-hesap']||'-')+'</span></td><td><span class="badge bi">'+(r['tiktok-hesap']||'-')+'</span></td><td><span class="badge '+(r['platform-status']==='Bekliyor'?'bw2':'bs2')+'">'+(r['platform-status']||'-')+'</span></td><td>'+(r['created-at']||'-').slice(0,10)+'</td></tr>').join(''):'<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">Short bulunamadi</td></tr>';
+  }
+
+  if (page==='urltakip') {
+    const tb=document.getElementById('url-tbody');
+    if(tb)tb.innerHTML=urls.length?urls.map(r=>'<tr><td class="uc" title="'+(r['youtube-url']||'')+'">'+(r['youtube-url']||'').slice(0,35)+'...</td><td><span class="badge bi">'+(r['kaynak']||'-')+'</span></td><td>'+(r['video-suresi-sn']||'-')+'</td><td>'+(r['izlenme-sayisi']||'-')+'</td><td>'+(r['uretilen-short-sayisi']||'-')+'</td><td>'+(r['bekleme-suresi-sn']||'-')+'</td><td><span class="badge '+(r['durum']==='Islemde'||r['durum']==='İşlemde'?'bw2':'bs2')+'">'+(r['durum']||'-')+'</span></td><td>'+(r['istek-tarihi']||'-').slice(0,16)+'</td></tr>').join(''):'<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">URL bulunamadi</td></tr>';
+  }
+
+  if (page==='arsiv') {
+    const ks=(document.getElementById('ar-k')||{}).value||'';
+    const ds=(document.getElementById('ar-s')||{}).value||'';
+    const de=(document.getElementById('ar-e')||{}).value||'';
+    let arch=urls.filter(r=>r['durum']==='Tamamlandi'||r['durum']==='Tamamlandı');
+    if(ks)arch=arch.filter(r=>r['kaynak']===ks);
+    if(ds)arch=arch.filter(r=>r['istek-tarihi']>=ds);
+    if(de)arch=arch.filter(r=>r['istek-tarihi']<=de+'Z');
+    const tb=document.getElementById('ar-tbody');
+    if(tb)tb.innerHTML=arch.length?arch.map(r=>'<tr><td class="uc" title="'+(r['youtube-url']||'')+'">'+(r['youtube-url']||'').slice(0,35)+'...</td><td><span class="badge bi">'+(r['kaynak']||'-')+'</span></td><td>'+(r['uretilen-short-sayisi']||'-')+'</td><td>'+(r['proje-id']||'-')+'</td><td>'+(r['istek-tarihi']||'-').slice(0,16)+'</td></tr>').join(''):'<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">Arsiv bos</td></tr>';
+  }
+
+  addLog('ok','sheets',page+' yüklendi');
 }
 
-function renderFallbackPlatform(elId, platKey, emoji, iconClass, linkBase) {
-  const el   = document.getElementById(elId);
-  const accs = S.accounts[platKey];
-  el.innerHTML = accs.map((id, i) => `
-    <div class="acc-card" onclick="window.open('${linkBase}${id}','_blank')" title="Hesaba git">
-      <div class="acc-info">
-        <div class="acc-icon ${iconClass}">${emoji}</div>
-        <div>
-          <div class="acc-name">Hesap ${i+1}</div>
-          <div class="acc-id">ID: ${id}</div>
-        </div>
-      </div>
-      <span class="badge bi" style="font-size:8px">↗ Git</span>
-    </div>`).join('');
+// ═══════════════════════════════════════════════════════════
+// RAPORLAR
+// ═══════════════════════════════════════════════════════════
+async function loadReports() {
+  addLog('info','sheets','Raporlar yukleniyor');
+  let shorts=[], urls=[];
+  if (S._panelCache) {
+    shorts=S._panelCache.shorts||[]; urls=S._panelCache.urls||[];
+  } else {
+    const sid=S.cfg.sheet||'';
+    const [sv,uv]=await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid,'URL-Takip!A:Z')]);
+    shorts=parseSheet(sv); urls=parseSheet(uv);
+  }
+  const now=new Date();
+  const wa=new Date(now-7*864e5), ma=new Date(now-30*864e5);
+  const wu=urls.filter(r=>new Date(r['istek-tarihi'])>=wa);
+  const ws=shorts.filter(r=>new Date(r['created-at'])>=wa);
+  setEl('rh-url',  wu.length);
+  setEl('rh-short',ws.length);
+  setEl('rh-avg',  wu.length?(ws.length/wu.length).toFixed(1):'—');
+  setEl('rh-rate', wu.length?Math.round(wu.filter(r=>r['durum']==='Tamamlandi'||r['durum']==='Tamamlandı').length/wu.length*100)+'%':'—');
+  setEl('ra-url',  urls.filter(r=>new Date(r['istek-tarihi'])>=ma).length);
+  setEl('ra-short',shorts.filter(r=>new Date(r['created-at'])>=ma).length);
+  const kSrc=k=>urls.filter(r=>r['kaynak']===k).length;
+  setEl('r-drive',kSrc('drive'));
+  setEl('r-yt',kSrc('youtube-arama')+kSrc('bulk-keyword'));
+  setEl('r-form',kSrc('panel')+kSrc('manuel'));
+  const igC=shorts.filter(r=>r['instagram-hesap']).length;
+  const ytC=shorts.filter(r=>r['youtube-hesap']).length;
+  const ttC=shorts.filter(r=>r['tiktok-hesap']).length;
+  const rpEl=document.getElementById('rp-content');
+  if(rpEl)rpEl.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="text-align:center;padding:8px 16px;background:rgba(225,48,108,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#e1306c">'+igC+'</div><div style="font-size:9px;color:var(--mt)">Instagram</div></div><div style="text-align:center;padding:8px 16px;background:rgba(255,0,0,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#f00">'+ytC+'</div><div style="font-size:9px;color:var(--mt)">YouTube</div></div><div style="text-align:center;padding:8px 16px;background:rgba(105,201,208,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#69c9d0">'+ttC+'</div><div style="font-size:9px;color:var(--mt)">TikTok</div></div></div>';
+  const dc={};
+  urls.forEach(r=>{const d=(r['istek-tarihi']||'').slice(0,10);if(d)dc[d]=(dc[d]||0)+1;});
+  const maxC=Math.max(...[0,1,2,3,4,5,6].map(i=>{const d=new Date(now);d.setDate(d.getDate()-6+i);return dc[d.toISOString().slice(0,10)]||0;}),1);
+  const rbars=document.querySelectorAll('#r-bars .bar');
+  [0,1,2,3,4,5,6].forEach((i,idx)=>{const d=new Date(now);d.setDate(d.getDate()-6+i);const c=dc[d.toISOString().slice(0,10)]||0;if(rbars[idx])rbars[idx].style.height=Math.max(10,c/maxC*100)+'%';});
+  addLog('ok','sheets','Raporlar guncellendi');
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// PLATFORMLAR
+// ═══════════════════════════════════════════════════════════
+async function loadPlatforms() {
+  setEl('plat-last','Yukleniyor...');
+  addLog('info','blotato','Platform bilgileri cekiliyor');
+  let d = S._panelCache?.accounts || null;
+  if (!d||!Object.keys(d).length) {
+    d = await n8nGet('/webhook/blotato-accounts');
+  }
+  S.blotatoAccounts=d;
+  const n8nOk = !!d;
+  if (d && (d.instagram||d.youtube||d.tiktok)) {
+    renderPlatEl('pl-ig', d.instagram||[], 'pi-ig','📸','https://instagram.com/');
+    renderPlatEl('pl-yt', d.youtube||[], 'pi-yt','▶','https://youtube.com/channel/');
+    renderPlatEl('pl-tt', d.tiktok||[], 'pi-tt','♪','https://tiktok.com/@');
+  } else if (d) {
+    const all=Array.isArray(d)?d:(d.data||d.accounts||d.items||[]);
+    renderPlatEl('pl-ig',all.filter(a=>a.platform==='instagram'||a.type==='INSTAGRAM'),'pi-ig','📸','https://instagram.com/');
+    renderPlatEl('pl-yt',all.filter(a=>a.platform==='youtube'||a.type==='YOUTUBE'),'pi-yt','▶','https://youtube.com/channel/');
+    renderPlatEl('pl-tt',all.filter(a=>a.platform==='tiktok'||a.type==='TIKTOK'),'pi-tt','♪','https://tiktok.com/@');
+  } else {
+    fallbackPlat('pl-ig','ig','📸','pi-ig','https://instagram.com/');
+    fallbackPlat('pl-yt','yt','▶','pi-yt','https://youtube.com/channel/');
+    fallbackPlat('pl-tt','tt','♪','pi-tt','https://tiktok.com/@');
+    addLog('warn','blotato','Blotato API yanitlamadi — kayitli ID\'ler kullaniliyor');
+  }
+  setEl('plat-last','Son: '+new Date().toLocaleTimeString('tr'));
+}
+
+function renderPlatEl(elId, accs, iconCls, emoji, linkBase) {
+  const el=document.getElementById(elId);
+  if(!el)return;
+  if(!accs.length){fallbackPlat(elId, iconCls.replace('pi-',''), emoji, iconCls, linkBase);return;}
+  el.innerHTML=accs.map((a,i)=>{
+    const name=a.username||a.name||a.displayName||('Hesap '+(i+1));
+    const id=a.id||a.accountId||a._id||'?';
+    const link=a.profileUrl||a.url||(linkBase+(a.username||id));
+    return '<div class="acc-card" onclick="window.open(\''+link+'\',\'_blank\')" title="Sosyal medyaya git"><div class="acc-info"><div class="acc-icon '+iconCls+'">'+emoji+'</div><div><div class="acc-name">'+name+'</div><div class="acc-id">ID: '+id+'</div></div></div><span class="badge bi" style="font-size:8px">Ac ↗</span></div>';
+  }).join('');
+}
+
+function fallbackPlat(elId, platKey, emoji, iconCls, linkBase) {
+  const el=document.getElementById(elId);
+  const accs=S.accounts[platKey]||[];
+  if(el)el.innerHTML=accs.map((id,i)=>'<div class="acc-card" onclick="window.open(\''+linkBase+id+'\',\'_blank\')"><div class="acc-info"><div class="acc-icon '+iconCls+'">'+emoji+'</div><div><div class="acc-name">Hesap '+(i+1)+'</div><div class="acc-id">ID: '+id+'</div></div></div><span class="badge bi" style="font-size:8px">Ac ↗</span></div>').join('');
+}
+
+// ═══════════════════════════════════════════════════════════
 // AYARLAR
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function updateWHs() {
-  const base = (document.getElementById('cfg-n8n').value || '').trim().replace(/\/$/, '');
-  S.cfg.n8n = base;
-  const paths = { 'wh-video': '/webhook/video-gonder', 'wh-ytara': '/webhook/youtube-ara', 'wh-bulk': '/webhook/bulk-keywords' };
-  Object.entries(paths).forEach(([id, path]) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = base ? base + path : path;
-  });
-  const svEl = document.getElementById('sv-wh-display');
-  if (svEl) svEl.textContent = base ? base + '/webhook/video-gonder' : '/webhook/video-gonder';
+  const base=(document.getElementById('cfg-n8n')||{}).value||'';
+  const b=base.trim().replace(/\/$/,'');
+  S.cfg.n8n=b;
+  const map={'wh-video':'/webhook/video-gonder','wh-ytara':'/webhook/youtube-ara','wh-bulk':'/webhook/bulk-keywords'};
+  Object.entries(map).forEach(([id,p])=>{const el=document.getElementById(id);if(el)el.textContent=b?b+p:p;});
+  const sv=document.getElementById('sv-wh-display');
+  if(sv)sv.textContent=b?b+'/webhook/video-gonder':'/webhook/video-gonder';
+  const conn=document.getElementById('conn-status');
+  if(conn)conn.textContent=b?'Bagli':'URL girilmedi';
 }
 
 function saveSettings() {
-  S.cfg = {
-    n8n:    document.getElementById('cfg-n8n').value.trim(),
-    shkey:  document.getElementById('cfg-shkey').value.trim(),
-    sheet:  document.getElementById('cfg-sheet').value.trim(),
-    sheet2: document.getElementById('cfg-sheet2').value.trim(),
-    blot:   document.getElementById('cfg-blot').value.trim(),
+  S.cfg={
+    n8n:   (document.getElementById('cfg-n8n')||{}).value||'',
+    shkey: (document.getElementById('cfg-shkey')||{}).value||'',
+    sheet: (document.getElementById('cfg-sheet')||{}).value||'',
+    sheet2:(document.getElementById('cfg-sheet2')||{}).value||'',
+    blot:  (document.getElementById('cfg-blot')||{}).value||'',
   };
-  S.limits = {
-    ig:    parseInt(document.getElementById('cfg-ig-lim').value) || 10,
-    yt:    parseInt(document.getElementById('cfg-yt-lim').value) || 10,
-    tt:    parseInt(document.getElementById('cfg-tt-lim').value) || 10,
-    start: document.getElementById('cfg-start').value,
-    end:   document.getElementById('cfg-end').value,
+  S.limits={
+    ig:    parseInt((document.getElementById('cfg-ig-lim')||{}).value||10),
+    yt:    parseInt((document.getElementById('cfg-yt-lim')||{}).value||10),
+    tt:    parseInt((document.getElementById('cfg-tt-lim')||{}).value||10),
+    start: (document.getElementById('cfg-start')||{}).value||'08:00',
+    end:   (document.getElementById('cfg-end')||{}).value||'22:00',
   };
-  localStorage.setItem('op_cfg',   JSON.stringify(S.cfg));
-  localStorage.setItem('op_lim',   JSON.stringify(S.limits));
-  document.getElementById('cfg-ok').style.display = 'block';
-  setTimeout(() => document.getElementById('cfg-ok').style.display='none', 2500);
-  updateWHs();
-  genLimCode();
+  localStorage.setItem('op_cfg', JSON.stringify(S.cfg));
+  localStorage.setItem('op_lim', JSON.stringify(S.limits));
+  setStyle('cfg-ok','display','block');
+  setTimeout(()=>setStyle('cfg-ok','display','none'),2500);
+  updateWHs(); genLimCode();
   addLog('ok','sistem','Ayarlar kaydedildi');
 }
 
 function genLimCode() {
-  const code = `const INSTAGRAM_GUNLUK_MAX = ${S.limits.ig};
-const TIKTOK_GUNLUK_MAX    = ${S.limits.tt};
-const YOUTUBE_GUNLUK_MAX   = ${S.limits.yt};
-const BASLANGIC_SAAT = ${parseInt(S.limits.start)};
-const BITIS_SAAT     = ${parseInt(S.limits.end)};`;
-  const el = document.getElementById('lim-code');
-  if (el) { el.value = code; document.getElementById('lim-code-wrap').style.display = 'block'; }
+  const code='const INSTAGRAM_GUNLUK_MAX = '+S.limits.ig+';\nconst TIKTOK_GUNLUK_MAX    = '+S.limits.tt+';\nconst YOUTUBE_GUNLUK_MAX   = '+S.limits.yt+';\nconst BASLANGIC_SAAT = '+parseInt(S.limits.start)+';\nconst BITIS_SAAT     = '+parseInt(S.limits.end)+';';
+  const el=document.getElementById('lim-code');
+  if(el){el.value=code;setStyle('lim-code-wrap','display','block');}
 }
 
 function loadSettings() {
-  const c = S.cfg;
-  if (c.n8n)    { document.getElementById('cfg-n8n').value = c.n8n; updateWHs(); }
-  if (c.shkey)  document.getElementById('cfg-shkey').value = c.shkey;
-  if (c.sheet)  document.getElementById('cfg-sheet').value = c.sheet;
-  if (c.sheet2) document.getElementById('cfg-sheet2').value = c.sheet2;
-  if (c.blot)   document.getElementById('cfg-blot').value = c.blot;
-  if (S.limits.ig)  document.getElementById('cfg-ig-lim').value = S.limits.ig;
-  if (S.limits.yt)  document.getElementById('cfg-yt-lim').value = S.limits.yt;
-  if (S.limits.tt)  document.getElementById('cfg-tt-lim').value = S.limits.tt;
-  if (S.limits.start) document.getElementById('cfg-start').value = S.limits.start;
-  if (S.limits.end)   document.getElementById('cfg-end').value   = S.limits.end;
+  const c=S.cfg;
+  const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
+  set('cfg-n8n',c.n8n); set('cfg-shkey',c.shkey); set('cfg-sheet',c.sheet);
+  set('cfg-sheet2',c.sheet2); set('cfg-blot',c.blot);
+  set('cfg-ig-lim',S.limits.ig); set('cfg-yt-lim',S.limits.yt); set('cfg-tt-lim',S.limits.tt);
+  set('cfg-start',S.limits.start); set('cfg-end',S.limits.end);
+  if(c.n8n) updateWHs();
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // HESAPLAR
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 function renderAccInputs() {
-  const mk = (id, accs) => {
-    document.getElementById(id).innerHTML = accs.map((a, i) => `
-      <div class="fg"><label>Hesap ${i+1}</label>
-        <input value="${a}" data-plat="${id.split('-')[0]}" data-i="${i}" oninput="updateAcc(this)"/>
-      </div>`).join('');
+  const mk=(id,accs)=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.innerHTML=accs.map((a,i)=>'<div class="fg"><label>Hesap '+(i+1)+'</label><input value="'+a+'" data-plat="'+id.split('-')[0]+'" data-i="'+i+'" oninput="updateAcc(this)"/></div>').join('');
   };
-  mk('ig-inputs', S.accounts.ig);
-  mk('yt-inputs', S.accounts.yt);
-  mk('tt-inputs', S.accounts.tt);
+  mk('ig-inputs',S.accounts.ig); mk('yt-inputs',S.accounts.yt); mk('tt-inputs',S.accounts.tt);
 }
 
 function updateAcc(el) {
-  const k = el.dataset.plat;
-  S.accounts[k][parseInt(el.dataset.i)] = el.value;
-  localStorage.setItem('op_' + k, JSON.stringify(S.accounts[k]));
+  const k=el.dataset.plat;
+  S.accounts[k][parseInt(el.dataset.i)]=el.value;
+  localStorage.setItem('op_'+k,JSON.stringify(S.accounts[k]));
 }
 
 function genAccCode() {
-  const code = `const INSTAGRAM_HESAPLAR = [${S.accounts.ig.map(a=>'"'+a+'"').join(',')}];
-const TIKTOK_HESAPLAR    = [${S.accounts.tt.map(a=>'"'+a+'"').join(',')}];
-const YOUTUBE_HESAPLAR   = [${S.accounts.yt.map(a=>'"'+a+'"').join(',')}];`;
-  document.getElementById('acc-code').value = code;
-  document.getElementById('acc-code-wrap').style.display = 'block';
-  addLog('ok','sistem','Hesap kodu üretildi');
+  const code='const INSTAGRAM_HESAPLAR = ['+S.accounts.ig.map(a=>'"'+a+'"').join(',')+'];\nconst TIKTOK_HESAPLAR    = ['+S.accounts.tt.map(a=>'"'+a+'"').join(',')+'];\nconst YOUTUBE_HESAPLAR   = ['+S.accounts.yt.map(a=>'"'+a+'"').join(',')+'];';
+  const el=document.getElementById('acc-code');
+  if(el){el.value=code;setStyle('acc-code-wrap','display','block');}
+  addLog('ok','sistem','Hesap kodu uretildi');
 }
 
-// ═══════════════════════════════════════════════════════════════
-// LOGLAR — yapılandırılmış, tarih/saat, kategori, seviye
-// ═══════════════════════════════════════════════════════════════
-const CAT_COLORS = { webhook:'#00e5ff', sheets:'#7c3aed', blotato:'#f59e0b', drive:'#10b981', sistem:'#64748b', bulk:'#ff3566' };
-const SEV_COLORS = { info:'#00e5ff', ok:'#10b981', warn:'#f59e0b', err:'#ef4444' };
+// ═══════════════════════════════════════════════════════════
+// LOGLAR
+// ═══════════════════════════════════════════════════════════
+const CAT_C={webhook:'#00e5ff',sheets:'#7c3aed',blotato:'#f59e0b',drive:'#10b981',sistem:'#64748b',bulk:'#ff3566'};
+const SEV_C={info:'#00e5ff',ok:'#10b981',warn:'#f59e0b',err:'#ef4444'};
 
-function addLog(sev, cat, msg) {
-  const entry = {
-    t:   new Date().toISOString(),
-    sev, cat,
-    msg
-  };
-  S.logs.unshift(entry);
-  if (S.logs.length > 500) S.logs.pop();
-  localStorage.setItem('op_logs', JSON.stringify(S.logs.slice(0,200)));
-  renderLogs();
-  updateLogStats();
+function addLog(sev,cat,msg) {
+  S.logs.unshift({t:new Date().toISOString(),sev,cat,msg});
+  if(S.logs.length>500)S.logs.pop();
+  try{localStorage.setItem('op_logs',JSON.stringify(S.logs.slice(0,200)));}catch(e){}
+  renderLogs(); updateLogStats();
 }
 
 function renderLogs() {
-  const sevF  = document.getElementById('log-sev')?.value || '';
-  const catF  = document.getElementById('log-cat')?.value || '';
-  const dateF = document.getElementById('log-date')?.value || '';
-  const srchF = (document.getElementById('log-search')?.value || '').toLowerCase();
-  const el    = document.getElementById('log-out');
-  if (!el) return;
-
-  const filtered = S.logs.filter(l => {
-    if (sevF && l.sev !== sevF) return false;
-    if (catF && l.cat !== catF) return false;
-    if (dateF && !l.t.startsWith(dateF)) return false;
-    if (srchF && !l.msg.toLowerCase().includes(srchF)) return false;
+  const el=document.getElementById('log-out');
+  if(!el)return;
+  const sf=(document.getElementById('log-sev')||{}).value||'';
+  const cf=(document.getElementById('log-cat')||{}).value||'';
+  const df=(document.getElementById('log-date')||{}).value||'';
+  const qf=((document.getElementById('log-search')||{}).value||'').toLowerCase();
+  const rows=S.logs.filter(l=>{
+    if(sf&&l.sev!==sf)return false;
+    if(cf&&l.cat!==cf)return false;
+    if(df&&!l.t.startsWith(df))return false;
+    if(qf&&!l.msg.toLowerCase().includes(qf))return false;
     return true;
-  }).slice(0, 300);
-
-  if (!filtered.length) { el.innerHTML = '<div style="color:var(--mt);padding:8px;text-align:center">Log bulunamadı</div>'; return; }
-
-  el.innerHTML = filtered.map(l => {
-    const dt      = new Date(l.t);
-    const timeStr = dt.toLocaleDateString('tr') + ' ' + dt.toLocaleTimeString('tr');
-    const catCol  = CAT_COLORS[l.cat] || '#64748b';
-    const sevCol  = SEV_COLORS[l.sev] || '#dde4f0';
-    return `<div class="ll">
-      <span class="lt">${timeStr}</span>
-      <span class="lcat" style="color:${catCol}">${l.cat}</span>
-      <span class="lv ${l.sev}" style="color:${sevCol}">${l.sev.toUpperCase()}</span>
-      <span class="lm">${l.msg}</span>
-    </div>`;
+  }).slice(0,300);
+  if(!rows.length){el.innerHTML='<div style="color:var(--mt);padding:8px;text-align:center">Log bulunamadi</div>';return;}
+  el.innerHTML=rows.map(l=>{
+    const dt=new Date(l.t);
+    const ts=dt.toLocaleDateString('tr')+' '+dt.toLocaleTimeString('tr');
+    return '<div class="ll"><span class="lt">'+ts+'</span><span class="lcat" style="color:'+(CAT_C[l.cat]||'#64748b')+'">'+l.cat+'</span><span class="lv '+l.sev+'" style="color:'+(SEV_C[l.sev]||'#dde4f0')+'">'+l.sev.toUpperCase()+'</span><span class="lm">'+l.msg+'</span></div>';
   }).join('');
 }
 
 function updateLogStats() {
-  const el = document.getElementById('log-stats');
-  if (!el) return;
-  const counts = {};
-  S.logs.forEach(l => counts[l.sev] = (counts[l.sev]||0)+1);
-  el.innerHTML = Object.entries(SEV_COLORS).map(([s,c]) =>
-    `<span class="badge" style="background:${c}22;color:${c}">${s.toUpperCase()}: ${counts[s]||0}</span>`
-  ).join('');
+  const el=document.getElementById('log-stats');
+  if(!el)return;
+  const c={};S.logs.forEach(l=>c[l.sev]=(c[l.sev]||0)+1);
+  el.innerHTML=Object.entries(SEV_C).map(([s,col])=>'<span class="badge" style="background:'+col+'22;color:'+col+'">'+s.toUpperCase()+': '+(c[s]||0)+'</span>').join('');
 }
 
-function clearLogs() { S.logs = []; localStorage.removeItem('op_logs'); renderLogs(); updateLogStats(); }
-function exportLogs() {
-  const txt = S.logs.map(l => `${l.t} [${l.cat}] [${l.sev.toUpperCase()}] ${l.msg}`).join('\n');
-  dl('opus_logs.txt', txt);
-}
-
-function toggleAutoLog() {
+function clearLogs(){S.logs=[];try{localStorage.removeItem('op_logs');}catch(e){}renderLogs();updateLogStats();}
+function exportLogs(){dl('opus_logs.txt',S.logs.map(l=>l.t+' ['+l.cat+'] ['+l.sev.toUpperCase()+'] '+l.msg).join('\n'));}
+function toggleAutoLog(){
   clearInterval(S.logTimer);
-  if (document.getElementById('log-auto')?.checked) {
-    S.logTimer = setInterval(() => addLog('info','sistem','Heartbeat — sistem aktif'), 60000);
-  }
+  if((document.getElementById('log-auto')||{}).checked)
+    S.logTimer=setInterval(()=>addLog('info','sistem','Heartbeat - sistem aktif'),60000);
 }
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // UTILS
-// ═══════════════════════════════════════════════════════════════
-function showRes(id, msg, type) {
-  const el = document.getElementById(id); if (!el) return;
-  el.className = 'res ' + type; el.textContent = msg; el.style.display = 'block';
-}
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-function copyText(txt) { navigator.clipboard.writeText(txt).then(() => addLog('ok','sistem','Kopyalandı')); }
-function dl(name, content) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([content],{type:'text/plain'})); a.download = name; a.click(); }
-function filterTbl(tbodyId, searchId) {
-  const q = document.getElementById(searchId)?.value.toLowerCase() || '';
-  document.querySelectorAll('#' + tbodyId + ' tr').forEach(tr => {
-    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
-  });
-}
-function exportCSV(tbodyId, name) {
-  const rows = [];
-  const tb = document.getElementById(tbodyId);
-  if (!tb) return;
-  const ths = tb.closest('table')?.querySelectorAll('thead th');
-  if (ths) rows.push([...ths].map(t=>t.textContent).join(','));
-  tb.querySelectorAll('tr').forEach(tr => {
-    if (tr.style.display==='none') return;
-    rows.push([...tr.querySelectorAll('td')].map(t=>'"'+t.textContent.replace(/"/g,'""')+'"').join(','));
-  });
-  dl(name+'.csv', rows.join('\n'));
-}
-function saveSent() { localStorage.setItem('op_sent', JSON.stringify([...S.sentURLs])); document.getElementById('dr-sent-cnt') && (document.getElementById('dr-sent-cnt').textContent = S.sentURLs.size); }
+// ═══════════════════════════════════════════════════════════
+function setEl(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+function setStyle(id,prop,v){const e=document.getElementById(id);if(e)e.style[prop]=v;}
+function showRes(id,msg,type){const e=document.getElementById(id);if(!e)return;e.className='res '+type;e.textContent=msg;e.style.display='block';}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+function copyText(txt){navigator.clipboard.writeText(txt).then(()=>addLog('ok','sistem','Kopyalandi'));}
+function dl(name,content){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'text/plain'}));a.download=name;a.click();}
+function filterTbl(tbodyId,searchId){const q=(document.getElementById(searchId)||{}).value||'';document.querySelectorAll('#'+tbodyId+' tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
+function exportCSV(tbodyId,name){const rows=[];const tb=document.getElementById(tbodyId);if(!tb)return;const ths=tb.closest('table')?.querySelectorAll('thead th');if(ths)rows.push([...ths].map(t=>t.textContent).join(','));tb.querySelectorAll('tr').forEach(tr=>{if(tr.style.display==='none')return;rows.push([...tr.querySelectorAll('td')].map(t=>'"'+t.textContent.replace(/"/g,'""')+'"').join(','));});dl(name+'.csv',rows.join('\n'));}
+function saveSent(){try{localStorage.setItem('op_sent',JSON.stringify([...S.sentURLs]));}catch(e){}setEl('dr-sent-cnt',S.sentURLs.size);}
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // INIT
-// ═══════════════════════════════════════════════════════════════
-(function init() {
-  loadSettings();
-  renderSearchHist();
-  renderKWTags();
-  renderAccInputs();
-  renderCatGrid();
-  updateLogStats();
-  renderSentURLs();
-  document.getElementById('conn-status').textContent = S.cfg.n8n ? 'Bağlı' : 'URL girilmedi';
-  addLog('ok','sistem','Panel v3 başlatıldı');
-  // Sheet ID placeholder
-  const sid = S.cfg.sheet;
-  if (sid) {
-    document.getElementById('cfg-sheet').value = sid;
-  }
-  // Sent URLs sayacı
-  const drSent = document.getElementById('dr-sent-cnt');
-  if (drSent) drSent.textContent = S.sentURLs.size;
-  toggleAutoLog();
-  // Dash son güncelleme
-  document.getElementById('dash-last').textContent = 'Güncelle butonuna tıklayın';
+// ═══════════════════════════════════════════════════════════
+(function init(){
+  try{
+    loadSettings();
+    renderSearchHist();
+    renderKWTags();
+    renderAccInputs();
+    renderCatGrid();
+    renderSentURLs();
+    updateLogStats();
+    setEl('conn-status', S.cfg.n8n?'Bagli':'URL girilmedi');
+    setEl('dr-sent-cnt', S.sentURLs.size);
+    addLog('ok','sistem','Panel v3 baslatildi');
+    toggleAutoLog();
+  }catch(e){console.error('Init hatasi:',e);}
 })();
 </script>
 </body>
