@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v3</title>
+<title>OPUS PRO v3.1</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -195,6 +195,15 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 <!-- DASHBOARD -->
 <div id="page-dashboard" class="page active">
   <div class="ph"><div class="pt">Dashboard</div><div class="ps">Canlı veriler — Blotato + Google Sheets</div></div>
+  <div id="sheets-hint" class="alert aw" style="display:none;margin-bottom:10px">
+    <span>⚠</span>
+    <div>
+      <b>Sheets API 403:</b> Aşağıdakilerden birini yap:<br>
+      1. Google Sheet → Paylaş → "Bağlantıya sahip herkes görüntüleyebilir" yap<br>
+      2. Google Cloud Console → API Key → Kısıtlamaları kaldır<br>
+      3. Ayarlar'dan n8n URL giriliyse bu sorun olmaz (n8n proxy kullanılır)
+    </div>
+  </div>
   <div class="alert ai" style="margin-bottom:10px">
     <span>ℹ</span>
     <span>Veriler <b>Google Sheets API</b> üzerinden çekilir. Ayarlar → <b>Google Sheets API Key</b> ve <b>Sheet ID</b> girin. Daha sonra <b>Yenile</b>'ye tıklayın.</span>
@@ -803,16 +812,42 @@ async function faf(url, body) {
   });
 }
 
-// Google Sheets API
+// Google Sheets API — önce n8n proxy, yoksa doğrudan
 async function sheetsGet(sheetId, range) {
+  // Önce n8n panel-data cache'ini dene
+  if (S._panelCache) {
+    const rangeUpper = range.toLowerCase();
+    if (rangeUpper.includes('url-takip')) return objToValues(S._panelCache.urls);
+    if (rangeUpper.includes('sheet1'))   return objToValues(S._panelCache.shorts);
+    return null;
+  }
+  // Doğrudan Sheets API
   const key = S.cfg.shkey;
   if (!key || !sheetId) return null;
   try {
-    const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${key}`);
+    const r = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(range)}?key=${key}`
+    );
+    if (r.status === 403) {
+      addLog('err','sheets','HTTP 403: Tabloyu "Herkes görüntüleyebilir" yapın veya API Key kısıtını kaldırın');
+      showSheetsHint();
+      return null;
+    }
     if (!r.ok) { addLog('err','sheets','Sheets API: HTTP ' + r.status); return null; }
     const d = await r.json();
     return d.values || [];
   } catch(e) { addLog('err','sheets','Sheets API: ' + e.message); return null; }
+}
+
+function objToValues(arr) {
+  if (!arr || !arr.length) return null;
+  const headers = Object.keys(arr[0]);
+  return [headers, ...arr.map(row => headers.map(h => row[h] || ''))];
+}
+
+function showSheetsHint() {
+  const hint = document.getElementById('sheets-hint');
+  if (hint) hint.style.display = 'block';
 }
 
 function parseSheet(values) {
@@ -825,16 +860,17 @@ function parseSheet(values) {
   });
 }
 
-// Blotato API
+// Blotato API — n8n proxy üzerinden
 async function blotatoGet(path) {
-  const key = S.cfg.blot || 'blt_A+qr0A1o9wct4vhi00VgqA1oloI2w8vhHThOAyFTI4A=';
+  const n8n = getN8N();
+  if (!n8n) { addLog('warn','blotato','n8n URL girilmemiş'); return null; }
   try {
-    const r = await fetch('https://backend.blotato.com' + path, {
-      headers: { 'blotato-api-key': key }
-    });
-    if (!r.ok) return null;
+    // Blotato accounts için özel endpoint
+    const proxyPath = path.includes('accounts') ? '/webhook/blotato-accounts' : '/webhook/panel-data';
+    const r = await fetch(n8n + proxyPath, { method: 'GET', mode: 'cors' });
+    if (!r.ok) { addLog('warn','blotato','Blotato proxy: HTTP ' + r.status); return null; }
     return await r.json();
-  } catch(e) { addLog('warn','blotato','Blotato API: ' + e.message); return null; }
+  } catch(e) { addLog('warn','blotato','Blotato proxy: ' + e.message); return null; }
 }
 
 async function testWH(whId, resId) {
@@ -852,26 +888,102 @@ async function refreshDash() {
   document.getElementById('dash-last').textContent = 'Güncelleniyor...';
   addLog('info','sistem','Dashboard yenileniyor');
 
+  const n8n  = getN8N();
+  let shorts = [], urls = [], sched = [], accounts = {};
+
+  if (n8n) {
+    // n8n panel-data proxy kullan
+    try {
+      addLog('info','webhook','Panel data çekiliyor: ' + n8n + '/webhook/panel-data');
+      const r = await fetch(n8n + '/webhook/panel-data', { method: 'GET', mode: 'cors' });
+      if (r.ok) {
+        const d   = await r.json();
+        shorts    = d.shorts   || [];
+        urls      = d.urls     || [];
+        sched     = d.scheduled|| [];
+        accounts  = d.accounts || {};
+        S._panelCache = d;
+        addLog('ok','webhook',`Panel data alındı: ${shorts.length} short, ${urls.length} URL`);
+      } else {
+        addLog('warn','webhook','Panel data: HTTP ' + r.status + ' — Sheets API'ye geçiliyor');
+        await loadFromSheetsDirectly();
+        return;
+      }
+    } catch(e) {
+      addLog('warn','webhook','Panel data proxy hatası: ' + e.message + ' — Sheets API'ye geçiliyor');
+      await loadFromSheetsDirectly();
+      return;
+    }
+  } else {
+    await loadFromSheetsDirectly();
+    return;
+  }
+
+  S.sheetData = { shorts, urls };
+  updateDashUI(shorts, urls, sched);
+}
+
+async function loadFromSheetsDirectly() {
+  addLog('info','sheets','Sheets API üzerinden çekiliyor...');
   const sid  = S.cfg.sheet  || '';
   const sid2 = S.cfg.sheet2 || sid;
-
-  const [shortVals, urlVals, schedPosts] = await Promise.all([
+  const [sv, uv] = await Promise.all([
     sheetsGet(sid,  'Sheet1!A:Z'),
     sheetsGet(sid2, 'URL-Takip!A:Z'),
-    blotatoGet('/v2/posts?status=scheduled&limit=200')
   ]);
-
-  const shorts = parseSheet(shortVals);
-  const urls   = parseSheet(urlVals);
+  const shorts = parseSheet(sv);
+  const urls   = parseSheet(uv);
   S.sheetData  = { shorts, urls };
+  updateDashUI(shorts, urls, [], {});
+}
+
+async function refreshDash_inner() {
+  document.getElementById('dash-last').textContent = 'Güncelleniyor...';
+  addLog('info','sistem','Dashboard yenileniyor');
+  await refreshDash();
+}
+
+async function refreshDash() {
+  document.getElementById('dash-last').textContent = 'Güncelleniyor...';
+  addLog('info','sistem','Dashboard yenileniyor');
+  const n8n = getN8N();
+  let shorts = [], urls = [], sched = [];
+
+  if (n8n) {
+    try {
+      const r = await fetch(n8n + '/webhook/panel-data', { method: 'GET', mode: 'cors' });
+      if (r.ok) {
+        const d = await r.json();
+        shorts = d.shorts || []; urls = d.urls || []; sched = d.scheduled || [];
+        S._panelCache = d;
+        addLog('ok','webhook',`Panel data: ${shorts.length} short, ${urls.length} URL`);
+      } else {
+        addLog('warn','webhook','n8n panel-data: HTTP ' + r.status);
+        const sid = S.cfg.sheet || '';
+        const [sv, uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'), sheetsGet(sid,'URL-Takip!A:Z')]);
+        shorts = parseSheet(sv); urls = parseSheet(uv);
+      }
+    } catch(e) {
+      addLog('warn','webhook', e.message);
+      const sid = S.cfg.sheet || '';
+      const [sv, uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'), sheetsGet(sid,'URL-Takip!A:Z')]);
+      shorts = parseSheet(sv); urls = parseSheet(uv);
+    }
+  } else {
+    const sid = S.cfg.sheet || '';
+    const [sv, uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'), sheetsGet(sid,'URL-Takip!A:Z')]);
+    shorts = parseSheet(sv); urls = parseSheet(uv);
+  }
+
+  S.sheetData = { shorts, urls };
 
   // Stats
   document.getElementById('d-url').textContent   = urls.length   || S.sentURLs.size || '—';
   document.getElementById('d-short').textContent = shorts.length || '—';
   document.getElementById('d-proc').textContent  = urls.filter(r => r['durum'] === 'İşlemde').length || '—';
 
-  const sched = schedPosts?.data || schedPosts?.posts || [];
-  document.getElementById('d-sched').textContent = Array.isArray(sched) ? sched.length : '—';
+  const schedPosts = sched;
+  document.getElementById('d-sched').textContent = Array.isArray(schedPosts) ? schedPosts.length : '—';
 
   // Platform counts
   const igC = shorts.filter(r => r['instagram-hesap']).length;
@@ -1470,9 +1582,18 @@ async function loadPlatforms() {
   addLog('info','blotato','Platform bilgileri çekiliyor');
 
   // Blotato'dan hesap bilgilerini çek
-  let d = await blotatoGet('/v2/accounts');
-  if (!d) d = await blotatoGet('/v2/social-accounts');
-  if (!d) d = await blotatoGet('/v2/profiles');
+  // Önce panel-data cache'inden bak
+  let d = S._panelCache?.accounts || null;
+  if (!d || !Object.keys(d).length) {
+    // n8n proxy üzerinden çek
+    const n8n = getN8N();
+    if (n8n) {
+      try {
+        const r = await fetch(n8n + '/webhook/blotato-accounts', { method: 'GET', mode: 'cors' });
+        if (r.ok) d = await r.json();
+      } catch(e) {}
+    }
+  }
 
   S.blotatoAccounts = d;
 
