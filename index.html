@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v3.2</title>
+<title>OPUS PRO v3</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -269,6 +269,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
       <div class="card">
         <div class="ct">Toplu URL</div>
         <div class="fg"><label>URL Listesi (her satıra bir)</label><textarea id="bv-urls" style="height:90px" placeholder="https://youtube.com/watch?v=AAA&#10;https://youtube.com/watch?v=BBB"></textarea></div>
+        <div class="fg"><label>Kategori</label><div class="cat-chips" id="bv-cats"></div></div>
         <div class="fg"><label>Gönderim Aralığı (dakika)</label><input id="bv-delay" type="number" value="1" min="1"/></div>
         <button class="btn bp" onclick="sendBulkURLs()">▶ Tümünü Gönder</button>
         <div id="bv-prog" style="display:none;margin-top:8px">
@@ -289,8 +290,13 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
       </div>
       <div class="card">
         <div class="ct">Webhook</div>
+        <div style="font-size:8px;letter-spacing:2px;color:var(--mt);text-transform:uppercase;margin-bottom:4px">Seçili Kategori</div>
         <div id="sv-wh-display" style="font-size:10px;color:var(--acc);word-break:break-all;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:8px 10px;margin-bottom:8px">/webhook/video-gonder</div>
         <button class="btn bg bsm" onclick="copyText(document.getElementById('sv-wh-display').textContent)">Kopyala</button>
+        <div style="margin-top:10px">
+          <div style="font-size:8px;letter-spacing:2px;color:var(--mt);text-transform:uppercase;margin-bottom:6px">Tüm Kategori Webhook'ları</div>
+          <div id="cat-wh-list" style="font-size:9px;line-height:2"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -373,6 +379,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
           </div>
         </div>
         <div class="fg" id="bk-delay-wrap" style="display:none"><label>Bekleme Süresi (dakika)</label><input id="bk-delay" type="number" value="30" min="1"/></div>
+        <div class="fg"><label>Kategori</label><div class="cat-chips" id="bk-cats"></div></div>
         <div style="display:flex;gap:8px;margin-top:6px">
           <button class="btn bp" onclick="sendBulkKW()">≋ Tümünü Gönder</button>
           <button class="btn bg bsm" onclick="S.kwList=[];renderKWTags()">✕ Temizle</button>
@@ -414,11 +421,14 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 <div id="page-drive" class="page">
   <div class="ph"><div class="pt">Google Drive</div><div class="ps">Drive sheet'inden URL listesi al ve gönder</div></div>
   <div class="alert aw" style="margin-bottom:12px"><span>⚠</span><span>Tekrar koruma aktif — işlenmiş URL'ler listede gösterilir ve tekrar gönderilmez.</span></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>oyun</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
   <div class="g2">
     <div class="card">
       <div class="ct">Sheet Bağlantısı</div>
       <div class="fg"><label>Google Sheets URL veya ID</label><input id="dr-sheet" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." oninput="parseDriveSheet()"/></div>
       <div class="fg"><label>URL Sütunu</label><input id="dr-col" type="text" value="Youtube Linki"/></div>
+      <div class="fg"><label>Kategori Sütunu <span style="color:var(--mt)">(opsiyonel — sheet'te varsa)</span></label><input id="dr-cat-col" type="text" value="Kategori" placeholder="Kategori"/></div>
+      <div class="fg"><label>Varsayılan Kategori <span style="color:var(--mt)">(sütun boşsa kullanılır)</span></label><div class="cat-chips" id="dr-cats"></div></div>
       <div style="display:flex;gap:8px">
         <button class="btn bp bsm" onclick="loadDriveSheet()">⊞ Sheet'i Tara</button>
         <button class="btn bs bsm" onclick="sendDriveURLs()">▶ Gönder</button>
@@ -446,12 +456,15 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 <div id="page-sheets" class="page">
   <div class="ph"><div class="pt">Google Sheets</div><div class="ps">Sheet'teki URL'leri oku ve gönder</div></div>
   <div class="alert aw" style="margin-bottom:12px"><span>⚠</span><span>Tarama ve gönderme ayrı — önce tara, kontrol et, sonra gönder.</span></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>oyun</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
   <div class="g2">
     <div class="card">
       <div class="ct">Bağlantı</div>
       <div class="fg"><label>Sheets URL veya ID</label><input id="sh-id" type="text" placeholder="https://docs.google.com/spreadsheets/d/..."/></div>
       <div class="fg"><label>URL Sütunu</label><input id="sh-col" type="text" value="Youtube Linki"/></div>
       <div class="fg"><label>İşlendi Sütunu</label><input id="sh-done" type="text" value="İşlendi"/></div>
+      <div class="fg"><label>Kategori Sütunu <span style="color:var(--mt)">(opsiyonel — sheet'te varsa)</span></label><input id="sh-cat-col" type="text" value="Kategori" placeholder="Kategori"/></div>
+      <div class="fg"><label>Varsayılan Kategori <span style="color:var(--mt)">(sütun boşsa kullanılır)</span></label><div class="cat-chips" id="sh-cats"></div></div>
       <div class="fg"><label>Bekleme Modu</label>
         <select id="sh-mode" onchange="document.getElementById('sh-delay-wrap').style.display=this.value==='time'?'block':'none'">
           <option value="status">Durum Bekle (n8n)</option>
@@ -628,7 +641,12 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
       <div class="card">
         <div class="ct">n8n Bağlantısı</div>
         <div class="fg"><label>n8n Base URL (Cloudflare Worker)</label><input id="cfg-n8n" type="url" placeholder="https://opus-proxy.xxx.workers.dev" oninput="updateWHs()"/></div>
-        <div class="fg"><label>Webhook: Video Gönder</label><div id="wh-video" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder</div></div>
+        <div class="fg"><label>Webhook: Video Gönder (Genel)</label><div id="wh-video" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder</div></div>
+        <div class="fg"><label>Webhook: Oyun</label><div id="wh-oyun" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-oyun</div></div>
+        <div class="fg"><label>Webhook: Eğlence</label><div id="wh-eglence" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-eglence</div></div>
+        <div class="fg"><label>Webhook: Bilim</label><div id="wh-bilim" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-bilim</div></div>
+        <div class="fg"><label>Webhook: Vlog</label><div id="wh-vlog" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-vlog</div></div>
+        <div class="fg"><label>Webhook: Komedi</label><div id="wh-komedi" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-komedi</div></div>
         <div class="fg"><label>Webhook: YouTube Ara</label><div id="wh-ytara" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/youtube-ara</div></div>
         <div class="fg"><label>Webhook: Toplu Kelime</label><div id="wh-bulk" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/bulk-keywords</div></div>
       </div>
@@ -942,35 +960,71 @@ function getSelCats(prefix) {
 
 async function sendSingle() {
   const url = (document.getElementById('sv-url')||{}).value||'';
-  const wh  = getWH('/webhook/video-gonder');
   if (!url.trim()) return showRes('sv-res','URL bos olamaz','err');
+
+  // Seçili kategoriyi al (ilk seçili chip, yoksa genel)
+  const selChips = [...document.querySelectorAll('#sv-cats .cat-chip.sel')];
+  const selCat   = selChips.length ? selChips[0].dataset.cat : 'genel';
+
+  // Kategoriye göre webhook path belirle
+  const CAT_WH = {
+    oyun:    '/webhook/video-gonder-oyun',
+    eglence: '/webhook/video-gonder-eglence',
+    bilim:   '/webhook/video-gonder-bilim',
+    vlog:    '/webhook/video-gonder-vlog',
+    komedi:  '/webhook/video-gonder-komedi',
+  };
+  const path = CAT_WH[selCat] || '/webhook/video-gonder';
+  const wh   = getN8N() + path;
+
   if (!wh.startsWith('http')) return showRes('sv-res','Ayarlar\'dan n8n URL girin','warn');
-  showRes('sv-res','⏳ Gonderiliyor...','info');
-  const cats = getSelCats('sv');
-  addLog('info','webhook','Video gonderiliyor: '+url.slice(0,60));
-  await faf(wh,{'Youtube linki':url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', categories:cats});
-  showRes('sv-res','✓ n8n\'e gonderildi (arka planda islenecek)','ok');
+  showRes('sv-res','⏳ Gonderiliyor... ['+selCat+']','info');
+  addLog('info','webhook','Video gonderiliyor ['+selCat+']: '+url.slice(0,60));
+
+  await faf(wh, {
+    'Youtube linki': url,
+    kaynak: (document.getElementById('sv-note')||{}).value||'panel',
+    kategori: selCat,
+    categories: getSelCats('sv')
+  });
+
+  showRes('sv-res','✓ n8n\'e gonderildi ['+selCat+']','ok');
   S.sentURLs.add(url.trim()); saveSent();
-  addLog('ok','webhook','Video gonderildi');
+  addLog('ok','webhook','Video gonderildi ['+selCat+']');
 }
 
 async function sendBulkURLs() {
   const raw   = (document.getElementById('bv-urls')||{}).value||'';
-  const wh    = getWH('/webhook/video-gonder');
   const delay = parseInt((document.getElementById('bv-delay')||{}).value||1)*60*1000;
   if (!raw) return;
+
+  // Seçili kategori
+  const selChips = [...document.querySelectorAll('#bv-cats .cat-chip.sel')];
+  const selCat   = selChips.length ? selChips[0].dataset.cat : 'genel';
+
+  const CAT_WH = {
+    oyun:    '/webhook/video-gonder-oyun',
+    eglence: '/webhook/video-gonder-eglence',
+    bilim:   '/webhook/video-gonder-bilim',
+    vlog:    '/webhook/video-gonder-vlog',
+    komedi:  '/webhook/video-gonder-komedi',
+  };
+  const path = CAT_WH[selCat] || '/webhook/video-gonder';
+  const wh   = getN8N() + path;
+
   if (!wh.startsWith('http')) return alert('Ayarlar\'dan n8n URL girin');
   const urls = raw.split('\n').map(u=>u.trim()).filter(Boolean);
   setStyle('bv-prog','display','block');
+  addLog('info','webhook','Toplu gonderim basliyor ['+selCat+']: '+urls.length+' URL');
   for (let i=0;i<urls.length;i++) {
-    setEl('bv-st',(i+1)+'/'+urls.length+': '+urls[i].slice(0,40));
+    setEl('bv-st',(i+1)+'/'+urls.length+' ['+selCat+']: '+urls[i].slice(0,40));
     setStyle('bv-bar','width',((i+1)/urls.length*100)+'%');
-    await faf(wh,{'Youtube linki':urls[i],kaynak:'toplu'});
+    await faf(wh,{'Youtube linki':urls[i], kaynak:'toplu', kategori:selCat});
     S.sentURLs.add(urls[i]); saveSent();
     if (i<urls.length-1) await sleep(delay);
   }
-  setEl('bv-st','✓ '+urls.length+' URL gonderildi');
-  addLog('ok','webhook','Toplu tamamlandi: '+urls.length);
+  setEl('bv-st','✓ '+urls.length+' URL gonderildi ['+selCat+']');
+  addLog('ok','webhook','Toplu tamamlandi ['+selCat+']: '+urls.length);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1038,32 +1092,39 @@ function renderKWTags() {
 
 async function sendBulkKW() {
   if (!S.kwList.length) return showRes('bk-res','Kelime listesi bos','err');
-  const wh   = getWH('/webhook/bulk-keywords');
   const dur  = (document.getElementById('bk-dur')||{}).value||'600';
   const mode = (document.getElementById('bk-mode')||{}).value||'time';
   const delay= parseInt((document.getElementById('bk-delay')||{}).value||30)*60*1000;
+
+  // Seçili kategori
+  const selChips=[...document.querySelectorAll('#bk-cats .cat-chip.sel')];
+  const selCat=selChips.length?selChips[0].dataset.cat:'genel';
+  const CAT_WH={oyun:'/webhook/video-gonder-oyun',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const whPath=CAT_WH[selCat]||'/webhook/youtube-ara';
+  const wh=getN8N()+whPath;
+
   if (!wh.startsWith('http')) return showRes('bk-res','Ayarlar\'dan n8n URL girin','warn');
   setStyle('bk-prog-empty','display','none');
   setStyle('bk-prog-wrap','display','block');
-  showRes('bk-res','⏳ Toplu gonderim...','info');
+  showRes('bk-res','⏳ Toplu gonderim... ['+selCat+']','info');
   const logEl=document.getElementById('bk-log');
   const bLog=msg=>{if(logEl)logEl.innerHTML+='<div>'+new Date().toLocaleTimeString('tr')+' — '+msg+'</div>';};
   const kws=[...S.kwList];
   for(let i=0;i<kws.length;i++){
-    setEl('bk-cur',(i+1)+'/'+kws.length+': "'+kws[i]+'"');
+    setEl('bk-cur',(i+1)+'/'+kws.length+' ['+selCat+']: "'+kws[i]+'"');
     setStyle('bk-pbar','width',((i+1)/kws.length*100)+'%');
-    bLog('Gonderiliyor: "'+kws[i]+'"');
-    await faf(wh,{keywords:[kws[i]], minDurationSec:parseInt(dur), lang:'tr'});
-    bLog('✓ "'+kws[i]+'" gonderildi');
-    addLog('ok','bulk','Keyword: '+kws[i]);
+    bLog('Gonderiliyor ['+selCat+']: "'+kws[i]+'"');
+    await faf(wh,{keywords:[kws[i]], anahtar_kelime:kws[i], minDurationSec:parseInt(dur), lang:'tr', kategori:selCat});
+    bLog('✓ "'+kws[i]+'" gonderildi ['+selCat+']');
+    addLog('ok','bulk','Keyword ['+selCat+']: '+kws[i]);
     if (i<kws.length-1) {
       if (mode==='status') { bLog('n8n bekleniyor (3dk)...'); await sleep(3*60*1000); }
       else { bLog(delay/60000+'dk bekleniyor...'); await sleep(delay); }
     }
   }
-  setEl('bk-cur','✓ '+kws.length+' kelime tamamlandi');
-  showRes('bk-res','✓ '+kws.length+' kelime gonderildi','ok');
-  S.bkHist.unshift({kws, t:new Date().toLocaleString('tr')});
+  setEl('bk-cur','✓ '+kws.length+' kelime tamamlandi ['+selCat+']');
+  showRes('bk-res','✓ '+kws.length+' kelime gonderildi ['+selCat+']','ok');
+  S.bkHist.unshift({kws, kat:selCat, t:new Date().toLocaleString('tr')});
   localStorage.setItem('op_bkh',JSON.stringify(S.bkHist.slice(0,10)));
 }
 
@@ -1084,13 +1145,29 @@ function renderCatGrid() {
       p.accs.map((a,i)=>'<span class="cat-chip '+ ((cat[p.key]||[]).includes(a)?'sel':'')+'" data-cat="'+ck+'" data-pk="'+p.key+'" data-acc="'+a+'" onclick="this.classList.toggle(\'sel\')">'+(i+1)+'</span>').join('')+
       '</div></div>').join('')+'</div>').join('');
   renderCatChips('sv-cats');
+  renderCatChips('bv-cats');
+  renderCatChips('bk-cats');
+  renderCatChips('dr-cats');
+  renderCatChips('sh-cats');
   renderCatChips('ya-cats');
 }
 
 function renderCatChips(id) {
   const el=document.getElementById(id);
   if(!el)return;
-  el.innerHTML=Object.entries(getCats()).map(([k,c])=>'<span class="cat-chip" data-cat="'+k+'" onclick="this.classList.toggle(\'sel\')">'+c.label+'</span>').join('');
+  const singleSel = ['sv-cats','bv-cats','bk-cats','dr-cats','sh-cats'].includes(id);
+  el.innerHTML=Object.entries(getCats()).map(([k,c])=>{
+    const handler = singleSel
+      ? 'onclick="catChipClick(this,\''+id+'\')"'
+      : 'onclick="this.classList.toggle(\'sel\')"';
+    return '<span class="cat-chip" data-cat="'+k+'" '+handler+'>'+c.label+'</span>';
+  }).join('');
+}
+
+function catChipClick(el, containerId) {
+  document.querySelectorAll('#'+containerId+' .cat-chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  if(containerId==='sv-cats') updateSVWHDisplay();
 }
 
 function saveCats() {
@@ -1133,18 +1210,20 @@ function parseDriveSheetID() {
 async function loadDriveSheet() {
   const sid=parseDriveSheetID();
   const col=(document.getElementById('dr-col')||{}).value||'Youtube Linki';
+  const catCol=(document.getElementById('dr-cat-col')||{}).value||'Kategori';
   showRes('dr-res','⏳ Taranıyor...','info');
   addLog('info','drive','Drive sheet taranıyor');
   const vals = await sheetsGet(sid,'Sheet1!A:Z');
   if (!vals) return showRes('dr-res','Tablo okunamadi — API Key ve Sheet ID kontrol edin','err');
   const rows=parseSheet(vals);
-  const allU=rows.map(r=>r[col]).filter(Boolean);
-  const newU=allU.filter(u=>!S.sentURLs.has(u));
+  const allU=rows.map(r=>({url:r[col],kategori:r[catCol]||''})).filter(r=>r.url);
+  const newU=allU.filter(r=>!S.sentURLs.has(r.url));
   S.driveURLs=allU;
+  S.driveRows=rows; // satır başvurusu için sakla
   setEl('dr-sent-cnt',S.sentURLs.size);
   setEl('dr-new-cnt',newU.length);
   const listEl=document.getElementById('dr-url-list');
-  if(listEl)listEl.innerHTML=allU.map(u=>'<div class="url-item '+(S.sentURLs.has(u)?'done':'')+'"><span class="url-text" title="'+u+'">'+u+'</span><span class="badge '+(S.sentURLs.has(u)?'bgr':'bi')+'">'+(S.sentURLs.has(u)?'Islendi':'Yeni')+'</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:9px">URL bulunamadi</div>';
+  if(listEl)listEl.innerHTML=allU.map(r=>'<div class="url-item '+(S.sentURLs.has(r.url)?'done':'')+'"><span class="url-text" title="'+r.url+'">'+r.url+'</span><span class="badge bi" style="margin-left:4px">'+(r.kategori||'genel')+'</span><span class="badge '+(S.sentURLs.has(r.url)?'bgr':'bi')+'">'+(S.sentURLs.has(r.url)?'Islendi':'Yeni')+'</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:9px">URL bulunamadi</div>';
   renderSentURLs();
   showRes('dr-res','✓ '+allU.length+' URL ('+newU.length+' yeni)','ok');
   addLog('ok','drive',allU.length+' URL, '+newU.length+' yeni');
@@ -1158,15 +1237,22 @@ function renderSentURLs() {
 }
 
 async function sendDriveURLs() {
-  const wh=getWH('/webhook/video-gonder');
-  const newU=S.driveURLs.filter(u=>!S.sentURLs.has(u));
+  const newU=(S.driveURLs||[]).filter(r=>!S.sentURLs.has(r.url||r));
   if(!newU.length)return showRes('dr-res','Yeni URL yok','warn');
-  if(!wh.startsWith('http'))return showRes('dr-res','n8n URL girin','warn');
+  // Varsayılan kategori (sheet sütunu boşsa kullanılır)
+  const selChips=[...document.querySelectorAll('#dr-cats .cat-chip.sel')];
+  const defCat=selChips.length?selChips[0].dataset.cat:'genel';
+  const CAT_WH={oyun:'/webhook/video-gonder-oyun',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const base=getN8N();
+  if(!base)return showRes('dr-res','n8n URL girin','warn');
   showRes('dr-res','⏳ '+newU.length+' URL gonderiliyor...','info');
-  for(const u of newU){
-    await faf(wh,{'Youtube linki':u,kaynak:'drive'});
-    S.sentURLs.add(u);
-    addLog('ok','drive','Drive: '+u.slice(0,60));
+  for(const r of newU){
+    const url=r.url||r;
+    const kat=(r.kategori&&r.kategori.trim())||defCat;
+    const path=CAT_WH[kat]||'/webhook/video-gonder';
+    await faf(base+path,{'Youtube linki':url,kaynak:'drive',kategori:kat});
+    S.sentURLs.add(url);
+    addLog('ok','drive','Drive ['+kat+']: '+url.slice(0,60));
   }
   saveSent(); renderSentURLs(); loadDriveSheet();
   showRes('dr-res','✓ '+newU.length+' URL gonderildi','ok');
@@ -1186,32 +1272,41 @@ async function scanSheet() {
   const v=(document.getElementById('sh-id')||{}).value||'';
   const sid=v.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]||v;
   const col=(document.getElementById('sh-col')||{}).value||'Youtube Linki';
+  const catCol=(document.getElementById('sh-cat-col')||{}).value||'Kategori';
   showRes('sh-res','⏳ Taranıyor...','info');
   const vals=await sheetsGet(sid,'Sheet1!A:Z');
   if(!vals)return showRes('sh-res','Tablo okunamadi','err');
   const rows=parseSheet(vals);
-  const allU=rows.map(r=>r[col]).filter(Boolean);
-  const newU=allU.filter(u=>!S.sentURLs.has(u));
-  S.sheetURLs=newU;
-  setEl('sh-total',allU.length); setEl('sh-new',newU.length); setEl('sh-skip',allU.length-newU.length);
+  const allRows=rows.map(r=>({url:r[col],kategori:r[catCol]||''})).filter(r=>r.url);
+  const allU=allRows.map(r=>r.url);
+  const newRows=allRows.filter(r=>!S.sentURLs.has(r.url));
+  S.sheetURLs=newRows; // {url, kategori} objesi olarak sakla
+  setEl('sh-total',allRows.length); setEl('sh-new',newRows.length); setEl('sh-skip',allRows.length-newRows.length);
   const listEl=document.getElementById('sh-url-list');
-  if(listEl)listEl.innerHTML=allU.map(u=>'<div class="url-item '+(S.sentURLs.has(u)?'done':'')+'"><span class="url-text">'+u+'</span><span class="badge '+(S.sentURLs.has(u)?'bgr':'bi')+'">'+(S.sentURLs.has(u)?'Atlandi':'Yeni')+'</span></div>').join('');
-  showRes('sh-res','✓ '+newU.length+' yeni URL','ok');
+  if(listEl)listEl.innerHTML=allRows.map(r=>'<div class="url-item '+(S.sentURLs.has(r.url)?'done':'')+'"><span class="url-text">'+r.url+'</span><span class="badge bi" style="margin-left:4px">'+(r.kategori||'genel')+'</span><span class="badge '+(S.sentURLs.has(r.url)?'bgr':'bi')+'">'+(S.sentURLs.has(r.url)?'Atlandi':'Yeni')+'</span></div>').join('');
+  showRes('sh-res','✓ '+newRows.length+' yeni URL','ok');
 }
 
 async function sendSheetURLs() {
-  if(!S.sheetURLs.length)return showRes('sh-res','Once Tara\'ya tiklayin','warn');
-  const wh=getWH('/webhook/video-gonder');
+  if(!S.sheetURLs||!S.sheetURLs.length)return showRes('sh-res','Once Tara\'ya tiklayin','warn');
+  // Varsayılan kategori
+  const selChips=[...document.querySelectorAll('#sh-cats .cat-chip.sel')];
+  const defCat=selChips.length?selChips[0].dataset.cat:'genel';
+  const CAT_WH={oyun:'/webhook/video-gonder-oyun',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const base=getN8N();
   const mode=(document.getElementById('sh-mode')||{}).value||'time';
   const delay=parseInt((document.getElementById('sh-delay')||{}).value||30)*60*1000;
-  if(!wh.startsWith('http'))return showRes('sh-res','n8n URL girin','warn');
+  if(!base)return showRes('sh-res','n8n URL girin','warn');
   setStyle('sh-prog','display','block');
   for(let i=0;i<S.sheetURLs.length;i++){
-    const u=S.sheetURLs[i];
-    setEl('sh-cur',(i+1)+'/'+S.sheetURLs.length+': '+u.slice(0,40));
+    const row=S.sheetURLs[i];
+    const url=row.url||row;
+    const kat=(row.kategori&&row.kategori.trim())||defCat;
+    const path=CAT_WH[kat]||'/webhook/video-gonder';
+    setEl('sh-cur',(i+1)+'/'+S.sheetURLs.length+' ['+kat+']: '+url.slice(0,40));
     setStyle('sh-pbar','width',((i+1)/S.sheetURLs.length*100)+'%');
-    await faf(wh,{'Youtube linki':u,kaynak:'sheets'});
-    S.sentURLs.add(u); saveSent();
+    await faf(base+path,{'Youtube linki':url,kaynak:'sheets',kategori:kat});
+    S.sentURLs.add(url); saveSent();
     if(i<S.sheetURLs.length-1) await sleep(mode==='time'?delay:3*60*1000);
   }
   setEl('sh-cur','✓ Tamamlandi');
@@ -1364,12 +1459,40 @@ function updateWHs() {
   const base=(document.getElementById('cfg-n8n')||{}).value||'';
   const b=base.trim().replace(/\/$/,'');
   S.cfg.n8n=b;
-  const map={'wh-video':'/webhook/video-gonder','wh-ytara':'/webhook/youtube-ara','wh-bulk':'/webhook/bulk-keywords'};
+  const map={
+    'wh-video':   '/webhook/video-gonder',
+    'wh-oyun':    '/webhook/video-gonder-oyun',
+    'wh-eglence': '/webhook/video-gonder-eglence',
+    'wh-bilim':   '/webhook/video-gonder-bilim',
+    'wh-vlog':    '/webhook/video-gonder-vlog',
+    'wh-komedi':  '/webhook/video-gonder-komedi',
+    'wh-ytara':   '/webhook/youtube-ara',
+    'wh-bulk':    '/webhook/bulk-keywords'
+  };
   Object.entries(map).forEach(([id,p])=>{const el=document.getElementById(id);if(el)el.textContent=b?b+p:p;});
-  const sv=document.getElementById('sv-wh-display');
-  if(sv)sv.textContent=b?b+'/webhook/video-gonder':'/webhook/video-gonder';
+  // Kategori webhook listesini güncelle (Video Gönder sayfası)
+  const catEl=document.getElementById('cat-wh-list');
+  if(catEl){
+    const cats=[['oyun','Oyun'],['eglence','Eğlence'],['bilim','Bilim'],['vlog','Vlog'],['komedi','Komedi'],['genel','Genel']];
+    catEl.innerHTML=cats.map(([k,label])=>{
+      const url=b?b+'/webhook/video-gonder'+(k==='genel'?'':'-'+k):'/webhook/video-gonder'+(k==='genel'?'':'-'+k);
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--brd)"><span style="color:var(--mt)">'+label+'</span><span style="color:var(--acc);font-size:8px;cursor:pointer" onclick="copyText(\''+url+'\')" title="Kopyala">'+url.split('/').pop()+' ⊕</span></div>';
+    }).join('');
+  }
+  // Aktif seçime göre sv-wh-display güncelle
+  updateSVWHDisplay();
   const conn=document.getElementById('conn-status');
   if(conn)conn.textContent=b?'Bagli':'URL girilmedi';
+}
+
+function updateSVWHDisplay() {
+  const b=getN8N();
+  const selChips=[...document.querySelectorAll('#sv-cats .cat-chip.sel')];
+  const selCat=selChips.length?selChips[0].dataset.cat:'genel';
+  const CAT_WH={oyun:'/webhook/video-gonder-oyun',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const path=CAT_WH[selCat]||'/webhook/video-gonder';
+  const sv=document.getElementById('sv-wh-display');
+  if(sv)sv.textContent=b?b+path:path;
 }
 
 function saveSettings() {
