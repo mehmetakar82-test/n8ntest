@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v3.3</title>
+<title>OPUS PRO v3.4</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -170,7 +170,6 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     <div class="ni" onclick="go('video',this)"><span class="ic">▶</span>Video Gönder</div>
     <div class="ni" onclick="go('ytara',this)"><span class="ic">⊕</span>YouTube Ara</div>
     <div class="ni" onclick="go('bulk',this)"><span class="ic">≋</span>Toplu Kelimeler</div>
-    <div class="ni" onclick="go('kategoriler',this)"><span class="ic">◈</span>Kategoriler</div>
     <div class="ns">Kaynaklar</div>
     <div class="ni" onclick="go('drive',this)"><span class="ic">◉</span>Google Drive</div>
     <div class="ni" onclick="go('sheets',this)"><span class="ic">▤</span>Google Sheets</div>
@@ -180,6 +179,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     <div class="ni" onclick="go('urltakip',this)"><span class="ic">⊙</span>URL Takip</div>
     <div class="ns">Analiz</div>
     <div class="ni" onclick="go('raporlar',this)"><span class="ic">◈</span>Raporlar</div>
+    <div class="ni" onclick="go('takvim',this)"><span class="ic">◫</span>Takvim</div>
     <div class="ni" onclick="go('platformlar',this)"><span class="ic">◎</span>Platformlar</div>
     <div class="ni" onclick="go('arsiv',this)"><span class="ic">▣</span>Arşiv</div>
     <div class="ns">Sistem</div>
@@ -406,22 +406,13 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 </div>
 
 <!-- KATEGORİLER -->
-<div id="page-kategoriler" class="page">
-  <div class="ph"><div class="pt">Kategoriler</div><div class="ps">Hangi kategori hangi hesaplarda yayınlanır</div></div>
-  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Her kategori için hangi IG/YT/TT hesaplarının kullanılacağını seç. Video gönderirken kategori seçilirse sadece o hesaplar kullanılır.</span></div>
-  <div id="cat-grid" class="g3"></div>
-  <div style="margin-top:10px;display:flex;gap:8px">
-    <button class="btn bp" onclick="saveCats()">⊞ Kaydet</button>
-    <button class="btn bg bsm" onclick="addCustomCat()">+ Özel Kategori</button>
-  </div>
-  <div id="cat-save-ok" style="display:none;font-size:9px;color:var(--ok);margin-top:6px">✓ Kategoriler kaydedildi</div>
-</div>
+
 
 <!-- GOOGLE DRIVE -->
 <div id="page-drive" class="page">
   <div class="ph"><div class="pt">Google Drive</div><div class="ps">Drive sheet'inden URL listesi al ve gönder</div></div>
   <div class="alert aw" style="margin-bottom:12px"><span>⚠</span><span>Tekrar koruma aktif — işlenmiş URL'ler listede gösterilir ve tekrar gönderilmez.</span></div>
-  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>oyun</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>film</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
   <div class="g2">
     <div class="card">
       <div class="ct">Sheet Bağlantısı</div>
@@ -456,7 +447,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 <div id="page-sheets" class="page">
   <div class="ph"><div class="pt">Google Sheets</div><div class="ps">Sheet'teki URL'leri oku ve gönder</div></div>
   <div class="alert aw" style="margin-bottom:12px"><span>⚠</span><span>Tarama ve gönderme ayrı — önce tara, kontrol et, sonra gönder.</span></div>
-  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>oyun</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>film</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
   <div class="g2">
     <div class="card">
       <div class="ct">Bağlantı</div>
@@ -633,6 +624,42 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
   </div>
 </div>
 
+<!-- TAKVİM -->
+<div id="page-takvim" class="page">
+  <div class="ph"><div class="pt">Takvim</div><div class="ps">Planlanmış short yayınları — aya göre görsel takvim</div></div>
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <button class="btn bg bsm" onclick="takPrev()">← Önceki Ay</button>
+    <span id="tak-title" style="font-family:var(--fh);font-size:14px;font-weight:700;color:#fff;min-width:140px;text-align:center"></span>
+    <button class="btn bg bsm" onclick="takNext()">Sonraki Ay →</button>
+    <button class="btn bp bsm" onclick="loadTakvim()">↻ Yenile</button>
+    <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
+      <span style="font-size:9px;color:var(--mt);align-self:center">Platform:</span>
+      <span class="badge bi" id="tak-f-ig" onclick="takFilter('ig')" style="cursor:pointer">📸 IG</span>
+      <span class="badge bi" id="tak-f-yt" onclick="takFilter('yt')" style="cursor:pointer">▶ YT</span>
+      <span class="badge bi" id="tak-f-tt" onclick="takFilter('tt')" style="cursor:pointer">♪ TT</span>
+      <span class="badge bgr" id="tak-f-all" onclick="takFilter('all')" style="cursor:pointer">Tümü</span>
+    </div>
+  </div>
+  <div id="tak-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px">
+    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">PTZ</div>
+    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">SAL</div>
+    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">ÇAR</div>
+    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">PER</div>
+    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">CUM</div>
+    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">CMT</div>
+    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">PAZ</div>
+  </div>
+  <div id="tak-days" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
+  <!-- Tooltip overlay -->
+  <div id="tak-tooltip" style="display:none;position:fixed;z-index:9999;background:var(--sur2);border:1px solid var(--acc);border-radius:8px;padding:12px 14px;max-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none">
+    <div id="ttt-title" style="font-family:var(--fh);font-size:12px;font-weight:700;color:#fff;margin-bottom:6px;line-height:1.3"></div>
+    <div id="ttt-thumb" style="margin-bottom:8px"></div>
+    <div id="ttt-desc" style="font-size:10px;color:var(--mt);margin-bottom:8px;line-height:1.5;max-height:60px;overflow:hidden"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap" id="ttt-badges"></div>
+    <div id="ttt-time" style="font-size:9px;color:var(--acc);margin-top:6px"></div>
+  </div>
+</div>
+
 <!-- AYARLAR -->
 <div id="page-ayarlar" class="page">
   <div class="ph"><div class="pt">Ayarlar</div><div class="ps">Bağlantı, zamanlama ve API yapılandırması</div></div>
@@ -642,7 +669,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
         <div class="ct">n8n Bağlantısı</div>
         <div class="fg"><label>n8n Base URL (Cloudflare Worker)</label><input id="cfg-n8n" type="url" placeholder="https://opus-proxy.xxx.workers.dev" oninput="updateWHs()"/></div>
         <div class="fg"><label>Webhook: Video Gönder (Genel)</label><div id="wh-video" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder</div></div>
-        <div class="fg"><label>Webhook: Oyun</label><div id="wh-oyun" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-oyun</div></div>
+        <div class="fg"><label>Webhook: Film</label><div id="wh-film" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-film</div></div>
         <div class="fg"><label>Webhook: Eğlence</label><div id="wh-eglence" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-eglence</div></div>
         <div class="fg"><label>Webhook: Bilim</label><div id="wh-bilim" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-bilim</div></div>
         <div class="fg"><label>Webhook: Vlog</label><div id="wh-vlog" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-vlog</div></div>
@@ -767,7 +794,7 @@ const S = {
 };
 
 const DEFAULT_CATS = {
-  oyun:    {label:'Oyun 🎮',            sel_ig:[],sel_yt:[],sel_tt:[]},
+  film:    {label:'Film 🎬',             sel_ig:[],sel_yt:[],sel_tt:[]},
   eglence: {label:'Eglence 🎉',         sel_ig:[],sel_yt:[],sel_tt:[]},
   bilim:   {label:'Bilim 🔬',           sel_ig:[],sel_yt:[],sel_tt:[]},
   vlog:    {label:'Vlog 📹',            sel_ig:[],sel_yt:[],sel_tt:[]},
@@ -790,7 +817,8 @@ function go(id, el) {
   el.classList.add('active');
   const h = {
     dashboard: refreshDash, loglar: renderLogs, hesaplar: renderAccInputs,
-    platformlar: loadPlatforms, kategoriler: renderCatGrid,
+    platformlar: loadPlatforms,
+    takvim:     loadTakvim,
     kuyruk:     ()=>loadSheetPage('kuyruk'),
     shortlist:  ()=>loadSheetPage('shortlist'),
     urltakip:   ()=>loadSheetPage('urltakip'),
@@ -968,7 +996,7 @@ async function sendSingle() {
 
   // Kategoriye göre webhook path belirle
   const CAT_WH = {
-    oyun:    '/webhook/video-gonder-oyun',
+    film:    '/webhook/video-gonder-film',
     eglence: '/webhook/video-gonder-eglence',
     bilim:   '/webhook/video-gonder-bilim',
     vlog:    '/webhook/video-gonder-vlog',
@@ -1003,7 +1031,7 @@ async function sendBulkURLs() {
   const selCat   = selChips.length ? selChips[0].dataset.cat : 'genel';
 
   const CAT_WH = {
-    oyun:    '/webhook/video-gonder-oyun',
+    film:    '/webhook/video-gonder-film',
     eglence: '/webhook/video-gonder-eglence',
     bilim:   '/webhook/video-gonder-bilim',
     vlog:    '/webhook/video-gonder-vlog',
@@ -1099,7 +1127,7 @@ async function sendBulkKW() {
   // Seçili kategori
   const selChips=[...document.querySelectorAll('#bk-cats .cat-chip.sel')];
   const selCat=selChips.length?selChips[0].dataset.cat:'genel';
-  const CAT_WH={oyun:'/webhook/video-gonder-oyun',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
   const whPath=CAT_WH[selCat]||'/webhook/youtube-ara';
   const wh=getN8N()+whPath;
 
@@ -1242,7 +1270,7 @@ async function sendDriveURLs() {
   // Varsayılan kategori (sheet sütunu boşsa kullanılır)
   const selChips=[...document.querySelectorAll('#dr-cats .cat-chip.sel')];
   const defCat=selChips.length?selChips[0].dataset.cat:'genel';
-  const CAT_WH={oyun:'/webhook/video-gonder-oyun',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
   const base=getN8N();
   if(!base)return showRes('dr-res','n8n URL girin','warn');
   showRes('dr-res','⏳ '+newU.length+' URL gonderiliyor...','info');
@@ -1292,7 +1320,7 @@ async function sendSheetURLs() {
   // Varsayılan kategori
   const selChips=[...document.querySelectorAll('#sh-cats .cat-chip.sel')];
   const defCat=selChips.length?selChips[0].dataset.cat:'genel';
-  const CAT_WH={oyun:'/webhook/video-gonder-oyun',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
   const base=getN8N();
   const mode=(document.getElementById('sh-mode')||{}).value||'time';
   const delay=parseInt((document.getElementById('sh-delay')||{}).value||30)*60*1000;
@@ -1446,10 +1474,17 @@ function renderPlatEl(elId, accs, iconCls, emoji, linkBase) {
   }).join('');
 }
 
+function getPlatLink(platform, id, username) {
+  if (platform === 'ig') return username ? 'https://instagram.com/' + username : 'https://instagram.com/';
+  if (platform === 'yt') return id && id.startsWith('UC') ? 'https://youtube.com/channel/' + id : 'https://youtube.com/';
+  if (platform === 'tt') return username ? 'https://tiktok.com/@' + username : 'https://tiktok.com/';
+  return '#';
+}
+
 function fallbackPlat(elId, platKey, emoji, iconCls, linkBase) {
   const el=document.getElementById(elId);
   const accs=S.accounts[platKey]||[];
-  if(el)el.innerHTML=accs.map((id,i)=>'<div class="acc-card" onclick="window.open(\''+linkBase+id+'\',\'_blank\')"><div class="acc-info"><div class="acc-icon '+iconCls+'">'+emoji+'</div><div><div class="acc-name">Hesap '+(i+1)+'</div><div class="acc-id">ID: '+id+'</div></div></div><span class="badge bi" style="font-size:8px">Ac ↗</span></div>').join('');
+  if(el)el.innerHTML=accs.map((id,i)=>'<div class="acc-card" onclick="window.open(\''+getPlatLink(platKey,id,null)+'\',\'_blank\')"><div class="acc-info"><div class="acc-icon '+iconCls+'">'+emoji+'</div><div><div class="acc-name">Hesap '+(i+1)+'</div><div class="acc-id">ID: '+id+'</div></div></div><span class="badge bi" style="font-size:8px">Ac ↗</span></div>').join('');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1461,7 +1496,7 @@ function updateWHs() {
   S.cfg.n8n=b;
   const map={
     'wh-video':   '/webhook/video-gonder',
-    'wh-oyun':    '/webhook/video-gonder-oyun',
+    'wh-film':    '/webhook/video-gonder-film',
     'wh-eglence': '/webhook/video-gonder-eglence',
     'wh-bilim':   '/webhook/video-gonder-bilim',
     'wh-vlog':    '/webhook/video-gonder-vlog',
@@ -1473,7 +1508,7 @@ function updateWHs() {
   // Kategori webhook listesini güncelle (Video Gönder sayfası)
   const catEl=document.getElementById('cat-wh-list');
   if(catEl){
-    const cats=[['oyun','Oyun'],['eglence','Eğlence'],['bilim','Bilim'],['vlog','Vlog'],['komedi','Komedi'],['genel','Genel']];
+    const cats=[['film','Film'],['eglence','Eğlence'],['bilim','Bilim'],['vlog','Vlog'],['komedi','Komedi'],['genel','Genel']];
     catEl.innerHTML=cats.map(([k,label])=>{
       const url=b?b+'/webhook/video-gonder'+(k==='genel'?'':'-'+k):'/webhook/video-gonder'+(k==='genel'?'':'-'+k);
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--brd)"><span style="color:var(--mt)">'+label+'</span><span style="color:var(--acc);font-size:8px;cursor:pointer" onclick="copyText(\''+url+'\')" title="Kopyala">'+url.split('/').pop()+' ⊕</span></div>';
@@ -1489,7 +1524,7 @@ function updateSVWHDisplay() {
   const b=getN8N();
   const selChips=[...document.querySelectorAll('#sv-cats .cat-chip.sel')];
   const selCat=selChips.length?selChips[0].dataset.cat:'genel';
-  const CAT_WH={oyun:'/webhook/video-gonder-oyun',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
   const path=CAT_WH[selCat]||'/webhook/video-gonder';
   const sv=document.getElementById('sv-wh-display');
   if(sv)sv.textContent=b?b+path:path;
@@ -1640,6 +1675,201 @@ function saveSent(){try{localStorage.setItem('op_sent',JSON.stringify([...S.sent
     toggleAutoLog();
   }catch(e){console.error('Init hatasi:',e);}
 })();
+
+// ═══════════════════════════════════════════════════════════
+// TAKVİM
+// ═══════════════════════════════════════════════════════════
+const TAK = {
+  year: new Date().getFullYear(),
+  month: new Date().getMonth(), // 0-based
+  shorts: [],
+  filter: 'all', // 'ig','yt','tt','all'
+};
+
+const PLAT_COLOR = {ig:'#e1306c', yt:'#ff0000', tt:'#69c9d0'};
+const PLAT_LABEL = {ig:'📸 IG', yt:'▶ YT', tt:'♪ TT'};
+
+async function loadTakvim() {
+  let shorts = [];
+  if (S._panelCache) {
+    shorts = S._panelCache.shorts || [];
+  } else {
+    const sid = S.cfg.sheet || '';
+    if (!sid && !S.cfg.shkey) { renderTakvim([]); return; }
+    const sv = await sheetsGet(sid, 'Sheet1!A:Z');
+    shorts = parseSheet(sv);
+  }
+  TAK.shorts = shorts;
+  renderTakvim(shorts);
+}
+
+function takFilter(f) {
+  TAK.filter = f;
+  ['ig','yt','tt','all'].forEach(k => {
+    const el = document.getElementById('tak-f-' + k);
+    if (!el) return;
+    el.style.opacity = (f === k) ? '1' : '0.4';
+  });
+  renderTakvim(TAK.shorts);
+}
+
+function takPrev() {
+  TAK.month--;
+  if (TAK.month < 0) { TAK.month = 11; TAK.year--; }
+  renderTakvim(TAK.shorts);
+}
+function takNext() {
+  TAK.month++;
+  if (TAK.month > 11) { TAK.month = 0; TAK.year++; }
+  renderTakvim(TAK.shorts);
+}
+
+function renderTakvim(shorts) {
+  const titleEl = document.getElementById('tak-title');
+  const daysEl  = document.getElementById('tak-days');
+  if (!titleEl || !daysEl) return;
+
+  const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  titleEl.textContent = monthNames[TAK.month] + ' ' + TAK.year;
+
+  // Ayın ilk günü ve toplam gün sayısı
+  const firstDay = new Date(TAK.year, TAK.month, 1);
+  const totalDays = new Date(TAK.year, TAK.month + 1, 0).getDate();
+  // Pazartesi=0 olacak şekilde hizala (JS: 0=Pz, 1=Pt... dönüştür)
+  let startOffset = firstDay.getDay() - 1;
+  if (startOffset < 0) startOffset = 6;
+
+  // Shortları tarihe göre grupla
+  // Her short 3 platform için plan içerebilir: ig-schedule, yt-schedule, tt-schedule
+  const byDay = {};
+  const addItem = (dateStr, item) => {
+    if (!dateStr) return;
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return;
+      if (d.getFullYear() !== TAK.year || d.getMonth() !== TAK.month) return;
+      const key = d.getDate();
+      if (!byDay[key]) byDay[key] = [];
+      byDay[key].push(item);
+    } catch(e) {}
+  };
+
+  shorts.forEach(r => {
+    if (TAK.filter === 'all' || TAK.filter === 'ig') {
+      addItem(r['ig-schedule'], {r, plat:'ig', time: r['ig-schedule']});
+    }
+    if (TAK.filter === 'all' || TAK.filter === 'yt') {
+      addItem(r['yt-schedule'], {r, plat:'yt', time: r['yt-schedule']});
+    }
+    if (TAK.filter === 'all' || TAK.filter === 'tt') {
+      addItem(r['tt-schedule'], {r, plat:'tt', time: r['tt-schedule']});
+    }
+  });
+
+  // Hücreleri oluştur
+  const totalCells = startOffset + totalDays;
+  const rows = Math.ceil(totalCells / 7);
+  const today = new Date();
+  const todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+
+  let html = '';
+  for (let i = 0; i < rows * 7; i++) {
+    const dayNum = i - startOffset + 1;
+    if (dayNum < 1 || dayNum > totalDays) {
+      html += '<div style="min-height:80px;background:rgba(26,37,53,.2);border-radius:4px"></div>';
+      continue;
+    }
+    const isToday = (TAK.year === today.getFullYear() && TAK.month === today.getMonth() && dayNum === today.getDate());
+    const items = byDay[dayNum] || [];
+    const isWeekend = (i % 7 >= 5);
+
+    let cellStyle = `min-height:80px;background:var(--sur);border:1px solid ${isToday ? 'var(--acc)' : 'var(--brd)'};border-radius:4px;padding:4px;overflow:hidden;position:relative;`;
+    if (isWeekend) cellStyle += 'background:rgba(0,229,255,.02);';
+
+    let inner = `<div style="font-size:9px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--acc)':'var(--mt)'};margin-bottom:3px">${dayNum}</div>`;
+
+    // Max 4 item göster, fazlası "+N" olarak
+    const shown = items.slice(0, 4);
+    const extra = items.length - shown.length;
+    shown.forEach(item => {
+      const t = item.time ? new Date(item.time).toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'}) : '';
+      const title = (item.r['title'] || '').slice(0, 18) || '(başlıksız)';
+      const col = PLAT_COLOR[item.plat] || 'var(--acc)';
+      const thumbUrl = item.r['thumbnail-url'] || '';
+      const dataAttrs = `data-plat="${item.plat}" data-time="${item.time||''}" data-title="${(item.r['title']||'').replace(/"/g,'&quot;')}" data-desc="${(item.r['description']||'').slice(0,120).replace(/"/g,'&quot;')}" data-status="${item.r['platform-status']||''}" data-thumb="${thumbUrl}" data-kat="${item.r['kategori']||'genel'}"`;
+      inner += `<div ${dataAttrs} onmouseenter="showTakTip(event,this)" onmouseleave="hideTakTip()" style="background:${col}22;border-left:2px solid ${col};border-radius:2px;padding:2px 4px;margin-bottom:2px;cursor:pointer;font-size:8px;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:${col}"><span style="opacity:.7">${t}</span> ${title}</div>`;
+    });
+    if (extra > 0) {
+      inner += `<div style="font-size:8px;color:var(--mt);text-align:right">+${extra} daha</div>`;
+    }
+
+    html += `<div style="${cellStyle}">${inner}</div>`;
+  }
+
+  daysEl.innerHTML = html;
+}
+
+function showTakTip(e, el) {
+  const tip = document.getElementById('tak-tooltip');
+  if (!tip) return;
+  const title  = el.dataset.title || '(başlıksız)';
+  const desc   = el.dataset.desc || '';
+  const plat   = el.dataset.plat || '';
+  const time   = el.dataset.time || '';
+  const status = el.dataset.status || '';
+  const thumb  = el.dataset.thumb || '';
+  const kat    = el.dataset.kat || 'genel';
+
+  document.getElementById('ttt-title').textContent = title;
+  document.getElementById('ttt-desc').textContent  = desc || '(açıklama yok)';
+
+  const thumbEl = document.getElementById('ttt-thumb');
+  if (thumb) {
+    thumbEl.innerHTML = `<img src="${thumb}" style="width:100%;border-radius:4px;max-height:80px;object-fit:cover" onerror="this.style.display='none'">`;
+  } else {
+    thumbEl.innerHTML = '';
+  }
+
+  const badgeEl = document.getElementById('ttt-badges');
+  const col = PLAT_COLOR[plat] || 'var(--acc)';
+  badgeEl.innerHTML = `<span class="badge" style="background:${col}22;color:${col}">${PLAT_LABEL[plat]||plat}</span>` +
+    (status ? `<span class="badge bw2">${status}</span>` : '') +
+    (kat ? `<span class="badge bi">${kat}</span>` : '');
+
+  const timeEl = document.getElementById('ttt-time');
+  if (time) {
+    try {
+      const d = new Date(time);
+      timeEl.textContent = '🕐 ' + d.toLocaleDateString('tr') + ' ' + d.toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'});
+    } catch(e) { timeEl.textContent = time; }
+  } else {
+    timeEl.textContent = '';
+  }
+
+  tip.style.display = 'block';
+  positionTip(e, tip);
+}
+
+function positionTip(e, tip) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const tw = 290, th = 220;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + tw > vw) x = e.clientX - tw - 8;
+  if (y + th > vh) y = e.clientY - th - 8;
+  tip.style.left = x + 'px';
+  tip.style.top  = y + 'px';
+}
+
+function hideTakTip() {
+  const tip = document.getElementById('tak-tooltip');
+  if (tip) tip.style.display = 'none';
+}
+
+// Tooltip pozisyonunu mouse hareketiyle güncelle
+document.addEventListener('mousemove', e => {
+  const tip = document.getElementById('tak-tooltip');
+  if (tip && tip.style.display !== 'none') positionTip(e, tip);
+});
 </script>
 </body>
 </html>
