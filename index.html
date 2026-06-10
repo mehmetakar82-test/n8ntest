@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v3.5</title>
+<title>OPUS PRO v3</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -657,6 +657,20 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     <div id="ttt-desc" style="font-size:10px;color:var(--mt);margin-bottom:8px;line-height:1.5;max-height:60px;overflow:hidden"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap" id="ttt-badges"></div>
     <div id="ttt-time" style="font-size:9px;color:var(--acc);margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- GÜN DETAY MODALI -->
+<div id="tak-day-modal" onclick="if(event.target===this)closeDayModal()" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.7);align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto">
+  <div style="background:var(--sur);border:1px solid var(--acc);border-radius:10px;width:min(700px,94vw);max-height:80vh;overflow-y:auto;padding:20px 24px;position:relative">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div id="dm-title" style="font-family:var(--fh);font-size:16px;font-weight:800;color:#fff"></div>
+        <div id="dm-sub" style="font-size:9px;color:var(--mt);margin-top:2px"></div>
+      </div>
+      <button onclick="closeDayModal()" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:4px;padding:5px 10px;cursor:pointer;font-size:10px;font-family:var(--fm)">✕ Kapat</button>
+    </div>
+    <div id="dm-list"></div>
   </div>
 </div>
 
@@ -1668,6 +1682,7 @@ const TAK = {
   month: new Date().getMonth(), // 0-based
   shorts: [],
   filter: 'all', // 'ig','yt','tt','all'
+  byDay: {}, // gün -> items cache (modal için)
 };
 
 const PLAT_COLOR = {ig:'#e1306c', yt:'#ff0000', tt:'#69c9d0'};
@@ -1750,11 +1765,13 @@ function renderTakvim(shorts) {
     }
   });
 
+  // byDay'i TAK'a kaydet — modal erişimi için
+  TAK.byDay = byDay;
+
   // Hücreleri oluştur
   const totalCells = startOffset + totalDays;
   const rows = Math.ceil(totalCells / 7);
   const today = new Date();
-  const todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
 
   let html = '';
   for (let i = 0; i < rows * 7; i++) {
@@ -1767,12 +1784,14 @@ function renderTakvim(shorts) {
     const items = byDay[dayNum] || [];
     const isWeekend = (i % 7 >= 5);
 
-    let cellStyle = `min-height:80px;background:var(--sur);border:1px solid ${isToday ? 'var(--acc)' : 'var(--brd)'};border-radius:4px;padding:4px;overflow:hidden;position:relative;`;
+    let cellStyle = `min-height:80px;background:var(--sur);border:1px solid ${isToday ? 'var(--acc)' : 'var(--brd)'};border-radius:4px;padding:4px;overflow:hidden;position:relative;cursor:${items.length>0?'pointer':'default'};`;
     if (isWeekend) cellStyle += 'background:rgba(0,229,255,.02);';
 
-    let inner = `<div style="font-size:9px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--acc)':'var(--mt)'};margin-bottom:3px">${dayNum}</div>`;
+    const cellClick = items.length > 0 ? `onclick="openDayModal(${dayNum})"` : '';
 
-    // Max 4 item göster, fazlası "+N" olarak
+    let inner = `<div style="font-size:9px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--acc)':'var(--mt)'};margin-bottom:3px">${dayNum}${items.length>0?` <span style="color:var(--acc);opacity:.7">(${items.length})</span>`:''}</div>`;
+
+    // Max 4 item göster, fazlası "+N daha" olarak
     const shown = items.slice(0, 4);
     const extra = items.length - shown.length;
     shown.forEach(item => {
@@ -1784,13 +1803,71 @@ function renderTakvim(shorts) {
       inner += `<div ${dataAttrs} onmouseenter="showTakTip(event,this)" onmouseleave="hideTakTip()" style="background:${col}22;border-left:2px solid ${col};border-radius:2px;padding:2px 4px;margin-bottom:2px;cursor:pointer;font-size:8px;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:${col}"><span style="opacity:.7">${t}</span> ${title}</div>`;
     });
     if (extra > 0) {
-      inner += `<div style="font-size:8px;color:var(--mt);text-align:right">+${extra} daha</div>`;
+      inner += `<div onclick="event.stopPropagation();openDayModal(${dayNum})" style="font-size:8px;color:var(--acc);text-align:right;cursor:pointer;text-decoration:underline;padding:1px 0">+${extra} daha</div>`;
     }
 
-    html += `<div style="${cellStyle}">${inner}</div>`;
+    html += `<div ${cellClick} style="${cellStyle}">${inner}</div>`;
   }
 
   daysEl.innerHTML = html;
+}
+
+function openDayModal(dayNum) {
+  hideTakTip();
+  const items = TAK.byDay[dayNum] || [];
+  if (!items.length) return;
+
+  const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+  const modal = document.getElementById('tak-day-modal');
+  const titleEl = document.getElementById('dm-title');
+  const subEl = document.getElementById('dm-sub');
+  const listEl = document.getElementById('dm-list');
+
+  titleEl.textContent = dayNum + ' ' + monthNames[TAK.month] + ' ' + TAK.year;
+  subEl.textContent = items.length + ' yayın planlandı';
+
+  // Saate göre sırala
+  const sorted = [...items].sort((a,b) => new Date(a.time||0) - new Date(b.time||0));
+
+  let html = '';
+  sorted.forEach(item => {
+    const col = PLAT_COLOR[item.plat] || 'var(--acc)';
+    const platLabel = PLAT_LABEL[item.plat] || item.plat;
+    const title = item.r['title'] || '(başlıksız)';
+    const desc = (item.r['description'] || '').slice(0, 160);
+    const status = item.r['platform-status'] || 'Bekliyor';
+    const thumb = item.r['thumbnail-url'] || '';
+    const timeStr = item.time ? new Date(item.time).toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'}) : '--:--';
+    const hesap = item.plat === 'ig' ? item.r['instagram-hesap'] :
+                  item.plat === 'yt' ? item.r['youtube-hesap'] :
+                  item.r['tiktok-hesap'] || '';
+
+    const statusColor = status === 'Bekliyor' ? 'var(--wn)' :
+                        (status.toLowerCase().includes('yayın') || status === 'Tamamlandı') ? 'var(--ok)' : 'var(--mt)';
+
+    html += `<div style="display:flex;gap:12px;padding:12px;border:1px solid var(--brd);border-left:3px solid ${col};border-radius:6px;margin-bottom:8px;background:var(--bg)">
+      ${thumb ? `<img src="${thumb}" style="width:72px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0" onerror="this.style.display='none'">` : `<div style="width:72px;height:48px;background:var(--brd);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">${platLabel.split(' ')[0]}</div>`}
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">${title}</span>
+        </div>
+        <div style="font-size:9px;color:var(--mt);margin-bottom:5px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${desc||'(açıklama yok)'}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <span style="background:${col}22;color:${col};padding:1px 7px;border-radius:3px;font-size:8px">${platLabel}</span>
+          <span style="color:var(--acc);font-size:9px">🕐 ${timeStr}</span>
+          <span style="color:${statusColor};font-size:9px">● ${status}</span>
+          ${hesap ? `<span style="color:var(--mt);font-size:9px">ID: ${hesap}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  });
+
+  listEl.innerHTML = html;
+  modal.style.display = 'flex';
+}
+
+function closeDayModal() {
+  document.getElementById('tak-day-modal').style.display = 'none';
 }
 
 function showTakTip(e, el) {
@@ -1853,6 +1930,11 @@ function hideTakTip() {
 document.addEventListener('mousemove', e => {
   const tip = document.getElementById('tak-tooltip');
   if (tip && tip.style.display !== 'none') positionTip(e, tip);
+});
+
+// Escape ile gün modalını kapat
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDayModal();
 });
 </script>
 </body>
