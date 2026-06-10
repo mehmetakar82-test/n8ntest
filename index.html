@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v3.6</title>
+<title>OPUS PRO v3.7</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -661,16 +661,46 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 </div>
 
 <!-- GÜN DETAY MODALI -->
-<div id="tak-day-modal" onclick="if(event.target===this)closeDayModal()" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.7);align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto">
-  <div style="background:var(--sur);border:1px solid var(--acc);border-radius:10px;width:min(700px,94vw);max-height:80vh;overflow-y:auto;padding:20px 24px;position:relative">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div>
-        <div id="dm-title" style="font-family:var(--fh);font-size:16px;font-weight:800;color:#fff"></div>
-        <div id="dm-sub" style="font-size:9px;color:var(--mt);margin-top:2px"></div>
+<div id="tak-day-modal" onclick="if(event.target===this)closeDayModal()" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;padding:40px 16px 40px;overflow-y:auto">
+  <div style="background:#0c1018;border:1px solid #1a2535;border-radius:14px;width:min(780px,98vw);position:relative;box-shadow:0 24px 64px rgba(0,0,0,.7)">
+
+    <!-- MODAL HEADER -->
+    <div style="padding:20px 24px 0;border-bottom:1px solid #1a2535">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
+        <div>
+          <div id="dm-title" style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#fff;line-height:1.1"></div>
+          <div id="dm-sub" style="font-size:10px;color:#4a5e72;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap"></div>
+        </div>
+        <button onclick="closeDayModal()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:10px;font-family:'DM Mono',monospace;flex-shrink:0;margin-left:12px;transition:all .15s" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">✕ Kapat</button>
       </div>
-      <button onclick="closeDayModal()" style="background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:4px;padding:5px 10px;cursor:pointer;font-size:10px;font-family:var(--fm)">✕ Kapat</button>
+
+      <!-- PLATFORM FİLTRE SEKMELERİ -->
+      <div style="display:flex;gap:0;margin-bottom:-1px">
+        <button id="dm-tab-all" onclick="dmFilter('all')" style="padding:8px 16px;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid #00e5ff;background:transparent;color:#00e5ff;text-transform:uppercase;transition:all .15s">Tümü</button>
+        <button id="dm-tab-ig"  onclick="dmFilter('ig')"  style="padding:8px 16px;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#4a5e72;text-transform:uppercase;transition:all .15s">
+          <span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366)"></span>Instagram</span>
+        </button>
+        <button id="dm-tab-yt"  onclick="dmFilter('yt')"  style="padding:8px 16px;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#4a5e72;text-transform:uppercase;transition:all .15s">
+          <span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff0000"></span>YouTube</span>
+        </button>
+        <button id="dm-tab-tt"  onclick="dmFilter('tt')"  style="padding:8px 16px;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#4a5e72;text-transform:uppercase;transition:all .15s">
+          <span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:linear-gradient(135deg,#69c9d0,#010101)"></span>TikTok</span>
+        </button>
+        <!-- SIRALAMA -->
+        <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding-bottom:6px">
+          <span style="font-size:8px;letter-spacing:1px;color:#4a5e72;text-transform:uppercase">Sırala</span>
+          <button id="dm-sort-btn" onclick="dmToggleSort()" style="background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.2);color:#00e5ff;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:9px;font-family:'DM Mono',monospace;display:flex;align-items:center;gap:4px" title="Sıralama değiştir">
+            <span id="dm-sort-icon">↑↓</span><span id="dm-sort-label">Saat ↑</span>
+          </button>
+        </div>
+      </div>
     </div>
-    <div id="dm-list"></div>
+
+    <!-- MODAL İÇERİK -->
+    <div id="dm-list" style="padding:16px 24px 20px;max-height:60vh;overflow-y:auto"></div>
+
+    <!-- MODAL FOOTER -->
+    <div id="dm-footer" style="padding:10px 24px;border-top:1px solid #1a2535;display:flex;gap:16px;font-size:9px;color:#4a5e72"></div>
   </div>
 </div>
 
@@ -1812,58 +1842,180 @@ function renderTakvim(shorts) {
   daysEl.innerHTML = html;
 }
 
+// ── GÜN MODALI ────────────────────────────────────────────────
+const DM = { items: [], filter: 'all', sortAsc: true };
+
+const IG_GRAD  = 'linear-gradient(135deg,#f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)';
+const YT_COLOR = '#ff0000';
+const TT_GRAD  = 'linear-gradient(135deg,#69c9d0,#ee1d52)';
+
+const PLAT_META = {
+  ig: { label:'Instagram', color:'#e1306c', dot: IG_GRAD,  icon:'📸', accent:'#e1306c' },
+  yt: { label:'YouTube',   color:'#ff0000', dot: YT_COLOR, icon:'▶',  accent:'#ff4444' },
+  tt: { label:'TikTok',    color:'#69c9d0', dot: TT_GRAD,  icon:'♪',  accent:'#69c9d0' },
+};
+
 function openDayModal(dayNum) {
   hideTakTip();
-  const items = TAK.byDay[dayNum] || [];
-  if (!items.length) return;
+  const allItems = TAK.byDay[dayNum] || [];
+  if (!allItems.length) return;
+
+  DM.items = allItems;
+  DM.filter = 'all';
+  DM.sortAsc = true;
+  DM.dayNum = dayNum;
 
   const monthNames = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
-  const modal = document.getElementById('tak-day-modal');
-  const titleEl = document.getElementById('dm-title');
-  const subEl = document.getElementById('dm-sub');
+  document.getElementById('dm-title').textContent = dayNum + ' ' + monthNames[TAK.month] + ' ' + TAK.year;
+
+  _dmRenderAll();
+  document.getElementById('tak-day-modal').style.display = 'flex';
+}
+
+function _dmRenderAll() {
+  const allItems = DM.items;
+
+  // Platform sayıları
+  const igC = allItems.filter(i=>i.plat==='ig').length;
+  const ytC = allItems.filter(i=>i.plat==='yt').length;
+  const ttC = allItems.filter(i=>i.plat==='tt').length;
+
+  // Sub satırı
+  document.getElementById('dm-sub').innerHTML =
+    `<span style="color:#e1306c">📸 ${igC} IG</span>` +
+    `<span style="color:#ff4444">▶ ${ytC} YT</span>` +
+    `<span style="color:#69c9d0">♪ ${ttC} TT</span>` +
+    `<span>Toplam: ${allItems.length} yayın</span>`;
+
+  // Sekme aktiflik
+  ['all','ig','yt','tt'].forEach(k => {
+    const btn = document.getElementById('dm-tab-'+k);
+    if (!btn) return;
+    const meta = PLAT_META[k];
+    const active = DM.filter === k;
+    if (active) {
+      const col = k === 'all' ? '#00e5ff' : meta.accent;
+      btn.style.borderBottomColor = col;
+      btn.style.color = col;
+    } else {
+      btn.style.borderBottomColor = 'transparent';
+      btn.style.color = '#4a5e72';
+    }
+  });
+
+  // Sıralama butonu
+  document.getElementById('dm-sort-label').textContent = DM.sortAsc ? 'Saat ↑' : 'Saat ↓';
+
+  // Filtrele
+  let filtered = DM.filter === 'all' ? [...allItems] : allItems.filter(i => i.plat === DM.filter);
+
+  // Sırala
+  filtered.sort((a,b) => {
+    const ta = new Date(a.time||0).getTime();
+    const tb = new Date(b.time||0).getTime();
+    return DM.sortAsc ? ta - tb : tb - ta;
+  });
+
+  // Render kartlar
+  _dmRenderList(filtered);
+
+  // Footer
+  const bekliyorC = filtered.filter(i => (i.r['platform-status']||'').includes('Bekliyor') || !(i.r['platform-status'])).length;
+  const yayinC = filtered.length - bekliyorC;
+  document.getElementById('dm-footer').innerHTML =
+    `<span>📋 ${filtered.length} yayın gösteriliyor</span>` +
+    `<span style="color:#10b981">✓ ${yayinC} yayınlandı</span>` +
+    `<span style="color:#f59e0b">◐ ${bekliyorC} bekliyor</span>`;
+}
+
+function _dmRenderList(items) {
   const listEl = document.getElementById('dm-list');
-
-  titleEl.textContent = dayNum + ' ' + monthNames[TAK.month] + ' ' + TAK.year;
-  subEl.textContent = items.length + ' yayın planlandı';
-
-  // Saate göre sırala
-  const sorted = [...items].sort((a,b) => new Date(a.time||0) - new Date(b.time||0));
+  if (!items.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:32px;color:#4a5e72;font-size:11px">Bu platformda yayın yok</div>';
+    return;
+  }
 
   let html = '';
-  sorted.forEach(item => {
-    const col = PLAT_COLOR[item.plat] || 'var(--acc)';
-    const platLabel = PLAT_LABEL[item.plat] || item.plat;
-    const title = item.r['title'] || '(başlıksız)';
-    const desc = (item.r['description'] || '').slice(0, 160);
+  items.forEach(item => {
+    const meta = PLAT_META[item.plat] || {label:item.plat, color:'#00e5ff', icon:'▪', accent:'#00e5ff'};
+    const title  = item.r['title'] || '(başlıksız)';
+    const desc   = (item.r['description'] || '').slice(0, 180);
     const status = item.r['platform-status'] || 'Bekliyor';
-    const thumb = item.r['thumbnail-url'] || '';
+    const thumb  = item.r['thumbnail-url'] || '';
     const timeStr = item.time ? new Date(item.time).toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'}) : '--:--';
-    const hesap = item.plat === 'ig' ? item.r['instagram-hesap'] :
-                  item.plat === 'yt' ? item.r['youtube-hesap'] :
-                  item.r['tiktok-hesap'] || '';
+    const hesap  = item.plat==='ig' ? item.r['instagram-hesap'] :
+                   item.plat==='yt' ? item.r['youtube-hesap'] : item.r['tiktok-hesap'] || '';
+    const hashtags = (item.r['hashtags'] || item.r['hashtags-ig'] || '').split(/\s+/).filter(h=>h.startsWith('#')).slice(0,4);
 
-    const statusColor = status === 'Bekliyor' ? 'var(--wn)' :
-                        (status.toLowerCase().includes('yayın') || status === 'Tamamlandı') ? 'var(--ok)' : 'var(--mt)';
+    const isPublished = status.toLowerCase().includes('yayın') || status === 'Tamamlandı';
+    const statusDot  = isPublished ? '#10b981' : '#f59e0b';
+    const statusText = isPublished ? status : 'Bekliyor';
 
-    html += `<div style="display:flex;gap:12px;padding:12px;border:1px solid var(--brd);border-left:3px solid ${col};border-radius:6px;margin-bottom:8px;background:var(--bg)">
-      ${thumb ? `<img src="${thumb}" style="width:72px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0" onerror="this.style.display='none'">` : `<div style="width:72px;height:48px;background:var(--brd);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px">${platLabel.split(' ')[0]}</div>`}
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;flex-wrap:wrap">
-          <span style="font-size:11px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px">${title}</span>
+    // Platform rozeti stili
+    const platBadgeStyle = item.plat === 'ig'
+      ? `background:${IG_GRAD};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-weight:700`
+      : item.plat === 'yt'
+      ? `color:#ff4444;font-weight:700`
+      : `color:#69c9d0;font-weight:700`;
+
+    html += `<div style="display:flex;gap:0;margin-bottom:10px;border-radius:10px;overflow:hidden;border:1px solid #1a2535;background:#07090e;transition:border-color .15s" onmouseover="this.style.borderColor='${meta.accent}33'" onmouseout="this.style.borderColor='#1a2535'">
+
+      <!-- SOL PLATFORM ŞERIDI -->
+      <div style="width:4px;flex-shrink:0;background:${meta.color}"></div>
+
+      <!-- THUMBNAIL -->
+      <div style="flex-shrink:0;width:88px;height:72px;overflow:hidden;position:relative;background:#111822">
+        ${thumb
+          ? `<img src="${thumb}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px\\'>${meta.icon}</div>'">`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;color:${meta.color}">${meta.icon}</div>`
+        }
+        <!-- saat overlay -->
+        <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);padding:2px 4px;font-size:9px;color:#fff;text-align:center;font-family:'DM Mono',monospace">${timeStr}</div>
+      </div>
+
+      <!-- İÇERİK -->
+      <div style="flex:1;padding:10px 14px;min-width:0">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
+          <div style="font-size:12px;font-weight:700;color:#dde4f0;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">${title}</div>
+          <!-- DURUM ROZETİ -->
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:4px;background:${isPublished?'rgba(16,185,129,.12)':'rgba(245,158,11,.1)'};border:1px solid ${isPublished?'rgba(16,185,129,.3)':'rgba(245,158,11,.25)'};border-radius:20px;padding:2px 9px">
+            <span style="width:5px;height:5px;border-radius:50%;background:${statusDot};display:inline-block;flex-shrink:0"></span>
+            <span style="font-size:8px;color:${statusDot};font-family:'DM Mono',monospace;white-space:nowrap">${statusText}</span>
+          </div>
         </div>
-        <div style="font-size:9px;color:var(--mt);margin-bottom:5px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${desc||'(açıklama yok)'}</div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <span style="background:${col}22;color:${col};padding:1px 7px;border-radius:3px;font-size:8px">${platLabel}</span>
-          <span style="color:var(--acc);font-size:9px">🕐 ${timeStr}</span>
-          <span style="color:${statusColor};font-size:9px">● ${status}</span>
-          ${hesap ? `<span style="color:var(--mt);font-size:9px">ID: ${hesap}</span>` : ''}
+
+        <div style="font-size:9px;color:#4a5e72;line-height:1.55;margin-bottom:7px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${desc || '(açıklama yok)'}</div>
+
+        <!-- ALT SATIR: platform + saat + hesap + hashtaglar -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <!-- Platform badge -->
+          <span style="font-size:9px;padding:1px 8px;border-radius:20px;background:${meta.color}18;border:1px solid ${meta.color}33">
+            <span style="${platBadgeStyle}">${meta.icon} ${meta.label}</span>
+          </span>
+          <!-- Saat -->
+          <span style="font-size:9px;color:#00e5ff;display:flex;align-items:center;gap:3px">
+            <span style="opacity:.6">🕐</span>${timeStr}
+          </span>
+          <!-- Hesap ID -->
+          ${hesap ? `<span style="font-size:8px;color:#4a5e72;background:#111822;border:1px solid #1a2535;border-radius:3px;padding:1px 6px">ID: ${hesap}</span>` : ''}
+          <!-- Hashtaglar -->
+          ${hashtags.map(h=>`<span style="font-size:8px;color:#7c3aed;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.2);border-radius:3px;padding:1px 6px">${h}</span>`).join('')}
         </div>
       </div>
     </div>`;
   });
 
   listEl.innerHTML = html;
-  modal.style.display = 'flex';
+}
+
+function dmFilter(f) {
+  DM.filter = f;
+  _dmRenderAll();
+}
+
+function dmToggleSort() {
+  DM.sortAsc = !DM.sortAsc;
+  _dmRenderAll();
 }
 
 function closeDayModal() {
