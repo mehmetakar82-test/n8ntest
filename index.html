@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v3.7</title>
+<title>OPUS PRO v3.8</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -161,7 +161,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 
 <aside class="sb">
   <div class="sb-logo">
-    <div class="sb-badge">◆ v3</div>
+    <div class="sb-badge">◆ v7</div>
     <div class="sb-name">OPUS<br>PRO</div>
   </div>
   <nav>
@@ -169,6 +169,8 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     <div class="ni active" onclick="go('dashboard',this)"><span class="ic">▦</span>Dashboard</div>
     <div class="ni" onclick="go('video',this)"><span class="ic">▶</span>Video Gönder</div>
     <div class="ni" onclick="go('ytara',this)"><span class="ic">⊕</span>YouTube Ara</div>
+    <div class="ni" onclick="go('ytkanal',this)"><span class="ic">📺</span>YT Kanal Ara</div>
+    <div class="ni" onclick="go('opusclip',this)"><span class="ic">◈</span>OpusClip Direkt</div>
     <div class="ni" onclick="go('bulk',this)"><span class="ic">≋</span>Toplu Kelimeler</div>
     <div class="ns">Kaynaklar</div>
     <div class="ni" onclick="go('drive',this)"><span class="ic">◉</span>Google Drive</div>
@@ -296,6 +298,106 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
         <div style="margin-top:10px">
           <div style="font-size:8px;letter-spacing:2px;color:var(--mt);text-transform:uppercase;margin-bottom:6px">Tüm Kategori Webhook'ları</div>
           <div id="cat-wh-list" style="font-size:9px;line-height:2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- YT KANAL ARA -->
+<div id="page-ytkanal" class="page">
+  <div class="ph"><div class="pt">YouTube Kanal Ara</div><div class="ps">Bir kanalın en çok izlenen videolarını bul ve seç</div></div>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="ct">Kanal Arama</div>
+        <div class="alert ai"><span>ℹ</span><span>Kanal adı veya @handle girin. Videolar izlenme sayısına göre sıralanır, seçtikleriniz Drive Sheet'e eklenir.</span></div>
+        <div class="fg"><label>YouTube API Key</label><input id="ytk-apikey" type="text" placeholder="AIza..." oninput="if(S.cfg.ytApiKey!==this.value){S.cfg.ytApiKey=this.value;localStorage.setItem('op_cfg',JSON.stringify(S.cfg));}"/></div>
+        <div class="fg"><label>Kanal Adı veya @handle</label>
+          <div style="display:flex;gap:6px">
+            <input id="ytk-channel" type="text" placeholder="@KanalAdi veya kanal adı..." style="flex:1"/>
+            <button class="btn bp bsm" onclick="searchYTChannel()">🔍 Ara</button>
+          </div>
+        </div>
+        <div class="fg"><label>Min. Video Süresi</label>
+          <select id="ytk-dur">
+            <option value="600">10 dakika</option>
+            <option value="1200">20 dakika</option>
+            <option value="1800">30 dakika</option>
+            <option value="3600">60 dakika</option>
+          </select>
+        </div>
+        <div class="fg"><label>Kategori</label><div class="cat-chips" id="ytk-cats"></div></div>
+        <div class="fg"><label>Drive Sheet'e Eklenecek Sheet ID</label>
+          <input id="ytk-sheetid" type="text" placeholder="18VJLAesKMfN-..." oninput="if(!this.value&&S.cfg.sheet2)this.value=S.cfg.sheet2"/>
+        </div>
+        <div id="ytk-res" class="res"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">Kanal Bilgisi</div>
+        <div id="ytk-channel-info" style="color:var(--mt);font-size:10px;text-align:center;padding:16px">Arama yapın</div>
+      </div>
+      <div class="card">
+        <div class="ct" style="margin-bottom:10px">En Çok İzlenen Videolar <span id="ytk-sel-count" style="color:var(--acc)">(0 seçili)</span></div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          <button class="btn bg bsm" onclick="ytkSelectAll()">Tümünü Seç</button>
+          <button class="btn bg bsm" onclick="ytkClearAll()">Seçimi Temizle</button>
+          <button class="btn bs bsm" onclick="ytkSendSelected()">▶ Seçilenleri Gönder</button>
+          <button class="btn bp bsm" onclick="ytkAddToSheet()">📋 Sheet'e Ekle</button>
+        </div>
+        <div id="ytk-video-list" style="max-height:400px;overflow-y:auto">
+          <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal arayın</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- OPUS CLIP DİREKT -->
+<div id="page-opusclip" class="page">
+  <div class="ph"><div class="pt">OpusClip Direkt</div><div class="ps">Opus Pro'daki mevcut projeleri clip ID ile işleme al</div></div>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="ct">Clip ID ile Gönder</div>
+        <div class="alert ai"><span>ℹ</span><span>Opus Pro'daki bir projenin URL'sinden ID'yi alın: <code>clip.opus.pro/clip/<b>P3061022AkhR</b></code> → <b>P3061022AkhR</b> girin</span></div>
+        <div class="fg">
+          <label>Clip/Proje URL veya ID</label>
+          <input id="opc-clipid" type="text" placeholder="P3061022AkhR veya https://clip.opus.pro/clip/P3061022AkhR"/>
+        </div>
+        <div class="fg"><label>Kategori</label><div class="cat-chips" id="opc-cats"></div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn bp" onclick="sendOpusClip()">▶ İşleme Al</button>
+        </div>
+        <div id="opc-res" class="res"></div>
+      </div>
+      <div class="card">
+        <div class="ct">Toplu Clip ID</div>
+        <div class="fg"><label>Her satıra bir ID veya URL</label>
+          <textarea id="opc-bulk" style="height:100px" placeholder="P3061022AkhR&#10;P1234567Abcd&#10;https://clip.opus.pro/clip/P9999XxYz"></textarea>
+        </div>
+        <div class="fg"><label>Kategori</label><div class="cat-chips" id="opc-bulk-cats"></div></div>
+        <div class="fg"><label>Gönderim Aralığı (saniye)</label><input id="opc-delay" type="number" value="10" min="1"/></div>
+        <button class="btn bp" onclick="sendOpusClipBulk()">≋ Tümünü Gönder</button>
+        <div id="opc-bulk-res" class="res"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">Gönderim Geçmişi</div>
+        <div id="opc-hist" style="max-height:300px;overflow-y:auto">
+          <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Henüz gönderim yok</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">Webhook Adresi</div>
+        <div id="opc-wh-display" style="font-size:10px;color:var(--acc);word-break:break-all;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:8px 10px;margin-bottom:8px">/webhook/opus-clip-direkt</div>
+        <button class="btn bg bsm" onclick="copyText(document.getElementById('opc-wh-display').textContent)">Kopyala</button>
+        <div style="margin-top:10px;font-size:9px;color:var(--mt)">
+          POST body: <code>{"clip_id": "P3061022AkhR", "kategori": "film"}</code>
         </div>
       </div>
     </div>
@@ -718,6 +820,9 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
         <div class="fg"><label>Webhook: Bilim</label><div id="wh-bilim" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-bilim</div></div>
         <div class="fg"><label>Webhook: Vlog</label><div id="wh-vlog" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-vlog</div></div>
         <div class="fg"><label>Webhook: Komedi</label><div id="wh-komedi" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-komedi</div></div>
+        <div class="fg"><label>Webhook: Oyun</label><div id="wh-oyun" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-oyun</div></div>
+        <div class="fg"><label>Webhook: Spor</label><div id="wh-spor" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-spor</div></div>
+        <div class="fg"><label>Webhook: OpusClip Direkt</label><div id="wh-opusclip" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/opus-clip-direkt</div></div>
         <div class="fg"><label>Webhook: YouTube Ara</label><div id="wh-ytara" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/youtube-ara</div></div>
         <div class="fg"><label>Webhook: Toplu Kelime</label><div id="wh-bulk" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/bulk-keywords</div></div>
       </div>
@@ -838,14 +943,14 @@ const S = {
 };
 
 const DEFAULT_CATS = {
-  film:    {label:'Film 🎬',             sel_ig:[],sel_yt:[],sel_tt:[]},
-  eglence: {label:'Eglence 🎉',         sel_ig:[],sel_yt:[],sel_tt:[]},
-  bilim:   {label:'Bilim 🔬',           sel_ig:[],sel_yt:[],sel_tt:[]},
-  vlog:    {label:'Vlog 📹',            sel_ig:[],sel_yt:[],sel_tt:[]},
-  komedi:  {label:'Komedi 😂',          sel_ig:[],sel_yt:[],sel_tt:[]},
-  film:    {label:'Film & Animasyon 🎬',sel_ig:[],sel_yt:[],sel_tt:[]},
-  spor:    {label:'Spor ⚽',            sel_ig:[],sel_yt:[],sel_tt:[]},
-  muzik:   {label:'Muzik 🎵',           sel_ig:[],sel_yt:[],sel_tt:[]},
+  film:    {label:'Film 🎬',    sel_ig:[],sel_yt:[],sel_tt:[]},
+  eglence: {label:'Eğlence 🎉', sel_ig:[],sel_yt:[],sel_tt:[]},
+  bilim:   {label:'Bilim 🔬',   sel_ig:[],sel_yt:[],sel_tt:[]},
+  vlog:    {label:'Vlog 📹',    sel_ig:[],sel_yt:[],sel_tt:[]},
+  komedi:  {label:'Komedi 😂',  sel_ig:[],sel_yt:[],sel_tt:[]},
+  oyun:    {label:'Oyun 🎮',    sel_ig:[],sel_yt:[],sel_tt:[]},
+  spor:    {label:'Spor ⚽',    sel_ig:[],sel_yt:[],sel_tt:[]},
+  genel:   {label:'Genel 📌',   sel_ig:[],sel_yt:[],sel_tt:[]},
 };
 function getCats(){ return Object.keys(S.cats).length ? S.cats : DEFAULT_CATS; }
 
@@ -868,6 +973,8 @@ function go(id, el) {
     urltakip:   ()=>loadSheetPage('urltakip'),
     arsiv:      ()=>loadSheetPage('arsiv'),
     raporlar:   loadReports,
+    ytkanal:    initYTKanal,
+    opusclip:   initOpusClip,
   };
   if (h[id]) try { h[id](); } catch(e) { console.error(id, e); }
 }
@@ -922,7 +1029,11 @@ async function sheetsGet(sheetId, range) {
       if (h) h.style.display='block';
       return null;
     }
-    if (!r.ok) { addLog('err','sheets','Sheets HTTP '+r.status); return null; }
+    if (r.status===400) {
+      addLog('err','sheets','HTTP 400 — API Key veya Sheet ID yanlis. Sheet ID: '+sheetId+' | Range: '+range);
+      return null;
+    }
+    if (!r.ok) { addLog('err','sheets','Sheets HTTP '+r.status+' — Sheet ID veya Range hatali olabilir'); return null; }
     const d = await r.json();
     return d.values||[];
   } catch(e) { addLog('err','sheets',e.message); return null; }
@@ -1035,7 +1146,7 @@ async function sendSingle() {
   if (!url.trim()) return showRes('sv-res','URL bos olamaz','err');
   const selCats = getSelCatList('sv-cats');
   const selCat  = selCats[0] || 'genel';
-  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const path = CAT_WH[selCat] || '/webhook/video-gonder';
   const wh   = getN8N() + path;
   if (!wh.startsWith('http')) return showRes('sv-res','Ayarlar\'dan n8n URL girin','warn');
@@ -1052,7 +1163,7 @@ async function sendBulkURLs() {
   const delay = parseInt((document.getElementById('bv-delay')||{}).value||1)*60*1000;
   if (!raw) return;
   const selCats = getSelCatList('bv-cats');
-  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const base = getN8N();
   if (!base) return alert('Ayarlar\'dan n8n URL girin');
   const urls = raw.split('\n').map(u=>u.trim()).filter(Boolean);
@@ -1083,7 +1194,7 @@ async function sendSearch() {
   const dur  = (document.getElementById('ya-dur')||{}).value||'600';
   const lang = (document.getElementById('ya-lang')||{}).value||'tr';
   const selCats = getSelCatList('ya-cats');
-  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const base = getN8N();
   if (!kw.trim()) return showRes('ya-res','Anahtar kelime girin','err');
   if (!base) return showRes('ya-res','Ayarlar\'dan n8n URL girin','warn');
@@ -1148,7 +1259,7 @@ async function sendBulkKW() {
   const mode  = (document.getElementById('bk-mode')||{}).value||'time';
   const delay = parseInt((document.getElementById('bk-delay')||{}).value||30)*60*1000;
   const selCats = getSelCatList('bk-cats');
-  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const base = getN8N();
   if (!base) return showRes('bk-res','Ayarlar\'dan n8n URL girin','warn');
   setStyle('bk-prog-empty','display','none');
@@ -1188,6 +1299,9 @@ function renderCatGrid() {
   renderCatChips('dr-cats');
   renderCatChips('sh-cats');
   renderCatChips('ya-cats');
+  renderCatChips('ytk-cats');
+  renderCatChips('opc-cats');
+  renderCatChips('opc-bulk-cats');
 }
 
 function renderCatChips(id) {
@@ -1224,7 +1338,7 @@ function updateBVWHDisplay() {
   const el = document.getElementById('bv-wh-display');
   if (!el) return;
   const b = getN8N();
-  const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const paths = cats.map(c=>(b||'')+(CAT_WH[c]||'/webhook/video-gonder')).join(' | ');
   el.textContent = paths || '/webhook/video-gonder';
 }function saveCats() {
@@ -1271,7 +1385,7 @@ async function loadDriveSheet() {
   showRes('dr-res','⏳ Taranıyor...','info');
   addLog('info','drive','Drive sheet taranıyor');
   const vals = await sheetsGet(sid,'Sheet1!A:Z');
-  if (!vals) return showRes('dr-res','Tablo okunamadi — API Key ve Sheet ID kontrol edin','err');
+  if (!vals) return showRes('dr-res','Tablo okunamadi — API Key ve Sheet ID kontrol edin ya da Google Sheet'i "Herkese açık" yapın','err');
   const rows=parseSheet(vals);
   const allU=rows.map(r=>({url:r[col],kategori:r[catCol]||''})).filter(r=>r.url);
   const newU=allU.filter(r=>!S.sentURLs.has(r.url));
@@ -1299,7 +1413,7 @@ async function sendDriveURLs() {
   // Varsayılan kategori (sheet sütunu boşsa kullanılır)
   const selChips=[...document.querySelectorAll('#dr-cats .cat-chip.sel')];
   const defCat=selChips.length?selChips[0].dataset.cat:'genel';
-  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const base=getN8N();
   if(!base)return showRes('dr-res','n8n URL girin','warn');
   showRes('dr-res','⏳ '+newU.length+' URL gonderiliyor...','info');
@@ -1349,7 +1463,7 @@ async function sendSheetURLs() {
   // Varsayılan kategori
   const selChips=[...document.querySelectorAll('#sh-cats .cat-chip.sel')];
   const defCat=selChips.length?selChips[0].dataset.cat:'genel';
-  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const base=getN8N();
   const mode=(document.getElementById('sh-mode')||{}).value||'time';
   const delay=parseInt((document.getElementById('sh-delay')||{}).value||30)*60*1000;
@@ -1524,25 +1638,31 @@ function updateWHs() {
   const b=base.trim().replace(/\/$/,'');
   S.cfg.n8n=b;
   const map={
-    'wh-video':   '/webhook/video-gonder',
-    'wh-film':    '/webhook/video-gonder-film',
-    'wh-eglence': '/webhook/video-gonder-eglence',
-    'wh-bilim':   '/webhook/video-gonder-bilim',
-    'wh-vlog':    '/webhook/video-gonder-vlog',
-    'wh-komedi':  '/webhook/video-gonder-komedi',
-    'wh-ytara':   '/webhook/youtube-ara',
-    'wh-bulk':    '/webhook/bulk-keywords'
+    'wh-video':    '/webhook/video-gonder',
+    'wh-film':     '/webhook/video-gonder-film',
+    'wh-eglence':  '/webhook/video-gonder-eglence',
+    'wh-bilim':    '/webhook/video-gonder-bilim',
+    'wh-vlog':     '/webhook/video-gonder-vlog',
+    'wh-komedi':   '/webhook/video-gonder-komedi',
+    'wh-oyun':     '/webhook/video-gonder-oyun',
+    'wh-spor':     '/webhook/video-gonder-spor',
+    'wh-opusclip': '/webhook/opus-clip-direkt',
+    'wh-ytara':    '/webhook/youtube-ara',
+    'wh-bulk':     '/webhook/bulk-keywords'
   };
   Object.entries(map).forEach(([id,p])=>{const el=document.getElementById(id);if(el)el.textContent=b?b+p:p;});
   // Kategori webhook listesini güncelle (Video Gönder sayfası)
   const catEl=document.getElementById('cat-wh-list');
   if(catEl){
-    const cats=[['film','Film'],['eglence','Eğlence'],['bilim','Bilim'],['vlog','Vlog'],['komedi','Komedi'],['genel','Genel']];
+    const cats=[['film','Film'],['eglence','Eğlence'],['bilim','Bilim'],['vlog','Vlog'],['komedi','Komedi'],['oyun','Oyun'],['spor','Spor'],['genel','Genel']];
     catEl.innerHTML=cats.map(([k,label])=>{
       const url=b?b+'/webhook/video-gonder'+(k==='genel'?'':'-'+k):'/webhook/video-gonder'+(k==='genel'?'':'-'+k);
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--brd)"><span style="color:var(--mt)">'+label+'</span><span style="color:var(--acc);font-size:8px;cursor:pointer" onclick="copyText(\''+url+'\')" title="Kopyala">'+url.split('/').pop()+' ⊕</span></div>';
     }).join('');
   }
+  // OpusClip WH display güncelle
+  const opcEl=document.getElementById('opc-wh-display');
+  if(opcEl)opcEl.textContent=b?b+'/webhook/opus-clip-direkt':'/webhook/opus-clip-direkt';
   // Aktif seçime göre sv-wh-display güncelle
   updateSVWHDisplay();
   const conn=document.getElementById('conn-status');
@@ -1552,7 +1672,7 @@ function updateWHs() {
 function updateSVWHDisplay() {
   const b=getN8N();
   const selCat=(getSelCatList('sv-cats'))[0]||'genel';
-  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi'};
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const path=CAT_WH[selCat]||'/webhook/video-gonder';
   const sv=document.getElementById('sv-wh-display');
   if(sv)sv.textContent=b?b+path:path;
@@ -1592,6 +1712,8 @@ function loadSettings() {
   const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
   set('cfg-n8n',c.n8n); set('cfg-shkey',c.shkey); set('cfg-sheet',c.sheet);
   set('cfg-sheet2',c.sheet2); set('cfg-blot',c.blot);
+  const ytkEl=document.getElementById('ytk-apikey');if(ytkEl&&c.ytApiKey)ytkEl.value=c.ytApiKey;
+  const ytkSh=document.getElementById('ytk-sheetid');if(ytkSh&&(c.sheet2||c.sheet))ytkSh.value=c.sheet2||c.sheet;
   set('cfg-ig-lim',S.limits.ig); set('cfg-yt-lim',S.limits.yt); set('cfg-tt-lim',S.limits.tt);
   set('cfg-start',S.limits.start); set('cfg-end',S.limits.end);
   if(c.n8n) updateWHs();
@@ -1685,6 +1807,274 @@ function filterTbl(tbodyId,searchId){const q=(document.getElementById(searchId)|
 function exportCSV(tbodyId,name){const rows=[];const tb=document.getElementById(tbodyId);if(!tb)return;const ths=tb.closest('table')?.querySelectorAll('thead th');if(ths)rows.push([...ths].map(t=>t.textContent).join(','));tb.querySelectorAll('tr').forEach(tr=>{if(tr.style.display==='none')return;rows.push([...tr.querySelectorAll('td')].map(t=>'"'+t.textContent.replace(/"/g,'""')+'"').join(','));});dl(name+'.csv',rows.join('\n'));}
 function saveSent(){try{localStorage.setItem('op_sent',JSON.stringify([...S.sentURLs]));}catch(e){}setEl('dr-sent-cnt',S.sentURLs.size);}
 
+
+// ═══════════════════════════════════════════════════════════
+// YT KANAL ARA
+// ═══════════════════════════════════════════════════════════
+const YTK = { videos: [], selected: new Set(), channelInfo: null };
+
+function initYTKanal() {
+  const ytkSh = document.getElementById('ytk-sheetid');
+  if (ytkSh && !ytkSh.value && S.cfg.sheet2) ytkSh.value = S.cfg.sheet2;
+  const ytkKey = document.getElementById('ytk-apikey');
+  if (ytkKey && !ytkKey.value && S.cfg.ytApiKey) ytkKey.value = S.cfg.ytApiKey;
+}
+
+async function searchYTChannel() {
+  const apiKey = (document.getElementById('ytk-apikey')||{}).value || S.cfg.ytApiKey || S.cfg.shkey || '';
+  const query  = (document.getElementById('ytk-channel')||{}).value || '';
+  const minDur = parseInt((document.getElementById('ytk-dur')||{}).value || 600);
+  if (!query.trim()) return showRes('ytk-res', 'Kanal adı girin', 'err');
+  if (!apiKey) return showRes('ytk-res', 'YouTube API Key gerekli (Ayarlar sekmesindeki Google API Key kullanılabilir)', 'warn');
+
+  showRes('ytk-res', '⏳ Kanal aranıyor...', 'info');
+  addLog('info', 'webhook', 'YT Kanal aranıyor: ' + query);
+
+  // Önce kanal ID bul
+  let channelId = '';
+  let channelTitle = '';
+  let channelThumb = '';
+  let subscriberCount = '';
+
+  try {
+    // Handle veya ad ile kanal ara
+    const handle = query.startsWith('@') ? query : '@' + query;
+    let chUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(handle)}&key=${apiKey}`;
+    let chRes = await fetch(chUrl);
+    let chData = await chRes.json();
+
+    if (!chData.items || !chData.items.length) {
+      // isim ile ara
+      const srUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(query)}&maxResults=1&key=${apiKey}`;
+      const srRes = await fetch(srUrl);
+      const srData = await srRes.json();
+      if (srData.items && srData.items.length) {
+        channelId    = srData.items[0].id.channelId || srData.items[0].snippet.channelId;
+        channelTitle = srData.items[0].snippet.channelTitle;
+        channelThumb = srData.items[0].snippet.thumbnails?.default?.url || '';
+        // detayları al
+        const dtUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}&key=${apiKey}`;
+        const dtRes = await fetch(dtUrl);
+        const dtData = await dtRes.json();
+        subscriberCount = dtData.items?.[0]?.statistics?.subscriberCount || '';
+      }
+    } else {
+      channelId       = chData.items[0].id;
+      channelTitle    = chData.items[0].snippet.title;
+      channelThumb    = chData.items[0].snippet.thumbnails?.default?.url || '';
+      subscriberCount = chData.items[0].statistics?.subscriberCount || '';
+    }
+
+    if (!channelId) {
+      showRes('ytk-res', 'Kanal bulunamadı', 'err');
+      return;
+    }
+
+    YTK.channelInfo = { channelId, channelTitle, channelThumb, subscriberCount };
+    const chInfoEl = document.getElementById('ytk-channel-info');
+    if (chInfoEl) {
+      const subs = subscriberCount ? parseInt(subscriberCount).toLocaleString('tr') + ' abone' : '';
+      chInfoEl.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        ${channelThumb ? `<img src="${channelThumb}" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--acc)">` : ''}
+        <div>
+          <div style="font-size:13px;font-weight:700;color:#fff">${channelTitle}</div>
+          <div style="font-size:9px;color:var(--mt)">${subs}</div>
+          <div style="font-size:8px;color:var(--acc)">${channelId}</div>
+        </div>
+      </div>`;
+    }
+
+    // Videoları çek (en çok izlenen)
+    showRes('ytk-res', '⏳ Videolar alınıyor...', 'info');
+    const vidUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=viewCount&maxResults=50&key=${apiKey}`;
+    const vidRes = await fetch(vidUrl);
+    const vidData = await vidRes.json();
+    const videoIds = (vidData.items || []).map(i => i.id.videoId).filter(Boolean).join(',');
+
+    if (!videoIds) { showRes('ytk-res', 'Video bulunamadı', 'warn'); return; }
+
+    // Detay ve süre bilgisi al
+    const detUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoIds}&key=${apiKey}`;
+    const detRes = await fetch(detUrl);
+    const detData = await detRes.json();
+
+    function parseDur(iso) {
+      const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+      if (!m) return 0;
+      return (parseInt(m[1]||0)*3600)+(parseInt(m[2]||0)*60)+parseInt(m[3]||0);
+    }
+
+    YTK.videos = (detData.items || [])
+      .filter(v => parseDur(v.contentDetails.duration) >= minDur)
+      .sort((a,b) => parseInt(b.statistics.viewCount||0) - parseInt(a.statistics.viewCount||0));
+
+    YTK.selected.clear();
+    renderYTKVideos();
+    showRes('ytk-res', `✓ ${YTK.videos.length} video (${minDur/60}dk+, izlenmeye göre sıralı)`, 'ok');
+    addLog('ok', 'webhook', `YT Kanal ${channelTitle}: ${YTK.videos.length} video`);
+
+  } catch(e) {
+    showRes('ytk-res', 'Hata: ' + e.message + ' — API Key ve izin kontrol edin', 'err');
+    addLog('err', 'webhook', 'YT Kanal hata: ' + e.message);
+  }
+}
+
+function renderYTKVideos() {
+  const el = document.getElementById('ytk-video-list');
+  if (!el) return;
+  const selCount = document.getElementById('ytk-sel-count');
+  if (selCount) selCount.textContent = `(${YTK.selected.size} seçili)`;
+  if (!YTK.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Video bulunamadı</div>'; return; }
+  el.innerHTML = YTK.videos.map((v, i) => {
+    const sel = YTK.selected.has(v.id);
+    const views = parseInt(v.statistics.viewCount||0).toLocaleString('tr');
+    const thumb = v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '';
+    const dur = v.contentDetails.duration.replace('PT','').replace('H','s ').replace('M','d ').replace('S','s');
+    const pubDate = (v.snippet.publishedAt||'').slice(0,10);
+    return `<div onclick="ytkToggle('${v.id}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s">
+      <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();ytkToggle('${v.id}')">
+      ${thumb?`<img src="${thumb}" style="width:80px;height:50px;object-fit:cover;border-radius:3px;flex-shrink:0">` : '<div style="width:80px;height:50px;background:var(--brd);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
+      <div style="min-width:0;flex:1">
+        <div style="font-size:10px;font-weight:600;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.snippet.title}</div>
+        <div style="font-size:8px;color:var(--mt);margin-top:3px">👁 ${views} &nbsp;⏱ ${dur} &nbsp;📅 ${pubDate}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function ytkToggle(id) {
+  if (YTK.selected.has(id)) YTK.selected.delete(id);
+  else YTK.selected.add(id);
+  renderYTKVideos();
+}
+
+function ytkSelectAll() { YTK.videos.forEach(v => YTK.selected.add(v.id)); renderYTKVideos(); }
+function ytkClearAll()  { YTK.selected.clear(); renderYTKVideos(); }
+
+async function ytkSendSelected() {
+  const sel = YTK.videos.filter(v => YTK.selected.has(v.id));
+  if (!sel.length) return showRes('ytk-res', 'Video seçin', 'warn');
+  const cats = getSelCatList('ytk-cats');
+  const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
+  const base = getN8N();
+  if (!base) return showRes('ytk-res', 'Ayarlar'dan n8n URL girin', 'warn');
+  showRes('ytk-res', `⏳ ${sel.length} video gönderiliyor...`, 'info');
+  let sent = 0;
+  for (const v of sel) {
+    const url = 'https://www.youtube.com/watch?v=' + v.id;
+    for (const kat of cats) {
+      const path = CAT_WH[kat] || '/webhook/video-gonder';
+      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, title: v.snippet.title, channelTitle: YTK.channelInfo?.channelTitle || ''});
+    }
+    sent++;
+    await sleep(500);
+  }
+  showRes('ytk-res', `✓ ${sent} video [${cats.join(',')}] gönderildi`, 'ok');
+  addLog('ok', 'webhook', `YT Kanal ${sent} video gönderildi [${cats.join(',')}]`);
+}
+
+async function ytkAddToSheet() {
+  const sel = YTK.videos.filter(v => YTK.selected.has(v.id));
+  if (!sel.length) return showRes('ytk-res', 'Video seçin', 'warn');
+  const apiKey = (document.getElementById('ytk-apikey')||{}).value || S.cfg.ytApiKey || S.cfg.shkey || '';
+  const sheetId = (document.getElementById('ytk-sheetid')||{}).value || S.cfg.sheet2 || S.cfg.sheet || '';
+  const cats = getSelCatList('ytk-cats');
+  const kat = cats[0] || 'genel';
+  if (!sheetId) return showRes('ytk-res', 'Sheet ID girin', 'warn');
+
+  // n8n proxy üzerinden yaz (Sheets API write gerektirir)
+  const base = getN8N();
+  if (!base) return showRes('ytk-res', 'n8n URL girin — yazma işlemi için n8n proxy gerekli', 'warn');
+
+  showRes('ytk-res', `⏳ ${sel.length} video Sheet'e ekleniyor...`, 'info');
+  let added = 0;
+  for (const v of sel) {
+    const url = 'https://www.youtube.com/watch?v=' + v.id;
+    await faf(base + '/webhook/sheet-ekle', {
+      sheetId,
+      url,
+      kategori: kat,
+      title: v.snippet.title,
+      channelTitle: YTK.channelInfo?.channelTitle || ''
+    });
+    added++;
+    await sleep(200);
+  }
+  showRes('ytk-res', `✓ ${added} video Sheet'e eklendi. n8n'den de gönderebilirsiniz.`, 'ok');
+  addLog('ok', 'sheets', `YT Kanal ${added} URL sheet'e eklendi`);
+}
+
+// ═══════════════════════════════════════════════════════════
+// OPUSCLIP DİREKT
+// ═══════════════════════════════════════════════════════════
+const OPC = { hist: JSON.parse(localStorage.getItem('op_opc_hist')||'[]') };
+
+function initOpusClip() {
+  renderOPCHist();
+  const wh = document.getElementById('opc-wh-display');
+  if (wh) wh.textContent = getN8N() ? getN8N() + '/webhook/opus-clip-direkt' : '/webhook/opus-clip-direkt';
+}
+
+function extractClipId(raw) {
+  const s = (raw||'').trim();
+  if (s.includes('/')) {
+    const parts = s.split('/');
+    return parts[parts.length - 1].trim();
+  }
+  return s;
+}
+
+async function sendOpusClip() {
+  const raw = (document.getElementById('opc-clipid')||{}).value || '';
+  const clipId = extractClipId(raw);
+  if (!clipId) return showRes('opc-res', 'Clip ID girin', 'err');
+  const cats = getSelCatList('opc-cats');
+  const kat = cats[0] || 'genel';
+  const base = getN8N();
+  if (!base) return showRes('opc-res', 'Ayarlar'dan n8n URL girin', 'warn');
+  showRes('opc-res', `⏳ [${clipId}] işleme alınıyor...`, 'info');
+  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat});
+  OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
+  localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
+  renderOPCHist();
+  showRes('opc-res', `✓ [${clipId}] n8n'e gönderildi [${kat}]`, 'ok');
+  addLog('ok', 'webhook', `OpusClip: ${clipId} [${kat}]`);
+}
+
+async function sendOpusClipBulk() {
+  const raw = (document.getElementById('opc-bulk')||{}).value || '';
+  const delay = parseInt((document.getElementById('opc-delay')||{}).value || 10) * 1000;
+  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  if (!lines.length) return showRes('opc-bulk-res', 'ID listesi boş', 'err');
+  const cats = getSelCatList('opc-bulk-cats');
+  const kat = cats[0] || 'genel';
+  const base = getN8N();
+  if (!base) return showRes('opc-bulk-res', 'n8n URL girin', 'warn');
+  showRes('opc-bulk-res', `⏳ ${lines.length} ID gönderiliyor...`, 'info');
+  for (let i=0; i<lines.length; i++) {
+    const clipId = extractClipId(lines[i]);
+    if (!clipId) continue;
+    await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat});
+    OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
+    if (i < lines.length-1) await sleep(delay);
+  }
+  localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
+  renderOPCHist();
+  showRes('opc-bulk-res', `✓ ${lines.length} ID gönderildi [${kat}]`, 'ok');
+  addLog('ok', 'webhook', `OpusClip Toplu: ${lines.length} ID [${kat}]`);
+}
+
+function renderOPCHist() {
+  const el = document.getElementById('opc-hist');
+  if (!el) return;
+  if (!OPC.hist.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Henüz gönderim yok</div>'; return; }
+  el.innerHTML = OPC.hist.slice(0,30).map(h=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--brd);font-size:9px">
+    <span style="color:var(--acc);font-family:var(--fm)">${h.id}</span>
+    <span class="badge bi">${h.kat}</span>
+    <span style="color:var(--mt)">${h.t}</span>
+  </div>`).join('');
+}
+
 // ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
@@ -1699,7 +2089,7 @@ function saveSent(){try{localStorage.setItem('op_sent',JSON.stringify([...S.sent
     updateLogStats();
     setEl('conn-status', S.cfg.n8n?'Bagli':'URL girilmedi');
     setEl('dr-sent-cnt', S.sentURLs.size);
-    addLog('ok','sistem','Panel v3 baslatildi');
+    addLog('ok','sistem','Panel v7 baslatildi — Oyun/Spor/OpusClip/YTKanal');
     toggleAutoLog();
   }catch(e){console.error('Init hatasi:',e);}
 })();
