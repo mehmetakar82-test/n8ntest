@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SHORT VIDEOS GENERATE PRO v3.8</title>
+<title>OPUS PRO v3.9</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -1385,7 +1385,7 @@ async function loadDriveSheet() {
   showRes('dr-res','⏳ Taranıyor...','info');
   addLog('info','drive','Drive sheet taranıyor');
   const vals = await sheetsGet(sid,'Sheet1!A:Z');
-  if (!vals) return showRes('dr-res','Tablo okunamadi — API Key ve Sheet ID kontrol edin ya da Google Sheet'i "Herkese açık" yapın','err');
+  if (!vals) return showRes('dr-res','Tablo okunamadi — API Key ve Sheet ID kontrol edin ya da Google Sheets tablosunu Herkese Acik yapin','err');
   const rows=parseSheet(vals);
   const allU=rows.map(r=>({url:r[col],kategori:r[catCol]||''})).filter(r=>r.url);
   const newU=allU.filter(r=>!S.sentURLs.has(r.url));
@@ -1957,7 +1957,7 @@ async function ytkSendSelected() {
   const cats = getSelCatList('ytk-cats');
   const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const base = getN8N();
-  if (!base) return showRes('ytk-res', 'Ayarlar'dan n8n URL girin', 'warn');
+  if (!base) return showRes('ytk-res', 'Ayarlar\'dan n8n URL girin', 'warn');
   showRes('ytk-res', `⏳ ${sel.length} video gönderiliyor...`, 'info');
   let sent = 0;
   for (const v of sel) {
@@ -2031,7 +2031,7 @@ async function sendOpusClip() {
   const cats = getSelCatList('opc-cats');
   const kat = cats[0] || 'genel';
   const base = getN8N();
-  if (!base) return showRes('opc-res', 'Ayarlar'dan n8n URL girin', 'warn');
+  if (!base) return showRes('opc-res', 'Ayarlar\'dan n8n URL girin', 'warn');
   showRes('opc-res', `⏳ [${clipId}] işleme alınıyor...`, 'info');
   await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat});
   OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
