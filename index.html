@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v3.9</title>
+<title>OPUS PRO v4.0</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -262,6 +262,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
         <div class="fg"><label>YouTube URL</label><input id="sv-url" type="url" placeholder="https://www.youtube.com/watch?v=..."/></div>
         <div class="fg"><label>Kategori</label><div class="cat-chips" id="sv-cats"></div></div>
         <div class="fg"><label>Kaynak Notu</label><input id="sv-note" type="text" placeholder="manuel, kampanya..."/></div>
+        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı — short açıklamasına eklenir)</span></label><input id="sv-aciklama" type="text" placeholder="örn. Excalibur Kanalı, Bölüm 1..."/></div>
         <div style="display:flex;gap:8px">
           <button class="btn bp" onclick="sendSingle()">▶ Gönder</button>
           <button class="btn bg bsm" onclick="testWH('sv-wh-display','sv-res')">⊙ Test</button>
@@ -272,6 +273,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
         <div class="ct">Toplu URL</div>
         <div class="fg"><label>URL Listesi (her satıra bir)</label><textarea id="bv-urls" style="height:90px" placeholder="https://youtube.com/watch?v=AAA&#10;https://youtube.com/watch?v=BBB"></textarea></div>
         <div class="fg"><label>Kategori <span style="color:var(--mt)">(birden fazla seçebilirsin)</span></label><div class="cat-chips" id="bv-cats"></div></div>
+        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı — tüm URL'ler için aynı)</span></label><input id="bv-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
         <div class="fg"><label>Gönderim Aralığı (dakika)</label><input id="bv-delay" type="number" value="1" min="1"/></div>
         <button class="btn bp" onclick="sendBulkURLs()">▶ Tümünü Gönder</button>
         <div id="bv-prog" style="display:none;margin-top:8px">
@@ -329,6 +331,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
           </select>
         </div>
         <div class="fg"><label>Kategori</label><div class="cat-chips" id="ytk-cats"></div></div>
+        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="ytk-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
         <div class="fg"><label>Drive Sheet'e Eklenecek Sheet ID</label>
           <input id="ytk-sheetid" type="text" placeholder="18VJLAesKMfN-..." oninput="if(!this.value&&S.cfg.sheet2)this.value=S.cfg.sheet2"/>
         </div>
@@ -369,6 +372,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
           <input id="opc-clipid" type="text" placeholder="P3061022AkhR veya https://clip.opus.pro/clip/P3061022AkhR"/>
         </div>
         <div class="fg"><label>Kategori</label><div class="cat-chips" id="opc-cats"></div></div>
+        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="opc-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
         <div style="display:flex;gap:8px">
           <button class="btn bp" onclick="sendOpusClip()">▶ İşleme Al</button>
         </div>
@@ -431,6 +435,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
         </div>
       </div>
       <div class="fg"><label>Kategori <span style="color:var(--mt)">(birden fazla seçebilirsin)</span></label><div class="cat-chips" id="ya-cats"></div></div>
+      <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="ya-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
       <div style="display:flex;gap:8px">
         <button class="btn bp" onclick="sendSearch()">⊕ Ara ve Gönder</button>
         <button class="btn bg bsm" onclick="addSearchHist()">+ Geçmişe Ekle</button>
@@ -482,6 +487,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
         </div>
         <div class="fg" id="bk-delay-wrap" style="display:none"><label>Bekleme Süresi (dakika)</label><input id="bk-delay" type="number" value="30" min="1"/></div>
         <div class="fg"><label>Kategori <span style="color:var(--mt)">(birden fazla seçebilirsin)</span></label><div class="cat-chips" id="bk-cats"></div></div>
+        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="bk-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
         <div style="display:flex;gap:8px;margin-top:6px">
           <button class="btn bp" onclick="sendBulkKW()">≋ Tümünü Gönder</button>
           <button class="btn bg bsm" onclick="S.kwList=[];renderKWTags()">✕ Temizle</button>
@@ -521,6 +527,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
       <div class="fg"><label>Google Sheets URL veya ID</label><input id="dr-sheet" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." oninput="parseDriveSheet()"/></div>
       <div class="fg"><label>URL Sütunu</label><input id="dr-col" type="text" value="Youtube Linki"/></div>
       <div class="fg"><label>Kategori Sütunu <span style="color:var(--mt)">(opsiyonel — sheet'te varsa)</span></label><input id="dr-cat-col" type="text" value="Kategori" placeholder="Kategori"/></div>
+      <div class="fg"><label>Açıklama Notu Sütunu <span style="color:var(--mt)">(opsiyonel — her URL için farklı not)</span></label><input id="dr-not-col" type="text" value="Aciklama Notu" placeholder="Aciklama Notu"/></div>
       <div class="fg"><label>Varsayılan Kategori <span style="color:var(--mt)">(sütun boşsa kullanılır)</span></label><div class="cat-chips" id="dr-cats"></div></div>
       <div style="display:flex;gap:8px">
         <button class="btn bp bsm" onclick="loadDriveSheet()">⊞ Sheet'i Tara</button>
@@ -557,6 +564,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
       <div class="fg"><label>URL Sütunu</label><input id="sh-col" type="text" value="Youtube Linki"/></div>
       <div class="fg"><label>İşlendi Sütunu</label><input id="sh-done" type="text" value="İşlendi"/></div>
       <div class="fg"><label>Kategori Sütunu <span style="color:var(--mt)">(opsiyonel — sheet'te varsa)</span></label><input id="sh-cat-col" type="text" value="Kategori" placeholder="Kategori"/></div>
+      <div class="fg"><label>Açıklama Notu Sütunu <span style="color:var(--mt)">(opsiyonel — her URL için farklı not)</span></label><input id="sh-not-col" type="text" value="Aciklama Notu" placeholder="Aciklama Notu"/></div>
       <div class="fg"><label>Varsayılan Kategori <span style="color:var(--mt)">(sütun boşsa kullanılır)</span></label><div class="cat-chips" id="sh-cats"></div></div>
       <div class="fg"><label>Bekleme Modu</label>
         <select id="sh-mode" onchange="document.getElementById('sh-delay-wrap').style.display=this.value==='time'?'block':'none'">
@@ -1152,7 +1160,8 @@ async function sendSingle() {
   if (!wh.startsWith('http')) return showRes('sv-res','Ayarlar\'dan n8n URL girin','warn');
   showRes('sv-res','⏳ Gonderiliyor... ['+selCat+']','info');
   addLog('info','webhook','Video gonderiliyor ['+selCat+']: '+url.slice(0,60));
-  await faf(wh, {'Youtube linki': url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat});
+  const svAciklama = (document.getElementById('sv-aciklama')||{}).value||'';
+  await faf(wh, {'Youtube linki': url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, aciklama_notu:svAciklama});
   showRes('sv-res','✓ n8n\'e gonderildi ['+selCat+']','ok');
   S.sentURLs.add(url.trim()); saveSent();
   addLog('ok','webhook','Video gonderildi ['+selCat+']');
@@ -1176,7 +1185,8 @@ async function sendBulkURLs() {
       const path = CAT_WH[kat] || '/webhook/video-gonder';
       setEl('bv-st',(i+1)+'/'+urls.length+' ['+kat+']: '+u.slice(0,40));
       setStyle('bv-bar','width',((sent+1)/(urls.length*selCats.length)*100)+'%');
-      await faf(base+path,{'Youtube linki':u, kaynak:'toplu', kategori:kat});
+      const bvAciklama = (document.getElementById('bv-aciklama')||{}).value||'';
+      await faf(base+path,{'Youtube linki':u, kaynak:'toplu', kategori:kat, aciklama_notu:bvAciklama});
       sent++;
     }
     S.sentURLs.add(u); saveSent();
@@ -1202,7 +1212,8 @@ async function sendSearch() {
   addLog('info','webhook','YouTube arama ['+selCats.join(',')+']:'+kw);
   for(const kat of selCats){
     const path = CAT_WH[kat] || '/webhook/youtube-ara';
-    faf(base+path,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, kategori:kat, categories:[kat]});
+    const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
+    faf(base+path,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, kategori:kat, categories:[kat], aciklama_notu:yaAciklama});
   }
   setTimeout(()=>showRes('ya-res','✓ Arama ['+selCats.join(',')+'] baslatildi — n8n arka planda calisiyor','ok'), 1500);
   S.searchHist.unshift({kw, kat:selCats.join(','), t:new Date().toLocaleString('tr')});
@@ -1274,7 +1285,8 @@ async function sendBulkKW() {
       setEl('bk-cur',(i+1)+'/'+kws.length+' ['+kat+']: "'+kws[i]+'"');
       setStyle('bk-pbar','width',((i+1)/kws.length*100)+'%');
       bLog('Gonderiliyor ['+kat+']: "'+kws[i]+'"');
-      await faf(base+path,{keywords:[kws[i]], anahtar_kelime:kws[i], minDurationSec:parseInt(dur), lang:'tr', kategori:kat});
+      const bkAciklama = (document.getElementById('bk-aciklama')||{}).value||'';
+      await faf(base+path,{keywords:[kws[i]], anahtar_kelime:kws[i], minDurationSec:parseInt(dur), lang:'tr', kategori:kat, aciklama_notu:bkAciklama});
       bLog('✓ "'+kws[i]+'" ['+kat+'] gonderildi');
       addLog('ok','bulk','KW ['+kat+']: '+kws[i]);
     }
@@ -1385,9 +1397,10 @@ async function loadDriveSheet() {
   showRes('dr-res','⏳ Taranıyor...','info');
   addLog('info','drive','Drive sheet taranıyor');
   const vals = await sheetsGet(sid,'Sheet1!A:Z');
-  if (!vals) return showRes('dr-res','Tablo okunamadi — API Key ve Sheet ID kontrol edin ya da Google Sheets tablosunu Herkese Acik yapin','err');
+  if (!vals) return showRes('dr-res','Tablo okunamadi — API Key ve Sheet ID kontrol edin ya da tabloyu herkese acik yapin','err');
   const rows=parseSheet(vals);
-  const allU=rows.map(r=>({url:r[col],kategori:r[catCol]||''})).filter(r=>r.url);
+  const drNotColV=(document.getElementById('dr-not-col')||{}).value||'Aciklama Notu';
+  const allU=rows.map(r=>({url:r[col],kategori:r[catCol]||'',aciklama_notu:r[drNotColV]||''})).filter(r=>r.url);
   const newU=allU.filter(r=>!S.sentURLs.has(r.url));
   S.driveURLs=allU;
   S.driveRows=rows; // satır başvurusu için sakla
@@ -1421,7 +1434,9 @@ async function sendDriveURLs() {
     const url=r.url||r;
     const kat=(r.kategori&&r.kategori.trim())||defCat;
     const path=CAT_WH[kat]||'/webhook/video-gonder';
-    await faf(base+path,{'Youtube linki':url,kaynak:'drive',kategori:kat});
+    const drNotCol = (document.getElementById('dr-not-col')||{}).value||'Aciklama Notu';
+    const drAciklama = (r[drNotCol]||'').trim();
+    await faf(base+path,{'Youtube linki':url,kaynak:'drive',kategori:kat,aciklama_notu:drAciklama});
     S.sentURLs.add(url);
     addLog('ok','drive','Drive ['+kat+']: '+url.slice(0,60));
   }
@@ -1448,7 +1463,8 @@ async function scanSheet() {
   const vals=await sheetsGet(sid,'Sheet1!A:Z');
   if(!vals)return showRes('sh-res','Tablo okunamadi','err');
   const rows=parseSheet(vals);
-  const allRows=rows.map(r=>({url:r[col],kategori:r[catCol]||''})).filter(r=>r.url);
+  const notColVal=(document.getElementById('sh-not-col')||{}).value||'Aciklama Notu';
+  const allRows=rows.map(r=>({url:r[col],kategori:r[catCol]||'',aciklama_notu:r[notColVal]||''})).filter(r=>r.url);
   const allU=allRows.map(r=>r.url);
   const newRows=allRows.filter(r=>!S.sentURLs.has(r.url));
   S.sheetURLs=newRows; // {url, kategori} objesi olarak sakla
@@ -1476,7 +1492,9 @@ async function sendSheetURLs() {
     const path=CAT_WH[kat]||'/webhook/video-gonder';
     setEl('sh-cur',(i+1)+'/'+S.sheetURLs.length+' ['+kat+']: '+url.slice(0,40));
     setStyle('sh-pbar','width',((i+1)/S.sheetURLs.length*100)+'%');
-    await faf(base+path,{'Youtube linki':url,kaynak:'sheets',kategori:kat});
+    const shNotCol = (document.getElementById('sh-not-col')||{}).value||'Aciklama Notu';
+    const shAciklama = ((row[shNotCol]||'').trim());
+    await faf(base+path,{'Youtube linki':url,kaynak:'sheets',kategori:kat,aciklama_notu:shAciklama});
     S.sentURLs.add(url); saveSent();
     if(i<S.sheetURLs.length-1) await sleep(mode==='time'?delay:3*60*1000);
   }
@@ -1957,14 +1975,15 @@ async function ytkSendSelected() {
   const cats = getSelCatList('ytk-cats');
   const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const base = getN8N();
-  if (!base) return showRes('ytk-res', 'Ayarlar\'dan n8n URL girin', 'warn');
+  if (!base) return showRes('ytk-res', 'Ayarlardan n8n URL girin', 'warn');
   showRes('ytk-res', `⏳ ${sel.length} video gönderiliyor...`, 'info');
   let sent = 0;
   for (const v of sel) {
     const url = 'https://www.youtube.com/watch?v=' + v.id;
     for (const kat of cats) {
       const path = CAT_WH[kat] || '/webhook/video-gonder';
-      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, title: v.snippet.title, channelTitle: YTK.channelInfo?.channelTitle || ''});
+      const ytkAciklama = (document.getElementById('ytk-aciklama')||{}).value||'';
+      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, title: v.snippet.title, channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
     }
     sent++;
     await sleep(500);
@@ -2031,9 +2050,10 @@ async function sendOpusClip() {
   const cats = getSelCatList('opc-cats');
   const kat = cats[0] || 'genel';
   const base = getN8N();
-  if (!base) return showRes('opc-res', 'Ayarlar\'dan n8n URL girin', 'warn');
+  if (!base) return showRes('opc-res', 'Ayarlardan n8n URL girin', 'warn');
   showRes('opc-res', `⏳ [${clipId}] işleme alınıyor...`, 'info');
-  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat});
+  const opcAciklama = (document.getElementById('opc-aciklama')||{}).value||'';
+  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, aciklama_notu: opcAciklama});
   OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
   localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
   renderOPCHist();
@@ -2054,7 +2074,8 @@ async function sendOpusClipBulk() {
   for (let i=0; i<lines.length; i++) {
     const clipId = extractClipId(lines[i]);
     if (!clipId) continue;
-    await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat});
+    const opcAciklama = (document.getElementById('opc-aciklama')||{}).value||'';
+  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, aciklama_notu: opcAciklama});
     OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
     if (i < lines.length-1) await sleep(delay);
   }
@@ -2078,7 +2099,10 @@ function renderOPCHist() {
 // ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
-(function init(){
+// go() global olarak tanımla (inline onclick için)
+window.go = go;
+
+document.addEventListener('DOMContentLoaded', function() {
   try{
     loadSettings();
     renderSearchHist();
@@ -2091,8 +2115,20 @@ function renderOPCHist() {
     setEl('dr-sent-cnt', S.sentURLs.size);
     addLog('ok','sistem','Panel v7 baslatildi — Oyun/Spor/OpusClip/YTKanal');
     toggleAutoLog();
+    // Tüm global fonksiyonları window'a bağla
+    const globals = [go,showTab,refreshDash,sendSingle,sendBulkURLs,sendSearch,
+      addKW,removeKW,sendBulkKW,loadDriveSheet,sendDriveURLs,clearSentURLs,
+      scanSheet,sendSheetURLs,filterTbl,exportCSV,loadReports,loadPlatforms,
+      renderAccInputs,genAccCode,saveSettings,updateWHs,copyText,renderLogs,
+      clearLogs,exportLogs,loadTakvim,takPrev,takNext,takFilter,openDayModal,
+      closeDayModal,showTakTip,hideTakTip,dmFilter,dmToggleSort,
+      searchYTChannel,ytkSelectAll,ytkClearAll,ytkSendSelected,ytkAddToSheet,
+      sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheet,addSearchHist,
+      toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
+      loadAllSheetData,loadSheetPage,sendOpusClipBulk];
+    globals.forEach(fn => { if(typeof fn === 'function') window[fn.name] = fn; });
   }catch(e){console.error('Init hatasi:',e);}
-})();
+});
 
 // ═══════════════════════════════════════════════════════════
 // TAKVİM
