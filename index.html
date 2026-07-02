@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v4.0</title>
+<title>OPUS PRO v7</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -196,7 +196,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 
 <!-- DASHBOARD -->
 <div id="page-dashboard" class="page active">
-  <div class="ph"><div class="pt">Dashboard</div><div class="ps">Canlı veriler — Blotato + Google Sheets</div></div>
+  <div class="ph"><div class="pt">Dashboard</div><div class="ps">Canlı veriler — Upload-Post + Google Sheets</div></div>
   <div id="sheets-hint" class="alert aw" style="display:none;margin-bottom:10px">
     <span>⚠</span>
     <div>
@@ -217,7 +217,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
   <div class="sg">
     <div class="sc c1"><div class="sl">İşlenen URL</div><div class="sv" id="d-url">—</div><div class="ss">URL-Takip sayfası</div></div>
     <div class="sc c2"><div class="sl">Üretilen Short</div><div class="sv" id="d-short">—</div><div class="ss">Short Kaydet</div></div>
-    <div class="sc c3"><div class="sl">Zamanlanmış</div><div class="sv" id="d-sched">—</div><div class="ss">Blotato scheduled</div></div>
+    <div class="sc c3"><div class="sl">Zamanlanmış</div><div class="sv" id="d-sched">—</div><div class="ss">Upload-Post scheduled</div></div>
     <div class="sc c4"><div class="sl">İşlemde</div><div class="sv" id="d-proc">—</div><div class="ss">Aktif kuyruk</div></div>
   </div>
   <div class="g2">
@@ -702,9 +702,9 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 
 <!-- PLATFORMLAR -->
 <div id="page-platformlar" class="page">
-  <div class="ph"><div class="pt">Platformlar</div><div class="ps">Blotato'dan çekilen hesap bilgileri — tıklayarak sosyal medyaya git</div></div>
+  <div class="ph"><div class="pt">Platformlar</div><div class="ps">Upload-Post'tan çekilen hesap bilgileri — tıklayarak sosyal medyaya git</div></div>
   <div style="display:flex;gap:8px;margin-bottom:12px">
-    <button class="btn bp bsm" onclick="loadPlatforms()">↻ Blotato'dan Çek</button>
+    <button class="btn bp bsm" onclick="loadPlatforms()">↻ Upload-Post'tan Çek</button>
     <span id="plat-last" style="font-size:9px;color:var(--mt);align-self:center"></span>
   </div>
   <div class="g3">
@@ -843,7 +843,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 </div>
         <div class="fg"><label>Sheet ID (Short Kaydet)</label><input id="cfg-sheet" type="text" placeholder="1eAm6yyasd_..."/></div>
         <div class="fg"><label>Sheet ID (URL-Takip)</label><input id="cfg-sheet2" type="text" placeholder="aynı veya farklı"/></div>
-        <div class="fg"><label>Blotato API Key</label><input id="cfg-blot" type="text" placeholder="blt_..."/></div>
+        <div class="fg"><label>Upload-Post API Key</label><input id="cfg-blot" type="text" placeholder="blt_..."/></div>
         <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
         <div id="cfg-ok" style="display:none;font-size:9px;color:var(--ok);margin-top:6px">✓ Kaydedildi</div>
       </div>
@@ -876,7 +876,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 
 <!-- HESAPLAR -->
 <div id="page-hesaplar" class="page">
-  <div class="ph"><div class="pt">Hesaplar</div><div class="ps">Blotato hesap ID'leri</div></div>
+  <div class="ph"><div class="pt">Hesaplar</div><div class="ps">Upload-Post profil isimleri</div></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Değişiklikler n8n Code in JavaScript3 node'una uygulanmalıdır. "Kodu Üret" butonu ile kopyalanabilir kod alın.</span></div>
   <div class="g3">
     <div class="card"><div class="ct">📸 Instagram</div><div id="ig-inputs"></div></div>
@@ -905,7 +905,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
       <option value="">Tüm Kategoriler</option>
       <option value="webhook">Webhook</option>
       <option value="sheets">Sheets API</option>
-      <option value="blotato">Blotato</option>
+      <option value="uploadpost">Upload-Post</option>
       <option value="drive">Drive</option>
       <option value="sistem">Sistem</option>
       <option value="bulk">Toplu</option>
@@ -1598,12 +1598,12 @@ async function loadReports() {
 // ═══════════════════════════════════════════════════════════
 async function loadPlatforms() {
   setEl('plat-last','Yukleniyor...');
-  addLog('info','blotato','Platform bilgileri cekiliyor');
+  addLog('info','uploadpost','Upload-Post profil bilgileri cekiliyor');
   let d = S._panelCache?.accounts || null;
   if (!d||!Object.keys(d).length) {
-    d = await n8nGet('/webhook/blotato-accounts');
+    d = await n8nGet('/webhook/uploadpost-profiller');
   }
-  S.blotatoAccounts=d;
+  S.uploadPostAccounts=d;
   const n8nOk = !!d;
   if (d && (d.instagram||d.youtube||d.tiktok)) {
     renderPlatEl('pl-ig', d.instagram||[], 'pi-ig','📸','https://instagram.com/');
@@ -1618,7 +1618,7 @@ async function loadPlatforms() {
     fallbackPlat('pl-ig','ig','📸','pi-ig','https://instagram.com/');
     fallbackPlat('pl-yt','yt','▶','pi-yt','https://youtube.com/channel/');
     fallbackPlat('pl-tt','tt','♪','pi-tt','https://tiktok.com/@');
-    addLog('warn','blotato','Blotato API yanitlamadi — kayitli ID\'ler kullaniliyor');
+    addLog('warn','uploadpost','Upload-Post API yanitlamadi — kayitli profil isimleri kullaniliyor');
   }
   setEl('plat-last','Son: '+new Date().toLocaleTimeString('tr'));
 }
@@ -1765,7 +1765,7 @@ function genAccCode() {
 // ═══════════════════════════════════════════════════════════
 // LOGLAR
 // ═══════════════════════════════════════════════════════════
-const CAT_C={webhook:'#00e5ff',sheets:'#7c3aed',blotato:'#f59e0b',drive:'#10b981',sistem:'#64748b',bulk:'#ff3566'};
+const CAT_C={webhook:'#00e5ff',sheets:'#7c3aed',uploadpost:'#f59e0b',drive:'#10b981',sistem:'#64748b',bulk:'#ff3566'};
 const SEV_C={info:'#00e5ff',ok:'#10b981',warn:'#f59e0b',err:'#ef4444'};
 
 function addLog(sev,cat,msg) {
