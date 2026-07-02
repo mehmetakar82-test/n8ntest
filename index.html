@@ -821,7 +821,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     <div>
       <div class="card">
         <div class="ct">n8n Bağlantısı</div>
-        <div class="fg"><label>n8n Base URL (Cloudflare Worker)</label><input id="cfg-n8n" type="url" placeholder="https://opus-proxy.xxx.workers.dev" oninput="updateWHs()"/></div>
+        <div class="fg"><label>n8n Base URL (Cloudflare Worker)</label><input id="cfg-n8n" type="url" placeholder="https://opus-proxy.xxx.workers.dev" oninput="updateWHs()"/><div style="font-size:9px;color:var(--mt);margin-top:4px">Sadece n8n adresi — workflow düzenleme linkini (…/workflow/xxxx) DEĞİL, sadece domain kısmını yapıştır (örn. https://xxx.app.n8n.cloud)</div></div>
         <div class="fg"><label>Webhook: Video Gönder (Genel)</label><div id="wh-video" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder</div></div>
         <div class="fg"><label>Webhook: Film</label><div id="wh-film" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-film</div></div>
         <div class="fg"><label>Webhook: Eğlence</label><div id="wh-eglence" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-eglence</div></div>
@@ -1003,11 +1003,25 @@ function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
 async function faf(url, body) {
+  // Belirgin şekilde bozuk URL'leri en baştan yakala (workflow editör linki vb.)
+  if (!url || /\/workflow\/|\/executions\//.test(url)) {
+    addLog('err','webhook','Gecersiz n8n URL — Ayarlar sayfasindan duzelt: '+url);
+    return {ok:false, invalidUrl:true};
+  }
   return new Promise(resolve=>{
-    const tid = setTimeout(()=>resolve({ok:true,timeout:true}),5000);
+    const tid = setTimeout(()=>resolve({ok:false,timeout:true}),8000);
     fetch(url,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-      .then(r=>{clearTimeout(tid);resolve(r);})
-      .catch(()=>{clearTimeout(tid);resolve({ok:true,timeout:true});});
+      .then(r=>{
+        clearTimeout(tid);
+        if (!r.ok) addLog('err','webhook','HTTP '+r.status+' — '+url);
+        resolve(r);
+      })
+      .catch(err=>{
+        clearTimeout(tid);
+        // CORS hatasi da buraya duser; ayirt edemeyiz ama en azindan logla
+        addLog('warn','webhook','Istek CORS/network engeline takilmis olabilir (yine de n8n tarafina ulasmis olabilir): '+url);
+        resolve({ok:false, corsOrNetwork:true});
+      });
   });
 }
 
@@ -1697,8 +1711,27 @@ function updateSVWHDisplay() {
 }
 
 function saveSettings() {
+  let n8nUrl = (document.getElementById('cfg-n8n')||{}).value||'';
+  n8nUrl = n8nUrl.trim().replace(/\/$/,'');
+  // Yaygın hata: workflow editör linkini yapıştırmak (…/workflow/xxxxx)
+  // Doğru olan sadece n8n instance domain'i (…/webhook/... path'i panel ekler)
+  const badPatterns = ['/workflow/', '/executions/', '/home/', '/settings/'];
+  const looksWrong = badPatterns.some(p => n8nUrl.includes(p));
+  if (looksWrong) {
+    const cleaned = n8nUrl.split(/\/workflow\/|\/executions\/|\/home\/|\/settings\//)[0];
+    const proceed = confirm(
+      'Bu URL bir workflow düzenleme linki gibi görünüyor:\n' + n8nUrl +
+      '\n\nWebhook istekleri buraya ulaşamaz (404 verir).\n' +
+      'Sadece n8n adresini kullan:\n' + cleaned +
+      '\n\nOtomatik düzeltilsin mi?'
+    );
+    if (proceed) {
+      n8nUrl = cleaned;
+      document.getElementById('cfg-n8n').value = n8nUrl;
+    }
+  }
   S.cfg={
-    n8n:   (document.getElementById('cfg-n8n')||{}).value||'',
+    n8n:   n8nUrl,
     shkey: (document.getElementById('cfg-shkey')||{}).value||'',
     sheet: (document.getElementById('cfg-sheet')||{}).value||'',
     sheet2:(document.getElementById('cfg-sheet2')||{}).value||'',
