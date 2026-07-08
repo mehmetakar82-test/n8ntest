@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v7</title>
+<title>OPUS PRO v9</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -309,26 +309,23 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 
 <!-- YT KANAL ARA -->
 <div id="page-ytkanal" class="page">
-  <div class="ph"><div class="pt">YouTube Kanal Ara</div><div class="ps">Bir kanalın en çok izlenen videolarını bul ve seç</div></div>
+  <div class="ph"><div class="pt">YouTube Kanal Ara</div><div class="ps">Anahtar kelime ile kanal bul, kanalın tüm videolarını incele ve seçtiklerini tek tek işleme al</div></div>
   <div class="g2">
     <div>
       <div class="card">
         <div class="ct">Kanal Arama</div>
-        <div class="alert ai"><span>ℹ</span><span>Kanal adı veya @handle girin. Videolar izlenme sayısına göre sıralanır, seçtikleriniz Drive Sheet'e eklenir.</span></div>
+        <div class="alert ai"><span>ℹ</span><span>Anahtar kelime veya @handle girin. Eşleşen kanallar abone / izlenme / video sayısı ile listelenir; bir kanala tıklayınca videoları sağda açılır.</span></div>
         <div class="fg"><label>YouTube API Key</label><input id="ytk-apikey" type="text" placeholder="AIza..." oninput="if(S.cfg.ytApiKey!==this.value){S.cfg.ytApiKey=this.value;localStorage.setItem('op_cfg',JSON.stringify(S.cfg));}"/></div>
-        <div class="fg"><label>Kanal Adı veya @handle</label>
+        <div class="fg"><label>Anahtar Kelime veya @handle</label>
           <div style="display:flex;gap:6px">
-            <input id="ytk-channel" type="text" placeholder="@KanalAdi veya kanal adı..." style="flex:1"/>
+            <input id="ytk-channel" type="text" placeholder="örn. tarih belgesel, @KanalAdi..." style="flex:1" onkeydown="if(event.key==='Enter')searchYTChannel()"/>
             <button class="btn bp bsm" onclick="searchYTChannel()">🔍 Ara</button>
           </div>
         </div>
-        <div class="fg"><label>Min. Video Süresi</label>
-          <select id="ytk-dur">
-            <option value="600">10 dakika</option>
-            <option value="1200">20 dakika</option>
-            <option value="1800">30 dakika</option>
-            <option value="3600">60 dakika</option>
-          </select>
+        <div class="fg"><label>Bulunan Kanallar <span id="ytk-ch-count" style="color:var(--acc)"></span></label>
+          <div id="ytk-channel-list" style="max-height:340px;overflow-y:auto;border:1px solid var(--brd);border-radius:4px">
+            <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Arama yapın</div>
+          </div>
         </div>
         <div class="fg"><label>Kategori</label><div class="cat-chips" id="ytk-cats"></div></div>
         <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="ytk-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
@@ -340,19 +337,39 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     </div>
     <div>
       <div class="card">
-        <div class="ct">Kanal Bilgisi</div>
-        <div id="ytk-channel-info" style="color:var(--mt);font-size:10px;text-align:center;padding:16px">Arama yapın</div>
+        <div class="ct">Seçili Kanal</div>
+        <div id="ytk-channel-info" style="color:var(--mt);font-size:10px;text-align:center;padding:16px">Soldaki listeden kanal seçin</div>
       </div>
       <div class="card">
-        <div class="ct" style="margin-bottom:10px">En Çok İzlenen Videolar <span id="ytk-sel-count" style="color:var(--acc)">(0 seçili)</span></div>
+        <div class="ct" style="margin-bottom:10px">Kanal Videoları <span id="ytk-sel-count" style="color:var(--acc)">(0 seçili)</span></div>
+        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+          <select id="ytk-dur" onchange="renderYTKVideos()" style="width:110px">
+            <option value="0">Tüm süreler</option>
+            <option value="600" selected>10 dk+</option>
+            <option value="1200">20 dk+</option>
+            <option value="1800">30 dk+</option>
+            <option value="3600">60 dk+</option>
+          </select>
+          <select id="ytk-sort" onchange="renderYTKVideos()" style="width:130px">
+            <option value="date">Yeni → Eski</option>
+            <option value="views">İzlenme ↓</option>
+            <option value="likes">Beğeni ↓</option>
+            <option value="comments">Yorum ↓</option>
+          </select>
+          <span id="ytk-vid-count" style="font-size:9px;color:var(--mt)"></span>
+        </div>
         <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
           <button class="btn bg bsm" onclick="ytkSelectAll()">Tümünü Seç</button>
           <button class="btn bg bsm" onclick="ytkClearAll()">Seçimi Temizle</button>
           <button class="btn bs bsm" onclick="ytkSendSelected()">▶ Seçilenleri Gönder</button>
           <button class="btn bp bsm" onclick="ytkAddToSheet()">📋 Sheet'e Ekle</button>
         </div>
-        <div id="ytk-video-list" style="max-height:400px;overflow-y:auto">
-          <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal arayın</div>
+        <div id="ytk-video-list" style="max-height:420px;overflow-y:auto">
+          <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal seçin</div>
+        </div>
+        <div id="ytk-more-wrap" style="margin-top:8px;gap:6px;justify-content:center;display:none">
+          <button class="btn bg bsm" id="ytk-more-btn" onclick="ytkLoadMore()">⬇ Daha Fazla Yükle (50)</button>
+          <button class="btn bg bsm" id="ytk-all-btn" onclick="ytkLoadAll()">⏬ Tümünü Yükle</button>
         </div>
       </div>
     </div>
@@ -524,7 +541,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
   <div class="g2">
     <div class="card">
       <div class="ct">Sheet Bağlantısı</div>
-      <div class="fg"><label>Google Sheets URL veya ID</label><input id="dr-sheet" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." oninput="parseDriveSheet()"/></div>
+      <div class="fg"><label>Google Sheets URL veya ID</label><input id="dr-sheet" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." oninput="parseDriveSheetID()"/></div>
       <div class="fg"><label>URL Sütunu</label><input id="dr-col" type="text" value="Youtube Linki"/></div>
       <div class="fg"><label>Kategori Sütunu <span style="color:var(--mt)">(opsiyonel — sheet'te varsa)</span></label><input id="dr-cat-col" type="text" value="Kategori" placeholder="Kategori"/></div>
       <div class="fg"><label>Açıklama Notu Sütunu <span style="color:var(--mt)">(opsiyonel — her URL için farklı not)</span></label><input id="dr-not-col" type="text" value="Aciklama Notu" placeholder="Aciklama Notu"/></div>
@@ -1519,6 +1536,12 @@ async function sendSheetURLs() {
 // ═══════════════════════════════════════════════════════════
 // SHEET PAGES
 // ═══════════════════════════════════════════════════════════
+// "Yenile" butonlarinin cagirdigi eski isim — taze veri icin cache temizleyip yukler
+async function loadAllSheetData(page) {
+  S._panelCache = null;
+  return loadSheetPage(page);
+}
+
 async function loadSheetPage(page) {
   const sid  = S.cfg.sheet  || '';
   const sid2 = S.cfg.sheet2 || sid;
@@ -1862,7 +1885,7 @@ function saveSent(){try{localStorage.setItem('op_sent',JSON.stringify([...S.sent
 // ═══════════════════════════════════════════════════════════
 // YT KANAL ARA
 // ═══════════════════════════════════════════════════════════
-const YTK = { videos: [], selected: new Set(), channelInfo: null };
+const YTK = { channels: [], videos: [], selected: new Set(), channelInfo: null, uploadsId: '', nextPage: '', loading: false };
 
 function initYTKanal() {
   const ytkSh = document.getElementById('ytk-sheetid');
@@ -1871,103 +1894,180 @@ function initYTKanal() {
   if (ytkKey && !ytkKey.value && S.cfg.ytApiKey) ytkKey.value = S.cfg.ytApiKey;
 }
 
+function ytkApiKey() {
+  return (document.getElementById('ytk-apikey')||{}).value || S.cfg.ytApiKey || S.cfg.shkey || '';
+}
+
+// 1234567 -> "1,2 Mn" gibi kısa Türkçe sayı formatı
+function ytkFmt(n) {
+  n = parseInt(n||0);
+  if (isNaN(n)) return '0';
+  if (n >= 1e9) return (n/1e9).toFixed(1).replace('.0','').replace('.',',') + ' Mr';
+  if (n >= 1e6) return (n/1e6).toFixed(1).replace('.0','').replace('.',',') + ' Mn';
+  if (n >= 1e3) return (n/1e3).toFixed(1).replace('.0','').replace('.',',') + ' B';
+  return String(n);
+}
+
+function ytkParseDur(iso) {
+  const m = (iso||'').match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return 0;
+  return (parseInt(m[1]||0)*3600)+(parseInt(m[2]||0)*60)+parseInt(m[3]||0);
+}
+
+function ytkDurFmt(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return (h?h+':':'') + String(m).padStart(h?2:1,'0') + ':' + String(s).padStart(2,'0');
+}
+
+// ── Kanal arama: anahtar kelime -> kanal listesi (abone/izlenme/video sayısı ile)
 async function searchYTChannel() {
-  const apiKey = (document.getElementById('ytk-apikey')||{}).value || S.cfg.ytApiKey || S.cfg.shkey || '';
-  const query  = (document.getElementById('ytk-channel')||{}).value || '';
-  const minDur = parseInt((document.getElementById('ytk-dur')||{}).value || 600);
-  if (!query.trim()) return showRes('ytk-res', 'Kanal adı girin', 'err');
+  const apiKey = ytkApiKey();
+  const query  = ((document.getElementById('ytk-channel')||{}).value||'').trim();
+  if (!query) return showRes('ytk-res', 'Anahtar kelime girin', 'err');
   if (!apiKey) return showRes('ytk-res', 'YouTube API Key gerekli (Ayarlar sekmesindeki Google API Key kullanılabilir)', 'warn');
 
-  showRes('ytk-res', '⏳ Kanal aranıyor...', 'info');
-  addLog('info', 'webhook', 'YT Kanal aranıyor: ' + query);
-
-  // Önce kanal ID bul
-  let channelId = '';
-  let channelTitle = '';
-  let channelThumb = '';
-  let subscriberCount = '';
+  showRes('ytk-res', '⏳ Kanallar aranıyor...', 'info');
+  addLog('info', 'webhook', 'YT Kanal arama: ' + query);
 
   try {
-    // Handle veya ad ile kanal ara
-    const handle = query.startsWith('@') ? query : '@' + query;
-    let chUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&forHandle=${encodeURIComponent(handle)}&key=${apiKey}`;
-    let chRes = await fetch(chUrl);
-    let chData = await chRes.json();
-
-    if (!chData.items || !chData.items.length) {
-      // isim ile ara
-      const srUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(query)}&maxResults=1&key=${apiKey}`;
-      const srRes = await fetch(srUrl);
-      const srData = await srRes.json();
-      if (srData.items && srData.items.length) {
-        channelId    = srData.items[0].id.channelId || srData.items[0].snippet.channelId;
-        channelTitle = srData.items[0].snippet.channelTitle;
-        channelThumb = srData.items[0].snippet.thumbnails?.default?.url || '';
-        // detayları al
-        const dtUrl = `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelId}&key=${apiKey}`;
-        const dtRes = await fetch(dtUrl);
-        const dtData = await dtRes.json();
-        subscriberCount = dtData.items?.[0]?.statistics?.subscriberCount || '';
-      }
-    } else {
-      channelId       = chData.items[0].id;
-      channelTitle    = chData.items[0].snippet.title;
-      channelThumb    = chData.items[0].snippet.thumbnails?.default?.url || '';
-      subscriberCount = chData.items[0].statistics?.subscriberCount || '';
+    const ids = [];
+    // @handle ise önce birebir eşleşme dene
+    if (query.startsWith('@')) {
+      const hr = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(query)}&key=${apiKey}`);
+      const hd = await hr.json();
+      if (hd.items && hd.items.length) ids.push(hd.items[0].id);
     }
+    // Anahtar kelime ile kanal ara
+    const sr = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(query.replace(/^@/,''))}&maxResults=10&key=${apiKey}`);
+    const sd = await sr.json();
+    if (sd.error) throw new Error(sd.error.message || 'API hatası');
+    (sd.items||[]).forEach(i => { const id = i.id && i.id.channelId; if (id && !ids.includes(id)) ids.push(id); });
 
-    if (!channelId) {
-      showRes('ytk-res', 'Kanal bulunamadı', 'err');
-      return;
-    }
+    if (!ids.length) { YTK.channels = []; renderYTKChannels(); return showRes('ytk-res', 'Kanal bulunamadı', 'warn'); }
 
-    YTK.channelInfo = { channelId, channelTitle, channelThumb, subscriberCount };
-    const chInfoEl = document.getElementById('ytk-channel-info');
-    if (chInfoEl) {
-      const subs = subscriberCount ? parseInt(subscriberCount).toLocaleString('tr') + ' abone' : '';
-      chInfoEl.innerHTML = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        ${channelThumb ? `<img src="${channelThumb}" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--acc)">` : ''}
-        <div>
-          <div style="font-size:13px;font-weight:700;color:#fff">${channelTitle}</div>
-          <div style="font-size:9px;color:var(--mt)">${subs}</div>
-          <div style="font-size:8px;color:var(--acc)">${channelId}</div>
-        </div>
-      </div>`;
-    }
-
-    // Videoları çek (en çok izlenen)
-    showRes('ytk-res', '⏳ Videolar alınıyor...', 'info');
-    const vidUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=viewCount&maxResults=50&key=${apiKey}`;
-    const vidRes = await fetch(vidUrl);
-    const vidData = await vidRes.json();
-    const videoIds = (vidData.items || []).map(i => i.id.videoId).filter(Boolean).join(',');
-
-    if (!videoIds) { showRes('ytk-res', 'Video bulunamadı', 'warn'); return; }
-
-    // Detay ve süre bilgisi al
-    const detUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoIds}&key=${apiKey}`;
-    const detRes = await fetch(detUrl);
-    const detData = await detRes.json();
-
-    function parseDur(iso) {
-      const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
-      if (!m) return 0;
-      return (parseInt(m[1]||0)*3600)+(parseInt(m[2]||0)*60)+parseInt(m[3]||0);
-    }
-
-    YTK.videos = (detData.items || [])
-      .filter(v => parseDur(v.contentDetails.duration) >= minDur)
-      .sort((a,b) => parseInt(b.statistics.viewCount||0) - parseInt(a.statistics.viewCount||0));
-
-    YTK.selected.clear();
-    renderYTKVideos();
-    showRes('ytk-res', `✓ ${YTK.videos.length} video (${minDur/60}dk+, izlenmeye göre sıralı)`, 'ok');
-    addLog('ok', 'webhook', `YT Kanal ${channelTitle}: ${YTK.videos.length} video`);
-
+    // Kanal detayları: abone, toplam izlenme, video sayısı
+    const dr = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${ids.join(',')}&key=${apiKey}`);
+    const dd = await dr.json();
+    if (dd.error) throw new Error(dd.error.message || 'API hatası');
+    const order = {}; ids.forEach((id,i)=>order[id]=i);
+    YTK.channels = (dd.items||[]).sort((a,b)=>order[a.id]-order[b.id]);
+    renderYTKChannels();
+    showRes('ytk-res', `✓ ${YTK.channels.length} kanal bulundu — videoları görmek için birine tıklayın`, 'ok');
+    addLog('ok', 'webhook', `YT Kanal arama "${query}": ${YTK.channels.length} kanal`);
   } catch(e) {
     showRes('ytk-res', 'Hata: ' + e.message + ' — API Key ve izin kontrol edin', 'err');
-    addLog('err', 'webhook', 'YT Kanal hata: ' + e.message);
+    addLog('err', 'webhook', 'YT Kanal arama hata: ' + e.message);
   }
+}
+
+function renderYTKChannels() {
+  const el = document.getElementById('ytk-channel-list');
+  if (!el) return;
+  const cnt = document.getElementById('ytk-ch-count');
+  if (cnt) cnt.textContent = YTK.channels.length ? `(${YTK.channels.length})` : '';
+  if (!YTK.channels.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal bulunamadı</div>'; return; }
+  el.innerHTML = YTK.channels.map(c => {
+    const st = c.statistics || {};
+    const active = YTK.channelInfo && YTK.channelInfo.channelId === c.id;
+    const thumb = c.snippet.thumbnails?.default?.url || '';
+    const handle = c.snippet.customUrl || '';
+    return `<div onclick="ytkPickChannel('${c.id}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;align-items:center;background:${active?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${active?'var(--acc)':'transparent'};transition:all .15s">
+      ${thumb?`<img src="${thumb}" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">`:''}
+      <div style="min-width:0;flex:1">
+        <div style="font-size:10px;font-weight:700;color:${active?'var(--acc)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.snippet.title} <span style="color:var(--mt);font-weight:400">${handle}</span></div>
+        <div style="font-size:8px;color:var(--mt);margin-top:2px">👥 ${ytkFmt(st.subscriberCount)} abone &nbsp;👁 ${ytkFmt(st.viewCount)} izlenme &nbsp;🎬 ${ytkFmt(st.videoCount)} video</div>
+      </div>
+      <span class="badge bi" style="flex-shrink:0">Videolar ▶</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Kanal seçimi: bilgi kartı + videoları yükle (uploads playlist, 50'şer sayfa)
+async function ytkPickChannel(chId) {
+  const c = YTK.channels.find(x => x.id === chId);
+  if (!c) return;
+  const st = c.statistics || {};
+  YTK.channelInfo = {
+    channelId: chId,
+    channelTitle: c.snippet.title,
+    channelThumb: c.snippet.thumbnails?.default?.url || '',
+    subscriberCount: st.subscriberCount || '0',
+    viewCount: st.viewCount || '0',
+    videoCount: st.videoCount || '0'
+  };
+  // Uploads playlist ID: UC... -> UU... (ekstra API çağrısı gerektirmez)
+  YTK.uploadsId = 'UU' + chId.slice(2);
+  YTK.videos = []; YTK.selected.clear(); YTK.nextPage = '';
+  renderYTKChannels();
+
+  const chInfoEl = document.getElementById('ytk-channel-info');
+  if (chInfoEl) {
+    chInfoEl.innerHTML = `<div style="display:flex;align-items:center;gap:10px;text-align:left">
+      ${YTK.channelInfo.channelThumb ? `<img src="${YTK.channelInfo.channelThumb}" style="width:44px;height:44px;border-radius:50%;border:2px solid var(--acc)">` : ''}
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13px;font-weight:700;color:#fff">${YTK.channelInfo.channelTitle}</div>
+        <div style="font-size:9px;color:var(--mt);margin-top:3px">👥 ${ytkFmt(st.subscriberCount)} abone &nbsp;👁 ${ytkFmt(st.viewCount)} toplam izlenme &nbsp;🎬 ${ytkFmt(st.videoCount)} video</div>
+        <a href="https://www.youtube.com/channel/${chId}" target="_blank" style="font-size:8px;color:var(--acc)">${chId}</a>
+      </div>
+    </div>`;
+  }
+  renderYTKVideos();
+  await ytkLoadMore(true);
+}
+
+async function ytkLoadMore(first) {
+  if (YTK.loading || !YTK.uploadsId) return;
+  if (!first && !YTK.nextPage) return;
+  const apiKey = ytkApiKey();
+  if (!apiKey) return showRes('ytk-res', 'YouTube API Key gerekli', 'warn');
+  YTK.loading = true;
+  const btn = document.getElementById('ytk-more-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Yükleniyor...'; }
+  if (first) showRes('ytk-res', '⏳ Videolar yükleniyor...', 'info');
+  try {
+    const pt = YTK.nextPage ? '&pageToken=' + YTK.nextPage : '';
+    const pr = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${YTK.uploadsId}&maxResults=50${pt}&key=${apiKey}`);
+    const pd = await pr.json();
+    if (pd.error) throw new Error(pd.error.message || 'API hatası');
+    YTK.nextPage = pd.nextPageToken || '';
+    const ids = (pd.items||[]).map(i => i.contentDetails && i.contentDetails.videoId).filter(Boolean);
+    if (ids.length) {
+      // Video detayları: izlenme, beğeni, yorum, tarih, süre
+      const vr = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${ids.join(',')}&key=${apiKey}`);
+      const vd = await vr.json();
+      if (vd.error) throw new Error(vd.error.message || 'API hatası');
+      const have = new Set(YTK.videos.map(v => v.id));
+      YTK.videos = YTK.videos.concat((vd.items||[]).filter(v => !have.has(v.id)));
+    }
+    showRes('ytk-res', `✓ ${YTK.videos.length}/${YTK.channelInfo ? YTK.channelInfo.videoCount : '?'} video yüklendi`, 'ok');
+  } catch(e) {
+    showRes('ytk-res', 'Video yükleme hatası: ' + e.message, 'err');
+    addLog('err', 'webhook', 'YT Kanal video hata: ' + e.message);
+  }
+  YTK.loading = false;
+  if (btn) { btn.disabled = false; btn.textContent = '⬇ Daha Fazla Yükle (50)'; }
+  renderYTKVideos();
+}
+
+async function ytkLoadAll() {
+  if (!YTK.uploadsId) return;
+  let guard = 0;
+  if (!YTK.videos.length) await ytkLoadMore(true);
+  // Kota koruması: en fazla 2000 video
+  while (YTK.nextPage && YTK.videos.length < 2000 && guard < 40) { await ytkLoadMore(); guard++; }
+  showRes('ytk-res', `✓ Toplam ${YTK.videos.length} video yüklendi`, 'ok');
+}
+
+function ytkFilteredVideos() {
+  const minDur = parseInt((document.getElementById('ytk-dur')||{}).value || 0);
+  const sort = (document.getElementById('ytk-sort')||{}).value || 'date';
+  const num = (v,k) => parseInt((v.statistics && v.statistics[k]) || 0);
+  let list = YTK.videos.filter(v => ytkParseDur(v.contentDetails.duration) >= minDur);
+  if (sort === 'views')         list = list.slice().sort((a,b) => num(b,'viewCount') - num(a,'viewCount'));
+  else if (sort === 'likes')    list = list.slice().sort((a,b) => num(b,'likeCount') - num(a,'likeCount'));
+  else if (sort === 'comments') list = list.slice().sort((a,b) => num(b,'commentCount') - num(a,'commentCount'));
+  else                          list = list.slice().sort((a,b) => new Date(b.snippet.publishedAt) - new Date(a.snippet.publishedAt));
+  return list;
 }
 
 function renderYTKVideos() {
@@ -1975,19 +2075,28 @@ function renderYTKVideos() {
   if (!el) return;
   const selCount = document.getElementById('ytk-sel-count');
   if (selCount) selCount.textContent = `(${YTK.selected.size} seçili)`;
-  if (!YTK.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Video bulunamadı</div>'; return; }
-  el.innerHTML = YTK.videos.map((v, i) => {
+  const mw = document.getElementById('ytk-more-wrap');
+  if (mw) mw.style.display = (YTK.uploadsId && YTK.nextPage) ? 'flex' : 'none';
+  const list = ytkFilteredVideos();
+  const vidCount = document.getElementById('ytk-vid-count');
+  if (vidCount) vidCount.textContent = YTK.videos.length ? `${list.length} gösteriliyor / ${YTK.videos.length} yüklü / kanalda ${ytkFmt(YTK.channelInfo ? YTK.channelInfo.videoCount : 0)}` : '';
+  if (!YTK.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal seçin</div>'; return; }
+  if (!list.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Süre filtresine uyan video yok — filtreyi "Tüm süreler" yapın veya daha fazla yükleyin</div>'; return; }
+  el.innerHTML = list.map(v => {
     const sel = YTK.selected.has(v.id);
-    const views = parseInt(v.statistics.viewCount||0).toLocaleString('tr');
+    const st = v.statistics || {};
     const thumb = v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '';
-    const dur = v.contentDetails.duration.replace('PT','').replace('H','s ').replace('M','d ').replace('S','s');
+    const durS = ytkParseDur(v.contentDetails.duration);
     const pubDate = (v.snippet.publishedAt||'').slice(0,10);
     return `<div onclick="ytkToggle('${v.id}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s">
       <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();ytkToggle('${v.id}')">
-      ${thumb?`<img src="${thumb}" style="width:80px;height:50px;object-fit:cover;border-radius:3px;flex-shrink:0">` : '<div style="width:80px;height:50px;background:var(--brd);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
+      <div style="position:relative;flex-shrink:0">
+        ${thumb?`<img src="${thumb}" style="width:80px;height:50px;object-fit:cover;border-radius:3px">` : '<div style="width:80px;height:50px;background:var(--brd);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
+        <span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.8);color:#fff;font-size:8px;padding:1px 4px;border-radius:2px">${ytkDurFmt(durS)}</span>
+      </div>
       <div style="min-width:0;flex:1">
         <div style="font-size:10px;font-weight:600;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.snippet.title}</div>
-        <div style="font-size:8px;color:var(--mt);margin-top:3px">👁 ${views} &nbsp;⏱ ${dur} &nbsp;📅 ${pubDate}</div>
+        <div style="font-size:8px;color:var(--mt);margin-top:3px">👁 ${ytkFmt(st.viewCount)} &nbsp;👍 ${st.likeCount!=null?ytkFmt(st.likeCount):'–'} &nbsp;💬 ${st.commentCount!=null?ytkFmt(st.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
       </div>
     </div>`;
   }).join('');
@@ -1999,9 +2108,10 @@ function ytkToggle(id) {
   renderYTKVideos();
 }
 
-function ytkSelectAll() { YTK.videos.forEach(v => YTK.selected.add(v.id)); renderYTKVideos(); }
+function ytkSelectAll() { ytkFilteredVideos().forEach(v => YTK.selected.add(v.id)); renderYTKVideos(); }
 function ytkClearAll()  { YTK.selected.clear(); renderYTKVideos(); }
 
+// Seçilen videoları n8n'e TEK TEK gönderir (her video ayrı webhook çağrısı)
 async function ytkSendSelected() {
   const sel = YTK.videos.filter(v => YTK.selected.has(v.id));
   if (!sel.length) return showRes('ytk-res', 'Video seçin', 'warn');
@@ -2009,19 +2119,19 @@ async function ytkSendSelected() {
   const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const base = getN8N();
   if (!base) return showRes('ytk-res', 'Ayarlardan n8n URL girin', 'warn');
-  showRes('ytk-res', `⏳ ${sel.length} video gönderiliyor...`, 'info');
   let sent = 0;
   for (const v of sel) {
+    showRes('ytk-res', `⏳ ${sent+1}/${sel.length} gönderiliyor: ${v.snippet.title.slice(0,40)}...`, 'info');
     const url = 'https://www.youtube.com/watch?v=' + v.id;
     for (const kat of cats) {
       const path = CAT_WH[kat] || '/webhook/video-gonder';
       const ytkAciklama = (document.getElementById('ytk-aciklama')||{}).value||'';
-      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, title: v.snippet.title, channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
+      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
     }
     sent++;
     await sleep(500);
   }
-  showRes('ytk-res', `✓ ${sent} video [${cats.join(',')}] gönderildi`, 'ok');
+  showRes('ytk-res', `✓ ${sent} video [${cats.join(',')}] tek tek gönderildi`, 'ok');
   addLog('ok', 'webhook', `YT Kanal ${sent} video gönderildi [${cats.join(',')}]`);
 }
 
@@ -2146,7 +2256,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateLogStats();
     setEl('conn-status', S.cfg.n8n?'Bagli':'URL girilmedi');
     setEl('dr-sent-cnt', S.sentURLs.size);
-    addLog('ok','sistem','Panel v7 baslatildi — Oyun/Spor/OpusClip/YTKanal');
+    addLog('ok','sistem','Panel v9 baslatildi — Kanal Listesi Arama/Video Detay/Kworb');
     toggleAutoLog();
     // Tüm global fonksiyonları window'a bağla
     const globals = [go,showTab,refreshDash,sendSingle,sendBulkURLs,sendSearch,
@@ -2156,7 +2266,8 @@ document.addEventListener('DOMContentLoaded', function() {
       clearLogs,exportLogs,loadTakvim,takPrev,takNext,takFilter,openDayModal,
       closeDayModal,showTakTip,hideTakTip,dmFilter,dmToggleSort,
       searchYTChannel,ytkSelectAll,ytkClearAll,ytkSendSelected,ytkAddToSheet,
-      sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheet,addSearchHist,
+      ytkPickChannel,ytkLoadMore,ytkLoadAll,renderYTKVideos,
+      sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
       loadAllSheetData,loadSheetPage,sendOpusClipBulk];
     globals.forEach(fn => { if(typeof fn === 'function') window[fn.name] = fn; });
