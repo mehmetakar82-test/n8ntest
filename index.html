@@ -1467,16 +1467,25 @@ function renderSearchHist() {
   el.innerHTML = S.searchHist.map((s,idx)=>{
     const vidCnt = Array.isArray(s.videos) ? s.videos.length : 0;
     const canOpen = vidCnt > 0;
-    return `<div style="padding:8px;border-bottom:1px solid var(--brd);font-size:10px">
+    return `<div class="ya-hist-item" data-idx="${idx}" style="padding:8px;border-bottom:1px solid var(--brd);font-size:10px;cursor:pointer" title="${canOpen?'Tıkla → geçmiş sonuçları modal olarak aç':'Bu kaydın video listesi saklı değil, tıklayınca sadece anahtar kelime dolar'}">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <span onclick="${canOpen ? 'yarOpenHistory('+idx+')' : ''};document.getElementById('ya-kw').value=${JSON.stringify(s.kw)}"
-              style="cursor:pointer;color:${canOpen?'var(--acc)':'var(--mt)'};font-weight:${canOpen?'600':'400'};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-              title="${canOpen?'Tıkla → geçmiş sonuçları modal olarak aç':'Bu kaydın video listesi saklı değil'}">${esc(s.kw)}</span>
+        <span style="color:${canOpen?'var(--acc)':'#dde4f0'};font-weight:${canOpen?'600':'400'};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.kw)}</span>
         <span style="color:var(--mt);font-size:8px;white-space:nowrap">${esc(s.t)}</span>
       </div>
-      <div style="font-size:8px;color:var(--mt);margin-top:2px">${canOpen ? '🎬 '+vidCnt+' video sonuç • tıkla modalda aç' : 'sonuç saklı değil'}</div>
+      <div style="font-size:8px;color:var(--mt);margin-top:2px">${canOpen ? '🎬 '+vidCnt+' video sonuç • tıkla modalda aç' : 'sonuç saklı değil (anahtar kelime doldurulur)'}</div>
     </div>`;
   }).join('');
+  // Event delegation — inline onclick'in HTML kırılma sorununu bypass eder
+  el.querySelectorAll('.ya-hist-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const idx = parseInt(item.dataset.idx, 10);
+      const h = S.searchHist[idx];
+      if (!h) return;
+      const kwEl = document.getElementById('ya-kw');
+      if (kwEl) kwEl.value = h.kw || '';
+      if (Array.isArray(h.videos) && h.videos.length) yarOpenHistory(idx);
+    });
+  });
 }
 
 // ═══════════════════════════════════════════════════════════
