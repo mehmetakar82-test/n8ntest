@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OPUS PRO v10</title>
+<title>OPUS PRO v9</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -471,20 +471,31 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     </div>
     <div>
       <div class="card">
-        <div class="ct" style="margin-bottom:10px">Arama Sonuçları <span id="ya-sel-count" style="color:var(--acc)">(0 seçili)</span></div>
-        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-          <button class="btn bg bsm" onclick="yarSelectAll()">Tümünü Seç</button>
-          <button class="btn bg bsm" onclick="yarClearAll()">Seçimi Temizle</button>
-          <button class="btn bs bsm" onclick="yarSendSelected()">▶ Seçilenleri Gönder</button>
-        </div>
-        <div id="ya-video-list" style="max-height:520px;overflow-y:auto">
-          <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Anahtar kelime girip Ara'ya bas</div>
-        </div>
+        <div class="ct">Arama Geçmişi <span style="font-size:9px;color:var(--mt);font-weight:400">(başlığa tıkla → sonuçları modal olarak aç)</span></div>
+        <div id="ya-hist" style="font-size:10px;max-height:640px;overflow-y:auto"><div style="color:var(--mt);text-align:center;padding:12px">Henüz arama yapılmadı</div></div>
       </div>
-      <div class="card" style="margin-top:12px">
-        <div class="ct">Arama Geçmişi</div>
-        <div id="ya-hist" style="font-size:10px"><div style="color:var(--mt);text-align:center;padding:12px">Henüz arama yapılmadı</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- YOUTUBE ARA MODAL -->
+<div id="ya-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;padding:40px;overflow-y:auto" onclick="if(event.target===this)yarCloseModal()">
+  <div style="max-width:900px;margin:0 auto;background:var(--sur);border:1px solid var(--acc);border-radius:8px;box-shadow:0 8px 40px rgba(0,229,255,.15)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--brd)">
+      <div style="min-width:0;flex:1">
+        <div style="font-family:var(--fh);font-weight:700;font-size:14px;color:#fff" id="ya-modal-title">Arama Sonuçları</div>
+        <div style="font-size:9px;color:var(--mt);margin-top:2px" id="ya-modal-sub"></div>
       </div>
+      <button class="btn bg bsm" onclick="yarCloseModal()" style="margin-left:12px">✕ Kapat</button>
+    </div>
+    <div style="padding:14px 18px">
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+        <span id="ya-sel-count" style="color:var(--acc);font-size:10px">(0 seçili)</span>
+        <button class="btn bg bsm" onclick="yarSelectAll()">Tümünü Seç</button>
+        <button class="btn bg bsm" onclick="yarClearAll()">Seçimi Temizle</button>
+        <button class="btn bs bsm" onclick="yarSendSelected()" style="margin-left:auto">▶ Seçilenleri Gönder</button>
+      </div>
+      <div id="ya-video-list" style="max-height:60vh;overflow-y:auto"></div>
     </div>
   </div>
 </div>
@@ -1290,13 +1301,25 @@ async function searchYARVideos() {
       .sort((a,b) => parseInt(b.statistics.viewCount||0) - parseInt(a.statistics.viewCount||0))
       .slice(0, 10);
     YAR.selected.clear();
-    renderYARVideos();
-    showRes('ya-res', `✓ ${YAR.videos.length} video bulundu (${durSec/60||'?'}dk+, izlenmeye göre)`, 'ok');
+    yarOpenModal(kw, durSec);
+    showRes('ya-res', `✓ ${YAR.videos.length} video bulundu — modal olarak açıldı`, 'ok');
     addLog('ok', 'webhook', `YouTube arama "${kw}": ${YAR.videos.length} video`);
-    // Geçmişe ekle
-    S.searchHist.unshift({kw, kat:'', t:new Date().toLocaleString('tr')});
-    S.searchHist = S.searchHist.slice(0,20);
-    localStorage.setItem('op_srch', JSON.stringify(S.searchHist));
+    // Geçmişe küçültülmüş video listesini de ekle (localStorage'a sığsın)
+    const compactVideos = YAR.videos.map(v => ({
+      id: v.id,
+      title: v.snippet.title,
+      channelTitle: v.snippet.channelTitle,
+      thumb: (v.snippet.thumbnails && (v.snippet.thumbnails.medium||v.snippet.thumbnails.default||{}).url) || '',
+      publishedAt: v.snippet.publishedAt,
+      duration: v.contentDetails.duration,
+      viewCount: v.statistics && v.statistics.viewCount,
+      likeCount: v.statistics && v.statistics.likeCount,
+      commentCount: v.statistics && v.statistics.commentCount
+    }));
+    S.searchHist.unshift({ kw, kat:'', t:new Date().toLocaleString('tr'), durSec, videos: compactVideos });
+    S.searchHist = S.searchHist.slice(0, 20);
+    try { localStorage.setItem('op_srch', JSON.stringify(S.searchHist)); }
+    catch(e) { /* kota dolmuş olabilir, sessizce devam */ }
     renderSearchHist();
   } catch(e) {
     showRes('ya-res', 'Hata: ' + ytkErrMsg(e.message), 'err');
@@ -1304,30 +1327,75 @@ async function searchYARVideos() {
   }
 }
 
+// Hem canli arama (full API objesi) hem gecmis (kompakt kayit) icin ortak render — alan adlarini normalize eder
+function yarNormalizeVideo(v) {
+  if (v.snippet) {
+    return {
+      id: v.id,
+      title: v.snippet.title,
+      channelTitle: v.snippet.channelTitle,
+      thumb: (v.snippet.thumbnails && (v.snippet.thumbnails.medium||v.snippet.thumbnails.default||{}).url) || '',
+      publishedAt: v.snippet.publishedAt,
+      duration: v.contentDetails && v.contentDetails.duration,
+      viewCount: v.statistics && v.statistics.viewCount,
+      likeCount: v.statistics && v.statistics.likeCount,
+      commentCount: v.statistics && v.statistics.commentCount
+    };
+  }
+  return v; // zaten kompakt
+}
+
 function renderYARVideos() {
   const el = document.getElementById('ya-video-list');
   if (!el) return;
   const cnt = document.getElementById('ya-sel-count');
   if (cnt) cnt.textContent = `(${YAR.selected.size} seçili)`;
-  if (!YAR.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Anahtar kelime girip Ara\'ya bas</div>'; return; }
-  el.innerHTML = YAR.videos.map(v => {
+  if (!YAR.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Video yok</div>'; return; }
+  el.innerHTML = YAR.videos.map(raw => {
+    const v = yarNormalizeVideo(raw);
     const sel = YAR.selected.has(v.id);
-    const st = v.statistics || {};
-    const thumb = v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '';
-    const durS = ytkParseDur(v.contentDetails.duration);
-    const pubDate = (v.snippet.publishedAt||'').slice(0,10);
+    const durS = ytkParseDur(v.duration);
+    const pubDate = (v.publishedAt||'').slice(0,10);
     return `<div onclick="yarToggle('${v.id}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s">
       <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();yarToggle('${v.id}')">
       <div style="position:relative;flex-shrink:0">
-        ${thumb?`<img src="${thumb}" style="width:80px;height:50px;object-fit:cover;border-radius:3px">` : '<div style="width:80px;height:50px;background:var(--brd);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
+        ${v.thumb?`<img src="${v.thumb}" style="width:100px;height:60px;object-fit:cover;border-radius:3px">` : '<div style="width:100px;height:60px;background:var(--brd);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
         <span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.8);color:#fff;font-size:8px;padding:1px 4px;border-radius:2px">${ytkDurFmt(durS)}</span>
       </div>
       <div style="min-width:0;flex:1">
-        <div style="font-size:10px;font-weight:600;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.snippet.title}</div>
-        <div style="font-size:8px;color:var(--mt);margin-top:3px">📺 ${v.snippet.channelTitle||''} &nbsp;👁 ${ytkFmt(st.viewCount)} &nbsp;👍 ${st.likeCount!=null?ytkFmt(st.likeCount):'–'} &nbsp;📅 ${pubDate}</div>
+        <div style="font-size:11px;font-weight:600;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.title}</div>
+        <div style="font-size:9px;color:var(--mt);margin-top:4px">📺 ${v.channelTitle||''} &nbsp;👁 ${ytkFmt(v.viewCount)} &nbsp;👍 ${v.likeCount!=null?ytkFmt(v.likeCount):'–'} &nbsp;💬 ${v.commentCount!=null?ytkFmt(v.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
       </div>
+      <a href="https://www.youtube.com/watch?v=${v.id}" target="_blank" onclick="event.stopPropagation()" style="align-self:center;color:var(--acc);font-size:9px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px;text-decoration:none;flex-shrink:0">↗ Aç</a>
     </div>`;
   }).join('');
+}
+
+// ── Modal aç/kapat + gecmisten yukle
+function yarOpenModal(kw, durSec) {
+  const t = document.getElementById('ya-modal-title');
+  const s = document.getElementById('ya-modal-sub');
+  if (t) t.textContent = kw ? '"' + kw + '" için sonuçlar' : 'Arama Sonuçları';
+  if (s) s.textContent = `${YAR.videos.length} video · ${durSec ? Math.round(durSec/60)+'dk+' : 'tüm süreler'} · izlenmeye göre sıralı`;
+  const m = document.getElementById('ya-modal');
+  if (m) m.style.display = 'block';
+  renderYARVideos();
+}
+
+function yarCloseModal() {
+  const m = document.getElementById('ya-modal');
+  if (m) m.style.display = 'none';
+}
+
+// Gecmisten bir aramayi modal olarak yeniden ac
+function yarOpenHistory(idx) {
+  const h = S.searchHist[idx];
+  if (!h || !Array.isArray(h.videos) || !h.videos.length) {
+    return showRes('ya-res', 'Bu geçmiş kaydında video listesi saklı değil (eski kayıt) — tekrar Ara\'ya bas', 'warn');
+  }
+  YAR.videos = h.videos;
+  YAR.selected.clear();
+  yarOpenModal(h.kw + ' (geçmiş)', h.durSec);
 }
 
 function yarToggle(id) { if (YAR.selected.has(id)) YAR.selected.delete(id); else YAR.selected.add(id); renderYARVideos(); }
@@ -1343,13 +1411,14 @@ async function yarSendSelected() {
   const base = getN8N();
   if (!base) return showRes('ya-res', 'Ayarlar\'dan n8n URL girin', 'warn');
   let sent = 0;
-  for (const v of sel) {
-    showRes('ya-res', `⏳ ${sent+1}/${sel.length} gönderiliyor: ${v.snippet.title.slice(0,40)}...`, 'info');
+  for (const raw of sel) {
+    const v = yarNormalizeVideo(raw);
+    showRes('ya-res', `⏳ ${sent+1}/${sel.length} gönderiliyor: ${(v.title||'').slice(0,40)}...`, 'info');
     const url = 'https://www.youtube.com/watch?v=' + v.id;
     for (const kat of cats) {
       const path = CAT_WH[kat] || '/webhook/video-gonder';
       const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
-      await faf(base + path, {'Youtube linki': url, kaynak: 'youtube-arama', kategori: kat, title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: v.snippet.channelTitle||'', aciklama_notu: yaAciklama});
+      await faf(base + path, {'Youtube linki': url, kaynak: 'youtube-arama', kategori: kat, title: v.title, durationSec: ytkParseDur(v.duration), channelTitle: v.channelTitle||'', aciklama_notu: yaAciklama});
     }
     sent++;
     await sleep(500);
@@ -1393,8 +1462,21 @@ function addSearchHist() {
 function renderSearchHist() {
   const el = document.getElementById('ya-hist');
   if (!el) return;
-  if (!S.searchHist.length) { el.innerHTML='<div style="color:var(--mt);text-align:center;padding:12px">Henuz arama yapilmadi</div>'; return; }
-  el.innerHTML = S.searchHist.map(s=>'<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--brd);font-size:9px"><span style="cursor:pointer;color:var(--acc)" onclick="document.getElementById(\'ya-kw\').value=\''+s.kw.replace(/'/g,"\\'")+'\'">'+s.kw+'</span><span style="color:var(--mt)">'+s.t+'</span></div>').join('');
+  if (!S.searchHist.length) { el.innerHTML='<div style="color:var(--mt);text-align:center;padding:12px">Henüz arama yapılmadı</div>'; return; }
+  const esc = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  el.innerHTML = S.searchHist.map((s,idx)=>{
+    const vidCnt = Array.isArray(s.videos) ? s.videos.length : 0;
+    const canOpen = vidCnt > 0;
+    return `<div style="padding:8px;border-bottom:1px solid var(--brd);font-size:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <span onclick="${canOpen ? 'yarOpenHistory('+idx+')' : ''};document.getElementById('ya-kw').value=${JSON.stringify(s.kw)}"
+              style="cursor:pointer;color:${canOpen?'var(--acc)':'var(--mt)'};font-weight:${canOpen?'600':'400'};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+              title="${canOpen?'Tıkla → geçmiş sonuçları modal olarak aç':'Bu kaydın video listesi saklı değil'}">${esc(s.kw)}</span>
+        <span style="color:var(--mt);font-size:8px;white-space:nowrap">${esc(s.t)}</span>
+      </div>
+      <div style="font-size:8px;color:var(--mt);margin-top:2px">${canOpen ? '🎬 '+vidCnt+' video sonuç • tıkla modalda aç' : 'sonuç saklı değil'}</div>
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1702,11 +1784,30 @@ async function loadSheetPage(page) {
     const ytK = ['youtube-hesap','youtube','yt-hesap','yt','youtube_account','YouTube'];
     const ttK = ['tiktok-hesap','tiktok','tt-hesap','tt','tiktok_account','TikTok'];
     const stK = ['platform-status','durum','status','yayin-durumu','Durum'];
-    const durMs = r => {
-      const v = r['duration-ms']||r['duration_ms']||r['sure-ms']||r['duration'];
-      const n = parseInt(v); return isNaN(n) ? 0 : n;
+    // Süreyi ISO / HH:MM:SS / M:SS / ms / saniye formatlarindan saniyeye çevir
+    const durSec = r => {
+      const raw = pick(r, ['duration-sec','duration_seconds','sure-sn','sure_sn','video-suresi-sn',
+                            'duration-ms','duration_ms','sure-ms',
+                            'duration','sure','length','Süre']);
+      if (!raw) return 0;
+      const s = String(raw).trim();
+      // ISO 8601: PT1H2M3S / PT10M / PT30S
+      if (/^PT/i.test(s)) return ytkParseDur(s);
+      // HH:MM:SS veya M:SS
+      if (/^\d+(:\d+){1,2}$/.test(s)) {
+        const p = s.split(':').map(x=>parseInt(x,10));
+        if (p.length === 3) return p[0]*3600 + p[1]*60 + p[2];
+        if (p.length === 2) return p[0]*60 + p[1];
+      }
+      const n = parseFloat(s);
+      if (isNaN(n)) return 0;
+      // Kolon adı ms iceriyor mu?
+      const isMs = Object.keys(r).some(k => /ms|milli/i.test(k) && r[k]==raw);
+      if (isMs) return Math.round(n/1000);
+      // Otomatik tahmin: cok buyukse ms
+      return n >= 10000 ? Math.round(n/1000) : Math.round(n);
     };
-    const fmtSec = ms => ms ? Math.round(ms/1000).toLocaleString('tr')+' sn' : '-';
+    const fmtSec = sec => sec ? sec.toLocaleString('tr')+' sn' : '-';
     if(tb)tb.innerHTML=shorts.length ? shorts.map(r=>{
       const ig = pick(r, igK), yt = pick(r, ytK), tt = pick(r, ttK);
       let dur = pick(r, stK);
@@ -1715,7 +1816,7 @@ async function loadSheetPage(page) {
       return '<tr>'
         + '<td class="uc" title="'+(r['title']||'')+'">'+(r['title']||'-').slice(0,30)+'</td>'
         + '<td>'+(r['score']||'-')+'</td>'
-        + '<td>'+fmtSec(durMs(r))+'</td>'
+        + '<td>'+fmtSec(durSec(r))+'</td>'
         + '<td>'+(ig ? '<span class="badge bi">'+ig+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
         + '<td>'+(yt ? '<span class="badge bi">'+yt+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
         + '<td>'+(tt ? '<span class="badge bi">'+tt+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
@@ -2468,6 +2569,7 @@ document.addEventListener('DOMContentLoaded', function() {
       searchYTChannel,ytkSelectAll,ytkClearAll,ytkSendSelected,ytkAddToSheet,
       ytkPickChannel,ytkLoadMore,ytkLoadAll,renderYTKVideos,
       searchYARVideos,yarToggle,yarSelectAll,yarClearAll,yarSendSelected,initYouTubeAra,
+      yarOpenModal,yarCloseModal,yarOpenHistory,yarNormalizeVideo,
       sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
       loadAllSheetData,loadSheetPage,sendOpusClipBulk];
