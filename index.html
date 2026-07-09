@@ -344,41 +344,64 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     <div>
       <div class="card">
         <div class="ct">Seçili Kanal</div>
-        <div id="ytk-channel-info" style="color:var(--mt);font-size:10px;text-align:center;padding:16px">Soldaki listeden kanal seçin</div>
-      </div>
-      <div class="card">
-        <div class="ct" style="margin-bottom:10px">Kanal Videoları <span id="ytk-sel-count" style="color:var(--acc)">(0 seçili)</span></div>
-        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
-          <select id="ytk-dur" onchange="renderYTKVideos()" style="width:110px">
-            <option value="0">Tüm süreler</option>
-            <option value="600" selected>10 dk+</option>
-            <option value="1200">20 dk+</option>
-            <option value="1800">30 dk+</option>
-            <option value="3600">60 dk+</option>
-          </select>
-          <select id="ytk-sort" onchange="renderYTKVideos()" style="width:130px">
-            <option value="date">Yeni → Eski</option>
-            <option value="views">İzlenme ↓</option>
-            <option value="likes">Beğeni ↓</option>
-            <option value="comments">Yorum ↓</option>
-          </select>
-          <span id="ytk-vid-count" style="font-size:9px;color:var(--mt)"></span>
-        </div>
-        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-          <button class="btn bg bsm" onclick="ytkSelectAll()">Tümünü Seç</button>
-          <button class="btn bg bsm" onclick="ytkClearAll()">Seçimi Temizle</button>
-          <button class="btn bs bsm" onclick="ytkSendSelected()">▶ Seçilenleri Gönder</button>
-          <button class="btn bp bsm" onclick="ytkAddToSheet()">📋 Sheet'e Ekle</button>
-        </div>
-        <div id="ytk-video-list" style="max-height:420px;overflow-y:auto">
-          <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal seçin</div>
-        </div>
-        <div id="ytk-more-wrap" style="margin-top:8px;gap:6px;justify-content:center;display:none">
-          <button class="btn bg bsm" id="ytk-more-btn" onclick="ytkLoadMore()">⬇ Daha Fazla Yükle (50)</button>
-          <button class="btn bg bsm" id="ytk-all-btn" onclick="ytkLoadAll()">⏬ Tümünü Yükle</button>
-        </div>
+        <div id="ytk-channel-info" style="color:var(--mt);font-size:10px;text-align:center;padding:16px">Sol listeden bir kanalın "Videoları Getir" butonuna bas</div>
+        <div class="alert ai" style="margin-top:12px;font-size:9px"><span>ℹ</span><span>Her kanal satırındaki <b>▶ Videoları Getir</b> butonuna bastığında videolar API'den çekilir ve büyük modal olarak açılır. Otomatik çekim yok — kota harcamaz.</span></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- YT KANAL VIDEO LISTESI MODAL -->
+<div id="ytk-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;padding:40px;overflow-y:auto" onclick="if(event.target===this)ytkCloseModal()">
+  <div style="max-width:1000px;margin:0 auto;background:var(--sur);border:1px solid var(--acc);border-radius:8px;box-shadow:0 8px 40px rgba(0,229,255,.15)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--brd);gap:12px">
+      <div style="min-width:0;flex:1">
+        <div style="font-family:var(--fh);font-weight:700;font-size:14px;color:#fff" id="ytk-modal-title">Kanal Videoları</div>
+        <div style="font-size:9px;color:var(--mt);margin-top:2px" id="ytk-modal-sub"></div>
+      </div>
+      <button class="btn bg bsm" onclick="ytkCloseModal()">✕ Kapat</button>
+    </div>
+    <div style="padding:14px 18px">
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+        <select id="ytk-dur" onchange="renderYTKVideos()" style="width:110px">
+          <option value="0">Tüm süreler</option>
+          <option value="600" selected>10 dk+</option>
+          <option value="1200">20 dk+</option>
+          <option value="1800">30 dk+</option>
+          <option value="3600">60 dk+</option>
+        </select>
+        <select id="ytk-sort" onchange="renderYTKVideos()" style="width:130px">
+          <option value="date">Yeni → Eski</option>
+          <option value="views">İzlenme ↓</option>
+          <option value="likes">Beğeni ↓</option>
+          <option value="comments">Yorum ↓</option>
+        </select>
+        <span id="ytk-vid-count" style="font-size:9px;color:var(--mt)"></span>
+        <span id="ytk-sel-count" style="color:var(--acc);font-size:10px;margin-left:auto">(0 seçili)</span>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+        <button class="btn bg bsm" onclick="ytkSelectAll()">Tümünü Seç</button>
+        <button class="btn bg bsm" onclick="ytkClearAll()">Seçimi Temizle</button>
+        <button class="btn bs bsm" onclick="ytkSendSelected()">▶ Seçilenleri Gönder</button>
+        <button class="btn bp bsm" onclick="ytkAddToSheet()">📋 Sheet'e Ekle</button>
+      </div>
+      <div id="ytk-video-list" style="max-height:55vh;overflow-y:auto"></div>
+      <div id="ytk-more-wrap" style="margin-top:10px;gap:6px;justify-content:center;display:none;flex-wrap:wrap">
+        <button class="btn bg bsm" id="ytk-more-btn" onclick="ytkLoadMore()">⬇ Daha Fazla Yükle (50)</button>
+        <button class="btn bg bsm" id="ytk-all-btn" onclick="ytkLoadAll()">⏬ Tümünü Yükle</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VIDEO DETAY MODAL (gomulu YouTube oynatici) -->
+<div id="ytv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;padding:30px;overflow-y:auto" onclick="if(event.target===this)ytvCloseModal()">
+  <div style="max-width:880px;margin:0 auto;background:var(--sur);border:1px solid var(--acc);border-radius:8px;box-shadow:0 8px 50px rgba(0,229,255,.2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--brd);gap:12px">
+      <div style="font-family:var(--fh);font-weight:700;font-size:13px;color:#fff;min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="ytv-modal-title">Video Detay</div>
+      <button class="btn bg bsm" onclick="ytvCloseModal()">✕ Kapat</button>
+    </div>
+    <div id="ytv-modal-body" style="padding:14px 18px"></div>
   </div>
 </div>
 
@@ -751,15 +774,26 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 
 <!-- PLATFORMLAR -->
 <div id="page-platformlar" class="page">
-  <div class="ph"><div class="pt">Platformlar</div><div class="ps">Upload-Post'tan çekilen hesap bilgileri — tıklayarak sosyal medyaya git</div></div>
-  <div style="display:flex;gap:8px;margin-bottom:12px">
-    <button class="btn bp bsm" onclick="loadPlatforms()">↻ Upload-Post'tan Çek</button>
+  <div class="ph"><div class="pt">Platformlar</div><div class="ps">Upload-Post hesapları — tümü kart olarak görünür, birine tıkla → detay modal</div></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den (api.upload-post.com/api/uploadposts/users) gelir. Ayarlar → <b>Upload-Post API Key</b> gerekli. n8n bağlıysa proxy üzerinden gelir (CORS sorunu olmaz), değilse doğrudan API'ye istek atılır.</span></div>
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+    <button class="btn bp bsm" onclick="loadPlatforms()">↻ Yenile</button>
     <span id="plat-last" style="font-size:9px;color:var(--mt);align-self:center"></span>
+    <span id="plat-src" style="font-size:9px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
-  <div class="g3">
-    <div><div class="ct">📸 Instagram</div><div id="pl-ig"><div style="color:var(--mt);font-size:10px;padding:8px">Yükleniyor...</div></div></div>
-    <div><div class="ct">▶ YouTube</div><div id="pl-yt"><div style="color:var(--mt);font-size:10px;padding:8px">Yükleniyor...</div></div></div>
-    <div><div class="ct">♪ TikTok</div><div id="pl-tt"><div style="color:var(--mt);font-size:10px;padding:8px">Yükleniyor...</div></div></div>
+  <div id="pl-grid" class="g3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
+    <div style="color:var(--mt);font-size:10px;padding:16px;text-align:center;grid-column:1/-1">Yenile'ye bas veya Ayarlar → API Key gir</div>
+  </div>
+</div>
+
+<!-- HESAP DETAY MODAL -->
+<div id="plat-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;padding:40px;overflow-y:auto" onclick="if(event.target===this)platCloseModal()">
+  <div style="max-width:560px;margin:0 auto;background:var(--sur);border:1px solid var(--acc);border-radius:8px;box-shadow:0 8px 40px rgba(0,229,255,.15)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--brd)">
+      <div style="font-family:var(--fh);font-weight:700;font-size:14px;color:#fff" id="plat-modal-title">Hesap Detayı</div>
+      <button class="btn bg bsm" onclick="platCloseModal()">✕ Kapat</button>
+    </div>
+    <div id="plat-modal-body" style="padding:18px"></div>
   </div>
 </div>
 
@@ -1778,17 +1812,38 @@ async function loadSheetPage(page) {
     shorts = parseSheet(sv); urls = parseSheet(uv);
   }
 
+  // Ortak yardımcılar — sheet sütun adları projeye göre değişebilir
+  const pick = (r, keys) => { for (const k of keys) { if (r[k]!=null && String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
+  const pURL   = r => pick(r, ['youtube-url','url','link','Link','YouTube URL','video-url','video_url']);
+  const pKaynak= r => pick(r, ['kaynak','source','Kaynak']);
+  const pDurum = r => pick(r, ['durum','status','Durum','yayin-durumu']);
+  const pTarih = r => pick(r, ['istek-tarihi','tarih','created-at','Tarih','olusturma-tarihi','date']);
+  const pIzl   = r => pick(r, ['izlenme-sayisi','views','viewCount','izlenme','İzlenme','view-count']);
+  const pShort = r => pick(r, ['uretilen-short-sayisi','short-sayisi','shorts','Short Sayisi','short-count']);
+  const pBekle = r => pick(r, ['bekleme-suresi-sn','bekleme','wait-sec','bekleme-sn']);
+  const pProje = r => pick(r, ['proje-id','project-id','clip-id','clipId','Proje ID','projectId']);
+  const isProcStr = d => { const s = String(d||'').toLowerCase().replace(/i̇/g,'i').replace(/ı/g,'i').replace(/ş/g,'s'); return s.includes('islem')||s.includes('bekli')||s.includes('progress')||s.includes('pending'); };
+  const isDoneStr = d => { const s = String(d||'').toLowerCase().replace(/i̇/g,'i').replace(/ı/g,'i').replace(/ş/g,'s'); return s.includes('tamamland')||s.includes('done')||s.includes('completed')||s.includes('yayinland'); };
+
   if (page==='kuyruk') {
-    const proc=urls.filter(r=>r['durum']==='Islemde'||r['durum']==='İşlemde');
-    setEl('kuyruk-last',new Date().toLocaleTimeString('tr'));
+    const proc = urls.filter(r => isProcStr(pDurum(r)));
+    setEl('kuyruk-last', new Date().toLocaleTimeString('tr'));
     const tb=document.getElementById('kuyruk-tbody');
-    if(tb)tb.innerHTML=proc.length?proc.map(r=>'<tr><td class="uc" title="'+(r['youtube-url']||'')+'">'+(r['youtube-url']||'').slice(0,35)+'...</td><td><span class="badge bi">'+(r['kaynak']||'-')+'</span></td><td>'+(r['video-suresi-sn']||'-')+'</td><td>'+(r['bekleme-suresi-sn']||'-')+'</td><td><span class="badge bw2">Islemde</span></td><td>'+(r['istek-tarihi']||'-').slice(0,16)+'</td></tr>').join(''):'<tr><td colspan="6" style="text-align:center;color:var(--mt);padding:16px">Aktif islem yok</td></tr>';
+    if(tb) tb.innerHTML = proc.length ? proc.map(r => {
+      const url = pURL(r), kaynak = pKaynak(r), tarih = pTarih(r);
+      return '<tr>'
+        + '<td class="uc" title="'+url+'">'+(url ? url.slice(0,35)+(url.length>35?'…':'') : '-')+'</td>'
+        + '<td>'+(kaynak ? '<span class="badge bi">'+kaynak+'</span>' : '-')+'</td>'
+        + '<td>'+(pick(r,['video-suresi-sn','sure','duration'])||'-')+'</td>'
+        + '<td>'+(pBekle(r)||'-')+'</td>'
+        + '<td><span class="badge bw2">'+(pDurum(r)||'İşlemde')+'</span></td>'
+        + '<td>'+(tarih.slice(0,16)||'-')+'</td>'
+        + '</tr>';
+    }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--mt);padding:16px">Aktif işlem yok</td></tr>';
   }
 
   if (page==='shortlist') {
     const tb=document.getElementById('sl-tbody');
-    // Sheet sütun isimleri projeye göre değişebiliyor — yaygın varyantları dene
-    const pick = (r, keys) => { for (const k of keys) { if (r[k]!=null && String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
     const igK = ['instagram-hesap','instagram','ig-hesap','ig','instagram_account','Instagram'];
     const ytK = ['youtube-hesap','youtube','yt-hesap','yt','youtube_account','YouTube'];
     const ttK = ['tiktok-hesap','tiktok','tt-hesap','tt','tiktok_account','TikTok'];
@@ -1837,19 +1892,41 @@ async function loadSheetPage(page) {
 
   if (page==='urltakip') {
     const tb=document.getElementById('url-tbody');
-    if(tb)tb.innerHTML=urls.length?urls.map(r=>'<tr><td class="uc" title="'+(r['youtube-url']||'')+'">'+(r['youtube-url']||'').slice(0,35)+'...</td><td><span class="badge bi">'+(r['kaynak']||'-')+'</span></td><td>'+(r['video-suresi-sn']||'-')+'</td><td>'+(r['izlenme-sayisi']||'-')+'</td><td>'+(r['uretilen-short-sayisi']||'-')+'</td><td>'+(r['bekleme-suresi-sn']||'-')+'</td><td><span class="badge '+(r['durum']==='Islemde'||r['durum']==='İşlemde'?'bw2':'bs2')+'">'+(r['durum']||'-')+'</span></td><td>'+(r['istek-tarihi']||'-').slice(0,16)+'</td></tr>').join(''):'<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">URL bulunamadi</td></tr>';
+    if(tb) tb.innerHTML = urls.length ? urls.map(r => {
+      const url = pURL(r), durum = pDurum(r), kaynak = pKaynak(r), tarih = pTarih(r);
+      const durCls = isProcStr(durum) ? 'bw2' : (isDoneStr(durum) ? 'bs2' : 'bi');
+      return '<tr>'
+        + '<td class="uc" title="'+url+'">'+(url ? url.slice(0,35)+(url.length>35?'…':'') : '-')+'</td>'
+        + '<td>'+(kaynak ? '<span class="badge bi">'+kaynak+'</span>' : '-')+'</td>'
+        + '<td>'+(pick(r,['video-suresi-sn','sure','duration'])||'-')+'</td>'
+        + '<td>'+(pIzl(r)||'-')+'</td>'
+        + '<td>'+(pShort(r)||'-')+'</td>'
+        + '<td>'+(pBekle(r)||'-')+'</td>'
+        + '<td><span class="badge '+durCls+'">'+(durum||'-')+'</span></td>'
+        + '<td>'+(tarih.slice(0,16)||'-')+'</td>'
+        + '</tr>';
+    }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">URL bulunamadı</td></tr>';
   }
 
   if (page==='arsiv') {
     const ks=(document.getElementById('ar-k')||{}).value||'';
     const ds=(document.getElementById('ar-s')||{}).value||'';
     const de=(document.getElementById('ar-e')||{}).value||'';
-    let arch=urls.filter(r=>r['durum']==='Tamamlandi'||r['durum']==='Tamamlandı');
-    if(ks)arch=arch.filter(r=>r['kaynak']===ks);
-    if(ds)arch=arch.filter(r=>r['istek-tarihi']>=ds);
-    if(de)arch=arch.filter(r=>r['istek-tarihi']<=de+'Z');
+    let arch = urls.filter(r => isDoneStr(pDurum(r)));
+    if(ks) arch = arch.filter(r => pKaynak(r) === ks);
+    if(ds) arch = arch.filter(r => pTarih(r) >= ds);
+    if(de) arch = arch.filter(r => pTarih(r) <= de+'Z');
     const tb=document.getElementById('ar-tbody');
-    if(tb)tb.innerHTML=arch.length?arch.map(r=>'<tr><td class="uc" title="'+(r['youtube-url']||'')+'">'+(r['youtube-url']||'').slice(0,35)+'...</td><td><span class="badge bi">'+(r['kaynak']||'-')+'</span></td><td>'+(r['uretilen-short-sayisi']||'-')+'</td><td>'+(r['proje-id']||'-')+'</td><td>'+(r['istek-tarihi']||'-').slice(0,16)+'</td></tr>').join(''):'<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">Arsiv bos</td></tr>';
+    if(tb) tb.innerHTML = arch.length ? arch.map(r => {
+      const url = pURL(r), kaynak = pKaynak(r), tarih = pTarih(r);
+      return '<tr>'
+        + '<td class="uc" title="'+url+'">'+(url ? url.slice(0,35)+(url.length>35?'…':'') : '-')+'</td>'
+        + '<td>'+(kaynak ? '<span class="badge bi">'+kaynak+'</span>' : '-')+'</td>'
+        + '<td>'+(pShort(r)||'-')+'</td>'
+        + '<td>'+(pProje(r)||'-')+'</td>'
+        + '<td>'+(tarih.slice(0,16)||'-')+'</td>'
+        + '</tr>';
+    }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">Arşiv boş — Filtrele\'ye bas veya "Tamamlandı" durumunda kayıt yok</td></tr>';
   }
 
   addLog('ok','sheets',page+' yüklendi');
@@ -1868,27 +1945,41 @@ async function loadReports() {
     const [sv,uv]=await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid,'URL-Takip!A:Z')]);
     shorts=parseSheet(sv); urls=parseSheet(uv);
   }
+  // Ortak yardımcılar — loadSheetPage'teki ile aynı, projelerde kolon adı fark eder
+  const pick = (r, keys) => { for (const k of keys) { if (r[k]!=null && String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
+  const pDurum = r => pick(r, ['durum','status','Durum','yayin-durumu']);
+  const pTarihUrl = r => pick(r, ['istek-tarihi','tarih','created-at','Tarih','olusturma-tarihi','date']);
+  const pTarihShort = r => pick(r, ['created-at','tarih','Tarih','yayinlanma-tarihi','created_at']);
+  const pKaynak = r => pick(r, ['kaynak','source','Kaynak']);
+  const pIG = r => pick(r, ['instagram-hesap','instagram','ig-hesap','ig','Instagram']);
+  const pYT = r => pick(r, ['youtube-hesap','youtube','yt-hesap','yt','YouTube']);
+  const pTT = r => pick(r, ['tiktok-hesap','tiktok','tt-hesap','tt','TikTok']);
+  const isDoneStr = d => { const s = String(d||'').toLowerCase().replace(/i̇/g,'i').replace(/ı/g,'i').replace(/ş/g,'s'); return s.includes('tamamland')||s.includes('done')||s.includes('completed')||s.includes('yayinland'); };
+  const parseDate = s => { if (!s) return null; const d = new Date(s); return isNaN(d) ? null : d; };
+
   const now=new Date();
   const wa=new Date(now-7*864e5), ma=new Date(now-30*864e5);
-  const wu=urls.filter(r=>new Date(r['istek-tarihi'])>=wa);
-  const ws=shorts.filter(r=>new Date(r['created-at'])>=wa);
+  const wu = urls.filter(r => { const d = parseDate(pTarihUrl(r));   return d && d >= wa; });
+  const ws = shorts.filter(r => { const d = parseDate(pTarihShort(r)); return d && d >= wa; });
+  const mu = urls.filter(r => { const d = parseDate(pTarihUrl(r));   return d && d >= ma; });
+  const ms = shorts.filter(r => { const d = parseDate(pTarihShort(r)); return d && d >= ma; });
   setEl('rh-url',  wu.length);
   setEl('rh-short',ws.length);
-  setEl('rh-avg',  wu.length?(ws.length/wu.length).toFixed(1):'—');
-  setEl('rh-rate', wu.length?Math.round(wu.filter(r=>r['durum']==='Tamamlandi'||r['durum']==='Tamamlandı').length/wu.length*100)+'%':'—');
-  setEl('ra-url',  urls.filter(r=>new Date(r['istek-tarihi'])>=ma).length);
-  setEl('ra-short',shorts.filter(r=>new Date(r['created-at'])>=ma).length);
-  const kSrc=k=>urls.filter(r=>r['kaynak']===k).length;
-  setEl('r-drive',kSrc('drive'));
-  setEl('r-yt',kSrc('youtube-arama')+kSrc('bulk-keyword'));
-  setEl('r-form',kSrc('panel')+kSrc('manuel'));
-  const igC=shorts.filter(r=>r['instagram-hesap']).length;
-  const ytC=shorts.filter(r=>r['youtube-hesap']).length;
-  const ttC=shorts.filter(r=>r['tiktok-hesap']).length;
+  setEl('rh-avg',  wu.length ? (ws.length/wu.length).toFixed(1) : '—');
+  setEl('rh-rate', wu.length ? Math.round(wu.filter(r => isDoneStr(pDurum(r))).length/wu.length*100)+'%' : '—');
+  setEl('ra-url',  mu.length);
+  setEl('ra-short',ms.length);
+  const kSrc = k => urls.filter(r => pKaynak(r) === k).length;
+  setEl('r-drive', kSrc('drive'));
+  setEl('r-yt',    kSrc('youtube-arama')+kSrc('bulk-keyword')+kSrc('ytkanal')+kSrc('kworb-trending'));
+  setEl('r-form',  kSrc('panel')+kSrc('manuel')+kSrc('toplu'));
+  const igC = shorts.filter(pIG).length;
+  const ytC = shorts.filter(pYT).length;
+  const ttC = shorts.filter(pTT).length;
   const rpEl=document.getElementById('rp-content');
   if(rpEl)rpEl.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="text-align:center;padding:8px 16px;background:rgba(225,48,108,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#e1306c">'+igC+'</div><div style="font-size:9px;color:var(--mt)">Instagram</div></div><div style="text-align:center;padding:8px 16px;background:rgba(255,0,0,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#f00">'+ytC+'</div><div style="font-size:9px;color:var(--mt)">YouTube</div></div><div style="text-align:center;padding:8px 16px;background:rgba(105,201,208,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#69c9d0">'+ttC+'</div><div style="font-size:9px;color:var(--mt)">TikTok</div></div></div>';
   const dc={};
-  urls.forEach(r=>{const d=(r['istek-tarihi']||'').slice(0,10);if(d)dc[d]=(dc[d]||0)+1;});
+  urls.forEach(r => { const d = (pTarihUrl(r)||'').slice(0,10); if(d)dc[d]=(dc[d]||0)+1; });
   const maxC=Math.max(...[0,1,2,3,4,5,6].map(i=>{const d=new Date(now);d.setDate(d.getDate()-6+i);return dc[d.toISOString().slice(0,10)]||0;}),1);
   const rbars=document.querySelectorAll('#r-bars .bar');
   [0,1,2,3,4,5,6].forEach((i,idx)=>{const d=new Date(now);d.setDate(d.getDate()-6+i);const c=dc[d.toISOString().slice(0,10)]||0;if(rbars[idx])rbars[idx].style.height=Math.max(10,c/maxC*100)+'%';});
@@ -1898,56 +1989,174 @@ async function loadReports() {
 // ═══════════════════════════════════════════════════════════
 // PLATFORMLAR
 // ═══════════════════════════════════════════════════════════
+// Upload-Post platformları — sıra, renk, avatar rengi, sosyal medya link üretici
+const PLAT_LIST = [
+  { key:'instagram', label:'Instagram',   icon:'📸', color:'#e1306c', link:a => 'https://instagram.com/' + (a.username||'') },
+  { key:'youtube',   label:'YouTube',     icon:'▶',  color:'#ff0000', link:a => a.id && String(a.id).startsWith('UC') ? 'https://youtube.com/channel/' + a.id : 'https://youtube.com/@' + (a.username||a.custom_url||'') },
+  { key:'tiktok',    label:'TikTok',      icon:'♪',  color:'#69c9d0', link:a => 'https://tiktok.com/@' + (a.username||'') },
+  { key:'facebook',  label:'Facebook',    icon:'ⓕ',  color:'#1877f2', link:a => a.id ? 'https://facebook.com/' + a.id : 'https://facebook.com/' + (a.username||a.name||'') },
+  { key:'linkedin',  label:'LinkedIn',    icon:'in', color:'#0a66c2', link:a => a.vanity_url ? 'https://linkedin.com/in/' + a.vanity_url : (a.urn ? 'https://linkedin.com/company/' + String(a.urn).split(':').pop() : 'https://linkedin.com/') },
+  { key:'twitter',   label:'X (Twitter)', icon:'𝕏',  color:'#0f1419', link:a => 'https://x.com/' + (a.username||a.handle||'') },
+  { key:'threads',   label:'Threads',     icon:'@',  color:'#000000', link:a => 'https://threads.net/@' + (a.username||'') },
+  { key:'pinterest', label:'Pinterest',   icon:'ⓟ',  color:'#e60023', link:a => 'https://pinterest.com/' + (a.username||'') },
+  { key:'bluesky',   label:'Bluesky',     icon:'🦋', color:'#0085ff', link:a => 'https://bsky.app/profile/' + (a.handle||a.username||'') }
+];
+
+const PLAT_MAP = PLAT_LIST.reduce((o,p)=>{o[p.key]=p;return o;},{});
+
 async function loadPlatforms() {
-  setEl('plat-last','Yukleniyor...');
-  addLog('info','uploadpost','Upload-Post profil bilgileri cekiliyor');
-  let d = S._panelCache?.accounts || null;
-  if (!d||!Object.keys(d).length) {
-    d = await n8nGet('/webhook/uploadpost-profiller');
+  setEl('plat-last','Yükleniyor...');
+  setEl('plat-src','');
+  addLog('info','uploadpost','Upload-Post profil bilgileri çekiliyor');
+  let raw = null, kaynak = '';
+  // 1) Panel cache (n8n panel-data içinden accounts)
+  if (S._panelCache && S._panelCache.accounts && Object.keys(S._panelCache.accounts).length) {
+    raw = S._panelCache.accounts; kaynak = 'panel-data cache';
   }
-  S.uploadPostAccounts=d;
-  const n8nOk = !!d;
-  if (d && (d.instagram||d.youtube||d.tiktok)) {
-    renderPlatEl('pl-ig', d.instagram||[], 'pi-ig','📸','https://instagram.com/');
-    renderPlatEl('pl-yt', d.youtube||[], 'pi-yt','▶','https://youtube.com/channel/');
-    renderPlatEl('pl-tt', d.tiktok||[], 'pi-tt','♪','https://tiktok.com/@');
-  } else if (d) {
-    const all=Array.isArray(d)?d:(d.data||d.accounts||d.items||[]);
-    renderPlatEl('pl-ig',all.filter(a=>a.platform==='instagram'||a.type==='INSTAGRAM'),'pi-ig','📸','https://instagram.com/');
-    renderPlatEl('pl-yt',all.filter(a=>a.platform==='youtube'||a.type==='YOUTUBE'),'pi-yt','▶','https://youtube.com/channel/');
-    renderPlatEl('pl-tt',all.filter(a=>a.platform==='tiktok'||a.type==='TIKTOK'),'pi-tt','♪','https://tiktok.com/@');
-  } else {
-    fallbackPlat('pl-ig','ig','📸','pi-ig','https://instagram.com/');
-    fallbackPlat('pl-yt','yt','▶','pi-yt','https://youtube.com/channel/');
-    fallbackPlat('pl-tt','tt','♪','pi-tt','https://tiktok.com/@');
-    addLog('warn','uploadpost','Upload-Post API yanitlamadi — kayitli profil isimleri kullaniliyor');
+  // 2) n8n webhook (var ve CORS izinli)
+  if (!raw) {
+    const d = await n8nGet('/webhook/uploadpost-profiller');
+    if (d) { raw = d; kaynak = 'n8n proxy'; }
   }
-  setEl('plat-last','Son: '+new Date().toLocaleTimeString('tr'));
+  // 3) Doğrudan API (S.cfg.blot varsa)
+  if (!raw && S.cfg.blot) {
+    try {
+      const r = await fetch('https://api.upload-post.com/api/uploadposts/users', { headers: { 'Authorization': 'Apikey ' + S.cfg.blot } });
+      const j = await r.json();
+      if (r.ok) { raw = j; kaynak = 'doğrudan API'; }
+      else addLog('warn','uploadpost','API '+r.status+': '+(j.message||j.error||'?'));
+    } catch(e) { addLog('warn','uploadpost','Doğrudan API başarısız (muhtemelen CORS): '+e.message); }
+  }
+  S.uploadPostAccounts = raw;
+  if (!raw) {
+    document.getElementById('pl-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mt);font-size:10px">Bağlanılamadı — n8n URL veya Upload-Post API Key girin</div>';
+    setEl('plat-last','Bağlanılamadı');
+    return;
+  }
+  setEl('plat-src','Kaynak: ' + kaynak);
+  const byPlat = normalizePlatforms(raw);
+  renderPlatformsGrid(byPlat);
+  setEl('plat-last','Son: ' + new Date().toLocaleTimeString('tr'));
+  addLog('ok','uploadpost','Platform verileri güncellendi ('+kaynak+')');
 }
 
-function renderPlatEl(elId, accs, iconCls, emoji, linkBase) {
-  const el=document.getElementById(elId);
-  if(!el)return;
-  if(!accs.length){fallbackPlat(elId, iconCls.replace('pi-',''), emoji, iconCls, linkBase);return;}
-  el.innerHTML=accs.map((a,i)=>{
-    const name=a.username||a.name||a.displayName||('Hesap '+(i+1));
-    const id=a.id||a.accountId||a._id||'?';
-    const link=a.profileUrl||a.url||(linkBase+(a.username||id));
-    return '<div class="acc-card" onclick="window.open(\''+link+'\',\'_blank\')" title="Sosyal medyaya git"><div class="acc-info"><div class="acc-icon '+iconCls+'">'+emoji+'</div><div><div class="acc-name">'+name+'</div><div class="acc-id">ID: '+id+'</div></div></div><span class="badge bi" style="font-size:8px">Ac ↗</span></div>';
-  }).join('');
+// Upload-Post response format: { profiles: [{ username, social_accounts: { instagram:{}, tiktok:{}, ... } }] }
+// n8n panel-data eski format: { instagram:[], youtube:[], tiktok:[], profiles:[] }
+function normalizePlatforms(d) {
+  const out = {}; PLAT_LIST.forEach(p => out[p.key] = []);
+  if (!d) return out;
+  // A) profiles[].social_accounts.* (yeni Upload-Post format)
+  if (Array.isArray(d.profiles) && d.profiles.length) {
+    for (const prof of d.profiles) {
+      const sa = prof.social_accounts || prof.socialAccounts || {};
+      PLAT_LIST.forEach(p => {
+        const acc = sa[p.key];
+        if (!acc) return;
+        const list = Array.isArray(acc) ? acc : [acc];
+        list.forEach(a => out[p.key].push(Object.assign({ _profile: prof.username, _platform: p.key }, a)));
+      });
+    }
+  }
+  // B) Eski n8n format: d.instagram/youtube/tiktok array
+  PLAT_LIST.forEach(p => {
+    if (Array.isArray(d[p.key]) && !out[p.key].length) {
+      d[p.key].forEach(a => out[p.key].push(Object.assign({ _platform: p.key }, a)));
+    }
+  });
+  return out;
 }
 
-function getPlatLink(platform, id, username) {
-  if (platform === 'ig') return username ? 'https://instagram.com/' + username : 'https://instagram.com/';
-  if (platform === 'yt') return id && id.startsWith('UC') ? 'https://youtube.com/channel/' + id : 'https://youtube.com/';
-  if (platform === 'tt') return username ? 'https://tiktok.com/@' + username : 'https://tiktok.com/';
-  return '#';
+function renderPlatformsGrid(byPlat) {
+  const grid = document.getElementById('pl-grid'); if (!grid) return;
+  grid.innerHTML = PLAT_LIST.filter(p => byPlat[p.key] && byPlat[p.key].length)
+    .map(p => {
+      const accs = byPlat[p.key];
+      return `<div class="card" style="border-top:3px solid ${p.color}">
+        <div class="ct" style="color:${p.color};display:flex;justify-content:space-between;align-items:center">
+          <span>${p.icon} ${p.label}</span>
+          <span style="font-size:9px;color:var(--mt);font-weight:400">${accs.length} hesap</span>
+        </div>
+        <div>${accs.map((a,i)=>platAccCard(a,p,i)).join('')}</div>
+      </div>`;
+    }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mt);font-size:10px">Bu profilde bağlı sosyal hesap yok</div>';
 }
 
-function fallbackPlat(elId, platKey, emoji, iconCls, linkBase) {
-  const el=document.getElementById(elId);
-  const accs=S.accounts[platKey]||[];
-  if(el)el.innerHTML=accs.map((id,i)=>'<div class="acc-card" onclick="window.open(\''+getPlatLink(platKey,id,null)+'\',\'_blank\')"><div class="acc-info"><div class="acc-icon '+iconCls+'">'+emoji+'</div><div><div class="acc-name">Hesap '+(i+1)+'</div><div class="acc-id">ID: '+id+'</div></div></div><span class="badge bi" style="font-size:8px">Ac ↗</span></div>').join('');
+function platAccName(a, p) {
+  return a.display_name || a.displayName || a.name || a.username || a.handle || a.vanity_url || a.id || (p.label + ' Hesabı');
+}
+
+function platAccCard(a, p, idx) {
+  const name = platAccName(a, p);
+  const handle = a.username || a.handle || '';
+  const avatar = a.profile_picture_url || a.profile_pic_url || a.profile_image_url || a.avatar_url || a.thumbnail || '';
+  const followers = a.followers_count || a.follower_count || null;
+  return `<div class="acc-card" onclick="platOpenModal('${p.key}',${idx})" style="cursor:pointer">
+    <div class="acc-info">
+      ${avatar ? `<img src="${avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.remove()">` : `<div class="acc-icon" style="background:${p.color}22;color:${p.color}">${p.icon}</div>`}
+      <div style="min-width:0">
+        <div class="acc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+        <div class="acc-id" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${handle ? '@'+handle : ''}${followers!=null ? ' · '+ytkFmt(followers)+' takipçi' : ''}</div>
+      </div>
+    </div>
+    <span class="badge bi" style="font-size:8px;flex-shrink:0">Detay ▶</span>
+  </div>`;
+}
+
+// Hesap detay modal — profil bilgisi + direkt link + kopyala
+function platOpenModal(platKey, idx) {
+  const p = PLAT_MAP[platKey]; if (!p) return;
+  const byPlat = normalizePlatforms(S.uploadPostAccounts);
+  const a = byPlat[platKey] && byPlat[platKey][idx]; if (!a) return;
+  const name = platAccName(a, p);
+  const handle = a.username || a.handle || '';
+  const avatar = a.profile_picture_url || a.profile_pic_url || a.profile_image_url || a.avatar_url || a.thumbnail || '';
+  const followers = a.followers_count || a.follower_count;
+  const posts = a.media_count || a.video_count || a.post_count;
+  const following = a.following_count;
+  const link = p.link(a);
+  const t = document.getElementById('plat-modal-title');
+  if (t) t.textContent = p.icon + ' ' + p.label + (handle ? ' — @' + handle : '');
+  const stat = (label, val) => val != null && val !== '' ? `<div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">${label}</div><div style="font-size:14px;font-weight:700;color:#fff">${ytkFmt(val)}</div></div>` : '';
+  const rows = [];
+  if (a._profile)          rows.push(['Upload-Post profili', a._profile]);
+  if (name && name!==handle) rows.push(['Görünen ad', name]);
+  if (handle)              rows.push(['Kullanıcı adı', '@'+handle]);
+  if (a.id)                rows.push(['Hesap ID', a.id]);
+  if (a.urn)               rows.push(['URN', a.urn]);
+  const rowsHtml = rows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:10px"><span style="color:var(--mt)">${k}</span><span style="color:#fff;font-family:var(--fm);word-break:break-all;text-align:right">${v}</span></div>`).join('');
+  const body = document.getElementById('plat-modal-body');
+  if (body) body.innerHTML = `
+    <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
+      ${avatar ? `<img src="${avatar}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid ${p.color}" onerror="this.remove()">` : `<div style="width:64px;height:64px;border-radius:50%;background:${p.color}22;color:${p.color};display:flex;align-items:center;justify-content:center;font-size:24px">${p.icon}</div>`}
+      <div style="min-width:0;flex:1">
+        <div style="font-size:14px;font-weight:700;color:#fff">${name}</div>
+        <div style="font-size:10px;color:var(--mt);margin-top:2px">${p.label}${handle?' · @'+handle:''}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-bottom:14px">
+      ${stat('Takipçi', followers)}${stat('Takip', following)}${stat('Gönderi', posts)}
+    </div>
+    ${rowsHtml ? `<div style="background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:10px 14px;margin-bottom:14px">${rowsHtml}</div>` : ''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <a href="${link}" target="_blank" rel="noopener" class="btn bp bsm" style="text-decoration:none">↗ ${p.label}'da Aç</a>
+      <button class="btn bg bsm" onclick="platCopyLink('${link.replace(/'/g,"\\'")}')">📋 Linki Kopyala</button>
+      <span style="font-size:9px;color:var(--mt);margin-left:auto;word-break:break-all;text-align:right;max-width:60%">${link}</span>
+    </div>`;
+  document.getElementById('plat-modal').style.display = 'block';
+}
+
+function platCloseModal() { const m = document.getElementById('plat-modal'); if (m) m.style.display = 'none'; }
+
+function platCopyLink(link) {
+  try {
+    navigator.clipboard.writeText(link);
+    addLog('ok','uploadpost','Link kopyalandı: '+link);
+  } catch(e) {
+    // Fallback
+    const ta = document.createElement('textarea'); ta.value = link; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e2){}
+    ta.remove();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2285,22 +2494,38 @@ function renderYTKChannels() {
     const active = YTK.channelInfo && YTK.channelInfo.channelId === c.id;
     const thumb = c.snippet.thumbnails?.default?.url || '';
     const handle = c.snippet.customUrl || '';
-    return `<div onclick="ytkPickChannel('${c.id}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;align-items:center;background:${active?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${active?'var(--acc)':'transparent'};transition:all .15s">
+    return `<div class="ytk-channel-row" data-cid="${c.id}" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;align-items:center;background:${active?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${active?'var(--acc)':'transparent'};transition:all .15s">
       ${thumb?`<img src="${thumb}" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">`:''}
       <div style="min-width:0;flex:1">
         <div style="font-size:10px;font-weight:700;color:${active?'var(--acc)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.snippet.title} <span style="color:var(--mt);font-weight:400">${handle}</span></div>
         <div style="font-size:8px;color:var(--mt);margin-top:2px">👥 ${ytkFmt(st.subscriberCount)} abone &nbsp;👁 ${ytkFmt(st.viewCount)} izlenme &nbsp;🎬 ${ytkFmt(st.videoCount)} video</div>
       </div>
-      <span class="badge bi" style="flex-shrink:0">Videolar ▶</span>
+      <button class="btn bs bsm ytk-fetch-btn" data-cid="${c.id}" style="flex-shrink:0;font-size:9px;padding:5px 8px">▶ Videoları Getir</button>
     </div>`;
   }).join('');
+  // Event delegation: satıra tıklanınca kanalı seç, "Videoları Getir" butonuna tıklanınca modal aç + fetch
+  el.querySelectorAll('.ytk-channel-row').forEach(row => {
+    row.addEventListener('click', e => {
+      const cid = row.dataset.cid;
+      if (e.target.classList.contains('ytk-fetch-btn')) return; // buton kendisi hallediyor
+      ytkPickChannel(cid, /*openModal*/ false);
+    });
+  });
+  el.querySelectorAll('.ytk-fetch-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const cid = btn.dataset.cid;
+      ytkPickChannel(cid, /*openModal*/ true);
+    });
+  });
 }
 
-// ── Kanal seçimi: bilgi kartı + videoları yükle (uploads playlist, 50'şer sayfa)
-async function ytkPickChannel(chId) {
+// ── Kanal seçimi: sadece bilgi göster; openModal=true ise videoları da çek ve modal aç
+async function ytkPickChannel(chId, openModal) {
   const c = YTK.channels.find(x => x.id === chId);
   if (!c) return;
   const st = c.statistics || {};
+  const newChannel = !YTK.channelInfo || YTK.channelInfo.channelId !== chId;
   YTK.channelInfo = {
     channelId: chId,
     channelTitle: c.snippet.title,
@@ -2311,7 +2536,8 @@ async function ytkPickChannel(chId) {
   };
   // Uploads playlist ID: UC... -> UU... (ekstra API çağrısı gerektirmez)
   YTK.uploadsId = 'UU' + chId.slice(2);
-  YTK.videos = []; YTK.selected.clear(); YTK.nextPage = '';
+  // Yeni kanala geçince eski videoları temizle
+  if (newChannel) { YTK.videos = []; YTK.selected.clear(); YTK.nextPage = ''; }
   renderYTKChannels();
 
   const chInfoEl = document.getElementById('ytk-channel-info');
@@ -2323,10 +2549,80 @@ async function ytkPickChannel(chId) {
         <div style="font-size:9px;color:var(--mt);margin-top:3px">👥 ${ytkFmt(st.subscriberCount)} abone &nbsp;👁 ${ytkFmt(st.viewCount)} toplam izlenme &nbsp;🎬 ${ytkFmt(st.videoCount)} video</div>
         <a href="https://www.youtube.com/channel/${chId}" target="_blank" style="font-size:8px;color:var(--acc)">${chId}</a>
       </div>
+      <button class="btn bs bsm" onclick="ytkPickChannel('${chId}', true)" style="align-self:center;flex-shrink:0">▶ Videoları Getir</button>
     </div>`;
   }
+  if (openModal) {
+    ytkOpenModal();
+    // Modal açıldıktan sonra fetch (yeni kanalsa veya cache boşsa)
+    if (!YTK.videos.length) await ytkLoadMore(true);
+    else renderYTKVideos();
+  }
+}
+
+// ── YT Kanal video listesi modal aç/kapat
+function ytkOpenModal() {
+  const m = document.getElementById('ytk-modal');
+  if (!m) return;
+  m.style.display = 'block';
+  const t = document.getElementById('ytk-modal-title');
+  const s = document.getElementById('ytk-modal-sub');
+  if (YTK.channelInfo) {
+    if (t) t.textContent = YTK.channelInfo.channelTitle + ' — Videolar';
+    if (s) s.textContent = `👥 ${ytkFmt(YTK.channelInfo.subscriberCount)} abone · 🎬 ${ytkFmt(YTK.channelInfo.videoCount)} video toplam`;
+  }
   renderYTKVideos();
-  await ytkLoadMore(true);
+}
+function ytkCloseModal() {
+  const m = document.getElementById('ytk-modal');
+  if (m) m.style.display = 'none';
+}
+
+// ── Video detay modal (gomulu YouTube oynatici)
+function ytvOpenModal(vid) {
+  const v = YTK.videos.find(x => x.id === vid) || (YAR.videos||[]).find(x => x.id === vid);
+  if (!v) return;
+  const isCompact = !v.snippet;
+  const title = isCompact ? v.title : v.snippet.title;
+  const channelTitle = isCompact ? v.channelTitle : v.snippet.channelTitle;
+  const description = isCompact ? '' : (v.snippet.description || '');
+  const publishedAt = isCompact ? v.publishedAt : v.snippet.publishedAt;
+  const duration = isCompact ? v.duration : v.contentDetails.duration;
+  const st = isCompact ? v : (v.statistics || {});
+  const tags = isCompact ? [] : (v.snippet.tags || []);
+  const m = document.getElementById('ytv-modal');
+  const t = document.getElementById('ytv-modal-title');
+  const body = document.getElementById('ytv-modal-body');
+  if (t) t.textContent = title;
+  if (body) {
+    body.innerHTML = `
+      <div style="position:relative;width:100%;padding-bottom:56.25%;background:#000;border-radius:4px;overflow:hidden;margin-bottom:14px">
+        <iframe src="https://www.youtube.com/embed/${v.id}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
+                style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px">
+        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">İzlenme</div><div style="font-size:14px;font-weight:700;color:#fff">${ytkFmt(st.viewCount)}</div></div>
+        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">Beğeni</div><div style="font-size:14px;font-weight:700;color:#fff">${st.likeCount!=null?ytkFmt(st.likeCount):'–'}</div></div>
+        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">Yorum</div><div style="font-size:14px;font-weight:700;color:#fff">${st.commentCount!=null?ytkFmt(st.commentCount):'–'}</div></div>
+        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">Süre</div><div style="font-size:14px;font-weight:700;color:#fff">${ytkDurFmt(ytkParseDur(duration))}</div></div>
+      </div>
+      <div style="font-size:10px;color:var(--mt);margin-bottom:10px">
+        📺 <b style="color:#fff">${channelTitle||''}</b> &nbsp; 📅 ${(publishedAt||'').slice(0,10)}
+      </div>
+      ${description ? `<div style="font-size:10px;color:#dde4f0;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:10px;max-height:180px;overflow-y:auto;white-space:pre-wrap;margin-bottom:10px">${description.replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>` : ''}
+      ${tags.length ? `<div style="margin-bottom:12px"><div style="font-size:9px;color:var(--mt);margin-bottom:4px">Etiketler</div><div style="display:flex;gap:4px;flex-wrap:wrap">${tags.slice(0,15).map(t=>`<span class="badge bi" style="font-size:8px">${t.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`).join('')}</div></div>` : ''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="https://www.youtube.com/watch?v=${v.id}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ YouTube'da Aç</a>
+        <button class="btn ${YTK.selected.has(v.id)?'bs':'bp'} bsm" onclick="ytkToggle('${v.id}');ytvOpenModal('${v.id}')">${YTK.selected.has(v.id)?'✓ Seçili — kaldır':'+ Seçime Ekle'}</button>
+      </div>`;
+  }
+  if (m) m.style.display = 'block';
+}
+function ytvCloseModal() {
+  const m = document.getElementById('ytv-modal');
+  const body = document.getElementById('ytv-modal-body');
+  if (m) m.style.display = 'none';
+  if (body) body.innerHTML = ''; // iframe'i durdur
 }
 
 async function ytkLoadMore(first) {
@@ -2398,16 +2694,17 @@ function renderYTKVideos() {
     const thumb = v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '';
     const durS = ytkParseDur(v.contentDetails.duration);
     const pubDate = (v.snippet.publishedAt||'').slice(0,10);
-    return `<div onclick="ytkToggle('${v.id}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s">
-      <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();ytkToggle('${v.id}')">
+    return `<div onclick="ytvOpenModal('${v.id}')" style="display:flex;gap:10px;padding:10px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s;align-items:center">
+      <input type="checkbox" style="flex-shrink:0;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();ytkToggle('${v.id}');renderYTKVideos()">
       <div style="position:relative;flex-shrink:0">
-        ${thumb?`<img src="${thumb}" style="width:80px;height:50px;object-fit:cover;border-radius:3px">` : '<div style="width:80px;height:50px;background:var(--brd);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
-        <span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.8);color:#fff;font-size:8px;padding:1px 4px;border-radius:2px">${ytkDurFmt(durS)}</span>
+        ${thumb?`<img src="${thumb}" style="width:120px;height:72px;object-fit:cover;border-radius:4px">` : '<div style="width:120px;height:72px;background:var(--brd);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
+        <span style="position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.85);color:#fff;font-size:9px;padding:2px 5px;border-radius:2px">${ytkDurFmt(durS)}</span>
       </div>
       <div style="min-width:0;flex:1">
-        <div style="font-size:10px;font-weight:600;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.snippet.title}</div>
-        <div style="font-size:8px;color:var(--mt);margin-top:3px">👁 ${ytkFmt(st.viewCount)} &nbsp;👍 ${st.likeCount!=null?ytkFmt(st.likeCount):'–'} &nbsp;💬 ${st.commentCount!=null?ytkFmt(st.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
+        <div style="font-size:11px;font-weight:700;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.snippet.title}</div>
+        <div style="font-size:9px;color:var(--mt);margin-top:4px">👁 ${ytkFmt(st.viewCount)} &nbsp;👍 ${st.likeCount!=null?ytkFmt(st.likeCount):'–'} &nbsp;💬 ${st.commentCount!=null?ytkFmt(st.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
       </div>
+      <span style="flex-shrink:0;color:var(--acc);font-size:9px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px">Detay ▶</span>
     </div>`;
   }).join('');
 }
@@ -2579,6 +2876,8 @@ document.addEventListener('DOMContentLoaded', function() {
       ytkPickChannel,ytkLoadMore,ytkLoadAll,renderYTKVideos,
       searchYARVideos,yarToggle,yarSelectAll,yarClearAll,yarSendSelected,initYouTubeAra,
       yarOpenModal,yarCloseModal,yarOpenHistory,yarNormalizeVideo,
+      ytkOpenModal,ytkCloseModal,ytvOpenModal,ytvCloseModal,
+      platOpenModal,platCloseModal,platCopyLink,
       sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
       loadAllSheetData,loadSheetPage,sendOpusClipBulk];
@@ -2665,16 +2964,16 @@ function renderTakvim(shorts) {
     } catch(e) {}
   };
 
+  const pickK = (r, keys) => { for (const k of keys) { if (r[k]!=null && String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
+  const pIgTime = r => pickK(r, ['ig-schedule','instagram-schedule','ig_scheduled_at','ig-yayin-tarihi','Instagram Schedule']);
+  const pYtTime = r => pickK(r, ['yt-schedule','youtube-schedule','yt_scheduled_at','yt-yayin-tarihi','YouTube Schedule']);
+  const pTtTime = r => pickK(r, ['tt-schedule','tiktok-schedule','tt_scheduled_at','tt-yayin-tarihi','TikTok Schedule']);
+
   shorts.forEach(r => {
-    if (TAK.filter === 'all' || TAK.filter === 'ig') {
-      addItem(r['ig-schedule'], {r, plat:'ig', time: r['ig-schedule']});
-    }
-    if (TAK.filter === 'all' || TAK.filter === 'yt') {
-      addItem(r['yt-schedule'], {r, plat:'yt', time: r['yt-schedule']});
-    }
-    if (TAK.filter === 'all' || TAK.filter === 'tt') {
-      addItem(r['tt-schedule'], {r, plat:'tt', time: r['tt-schedule']});
-    }
+    const igT = pIgTime(r), ytT = pYtTime(r), ttT = pTtTime(r);
+    if ((TAK.filter === 'all' || TAK.filter === 'ig') && igT) addItem(igT, {r, plat:'ig', time: igT});
+    if ((TAK.filter === 'all' || TAK.filter === 'yt') && ytT) addItem(ytT, {r, plat:'yt', time: ytT});
+    if ((TAK.filter === 'all' || TAK.filter === 'tt') && ttT) addItem(ttT, {r, plat:'tt', time: ttT});
   });
 
   // byDay'i TAK'a kaydet — modal erişimi için
@@ -2708,10 +3007,15 @@ function renderTakvim(shorts) {
     const extra = items.length - shown.length;
     shown.forEach(item => {
       const t = item.time ? new Date(item.time).toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'}) : '';
-      const title = (item.r['title'] || '').slice(0, 18) || '(başlıksız)';
+      const r = item.r;
+      const rawTitle = pickK(r, ['title','baslik','Title','Başlık','name']);
+      const title = (rawTitle || '(başlıksız)').slice(0, 18);
       const col = PLAT_COLOR[item.plat] || 'var(--acc)';
-      const thumbUrl = item.r['thumbnail-url'] || '';
-      const dataAttrs = `data-plat="${item.plat}" data-time="${item.time||''}" data-title="${(item.r['title']||'').replace(/"/g,'&quot;')}" data-desc="${(item.r['description']||'').slice(0,120).replace(/"/g,'&quot;')}" data-status="${item.r['platform-status']||''}" data-thumb="${thumbUrl}" data-kat="${item.r['kategori']||'genel'}"`;
+      const thumbUrl = pickK(r, ['thumbnail-url','thumbnail','thumb','image','preview-url','image-url','Thumbnail']);
+      const desc = pickK(r, ['description','aciklama','Description','Açıklama']).slice(0,120);
+      const status = pickK(r, ['platform-status','durum','status','Durum']);
+      const kat = pickK(r, ['kategori','category','Kategori']) || 'genel';
+      const dataAttrs = `data-plat="${item.plat}" data-time="${item.time||''}" data-title="${(rawTitle||'').replace(/"/g,'&quot;')}" data-desc="${desc.replace(/"/g,'&quot;')}" data-status="${status}" data-thumb="${thumbUrl}" data-kat="${kat}"`;
       inner += `<div ${dataAttrs} onmouseenter="showTakTip(event,this)" onmouseleave="hideTakTip()" style="background:${col}22;border-left:2px solid ${col};border-radius:2px;padding:2px 4px;margin-bottom:2px;cursor:pointer;font-size:8px;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:${col}"><span style="opacity:.7">${t}</span> ${title}</div>`;
     });
     if (extra > 0) {

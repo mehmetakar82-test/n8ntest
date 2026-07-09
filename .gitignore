@@ -1,0 +1,27 @@
+# n8n workflow JSON — credential icerdigi icin push edilmez
+OPUSPRO_v13_UploadPost.json
+OPUSPRO_v14_Kworb.json
+*.n8n.json
+
+# Panel eski surumler
+opuspro_panel_v8.html
+
+# Yerel Claude Code config
+.claude/
+.claude-workspace
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.vscode/
+.idea/
+
+# Scratchpad ve gecici dosyalar
+scratchpad/
+_test_*
+*.tmp
+
+# Kaynak dosya sadece 'index.html' olarak push ediliyor
+opuspro_panel_v9.html
