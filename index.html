@@ -31,7 +31,8 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--ok);margin-right:4px;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* MAIN */
-.main{flex:1;padding:24px 28px;overflow-y:auto}
+.main{flex:1;padding:24px 28px;overflow-y:auto;overflow-x:hidden}
+.main > .page{max-width:1400px;margin:0 auto}
 .page{display:none;animation:fi .18s ease}
 .page.active{display:block}
 @keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -153,7 +154,8 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--brd);border-radius:2px}
-@media(max-width:900px){.sg{grid-template-columns:repeat(2,1fr)}.g2,.g3{grid-template-columns:1fr}.sb{width:160px}}
+@media(max-width:1100px){.sg{grid-template-columns:repeat(2,1fr)}.g2,.g3{grid-template-columns:1fr}}
+@media(max-width:900px){.sb{width:160px}}
 </style>
 </head>
 <body>
@@ -186,7 +188,6 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     <div class="ni" onclick="go('arsiv',this)"><span class="ic">▣</span>Arşiv</div>
     <div class="ns">Sistem</div>
     <div class="ni" onclick="go('ayarlar',this)"><span class="ic">⊞</span>Ayarlar</div>
-    <div class="ni" onclick="go('hesaplar',this)"><span class="ic">◎</span>Hesaplar</div>
     <div class="ni" onclick="go('loglar',this)"><span class="ic">⊟</span>Loglar</div>
   </nav>
   <div class="sb-foot"><span class="dot"></span><span id="conn-status">Hazır</span></div>
@@ -315,7 +316,12 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
       <div class="card">
         <div class="ct">Kanal Arama</div>
         <div class="alert ai"><span>ℹ</span><span>Anahtar kelime veya @handle girin. Eşleşen kanallar abone / izlenme / video sayısı ile listelenir; bir kanala tıklayınca videoları sağda açılır.</span></div>
-        <div class="fg"><label>YouTube API Key</label><input id="ytk-apikey" type="text" placeholder="AIza..." oninput="if(S.cfg.ytApiKey!==this.value){S.cfg.ytApiKey=this.value;localStorage.setItem('op_cfg',JSON.stringify(S.cfg));}"/></div>
+        <div class="fg"><label>YouTube API Key <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--acc);font-size:9px;margin-left:6px">Console ↗</a></label>
+          <div style="display:flex;gap:6px">
+            <input id="ytk-apikey" type="text" placeholder="AIza..." style="flex:1" oninput="if(S.cfg.ytApiKey!==this.value){S.cfg.ytApiKey=this.value;localStorage.setItem('op_cfg',JSON.stringify(S.cfg));}"/>
+            <button class="btn bg bsm" onclick="ytkTestApi()" title="API Key'i test et">✓ Test</button>
+          </div>
+        </div>
         <div class="fg"><label>Anahtar Kelime veya @handle</label>
           <div style="display:flex;gap:6px">
             <input id="ytk-channel" type="text" placeholder="örn. tarih belgesel, @KanalAdi..." style="flex:1" onkeydown="if(event.key==='Enter')searchYTChannel()"/>
@@ -427,20 +433,28 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 
 <!-- YOUTUBE ARA -->
 <div id="page-ytara" class="page">
-  <div class="ph"><div class="pt">YouTube Ara</div><div class="ps">Anahtar kelimeyle video bul — arka planda çalışır (524 yok)</div></div>
+  <div class="ph"><div class="pt">YouTube Ara</div><div class="ps">Anahtar kelimeye göre 10 video listele, seçtiklerini tek tek işleme al</div></div>
   <div class="g2">
     <div class="card">
       <div class="ct">Arama</div>
-      <div class="alert ai"><span>ℹ</span><span>İstek gönderildikten sonra panel beklemez — n8n arka planda çalışır. 524 hatası artık görünmez.</span></div>
-      <div class="fg"><label>Anahtar Kelime</label><input id="ya-kw" type="text" placeholder="motivasyon konuşması türkçe"/></div>
+      <div class="alert ai"><span>ℹ</span><span>Anahtar kelime + süre + dil ile YouTube'da video ara; sonuçlar sağda listelenir. Seçtiğin videolar OpusClip akışına tek tek gönderilir.</span></div>
+      <div class="fg"><label>YouTube API Key <span style="color:var(--mt)">(YT Kanal Ara ile aynı)</span></label>
+        <input id="ya-apikey" type="text" placeholder="AIza..." oninput="if(S.cfg.ytApiKey!==this.value){S.cfg.ytApiKey=this.value;localStorage.setItem('op_cfg',JSON.stringify(S.cfg));}"/>
+      </div>
+      <div class="fg"><label>Anahtar Kelime</label>
+        <div style="display:flex;gap:6px">
+          <input id="ya-kw" type="text" placeholder="motivasyon konuşması türkçe" style="flex:1" onkeydown="if(event.key==='Enter')searchYARVideos()"/>
+          <button class="btn bp bsm" onclick="searchYARVideos()">🔍 Ara</button>
+        </div>
+      </div>
       <div class="g2" style="gap:8px">
         <div class="fg"><label>Min. Süre</label>
           <select id="ya-dur">
-            <option value="600">10 dakika</option>
+            <option value="600" selected>10 dakika</option>
             <option value="1200">20 dakika</option>
             <option value="1800">30 dakika</option>
             <option value="3600">60 dakika</option>
-            <option value="5400">90 dakika</option>
+            <option value="0">Tümü</option>
           </select>
         </div>
         <div class="fg"><label>Dil</label>
@@ -453,14 +467,21 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
       </div>
       <div class="fg"><label>Kategori <span style="color:var(--mt)">(birden fazla seçebilirsin)</span></label><div class="cat-chips" id="ya-cats"></div></div>
       <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="ya-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn bp" onclick="sendSearch()">⊕ Ara ve Gönder</button>
-        <button class="btn bg bsm" onclick="addSearchHist()">+ Geçmişe Ekle</button>
-      </div>
       <div id="ya-res" class="res"></div>
     </div>
     <div>
       <div class="card">
+        <div class="ct" style="margin-bottom:10px">Arama Sonuçları <span id="ya-sel-count" style="color:var(--acc)">(0 seçili)</span></div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          <button class="btn bg bsm" onclick="yarSelectAll()">Tümünü Seç</button>
+          <button class="btn bg bsm" onclick="yarClearAll()">Seçimi Temizle</button>
+          <button class="btn bs bsm" onclick="yarSendSelected()">▶ Seçilenleri Gönder</button>
+        </div>
+        <div id="ya-video-list" style="max-height:520px;overflow-y:auto">
+          <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Anahtar kelime girip Ara'ya bas</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
         <div class="ct">Arama Geçmişi</div>
         <div id="ya-hist" style="font-size:10px"><div style="color:var(--mt);text-align:center;padding:12px">Henüz arama yapılmadı</div></div>
       </div>
@@ -891,22 +912,6 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
   </div>
 </div>
 
-<!-- HESAPLAR -->
-<div id="page-hesaplar" class="page">
-  <div class="ph"><div class="pt">Hesaplar</div><div class="ps">Upload-Post profil isimleri</div></div>
-  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Değişiklikler n8n Code in JavaScript3 node'una uygulanmalıdır. "Kodu Üret" butonu ile kopyalanabilir kod alın.</span></div>
-  <div class="g3">
-    <div class="card"><div class="ct">📸 Instagram</div><div id="ig-inputs"></div></div>
-    <div class="card"><div class="ct">▶ YouTube</div><div id="yt-inputs"></div></div>
-    <div class="card"><div class="ct">♪ TikTok</div><div id="tt-inputs"></div></div>
-  </div>
-  <button class="btn bp" onclick="genAccCode()" style="margin-top:6px">⊞ n8n Kodu Üret</button>
-  <div id="acc-code-wrap" style="display:none;margin-top:10px">
-    <div class="ct">Code in JavaScript3'te HESAPLAR bölümünü değiştir:</div>
-    <textarea id="acc-code" style="height:90px;font-size:9px;background:var(--bg);margin-top:4px"></textarea>
-  </div>
-</div>
-
 <!-- LOGLAR -->
 <div id="page-loglar" class="page">
   <div class="ph"><div class="pt">Loglar</div><div class="ps">Tarih/saat, kategori ve seviyeye göre filtrelenmiş işlem geçmişi</div></div>
@@ -936,7 +941,19 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     </label>
   </div>
   <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap" id="log-stats"></div>
-  <div class="ls" id="log-out"></div>
+  <div class="card">
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th style="width:150px">Tarih / Saat</th>
+          <th style="width:110px">Kategori</th>
+          <th style="width:80px">Seviye</th>
+          <th>Mesaj</th>
+        </tr></thead>
+        <tbody id="log-tbody"><tr><td colspan="4" style="text-align:center;color:var(--mt);padding:16px">Log bulunamadı</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 </main>
@@ -990,7 +1007,7 @@ function go(id, el) {
   page.classList.add('active');
   el.classList.add('active');
   const h = {
-    dashboard: refreshDash, loglar: renderLogs, hesaplar: renderAccInputs,
+    dashboard: refreshDash, loglar: renderLogs,
     platformlar: loadPlatforms,
     takvim:     loadTakvim,
     kuyruk:     ()=>loadSheetPage('kuyruk'),
@@ -999,6 +1016,7 @@ function go(id, el) {
     arsiv:      ()=>loadSheetPage('arsiv'),
     raporlar:   loadReports,
     ytkanal:    initYTKanal,
+    ytara:      initYouTubeAra,
     opusclip:   initOpusClip,
   };
   if (h[id]) try { h[id](); } catch(e) { console.error(id, e); }
@@ -1120,10 +1138,16 @@ async function refreshDash() {
 
   S.sheetData = {shorts, urls};
 
-  setEl('d-url',   urls.length || S.sentURLs.size || '—');
-  setEl('d-short', shorts.length || '—');
-  setEl('d-proc',  urls.filter(r=>r['durum']==='Islemde').length || '—');
-  setEl('d-sched', Array.isArray(sched) ? sched.length : '—');
+  // "Islemde" / "İşlemde" / "işlemde" / "ISLEMDE" varyantlarını yakala
+  const isProc = r => {
+    const d = String(r['durum']||'').toLowerCase().replace(/i̇/g,'i').replace(/ı/g,'i').replace(/ş/g,'s');
+    return d.includes('islem') || d.includes('bekli') || d.includes('progress') || d.includes('pending');
+  };
+  const procCount = urls.filter(isProc).length;
+  setEl('d-url',   urls.length ? urls.length.toLocaleString('tr') : (S.sentURLs.size || 0));
+  setEl('d-short', shorts.length.toLocaleString('tr'));
+  setEl('d-proc',  procCount.toLocaleString('tr'));
+  setEl('d-sched', Array.isArray(sched) ? sched.length.toLocaleString('tr') : 0);
 
   const igC = shorts.filter(r=>r['instagram-hesap']).length;
   const ytC = shorts.filter(r=>r['youtube-hesap']).length;
@@ -1228,8 +1252,113 @@ async function sendBulkURLs() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// YOUTUBE ARA — fire-and-forget (524 cozumlendi)
+// YOUTUBE ARA — canli arama + secim + tek tek gonder (kanal ara mantigi)
 // ═══════════════════════════════════════════════════════════
+const YAR = { videos: [], selected: new Set() };
+
+function initYouTubeAra() {
+  const el = document.getElementById('ya-apikey');
+  if (el && !el.value && S.cfg.ytApiKey) el.value = S.cfg.ytApiKey;
+}
+
+// YouTube Data API v3 ile canli arama, sonra videoya detay istatistigi çeker
+async function searchYARVideos() {
+  const kw   = ((document.getElementById('ya-kw')||{}).value||'').trim();
+  const dur  = (document.getElementById('ya-dur')||{}).value||'600';
+  const lang = (document.getElementById('ya-lang')||{}).value||'';
+  const apiKey = (document.getElementById('ya-apikey')||{}).value || S.cfg.ytApiKey || S.cfg.shkey || '';
+  if (!kw) return showRes('ya-res', 'Anahtar kelime girin', 'err');
+  if (!apiKey) return showRes('ya-res', 'YouTube API Key gerekli (YT Kanal Ara ile aynı key)', 'warn');
+  showRes('ya-res', '⏳ Aranıyor: ' + kw, 'info');
+  addLog('info', 'webhook', 'YouTube canlı arama: ' + kw);
+  try {
+    // Süreye göre videoDuration parametresi (medium=4-20dk, long=20dk+)
+    const durSec = parseInt(dur)||0;
+    let ytDur = ''; if (durSec >= 1200) ytDur = 'long'; else if (durSec >= 240) ytDur = 'medium';
+    let url = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=' + encodeURIComponent(kw) +
+             '&order=viewCount&maxResults=25&key=' + apiKey;
+    if (ytDur) url += '&videoDuration=' + ytDur;
+    if (lang)  url += '&relevanceLanguage=' + lang;
+    const sr = await ytkFetch(url);
+    const ids = (sr.items||[]).map(i => i.id && i.id.videoId).filter(Boolean);
+    if (!ids.length) { YAR.videos = []; YAR.selected.clear(); renderYARVideos(); return showRes('ya-res','Video bulunamadı','warn'); }
+    const dr = await ytkFetch('https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=' + ids.join(',') + '&key=' + apiKey);
+    const items = dr.items || [];
+    // Süre filtresi + izlenmeye göre sırala, ilk 10'u al
+    YAR.videos = items
+      .filter(v => ytkParseDur(v.contentDetails.duration) >= durSec)
+      .sort((a,b) => parseInt(b.statistics.viewCount||0) - parseInt(a.statistics.viewCount||0))
+      .slice(0, 10);
+    YAR.selected.clear();
+    renderYARVideos();
+    showRes('ya-res', `✓ ${YAR.videos.length} video bulundu (${durSec/60||'?'}dk+, izlenmeye göre)`, 'ok');
+    addLog('ok', 'webhook', `YouTube arama "${kw}": ${YAR.videos.length} video`);
+    // Geçmişe ekle
+    S.searchHist.unshift({kw, kat:'', t:new Date().toLocaleString('tr')});
+    S.searchHist = S.searchHist.slice(0,20);
+    localStorage.setItem('op_srch', JSON.stringify(S.searchHist));
+    renderSearchHist();
+  } catch(e) {
+    showRes('ya-res', 'Hata: ' + ytkErrMsg(e.message), 'err');
+    addLog('err', 'webhook', 'YouTube arama hata: ' + e.message);
+  }
+}
+
+function renderYARVideos() {
+  const el = document.getElementById('ya-video-list');
+  if (!el) return;
+  const cnt = document.getElementById('ya-sel-count');
+  if (cnt) cnt.textContent = `(${YAR.selected.size} seçili)`;
+  if (!YAR.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Anahtar kelime girip Ara\'ya bas</div>'; return; }
+  el.innerHTML = YAR.videos.map(v => {
+    const sel = YAR.selected.has(v.id);
+    const st = v.statistics || {};
+    const thumb = v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '';
+    const durS = ytkParseDur(v.contentDetails.duration);
+    const pubDate = (v.snippet.publishedAt||'').slice(0,10);
+    return `<div onclick="yarToggle('${v.id}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s">
+      <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();yarToggle('${v.id}')">
+      <div style="position:relative;flex-shrink:0">
+        ${thumb?`<img src="${thumb}" style="width:80px;height:50px;object-fit:cover;border-radius:3px">` : '<div style="width:80px;height:50px;background:var(--brd);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
+        <span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.8);color:#fff;font-size:8px;padding:1px 4px;border-radius:2px">${ytkDurFmt(durS)}</span>
+      </div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:10px;font-weight:600;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.snippet.title}</div>
+        <div style="font-size:8px;color:var(--mt);margin-top:3px">📺 ${v.snippet.channelTitle||''} &nbsp;👁 ${ytkFmt(st.viewCount)} &nbsp;👍 ${st.likeCount!=null?ytkFmt(st.likeCount):'–'} &nbsp;📅 ${pubDate}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function yarToggle(id) { if (YAR.selected.has(id)) YAR.selected.delete(id); else YAR.selected.add(id); renderYARVideos(); }
+function yarSelectAll() { YAR.videos.forEach(v => YAR.selected.add(v.id)); renderYARVideos(); }
+function yarClearAll()  { YAR.selected.clear(); renderYARVideos(); }
+
+// Secilen videolari n8n'e TEK TEK gonderir (video-gonder[-kategori] webhook)
+async function yarSendSelected() {
+  const sel = YAR.videos.filter(v => YAR.selected.has(v.id));
+  if (!sel.length) return showRes('ya-res', 'Video seçin', 'warn');
+  const cats = getSelCatList('ya-cats');
+  const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
+  const base = getN8N();
+  if (!base) return showRes('ya-res', 'Ayarlar\'dan n8n URL girin', 'warn');
+  let sent = 0;
+  for (const v of sel) {
+    showRes('ya-res', `⏳ ${sent+1}/${sel.length} gönderiliyor: ${v.snippet.title.slice(0,40)}...`, 'info');
+    const url = 'https://www.youtube.com/watch?v=' + v.id;
+    for (const kat of cats) {
+      const path = CAT_WH[kat] || '/webhook/video-gonder';
+      const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
+      await faf(base + path, {'Youtube linki': url, kaynak: 'youtube-arama', kategori: kat, title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: v.snippet.channelTitle||'', aciklama_notu: yaAciklama});
+    }
+    sent++;
+    await sleep(500);
+  }
+  showRes('ya-res', `✓ ${sent} video [${cats.join(',')}] gönderildi`, 'ok');
+  addLog('ok', 'webhook', `YouTube arama ${sent} video gönderildi [${cats.join(',')}]`);
+}
+
+// Eski fire-and-forget: geriye uyumluluk için tutuluyor ama yeni buton çağırmıyor
 async function sendSearch() {
   const kw   = (document.getElementById('ya-kw')||{}).value||'';
   const dur  = (document.getElementById('ya-dur')||{}).value||'600';
@@ -1567,7 +1696,33 @@ async function loadSheetPage(page) {
 
   if (page==='shortlist') {
     const tb=document.getElementById('sl-tbody');
-    if(tb)tb.innerHTML=shorts.length?shorts.map(r=>'<tr><td class="uc" title="'+(r['title']||'')+'">'+(r['title']||'-').slice(0,30)+'</td><td>'+(r['score']||'-')+'</td><td>'+(r['duration-ms']?Math.round(parseInt(r['duration-ms'])/60000)+'dk':'-')+'</td><td><span class="badge bi">'+(r['instagram-hesap']||'-')+'</span></td><td><span class="badge bi">'+(r['youtube-hesap']||'-')+'</span></td><td><span class="badge bi">'+(r['tiktok-hesap']||'-')+'</span></td><td><span class="badge '+(r['platform-status']==='Bekliyor'?'bw2':'bs2')+'">'+(r['platform-status']||'-')+'</span></td><td>'+(r['created-at']||'-').slice(0,10)+'</td></tr>').join(''):'<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">Short bulunamadi</td></tr>';
+    // Sheet sütun isimleri projeye göre değişebiliyor — yaygın varyantları dene
+    const pick = (r, keys) => { for (const k of keys) { if (r[k]!=null && String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
+    const igK = ['instagram-hesap','instagram','ig-hesap','ig','instagram_account','Instagram'];
+    const ytK = ['youtube-hesap','youtube','yt-hesap','yt','youtube_account','YouTube'];
+    const ttK = ['tiktok-hesap','tiktok','tt-hesap','tt','tiktok_account','TikTok'];
+    const stK = ['platform-status','durum','status','yayin-durumu','Durum'];
+    const durMs = r => {
+      const v = r['duration-ms']||r['duration_ms']||r['sure-ms']||r['duration'];
+      const n = parseInt(v); return isNaN(n) ? 0 : n;
+    };
+    const fmtSec = ms => ms ? Math.round(ms/1000).toLocaleString('tr')+' sn' : '-';
+    if(tb)tb.innerHTML=shorts.length ? shorts.map(r=>{
+      const ig = pick(r, igK), yt = pick(r, ytK), tt = pick(r, ttK);
+      let dur = pick(r, stK);
+      if (!dur) dur = (ig || yt || tt) ? 'Yayınlandı' : 'Bekliyor';
+      const durCls = /bekli/i.test(dur) ? 'bw2' : 'bs2';
+      return '<tr>'
+        + '<td class="uc" title="'+(r['title']||'')+'">'+(r['title']||'-').slice(0,30)+'</td>'
+        + '<td>'+(r['score']||'-')+'</td>'
+        + '<td>'+fmtSec(durMs(r))+'</td>'
+        + '<td>'+(ig ? '<span class="badge bi">'+ig+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
+        + '<td>'+(yt ? '<span class="badge bi">'+yt+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
+        + '<td>'+(tt ? '<span class="badge bi">'+tt+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
+        + '<td><span class="badge '+durCls+'">'+dur+'</span></td>'
+        + '<td>'+(r['created-at']||r['tarih']||'-').slice(0,10)+'</td>'
+        + '</tr>';
+    }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">Short bulunamadı</td></tr>';
   }
 
   if (page==='urltakip') {
@@ -1832,7 +1987,7 @@ function addLog(sev,cat,msg) {
 }
 
 function renderLogs() {
-  const el=document.getElementById('log-out');
+  const el=document.getElementById('log-tbody') || document.getElementById('log-out');
   if(!el)return;
   const sf=(document.getElementById('log-sev')||{}).value||'';
   const cf=(document.getElementById('log-cat')||{}).value||'';
@@ -1845,11 +2000,22 @@ function renderLogs() {
     if(qf&&!l.msg.toLowerCase().includes(qf))return false;
     return true;
   }).slice(0,300);
-  if(!rows.length){el.innerHTML='<div style="color:var(--mt);padding:8px;text-align:center">Log bulunamadi</div>';return;}
+  if(!rows.length){
+    el.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--mt);padding:16px">Log bulunamadı</td></tr>';
+    return;
+  }
+  const esc = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   el.innerHTML=rows.map(l=>{
     const dt=new Date(l.t);
     const ts=dt.toLocaleDateString('tr')+' '+dt.toLocaleTimeString('tr');
-    return '<div class="ll"><span class="lt">'+ts+'</span><span class="lcat" style="color:'+(CAT_C[l.cat]||'#64748b')+'">'+l.cat+'</span><span class="lv '+l.sev+'" style="color:'+(SEV_C[l.sev]||'#dde4f0')+'">'+l.sev.toUpperCase()+'</span><span class="lm">'+l.msg+'</span></div>';
+    const catCol = CAT_C[l.cat]||'#64748b';
+    const sevCol = SEV_C[l.sev]||'#dde4f0';
+    return '<tr>'
+      + '<td style="white-space:nowrap;font-size:9px;color:var(--mt)">'+esc(ts)+'</td>'
+      + '<td><span class="badge" style="background:'+catCol+'22;color:'+catCol+'">'+esc(l.cat)+'</span></td>'
+      + '<td><span class="badge" style="background:'+sevCol+'22;color:'+sevCol+';font-weight:700">'+esc((l.sev||'').toUpperCase())+'</span></td>'
+      + '<td style="word-break:break-word">'+esc(l.msg)+'</td>'
+      + '</tr>';
   }).join('');
 }
 
@@ -1898,6 +2064,47 @@ function ytkApiKey() {
   return (document.getElementById('ytk-apikey')||{}).value || S.cfg.ytApiKey || S.cfg.shkey || '';
 }
 
+// YouTube API hata mesajını insan diline çevir. Hem structured error objesi hem düz string kabul eder.
+function ytkErrMsg(e) {
+  if (!e) return 'Bilinmeyen hata';
+  const r = (typeof e === 'string') ? {} : (e.error || e);
+  const reason = (r.errors && r.errors[0] && r.errors[0].reason) || r.status || '';
+  const msg = (typeof e === 'string') ? e : (r.message || '');
+  if (reason === 'ipRefererBlocked' || /referer|referrer|API_KEY_HTTP_REFERRER_BLOCKED/i.test(msg)) {
+    return 'API Key HTTP Referrer kısıtlı — Google Cloud Console → "APIs & Credentials" → API Key düzenle → "Application restrictions" = None (veya bu domain\'i whitelist). Panel dosyayı çift tıklayarak açıyorsan file:// referrer\'ı bloklanır.';
+  }
+  if (/API_KEY_IP_ADDRESS_BLOCKED|IP address .* (blocked|not allowed)/i.test(msg)) {
+    return 'Key IP kısıtı alıyor — Cloud Console → "Application restrictions" bölümünde bu makinenin IP\'si izinli değil.';
+  }
+  if (reason === 'API_KEY_INVALID' || /API key not valid/i.test(msg)) {
+    return 'API Key geçersiz — Ayarlar\'daki key yanlış veya silinmiş. Yenisini oluştur.';
+  }
+  if (reason === 'accessNotConfigured' || /has not been used|not enabled/i.test(msg)) {
+    return 'YouTube Data API v3 bu projede AÇIK DEĞİL — Google Cloud Console → "APIs & Services" → "Enable APIs" → YouTube Data API v3 → Enable.';
+  }
+  if (reason === 'quotaExceeded' || /quota/i.test(msg)) {
+    return 'Günlük kota doldu (10.000 birim) — yarın sıfırlanır, veya farklı projede yeni key oluştur.';
+  }
+  // "V3DataSearchService.List are blocked" tarzı API restriction: reason=keyInvalid veya sadece "blocked" içerir
+  if (reason === 'keyInvalid' || /SERVICE_DISABLED|are blocked|blocked\./i.test(msg)) {
+    return 'Key\'in "API restrictions" listesinde YouTube Data API v3 seçili değil — Google Cloud Console → Credentials → bu API Key → "API restrictions" bölümünde YouTube Data API v3\'ü ekle (veya "Don\'t restrict key").';
+  }
+  return msg || reason || JSON.stringify(r).slice(0, 200);
+}
+
+// YouTube API çağrısı için tek yerden fetch — HTTP hata + JSON error alanını her yerde aynı şekilde yakalar
+async function ytkFetch(url) {
+  let r;
+  try { r = await fetch(url); }
+  catch(e) { throw new Error('Ağ hatası: ' + e.message + ' (internet bağlantısı veya CORS)'); }
+  let j;
+  try { j = await r.json(); }
+  catch(e) { throw new Error('HTTP ' + r.status + ' — yanıt JSON değil'); }
+  if (j.error) throw new Error(ytkErrMsg(j));
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + ytkErrMsg(j));
+  return j;
+}
+
 // 1234567 -> "1,2 Mn" gibi kısa Türkçe sayı formatı
 function ytkFmt(n) {
   n = parseInt(n||0);
@@ -1933,29 +2140,26 @@ async function searchYTChannel() {
     const ids = [];
     // @handle ise önce birebir eşleşme dene
     if (query.startsWith('@')) {
-      const hr = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(query)}&key=${apiKey}`);
-      const hd = await hr.json();
-      if (hd.items && hd.items.length) ids.push(hd.items[0].id);
+      try {
+        const hd = await ytkFetch(`https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(query)}&key=${apiKey}`);
+        if (hd.items && hd.items.length) ids.push(hd.items[0].id);
+      } catch(e) { /* handle bulunamazsa arama fallback'ine düş */ }
     }
     // Anahtar kelime ile kanal ara
-    const sr = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(query.replace(/^@/,''))}&maxResults=10&key=${apiKey}`);
-    const sd = await sr.json();
-    if (sd.error) throw new Error(sd.error.message || 'API hatası');
+    const sd = await ytkFetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(query.replace(/^@/,''))}&maxResults=10&key=${apiKey}`);
     (sd.items||[]).forEach(i => { const id = i.id && i.id.channelId; if (id && !ids.includes(id)) ids.push(id); });
 
     if (!ids.length) { YTK.channels = []; renderYTKChannels(); return showRes('ytk-res', 'Kanal bulunamadı', 'warn'); }
 
     // Kanal detayları: abone, toplam izlenme, video sayısı
-    const dr = await fetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${ids.join(',')}&key=${apiKey}`);
-    const dd = await dr.json();
-    if (dd.error) throw new Error(dd.error.message || 'API hatası');
+    const dd = await ytkFetch(`https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${ids.join(',')}&key=${apiKey}`);
     const order = {}; ids.forEach((id,i)=>order[id]=i);
     YTK.channels = (dd.items||[]).sort((a,b)=>order[a.id]-order[b.id]);
     renderYTKChannels();
     showRes('ytk-res', `✓ ${YTK.channels.length} kanal bulundu — videoları görmek için birine tıklayın`, 'ok');
     addLog('ok', 'webhook', `YT Kanal arama "${query}": ${YTK.channels.length} kanal`);
   } catch(e) {
-    showRes('ytk-res', 'Hata: ' + e.message + ' — API Key ve izin kontrol edin', 'err');
+    showRes('ytk-res', 'Hata: ' + e.message, 'err');
     addLog('err', 'webhook', 'YT Kanal arama hata: ' + e.message);
   }
 }
@@ -2026,22 +2230,18 @@ async function ytkLoadMore(first) {
   if (first) showRes('ytk-res', '⏳ Videolar yükleniyor...', 'info');
   try {
     const pt = YTK.nextPage ? '&pageToken=' + YTK.nextPage : '';
-    const pr = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${YTK.uploadsId}&maxResults=50${pt}&key=${apiKey}`);
-    const pd = await pr.json();
-    if (pd.error) throw new Error(pd.error.message || 'API hatası');
+    const pd = await ytkFetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${YTK.uploadsId}&maxResults=50${pt}&key=${apiKey}`);
     YTK.nextPage = pd.nextPageToken || '';
     const ids = (pd.items||[]).map(i => i.contentDetails && i.contentDetails.videoId).filter(Boolean);
     if (ids.length) {
       // Video detayları: izlenme, beğeni, yorum, tarih, süre
-      const vr = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${ids.join(',')}&key=${apiKey}`);
-      const vd = await vr.json();
-      if (vd.error) throw new Error(vd.error.message || 'API hatası');
+      const vd = await ytkFetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${ids.join(',')}&key=${apiKey}`);
       const have = new Set(YTK.videos.map(v => v.id));
       YTK.videos = YTK.videos.concat((vd.items||[]).filter(v => !have.has(v.id)));
     }
     showRes('ytk-res', `✓ ${YTK.videos.length}/${YTK.channelInfo ? YTK.channelInfo.videoCount : '?'} video yüklendi`, 'ok');
   } catch(e) {
-    showRes('ytk-res', 'Video yükleme hatası: ' + e.message, 'err');
+    showRes('ytk-res', 'Video yükleme hatası: ' + ytkErrMsg(e.message), 'err');
     addLog('err', 'webhook', 'YT Kanal video hata: ' + e.message);
   }
   YTK.loading = false;
@@ -2267,6 +2467,7 @@ document.addEventListener('DOMContentLoaded', function() {
       closeDayModal,showTakTip,hideTakTip,dmFilter,dmToggleSort,
       searchYTChannel,ytkSelectAll,ytkClearAll,ytkSendSelected,ytkAddToSheet,
       ytkPickChannel,ytkLoadMore,ytkLoadAll,renderYTKVideos,
+      searchYARVideos,yarToggle,yarSelectAll,yarClearAll,yarSendSelected,initYouTubeAra,
       sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
       loadAllSheetData,loadSheetPage,sendOpusClipBulk];
