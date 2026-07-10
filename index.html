@@ -171,6 +171,48 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 ::-webkit-scrollbar-thumb{background:var(--brd);border-radius:2px}
 @media(max-width:1100px){.sg{grid-template-columns:repeat(2,1fr)}.g2,.g3{grid-template-columns:1fr}}
 @media(max-width:900px){.sb{width:160px}}
+
+/* ── UI CILASI — davranış değişikliği yok, yalnızca görsel ─────────── */
+:root{--focus-ring:rgba(0,229,255,.12);--hover-bg:rgba(0,229,255,.04)}
+html.light-theme{--focus-ring:rgba(2,132,199,.15);--hover-bg:rgba(2,132,199,.05)}
+/* Sayfa başlığı: alt çizgi ile içerikten ayrılır, açıklama biraz büyütüldü */
+.ph{border-bottom:1px solid var(--brd);padding-bottom:12px}
+.ps{font-size:11px;margin-top:4px;line-height:1.5}
+/* Menü: daha okunur, aktif öğe belirgin */
+.ni{font-size:11px;padding:8px 14px}
+.ni:hover{padding-left:17px}
+.ni.active{background:linear-gradient(90deg,var(--hover-bg),transparent);font-weight:500}
+.ns{font-size:8px;padding-top:12px}
+/* Kart: başlıkta renkli nokta, hover'da kenarlık vurgusu */
+.card{transition:border-color .2s ease}
+.card:hover{border-color:var(--input-brd)}
+.ct{position:relative;padding-left:13px}
+.ct::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:var(--acc)}
+/* İstatistik kartları: hover'da hafif yükselme */
+.sc{transition:transform .18s ease,box-shadow .18s ease}
+.sc:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(0,0,0,.16)}
+/* Form: yumuşak köşe + odak halkası */
+input,select,textarea{border-radius:6px}
+input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px var(--focus-ring)}
+/* Buton: yumuşak köşe, hover/odak geri bildirimi */
+.btn{border-radius:6px}
+.btn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.bs:hover,.bw:hover,.bd:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn:active{transform:translateY(0);filter:none}
+/* Tablo ve liste satırları: hover daha görünür */
+tbody tr:hover{background:var(--hover-bg)}
+tbody td{line-height:1.5}
+.acc-card{transition:border-color .15s,transform .15s}
+.acc-card:hover{transform:translateX(2px)}
+/* Sekmeler */
+.tab{padding:7px 14px}
+.tab:hover{color:var(--tx)}
+/* Uyarı/sonuç kutuları: satır aralığı */
+.alert,.res{line-height:1.55}
+/* Kaydırma çubuğu: biraz kalın, hover'da renkli */
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:var(--brd);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--mt)}
 </style>
 </head>
 <body>
@@ -192,6 +234,7 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
     <div class="ni" onclick="go('video',this)"><span class="ic">▶</span>Video Gönder</div>
     <div class="ni" onclick="go('ytara',this)"><span class="ic">⊕</span>YouTube Ara</div>
     <div class="ni" onclick="go('ytkanal',this)"><span class="ic">📺</span>YT Kanal Ara</div>
+    <div class="ni" onclick="go('yayin',this)"><span class="ic">📡</span>Yayın Tekrarları</div>
     <div class="ni" onclick="go('opusclip',this)"><span class="ic">◈</span>OpusClip Direkt</div>
     <div class="ni" onclick="go('uppost',this)"><span class="ic">⇑</span>Upload-Post</div>
     <div class="ni" onclick="go('bulk',this)"><span class="ic">≋</span>Toplu Kelimeler</div>
@@ -373,6 +416,77 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
         <div id="ytk-hist-list" style="max-height:340px;overflow-y:auto">
           <div style="color:var(--mt);font-size:9px;text-align:center;padding:12px">Henüz kanal incelenmedi</div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- YAYIN TEKRARLARI (TWITCH / KICK VOD) -->
+<div id="page-yayin" class="page">
+  <div class="ph"><div class="pt">Yayın Tekrarları</div><div class="ps">Twitch / Kick kanallarını ara, yayın tekrarlarından (VOD) short oluştur</div></div>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="ct">Kanal Arama</div>
+        <div class="fg"><label>Platform</label>
+          <div class="cat-chips">
+            <span class="cat-chip sel" id="str-pf-twitch" onclick="strSetPlatform('twitch')">🟣 Twitch</span>
+            <span class="cat-chip" id="str-pf-kick" onclick="strSetPlatform('kick')">🟢 Kick</span>
+          </div>
+        </div>
+        <div id="str-tw-cfg">
+          <div class="fg"><label>Twitch Client ID <a href="https://dev.twitch.tv/console/apps" target="_blank" style="color:var(--acc);font-size:9px;margin-left:6px">Console ↗</a></label>
+            <input id="str-tw-cid" type="text" placeholder="Twitch uygulaması Client ID" oninput="S.cfg.twClientId=this.value;S.cfg.twTok='';localStorage.setItem('op_cfg',JSON.stringify(S.cfg))"/>
+          </div>
+          <div class="fg"><label>Twitch Client Secret</label>
+            <div style="display:flex;gap:6px">
+              <input id="str-tw-sec" type="password" placeholder="Client Secret" style="flex:1" oninput="S.cfg.twSecret=this.value;S.cfg.twTok='';localStorage.setItem('op_cfg',JSON.stringify(S.cfg))"/>
+              <button class="btn bg bsm" onclick="strTwTest()" title="Bağlantıyı test et">✓ Test</button>
+            </div>
+          </div>
+          <div class="alert ai" style="font-size:9px"><span>ℹ</span><span><b>dev.twitch.tv/console/apps</b> → "Register Your Application" ile ücretsiz Client ID + Secret al. Bilgiler yalnızca bu tarayıcıda (localStorage) saklanır.</span></div>
+        </div>
+        <div id="str-kick-cfg" style="display:none">
+          <div class="alert ai" style="font-size:9px"><span>ℹ</span><span>Kick'in arama API'si tarayıcıdan erişime kapalı (Cloudflare). Kanal adını doğrudan yaz: kick.com/<b>kanaladi</b> → "kanaladi". Veri önce n8n proxy'den (<code>/webhook/kick-proxy</code>) denenir, yoksa doğrudan istek yapılır.</span></div>
+        </div>
+        <div class="fg"><label id="str-q-label">Kanal Adı / Anahtar Kelime</label>
+          <div style="display:flex;gap:6px">
+            <input id="str-q" type="text" placeholder="örn. elraenn, jahrein..." style="flex:1" onkeydown="if(event.key==='Enter')strSearch()"/>
+            <button class="btn bp bsm" onclick="strSearch()">🔍 Ara</button>
+          </div>
+        </div>
+        <div class="fg"><label>Bulunan Kanallar <span id="str-ch-count" style="color:var(--acc)"></span></label>
+          <div id="str-ch-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--brd);border-radius:4px">
+            <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Arama yapın</div>
+          </div>
+        </div>
+        <div class="fg"><label>Kategori</label><div class="cat-chips" id="str-cats"></div></div>
+        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="str-aciklama" type="text" placeholder="örn. Twitch tekrar denemesi"/></div>
+        <div id="str-res" class="res"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>Yayın Tekrarları (VOD)</span><span id="str-ch-name" style="font-size:9px;color:var(--acc);font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+        <div id="str-vod-controls" style="display:none;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+          <select id="str-dur" onchange="strRenderVods()" style="width:110px">
+            <option value="0">Tüm süreler</option>
+            <option value="600" selected>10 dk+</option>
+            <option value="1800">30 dk+</option>
+            <option value="3600">1 saat+</option>
+            <option value="7200">2 saat+</option>
+          </select>
+          <select id="str-sort" onchange="strRenderVods()" style="width:130px">
+            <option value="date">Yeni → Eski</option>
+            <option value="views">İzlenme ↓</option>
+            <option value="dur">Süre ↓</option>
+          </select>
+          <span id="str-vod-count" style="font-size:9px;color:var(--mt)"></span>
+        </div>
+        <div id="str-vod-list" style="max-height:560px;overflow-y:auto">
+          <div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">Soldan bir kanal arayıp "▶ VOD'lar" butonuna bas</div>
+        </div>
+        <div class="alert ai" style="margin-top:10px;font-size:9px"><span>ℹ</span><span><b>▶ İşleme Al</b>: VOD linki, seçili kategoriye göre n8n webhook'una (<code>video-gonder[-kategori]</code>) <code>kaynak: twitch/kick</code> ile gönderilir. OpusClip Twitch VOD linklerini destekler; Kick linkleri için workflow tarafında ek indirme adımı gerekebilir.</span></div>
       </div>
     </div>
   </div>
@@ -1148,6 +1262,7 @@ function go(id, el) {
     arsiv:      ()=>loadSheetPage('arsiv'),
     raporlar:   loadReports,
     ytkanal:    initYTKanal,
+    yayin:      initYayin,
     ytara:      initYouTubeAra,
     opusclip:   initOpusClip,
     uppost:     initUpPost,
@@ -1685,6 +1800,7 @@ function renderCatGrid() {
   renderCatChips('sh-cats');
   renderCatChips('ya-cats');
   renderCatChips('ytk-cats');
+  renderCatChips('str-cats');
   renderCatChips('opc-cats');
   renderCatChips('opc-bulk-cats');
 }
@@ -3169,6 +3285,218 @@ async function ytkAddToSheet() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// YAYIN TEKRARLARI — TWITCH / KICK VOD
+// ═══════════════════════════════════════════════════════════
+const STR = { platform:'twitch', channels:[], ch:null, vods:[] };
+const strEsc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function initYayin(){
+  const cid=document.getElementById('str-tw-cid'); if(cid&&!cid.value&&S.cfg.twClientId)cid.value=S.cfg.twClientId;
+  const sec=document.getElementById('str-tw-sec'); if(sec&&!sec.value&&S.cfg.twSecret)sec.value=S.cfg.twSecret;
+  renderCatChips('str-cats');
+}
+
+function strSetPlatform(p){
+  STR.platform=p; STR.channels=[]; STR.ch=null; STR.vods=[];
+  const tw=document.getElementById('str-pf-twitch'), kk=document.getElementById('str-pf-kick');
+  if(tw)tw.classList.toggle('sel',p==='twitch');
+  if(kk)kk.classList.toggle('sel',p==='kick');
+  setStyle('str-tw-cfg','display',p==='twitch'?'block':'none');
+  setStyle('str-kick-cfg','display',p==='kick'?'block':'none');
+  setEl('str-q-label', p==='twitch'?'Kanal Adı / Anahtar Kelime':'Kick Kanal Adı (kick.com/kanaladi)');
+  const q=document.getElementById('str-q');
+  if(q)q.placeholder = p==='twitch'?'örn. elraenn, jahrein...':'örn. xqc (tam kanal adı)';
+  const list=document.getElementById('str-ch-list');
+  if(list)list.innerHTML='<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Arama yapın</div>';
+  setEl('str-ch-count',''); setEl('str-ch-name','');
+  setStyle('str-vod-controls','display','none');
+  const vl=document.getElementById('str-vod-list');
+  if(vl)vl.innerHTML='<div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">Soldan bir kanal arayıp "▶ VOD\'lar" butonuna bas</div>';
+}
+
+// Twitch app access token (client_credentials) — cache'li, süresi dolunca yenilenir
+async function twToken(){
+  const cid=((document.getElementById('str-tw-cid')||{}).value||S.cfg.twClientId||'').trim();
+  const sec=((document.getElementById('str-tw-sec')||{}).value||S.cfg.twSecret||'').trim();
+  if(!cid||!sec) throw new Error('Twitch Client ID + Secret girin (dev.twitch.tv/console/apps → Register Application)');
+  if(S.cfg.twTok && S.cfg.twTokExp>Date.now()+60000 && S.cfg.twTokCid===cid) return S.cfg.twTok;
+  let r;
+  try{
+    r=await fetch('https://id.twitch.tv/oauth2/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'client_id='+encodeURIComponent(cid)+'&client_secret='+encodeURIComponent(sec)+'&grant_type=client_credentials'});
+  }catch(e){ throw new Error('Twitch token servisine ulaşılamadı (ağ/CORS): '+e.message); }
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok||!j.access_token) throw new Error('Twitch token alınamadı: '+(j.message||('HTTP '+r.status)));
+  S.cfg.twTok=j.access_token; S.cfg.twTokExp=Date.now()+(j.expires_in||3600)*1000; S.cfg.twTokCid=cid;
+  localStorage.setItem('op_cfg',JSON.stringify(S.cfg));
+  return j.access_token;
+}
+
+async function twApi(path){
+  const tok=await twToken();
+  const cid=((document.getElementById('str-tw-cid')||{}).value||S.cfg.twClientId||'').trim();
+  const r=await fetch('https://api.twitch.tv/helix'+path,{headers:{'Client-Id':cid,'Authorization':'Bearer '+tok}});
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401){ S.cfg.twTok=''; localStorage.setItem('op_cfg',JSON.stringify(S.cfg)); throw new Error('Twitch token geçersiz oldu — tekrar dene (otomatik yenilenecek)'); }
+  if(!r.ok) throw new Error('Twitch API HTTP '+r.status+': '+(j.message||'?'));
+  return j;
+}
+
+async function strTwTest(){
+  showRes('str-res','⏳ Twitch bağlantısı test ediliyor…','info');
+  try{ S.cfg.twTok=''; await twToken(); showRes('str-res','✓ Twitch bağlantısı OK — token alındı','ok'); }
+  catch(e){ showRes('str-res','✗ '+e.message,'err'); }
+}
+
+// Kick verisi: önce n8n proxy (CORS izinli), yoksa doğrudan dene
+async function kickFetch(path){
+  const base=getN8N();
+  if(base){
+    try{
+      const r=await fetch(base+'/webhook/kick-proxy?path='+encodeURIComponent(path));
+      if(r.ok) return await r.json();
+    }catch(e){ /* doğrudan dene */ }
+  }
+  try{
+    const r=await fetch('https://kick.com'+path,{headers:{'Accept':'application/json'}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return await r.json();
+  }catch(e){
+    throw new Error('Kick API\'ye ulaşılamadı (Cloudflare/CORS engeli). Çözüm: n8n\'e "kick-proxy" adında bir GET webhook ekle — gelen ?path parametresini https://kick.com adresine iletip dönen JSON\'u aynen geri döndürsün.');
+  }
+}
+
+async function strSearch(){
+  const q=((document.getElementById('str-q')||{}).value||'').trim();
+  if(!q) return showRes('str-res','Kanal adı girin','warn');
+  const list=document.getElementById('str-ch-list');
+  if(list)list.innerHTML='<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">⏳ Aranıyor…</div>';
+  try{
+    if(STR.platform==='twitch'){
+      const j=await twApi('/search/channels?first=15&query='+encodeURIComponent(q));
+      STR.channels=(j.data||[]).map(c=>({id:c.id, name:c.display_name||c.broadcaster_login, login:c.broadcaster_login, avatar:c.thumbnail_url||'', live:!!c.is_live}));
+    }else{
+      const slug=q.toLowerCase().replace(/^@+/,'').replace(/\s+/g,'').replace(/[^a-z0-9_-]/g,'');
+      if(!slug) return showRes('str-res','Geçerli bir Kick kanal adı girin','warn');
+      const d=await kickFetch('/api/v2/channels/'+slug);
+      if(!d||!d.id) throw new Error('"'+slug+'" adında bir Kick kanalı bulunamadı');
+      STR.channels=[{id:d.id, name:(d.user&&d.user.username)||slug, login:slug, avatar:(d.user&&d.user.profile_pic)||'', live:!!d.livestream, followers:d.followers_count}];
+    }
+    setEl('str-ch-count','('+STR.channels.length+')');
+    strRenderChannels();
+    addLog('ok','yayin',STR.platform+' arama: "'+q+'" → '+STR.channels.length+' kanal');
+  }catch(e){
+    if(list)list.innerHTML='<div style="color:var(--er);font-size:9px;padding:14px;text-align:center;line-height:1.6">'+strEsc(e.message)+'</div>';
+    addLog('err','yayin',e.message);
+  }
+}
+
+function strRenderChannels(){
+  const list=document.getElementById('str-ch-list'); if(!list)return;
+  if(!STR.channels.length){ list.innerHTML='<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal bulunamadı</div>'; return; }
+  const site=STR.platform==='twitch'?'twitch.tv/':'kick.com/';
+  list.innerHTML=STR.channels.map((c,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--brd)">
+      ${c.avatar?`<img src="${strEsc(c.avatar)}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.remove()">`:''}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${strEsc(c.name)} ${c.live?'<span class="badge be">● CANLI</span>':''}</div>
+        <div style="font-size:8px;color:var(--mt)">${site}${strEsc(c.login)}${c.followers!=null?' · '+ytkFmt(c.followers)+' takipçi':''}</div>
+      </div>
+      <button class="btn bg bsm" onclick="strPickChannel(${i})" style="flex-shrink:0">▶ VOD'lar</button>
+    </div>`).join('');
+}
+
+async function strPickChannel(i){
+  const c=STR.channels[i]; if(!c)return;
+  STR.ch=c; STR.vods=[];
+  setEl('str-ch-name',(STR.platform==='twitch'?'🟣 ':'🟢 ')+c.name);
+  const el=document.getElementById('str-vod-list');
+  if(el)el.innerHTML='<div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">⏳ VOD listesi yükleniyor…</div>';
+  try{
+    if(STR.platform==='twitch'){
+      const j=await twApi('/videos?type=archive&first=50&user_id='+encodeURIComponent(c.id));
+      STR.vods=(j.data||[]).map(v=>({ id:v.id, url:v.url, title:v.title||'VOD', date:v.created_at,
+        sec:twDurSec(v.duration), views:v.view_count||0,
+        thumb:(v.thumbnail_url||'').replace('%{width}','320').replace('%{height}','180') }));
+    }else{
+      const arr=await kickFetch('/api/v2/channels/'+c.login+'/videos');
+      STR.vods=(Array.isArray(arr)?arr:[]).map(v=>{
+        const uuid=(v.video&&v.video.uuid)||v.uuid||v.id;
+        return { id:uuid, url:'https://kick.com/'+c.login+'/videos/'+uuid,
+          title:v.session_title||v.title||'VOD', date:v.created_at||v.start_time,
+          sec:Math.round((v.duration||0)/1000), views:v.views||v.viewer_count||0,
+          thumb:(v.thumbnail&&(v.thumbnail.src||v.thumbnail))||'' };
+      });
+    }
+    setStyle('str-vod-controls','display','flex');
+    strRenderVods();
+    addLog('ok','yayin',c.name+' → '+STR.vods.length+' VOD bulundu');
+  }catch(e){
+    if(el)el.innerHTML='<div style="color:var(--er);font-size:9px;padding:14px;text-align:center;line-height:1.6">'+strEsc(e.message)+'</div>';
+    addLog('err','yayin',e.message);
+  }
+}
+
+// Twitch süre formatı: "3h20m18s" → saniye
+function twDurSec(d){
+  const m=String(d||'').match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/)||[];
+  return (+(m[1]||0))*3600+(+(m[2]||0))*60+(+(m[3]||0));
+}
+function strFmtDur(s){
+  s=Math.round(s||0);
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
+  return h ? h+'sa '+m+'dk' : (m ? m+'dk' : s+'sn');
+}
+
+function strFilteredVods(){
+  const min=+((document.getElementById('str-dur')||{}).value||0);
+  const sort=(document.getElementById('str-sort')||{}).value||'date';
+  const v=STR.vods.filter(x=>x.sec>=min);
+  if(sort==='views') v.sort((a,b)=>(b.views||0)-(a.views||0));
+  else if(sort==='dur') v.sort((a,b)=>(b.sec||0)-(a.sec||0));
+  else v.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+  return v;
+}
+
+function strRenderVods(){
+  const el=document.getElementById('str-vod-list'); if(!el)return;
+  const v=strFilteredVods();
+  setEl('str-vod-count',v.length+' / '+STR.vods.length+' VOD');
+  if(!v.length){ el.innerHTML='<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">'+(STR.vods.length?'Süre filtresine uyan VOD yok':'Bu kanalda kayıtlı yayın tekrarı yok')+'</div>'; return; }
+  el.innerHTML=v.map(x=>{
+    const i=STR.vods.indexOf(x);
+    return `<div style="display:flex;gap:10px;padding:8px;border:1px solid var(--brd);border-radius:6px;margin-bottom:6px;background:var(--bg)">
+      ${x.thumb?`<img src="${strEsc(x.thumb)}" style="width:96px;height:54px;border-radius:4px;object-fit:cover;flex-shrink:0" onerror="this.remove()">`:''}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:10px;color:var(--tx);line-height:1.4;max-height:28px;overflow:hidden">${strEsc(x.title)}</div>
+        <div style="font-size:8px;color:var(--mt);margin-top:3px">⏱ ${strFmtDur(x.sec)} · 👁 ${ytkFmt(x.views||0)}${x.date?' · '+new Date(x.date).toLocaleDateString('tr'):''}</div>
+        <div style="display:flex;gap:5px;margin-top:5px">
+          <button class="btn bs bsm" onclick="strSendVod(${i})">▶ İşleme Al</button>
+          <a class="btn bg bsm" href="${strEsc(x.url)}" target="_blank" style="text-decoration:none">↗ İzle</a>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Seçilen VOD'u n8n'e gönder — YouTube akışıyla aynı webhook, kaynak: twitch/kick
+async function strSendVod(i){
+  const v=STR.vods[i]; if(!v)return;
+  const base=getN8N();
+  if(!base) return showRes('str-res','Ayarlar\'dan n8n URL girin','warn');
+  const cats=getSelCatList('str-cats');
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
+  const note=(document.getElementById('str-aciklama')||{}).value||'';
+  showRes('str-res','⏳ Gönderiliyor: '+v.title.slice(0,40)+'…','info');
+  for(const kat of cats){
+    const path=CAT_WH[kat]||'/webhook/video-gonder';
+    await faf(base+path,{'Youtube linki':v.url, kaynak:STR.platform, kategori:kat, title:v.title, durationSec:v.sec, channelTitle:(STR.ch&&STR.ch.name)||'', aciklama_notu:note});
+  }
+  showRes('str-res','✓ VOD gönderildi ['+cats.join(',')+'] — '+v.title.slice(0,50),'ok');
+  addLog('ok','yayin',STR.platform+' VOD gönderildi: '+v.title.slice(0,60));
+}
+
+// ═══════════════════════════════════════════════════════════
 // OPUSCLIP DİREKT
 // ═══════════════════════════════════════════════════════════
 const OPC = { hist: JSON.parse(localStorage.getItem('op_opc_hist')||'[]') };
@@ -3298,6 +3626,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ytkOpenModal,ytkCloseModal,ytvOpenModal,ytvCloseModal,
       platOpenModal,platCloseModal,platCopyLink,platLoadAnalytics,platLoadExtra,upFetch,
       initUpPost,upPostSend,upStatusCheck,renderUpHistory,
+      initYayin,strSetPlatform,strTwTest,strSearch,strPickChannel,strRenderVods,strSendVod,
       toggleTheme,applyTheme,
       sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,

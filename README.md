@@ -8,6 +8,7 @@ YouTube video → Short otomasyon sisteminin kontrol paneli. Tek dosyalık stati
 - **Video Gönder / Toplu URL** — tekli veya toplu YouTube linklerini kategori seçerek n8n webhook'una yollar
 - **YouTube Ara** — anahtar kelimeyle 10 video getir, seçtiklerini tek tek işleme al (arama geçmişi cache'te saklanır)
 - **YT Kanal Ara** — anahtar kelimeye eşleşen kanalları listeler, "▶ Videoları Getir" ile lazy load, videoya tıklayınca gömülü YouTube oynatıcı modal
+- **Yayın Tekrarları** — Twitch kanal arama (Helix API, kendi Client ID + Secret'ınla) ve Kick kanal sorgulama; seçilen yayın tekrarı (VOD) kategoriyle n8n'e işleme yollanır
 - **OpusClip Direkt** — mevcut OpusClip projelerini clip ID ile işleme al
 - **Toplu Anahtar Kelimeler** — sıralı arama, önceki tamamlanana kadar bekler
 - **Google Drive / Sheets** — Drive Sheet'inden URL çekip toplu gönderim
