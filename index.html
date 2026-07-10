@@ -2087,10 +2087,10 @@ const PLAT_LIST = [
   { key:'tiktok',    label:'TikTok',      icon:'♪',  color:'#69c9d0', link:a => 'https://tiktok.com/@' + cleanHandle(a.username||a.handle) },
   { key:'facebook',  label:'Facebook',    icon:'ⓕ',  color:'#1877f2', link:a => a.id ? 'https://facebook.com/' + a.id : 'https://facebook.com/' + cleanHandle(a.username||a.name) },
   { key:'linkedin',  label:'LinkedIn',    icon:'in', color:'#0a66c2', link:a => a.vanity_url ? 'https://linkedin.com/in/' + cleanHandle(a.vanity_url) : (a.urn ? 'https://linkedin.com/company/' + String(a.urn).split(':').pop() : (a.username ? 'https://linkedin.com/in/' + cleanHandle(a.username) : 'https://linkedin.com/')) },
-  { key:'twitter',   label:'X (Twitter)', icon:'𝕏',  color:'#0f1419', link:a => 'https://x.com/' + cleanHandle(a.username||a.handle) },
+  { key:'twitter',   label:'X (Twitter)', icon:'𝕏',  color:'#0f1419', alt:['x'], link:a => 'https://x.com/' + cleanHandle(a.username||a.handle) },
   { key:'threads',   label:'Threads',     icon:'@',  color:'#000000', link:a => 'https://threads.net/@' + cleanHandle(a.username||a.handle) },
   { key:'pinterest', label:'Pinterest',   icon:'ⓟ',  color:'#e60023', link:a => 'https://pinterest.com/' + cleanHandle(a.username||a.handle) },
-  { key:'bluesky',   label:'Bluesky',     icon:'🦋', color:'#0085ff', link:a => 'https://bsky.app/profile/' + cleanHandle(a.handle||a.username) }
+  { key:'bluesky',   label:'Bluesky',     icon:'🦋', color:'#0085ff', alt:['blueesky'], link:a => 'https://bsky.app/profile/' + cleanHandle(a.handle||a.username) }
 ];
 
 const PLAT_MAP = PLAT_LIST.reduce((o,p)=>{o[p.key]=p;return o;},{});
@@ -2136,12 +2136,14 @@ async function loadPlatforms() {
 function normalizePlatforms(d) {
   const out = {}; PLAT_LIST.forEach(p => out[p.key] = []);
   if (!d) return out;
+  // Platform anahtarının olası tüm adları (ör. X hem 'twitter' hem 'x' gelebilir)
+  const keysFor = p => [p.key].concat(p.alt || []);
   // A) profiles[].social_accounts.* (yeni Upload-Post format)
   if (Array.isArray(d.profiles) && d.profiles.length) {
     for (const prof of d.profiles) {
       const sa = prof.social_accounts || prof.socialAccounts || {};
       PLAT_LIST.forEach(p => {
-        const acc = sa[p.key];
+        const acc = keysFor(p).map(k => sa[k]).find(v => v != null);
         if (!acc) return;
         const list = Array.isArray(acc) ? acc : [acc];
         list.forEach(a => out[p.key].push(Object.assign({ _profile: prof.username, _platform: p.key }, a)));
@@ -2150,9 +2152,9 @@ function normalizePlatforms(d) {
   }
   // B) Eski n8n format: d.instagram/youtube/tiktok array
   PLAT_LIST.forEach(p => {
-    if (Array.isArray(d[p.key]) && !out[p.key].length) {
-      d[p.key].forEach(a => out[p.key].push(Object.assign({ _platform: p.key }, a)));
-    }
+    if (out[p.key].length) return;
+    const arr = keysFor(p).map(k => d[k]).find(v => Array.isArray(v));
+    if (arr) arr.forEach(a => out[p.key].push(Object.assign({ _platform: p.key }, a)));
   });
   return out;
 }
