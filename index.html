@@ -2078,16 +2078,19 @@ async function loadReports() {
 // PLATFORMLAR
 // ═══════════════════════════════════════════════════════════
 // Upload-Post platformları — sıra, renk, avatar rengi, sosyal medya link üretici
+// Kullanıcı adının başındaki @ işaretlerini temizler (çift @ hatasını önler)
+const cleanHandle = u => String(u==null?'':u).trim().replace(/^@+/, '');
+
 const PLAT_LIST = [
-  { key:'instagram', label:'Instagram',   icon:'📸', color:'#e1306c', link:a => 'https://instagram.com/' + (a.username||'') },
-  { key:'youtube',   label:'YouTube',     icon:'▶',  color:'#ff0000', link:a => a.id && String(a.id).startsWith('UC') ? 'https://youtube.com/channel/' + a.id : 'https://youtube.com/@' + (a.username||a.custom_url||'') },
-  { key:'tiktok',    label:'TikTok',      icon:'♪',  color:'#69c9d0', link:a => 'https://tiktok.com/@' + (a.username||'') },
-  { key:'facebook',  label:'Facebook',    icon:'ⓕ',  color:'#1877f2', link:a => a.id ? 'https://facebook.com/' + a.id : 'https://facebook.com/' + (a.username||a.name||'') },
-  { key:'linkedin',  label:'LinkedIn',    icon:'in', color:'#0a66c2', link:a => a.vanity_url ? 'https://linkedin.com/in/' + a.vanity_url : (a.urn ? 'https://linkedin.com/company/' + String(a.urn).split(':').pop() : 'https://linkedin.com/') },
-  { key:'twitter',   label:'X (Twitter)', icon:'𝕏',  color:'#0f1419', link:a => 'https://x.com/' + (a.username||a.handle||'') },
-  { key:'threads',   label:'Threads',     icon:'@',  color:'#000000', link:a => 'https://threads.net/@' + (a.username||'') },
-  { key:'pinterest', label:'Pinterest',   icon:'ⓟ',  color:'#e60023', link:a => 'https://pinterest.com/' + (a.username||'') },
-  { key:'bluesky',   label:'Bluesky',     icon:'🦋', color:'#0085ff', link:a => 'https://bsky.app/profile/' + (a.handle||a.username||'') }
+  { key:'instagram', label:'Instagram',   icon:'📸', color:'#e1306c', link:a => 'https://instagram.com/' + cleanHandle(a.username||a.handle) },
+  { key:'youtube',   label:'YouTube',     icon:'▶',  color:'#ff0000', link:a => a.id && String(a.id).startsWith('UC') ? 'https://youtube.com/channel/' + a.id : 'https://youtube.com/@' + cleanHandle(a.username||a.custom_url||a.handle) },
+  { key:'tiktok',    label:'TikTok',      icon:'♪',  color:'#69c9d0', link:a => 'https://tiktok.com/@' + cleanHandle(a.username||a.handle) },
+  { key:'facebook',  label:'Facebook',    icon:'ⓕ',  color:'#1877f2', link:a => a.id ? 'https://facebook.com/' + a.id : 'https://facebook.com/' + cleanHandle(a.username||a.name) },
+  { key:'linkedin',  label:'LinkedIn',    icon:'in', color:'#0a66c2', link:a => a.vanity_url ? 'https://linkedin.com/in/' + cleanHandle(a.vanity_url) : (a.urn ? 'https://linkedin.com/company/' + String(a.urn).split(':').pop() : (a.username ? 'https://linkedin.com/in/' + cleanHandle(a.username) : 'https://linkedin.com/')) },
+  { key:'twitter',   label:'X (Twitter)', icon:'𝕏',  color:'#0f1419', link:a => 'https://x.com/' + cleanHandle(a.username||a.handle) },
+  { key:'threads',   label:'Threads',     icon:'@',  color:'#000000', link:a => 'https://threads.net/@' + cleanHandle(a.username||a.handle) },
+  { key:'pinterest', label:'Pinterest',   icon:'ⓟ',  color:'#e60023', link:a => 'https://pinterest.com/' + cleanHandle(a.username||a.handle) },
+  { key:'bluesky',   label:'Bluesky',     icon:'🦋', color:'#0085ff', link:a => 'https://bsky.app/profile/' + cleanHandle(a.handle||a.username) }
 ];
 
 const PLAT_MAP = PLAT_LIST.reduce((o,p)=>{o[p.key]=p;return o;},{});
@@ -2175,7 +2178,7 @@ function platAccName(a, p) {
 
 function platAccCard(a, p, idx) {
   const name = platAccName(a, p);
-  const handle = a.username || a.handle || '';
+  const handle = cleanHandle(a.username || a.handle);
   const avatar = a.profile_picture_url || a.profile_pic_url || a.profile_image_url || a.avatar_url || a.thumbnail || '';
   const followers = a.followers_count || a.follower_count || null;
   return `<div class="acc-card" onclick="platOpenModal('${p.key}',${idx})" style="cursor:pointer">
@@ -2196,7 +2199,7 @@ function platOpenModal(platKey, idx) {
   const byPlat = normalizePlatforms(S.uploadPostAccounts);
   const a = byPlat[platKey] && byPlat[platKey][idx]; if (!a) return;
   const name = platAccName(a, p);
-  const handle = a.username || a.handle || '';
+  const handle = cleanHandle(a.username || a.handle);
   const avatar = a.profile_picture_url || a.profile_pic_url || a.profile_image_url || a.avatar_url || a.thumbnail || '';
   const followers = a.followers_count || a.follower_count;
   const posts = a.media_count || a.video_count || a.post_count;
