@@ -3,6 +3,9 @@ OPUSPRO_v13_UploadPost.json
 OPUSPRO_v14_Kworb.json
 *.n8n.json
 
+# Oto Yakala kurulum rehberi — yerel dokuman, public repoya gitmez
+OTOYAKALA_KURULUM.md
+
 # Panel eski surumler
 opuspro_panel_v8.html
 
