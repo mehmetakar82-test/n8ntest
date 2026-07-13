@@ -1464,7 +1464,7 @@ async function sendSingle() {
   showRes('sv-res','⏳ Gonderiliyor... ['+selCat+']','info');
   addLog('info','webhook','Video gonderiliyor ['+selCat+']: '+url.slice(0,60));
   const svAciklama = (document.getElementById('sv-aciklama')||{}).value||'';
-  await faf(wh, {'Youtube linki': url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, aciklama_notu:svAciklama});
+  await faf(wh, {'Youtube linki': url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, dil:getSelLang('sv-cats'), aciklama_notu:svAciklama});
   showRes('sv-res','✓ n8n\'e gonderildi ['+selCat+']','ok');
   S.sentURLs.add(url.trim()); saveSent();
   addLog('ok','webhook','Video gonderildi ['+selCat+']');
@@ -1489,7 +1489,7 @@ async function sendBulkURLs() {
       setEl('bv-st',(i+1)+'/'+urls.length+' ['+kat+']: '+u.slice(0,40));
       setStyle('bv-bar','width',((sent+1)/(urls.length*selCats.length)*100)+'%');
       const bvAciklama = (document.getElementById('bv-aciklama')||{}).value||'';
-      await faf(base+path,{'Youtube linki':u, kaynak:'toplu', kategori:kat, aciklama_notu:bvAciklama});
+      await faf(base+path,{'Youtube linki':u, kaynak:'toplu', kategori:kat, dil:getSelLang('bv-cats'), aciklama_notu:bvAciklama});
       sent++;
     }
     S.sentURLs.add(u); saveSent();
@@ -1655,7 +1655,7 @@ async function yarSendSelected() {
     for (const kat of cats) {
       const path = CAT_WH[kat] || '/webhook/video-gonder';
       const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
-      await faf(base + path, {'Youtube linki': url, kaynak: 'youtube-arama', kategori: kat, title: v.title, durationSec: ytkParseDur(v.duration), channelTitle: v.channelTitle||'', aciklama_notu: yaAciklama});
+      await faf(base + path, {'Youtube linki': url, kaynak: 'youtube-arama', kategori: kat, dil: getSelLang('ya-cats'), title: v.title, durationSec: ytkParseDur(v.duration), channelTitle: v.channelTitle||'', aciklama_notu: yaAciklama});
     }
     sent++;
     await sleep(500);
@@ -1679,7 +1679,7 @@ async function sendSearch() {
   for(const kat of selCats){
     const path = CAT_WH[kat] || '/webhook/youtube-ara';
     const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
-    faf(base+path,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, kategori:kat, categories:[kat], aciklama_notu:yaAciklama});
+    faf(base+path,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, kategori:kat, dil:getSelLang('ya-cats'), categories:[kat], aciklama_notu:yaAciklama});
   }
   setTimeout(()=>showRes('ya-res','✓ Arama ['+selCats.join(',')+'] baslatildi — n8n arka planda calisiyor','ok'), 1500);
   S.searchHist.unshift({kw, kat:selCats.join(','), t:new Date().toLocaleString('tr')});
@@ -1774,7 +1774,7 @@ async function sendBulkKW() {
       setStyle('bk-pbar','width',((i+1)/kws.length*100)+'%');
       bLog('Gonderiliyor ['+kat+']: "'+kws[i]+'"');
       const bkAciklama = (document.getElementById('bk-aciklama')||{}).value||'';
-      await faf(base+path,{keywords:[kws[i]], anahtar_kelime:kws[i], minDurationSec:parseInt(dur), lang:'tr', kategori:kat, aciklama_notu:bkAciklama});
+      await faf(base+path,{keywords:[kws[i]], anahtar_kelime:kws[i], minDurationSec:parseInt(dur), lang:'tr', kategori:kat, dil:getSelLang('bk-cats'), aciklama_notu:bkAciklama});
       bLog('✓ "'+kws[i]+'" ['+kat+'] gonderildi');
       addLog('ok','bulk','KW ['+kat+']: '+kws[i]);
     }
@@ -1814,18 +1814,53 @@ function renderCatChips(id) {
     const fn = single ? 'catChipSingle(this,\''+id+'\')' : 'catChipToggle(this,\''+id+'\')';
     return '<span class="cat-chip" data-cat="'+k+'" onclick="'+fn+'">'+c.label+'</span>';
   }).join('');
+  renderLangToggle(id);
+  updateLangVisibility(id);
 }
 
 function catChipSingle(el, containerId) {
   document.querySelectorAll('#'+containerId+' .cat-chip').forEach(c=>c.classList.remove('sel'));
   el.classList.add('sel');
   updateSVWHDisplay();
+  updateLangVisibility(containerId);
 }
 
 function catChipToggle(el, containerId) {
   el.classList.toggle('sel');
   // bv-cats için webhook display güncelle
   if(containerId==='bv-cats') updateBVWHDisplay();
+  updateLangVisibility(containerId);
+}
+
+// ── Genel kategorisi için TR/EN dil seçici ─────────────────────────
+// 'genel' kategori chip'i seçiliyken cat-chips'in altında görünür.
+function renderLangToggle(id) {
+  const catsEl = document.getElementById(id);
+  if (!catsEl || document.getElementById(id+'-lang')) return;
+  const div = document.createElement('div');
+  div.id = id+'-lang';
+  div.style.display = 'none';
+  div.style.marginTop = '6px';
+  div.innerHTML = '<label style="margin-bottom:3px">Genel Kategorisi Dili</label><div class="cat-chips">'
+    + '<span class="cat-chip sel" data-lang="tr" onclick="langChipToggle(this)">🇹🇷 Türkçe</span>'
+    + '<span class="cat-chip" data-lang="en" onclick="langChipToggle(this)">🇬🇧 English</span></div>';
+  catsEl.insertAdjacentElement('afterend', div);
+}
+
+function langChipToggle(el) {
+  el.parentElement.querySelectorAll('.cat-chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+function updateLangVisibility(containerId) {
+  const hasGenel = !!document.querySelector('#'+containerId+' .cat-chip.sel[data-cat="genel"]');
+  setStyle(containerId+'-lang','display', hasGenel ? 'block' : 'none');
+}
+
+// Seçili dili döndürür ('tr' varsayılan) — yalnız 'genel' kategorisinde anlamlı
+function getSelLang(containerId) {
+  const sel = document.querySelector('#'+containerId+'-lang .cat-chip.sel');
+  return (sel && sel.dataset.lang) || 'tr';
 }
 
 // Seçili kategorileri döndür - birden fazla seçim destekler
@@ -1925,7 +1960,7 @@ async function sendDriveURLs() {
     const path=CAT_WH[kat]||'/webhook/video-gonder';
     const drNotCol = (document.getElementById('dr-not-col')||{}).value||'Aciklama Notu';
     const drAciklama = (r[drNotCol]||'').trim();
-    await faf(base+path,{'Youtube linki':url,kaynak:'drive',kategori:kat,aciklama_notu:drAciklama});
+    await faf(base+path,{'Youtube linki':url,kaynak:'drive',kategori:kat,dil:getSelLang('dr-cats'),aciklama_notu:drAciklama});
     S.sentURLs.add(url);
     addLog('ok','drive','Drive ['+kat+']: '+url.slice(0,60));
   }
@@ -1983,7 +2018,7 @@ async function sendSheetURLs() {
     setStyle('sh-pbar','width',((i+1)/S.sheetURLs.length*100)+'%');
     const shNotCol = (document.getElementById('sh-not-col')||{}).value||'Aciklama Notu';
     const shAciklama = ((row[shNotCol]||'').trim());
-    await faf(base+path,{'Youtube linki':url,kaynak:'sheets',kategori:kat,aciklama_notu:shAciklama});
+    await faf(base+path,{'Youtube linki':url,kaynak:'sheets',kategori:kat,dil:getSelLang('sh-cats'),aciklama_notu:shAciklama});
     S.sentURLs.add(url); saveSent();
     if(i<S.sheetURLs.length-1) await sleep(mode==='time'?delay:3*60*1000);
   }
@@ -3244,7 +3279,7 @@ async function ytkSendSelected() {
     for (const kat of cats) {
       const path = CAT_WH[kat] || '/webhook/video-gonder';
       const ytkAciklama = (document.getElementById('ytk-aciklama')||{}).value||'';
-      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
+      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, dil: getSelLang('ytk-cats'), title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
     }
     sent++;
     await sleep(500);
@@ -3274,6 +3309,7 @@ async function ytkAddToSheet() {
       sheetId,
       url,
       kategori: kat,
+      dil: getSelLang('ytk-cats'),
       title: v.snippet.title,
       channelTitle: YTK.channelInfo?.channelTitle || ''
     });
@@ -3490,7 +3526,7 @@ async function strSendVod(i){
   showRes('str-res','⏳ Gönderiliyor: '+v.title.slice(0,40)+'…','info');
   for(const kat of cats){
     const path=CAT_WH[kat]||'/webhook/video-gonder';
-    await faf(base+path,{'Youtube linki':v.url, kaynak:STR.platform, kategori:kat, title:v.title, durationSec:v.sec, channelTitle:(STR.ch&&STR.ch.name)||'', aciklama_notu:note});
+    await faf(base+path,{'Youtube linki':v.url, kaynak:STR.platform, kategori:kat, dil:getSelLang('str-cats'), title:v.title, durationSec:v.sec, channelTitle:(STR.ch&&STR.ch.name)||'', aciklama_notu:note});
   }
   showRes('str-res','✓ VOD gönderildi ['+cats.join(',')+'] — '+v.title.slice(0,50),'ok');
   addLog('ok','yayin',STR.platform+' VOD gönderildi: '+v.title.slice(0,60));
@@ -3526,7 +3562,7 @@ async function sendOpusClip() {
   if (!base) return showRes('opc-res', 'Ayarlardan n8n URL girin', 'warn');
   showRes('opc-res', `⏳ [${clipId}] işleme alınıyor...`, 'info');
   const opcAciklama = (document.getElementById('opc-aciklama')||{}).value||'';
-  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, aciklama_notu: opcAciklama});
+  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, dil: getSelLang('opc-cats'), aciklama_notu: opcAciklama});
   OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
   localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
   renderOPCHist();
@@ -3548,7 +3584,7 @@ async function sendOpusClipBulk() {
     const clipId = extractClipId(lines[i]);
     if (!clipId) continue;
     const opcAciklama = (document.getElementById('opc-aciklama')||{}).value||'';
-  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, aciklama_notu: opcAciklama});
+  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, dil: getSelLang('opc-bulk-cats'), aciklama_notu: opcAciklama});
     OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
     if (i < lines.length-1) await sleep(delay);
   }
@@ -3627,6 +3663,7 @@ document.addEventListener('DOMContentLoaded', function() {
       platOpenModal,platCloseModal,platCopyLink,platLoadAnalytics,platLoadExtra,upFetch,
       initUpPost,upPostSend,upStatusCheck,renderUpHistory,
       initYayin,strSetPlatform,strTwTest,strSearch,strPickChannel,strRenderVods,strSendVod,
+      renderLangToggle,langChipToggle,updateLangVisibility,getSelLang,
       toggleTheme,applyTheme,
       sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
