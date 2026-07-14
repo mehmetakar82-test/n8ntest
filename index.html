@@ -235,6 +235,7 @@ tbody td{line-height:1.5}
     <div class="ni" onclick="go('ytara',this)"><span class="ic">⊕</span>YouTube Ara</div>
     <div class="ni" onclick="go('ytkanal',this)"><span class="ic">📺</span>YT Kanal Ara</div>
     <div class="ni" onclick="go('yayin',this)"><span class="ic">📡</span>Yayın Tekrarları</div>
+    <div class="ni" onclick="go('parcala',this)"><span class="ic">✂</span>Video Parçala</div>
     <div class="ni" onclick="go('opusclip',this)"><span class="ic">◈</span>OpusClip Direkt</div>
     <div class="ni" onclick="go('uppost',this)"><span class="ic">⇑</span>Upload-Post</div>
     <div class="ni" onclick="go('bulk',this)"><span class="ic">≋</span>Toplu Kelimeler</div>
@@ -487,6 +488,41 @@ tbody td{line-height:1.5}
           <div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">Soldan bir kanal arayıp "▶ VOD'lar" butonuna bas</div>
         </div>
         <div class="alert ai" style="margin-top:10px;font-size:9px"><span>ℹ</span><span><b>▶ İşleme Al</b>: VOD linki, seçili kategoriye göre n8n webhook'una (<code>video-gonder[-kategori]</code>) <code>kaynak: twitch/kick</code> ile gönderilir. OpusClip Twitch VOD linklerini destekler; Kick linkleri için workflow tarafında ek indirme adımı gerekebilir.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VIDEO PARÇALA -->
+<div id="page-parcala" class="page">
+  <div class="ph"><div class="pt">Video Parçala</div><div class="ps">Uzun bir YouTube videosunu sabit uzunlukta parçalara böl, her parçayı ayrı short olarak yayınla</div></div>
+  <div class="alert ai"><span>ℹ</span><span>OpusClip her parça için ayrı bir proje oluşturur ve o zaman penceresine odaklanır (AI en iyi anı seçer, milisaniye hassasiyetinde birebir kesim garanti edilmez). Kredi/kota parça sayısı kadar tüketilir.</span></div>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="ct">Video</div>
+        <div class="fg"><label>YouTube Linki</label>
+          <input id="vp-url" type="text" placeholder="https://www.youtube.com/watch?v=..."/>
+        </div>
+        <div class="fg">
+          <button class="btn bg bsm" onclick="vpFetchDuration()">⏱ Süreyi Getir</button>
+          <span id="vp-dur-display" style="font-size:10px;color:var(--acc);margin-left:8px"></span>
+        </div>
+        <div class="fg"><label>Parça Uzunluğu (sn)</label><input id="vp-seglen" type="number" value="120" min="10"/></div>
+        <div class="fg"><label>Parçalar Arası Örtüşme (sn) <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="vp-overlap" type="number" value="5" min="0"/></div>
+        <div class="fg"><button class="btn bp bsm" onclick="vpComputeSegments()">▤ Parçaları Hesapla</button></div>
+        <div class="fg"><label>Kategori</label><div class="cat-chips" id="vp-cats"></div></div>
+        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="vp-aciklama" type="text" placeholder="örn. Bölüm serisi"/></div>
+        <div class="fg"><button class="btn bs bsm" onclick="vpSend()">▶ Tüm Parçaları Gönder</button></div>
+        <div id="vp-res" class="res"></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>Parça Önizleme</span><span id="vp-seg-count" style="font-size:9px;color:var(--mt);font-weight:400"></span></div>
+        <div id="vp-seg-list" style="max-height:520px;overflow-y:auto">
+          <div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">Süreyi getir → Parçaları Hesapla'ya bas</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1263,6 +1299,7 @@ function go(id, el) {
     raporlar:   loadReports,
     ytkanal:    initYTKanal,
     yayin:      initYayin,
+    parcala:    initParcala,
     ytara:      initYouTubeAra,
     opusclip:   initOpusClip,
     uppost:     initUpPost,
@@ -1801,6 +1838,7 @@ function renderCatGrid() {
   renderCatChips('ya-cats');
   renderCatChips('ytk-cats');
   renderCatChips('str-cats');
+  renderCatChips('vp-cats');
   renderCatChips('opc-cats');
   renderCatChips('opc-bulk-cats');
 }
@@ -3533,6 +3571,104 @@ async function strSendVod(i){
 }
 
 // ═══════════════════════════════════════════════════════════
+// VIDEO PARÇALA — sabit uzunlukta ardışık parçalara böl
+// ═══════════════════════════════════════════════════════════
+const VP = { durationSec: 0, segments: [] };
+
+function initParcala() {
+  renderCatChips('vp-cats');
+}
+
+function vpExtractVideoId(url) {
+  const m = String(url||'').match(/(?:v=|\/shorts\/|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : '';
+}
+
+async function vpFetchDuration() {
+  const url = (document.getElementById('vp-url')||{}).value||'';
+  const id = vpExtractVideoId(url);
+  if (!id) return showRes('vp-res','Geçerli bir YouTube linki girin','warn');
+  const apiKey = ytkApiKey();
+  if (!apiKey) return showRes('vp-res','YouTube API Key gerekli (YT Kanal Ara sekmesinden veya Ayarlar\'dan girin)','warn');
+  setEl('vp-dur-display','⏳ alınıyor…');
+  try {
+    const j = await ytkFetch('https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id='+id+'&key='+apiKey);
+    const item = (j.items||[])[0];
+    if (!item) { setEl('vp-dur-display',''); return showRes('vp-res','Video bulunamadı','err'); }
+    VP.durationSec = ytkParseDur(item.contentDetails.duration);
+    setEl('vp-dur-display','Toplam süre: '+ytkDurFmt(VP.durationSec)+' ('+VP.durationSec+' sn)');
+    showRes('vp-res','✓ Süre alındı — şimdi Parçaları Hesapla\'ya bas','ok');
+  } catch(e) {
+    setEl('vp-dur-display','');
+    showRes('vp-res','✗ '+e.message,'err');
+  }
+}
+
+// Sabit uzunluk + sabit ortusme ile ardisik segmentler uretir.
+// Son parca cok kisa kalirsa (segLen'in ucte birinden az) bir onceki parcayla birlestirilir.
+function vpCalcSegments(totalSec, segLen, overlap) {
+  totalSec = Math.max(1, Math.round(totalSec));
+  segLen = Math.max(10, Math.round(segLen));
+  overlap = Math.max(0, Math.min(Math.round(overlap||0), segLen-5));
+  const step = segLen - overlap;
+  const segs = [];
+  let start = 0;
+  while (start < totalSec) {
+    const end = Math.min(start+segLen, totalSec);
+    segs.push({start, end});
+    if (end >= totalSec) break;
+    start += step;
+  }
+  if (segs.length > 1) {
+    const last = segs[segs.length-1];
+    if ((last.end-last.start) < segLen/3) {
+      segs[segs.length-2].end = last.end;
+      segs.pop();
+    }
+  }
+  return segs;
+}
+
+function vpComputeSegments() {
+  if (!VP.durationSec) return showRes('vp-res','Önce Süreyi Getir\'e bas','warn');
+  const segLen = parseInt((document.getElementById('vp-seglen')||{}).value)||120;
+  const overlap = parseInt((document.getElementById('vp-overlap')||{}).value)||0;
+  VP.segments = vpCalcSegments(VP.durationSec, segLen, overlap);
+  vpRenderSegments();
+}
+
+function vpRenderSegments() {
+  const el = document.getElementById('vp-seg-list'); if(!el) return;
+  setEl('vp-seg-count', VP.segments.length+' parça');
+  if (!VP.segments.length) { el.innerHTML='<div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">Süreyi getir → Parçaları Hesapla\'ya bas</div>'; return; }
+  el.innerHTML = VP.segments.map((s,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--brd);border-radius:6px;margin-bottom:6px;background:var(--bg)">
+    <span style="font-size:10px;color:var(--tx)">Parça ${i+1}/${VP.segments.length}</span>
+    <span style="font-size:10px;color:var(--acc);font-family:var(--fm)">${ytkDurFmt(s.start)} — ${ytkDurFmt(s.end)}</span>
+    <span style="font-size:9px;color:var(--mt)">${s.end-s.start}sn</span>
+  </div>`).join('');
+}
+
+async function vpSend() {
+  const url = (document.getElementById('vp-url')||{}).value||'';
+  if (!url.trim()) return showRes('vp-res','YouTube linki girin','err');
+  if (!VP.segments.length) return showRes('vp-res','Önce Parçaları Hesapla\'ya bas','warn');
+  const base = getN8N();
+  if (!base) return showRes('vp-res','Ayarlar\'dan n8n URL girin','warn');
+  const cats = getSelCatList('vp-cats');
+  const kategori = cats[0] || 'genel';
+  const dil = getSelLang('vp-cats');
+  const aciklama_notu = (document.getElementById('vp-aciklama')||{}).value||'';
+  showRes('vp-res','⏳ '+VP.segments.length+' parça gönderiliyor…','info');
+  await faf(base+'/webhook/video-parcala', {
+    'Youtube linki': url.trim(),
+    kategori, dil, aciklama_notu,
+    segments: VP.segments,
+  });
+  showRes('vp-res','✓ '+VP.segments.length+' parça n8n\'e gönderildi ['+kategori+(dil==='en'?'/EN':'')+']','ok');
+  addLog('ok','webhook','Video Parçala: '+VP.segments.length+' parça gönderildi — '+url.slice(0,50));
+}
+
+// ═══════════════════════════════════════════════════════════
 // OPUSCLIP DİREKT
 // ═══════════════════════════════════════════════════════════
 const OPC = { hist: JSON.parse(localStorage.getItem('op_opc_hist')||'[]') };
@@ -3663,6 +3799,7 @@ document.addEventListener('DOMContentLoaded', function() {
       platOpenModal,platCloseModal,platCopyLink,platLoadAnalytics,platLoadExtra,upFetch,
       initUpPost,upPostSend,upStatusCheck,renderUpHistory,
       initYayin,strSetPlatform,strTwTest,strSearch,strPickChannel,strRenderVods,strSendVod,
+      initParcala,vpFetchDuration,vpComputeSegments,vpRenderSegments,vpSend,
       renderLangToggle,langChipToggle,updateLangVisibility,getSelLang,
       toggleTheme,applyTheme,
       sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
