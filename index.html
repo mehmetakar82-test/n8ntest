@@ -1301,6 +1301,33 @@ function confirmDupeSend(url) {
   return confirm('⚠ Bu video daha önce gönderilmiş!\n\nTarih: '+d.t+'\nKategori: '+(d.kategori||'?')+'\n\nYine de göndermek istiyor musun?');
 }
 
+// Coklu secim gonderimlerinde kullanilir — native confirm()'in belirsiz
+// Tamam/Iptal anlamlarindan kacinmak icin 3 net secenekli ozel modal:
+// 'skip' = yalniz yenileri gonder, 'all' = hepsini gonder, 'cancel' = vazgec.
+function dupeChoiceModal(dupeCount, newCount) {
+  return new Promise(resolve => {
+    const old = document.getElementById('dupe-modal'); if (old) old.remove();
+    const div = document.createElement('div');
+    div.id = 'dupe-modal';
+    div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center';
+    div.innerHTML = `<div style="background:var(--sur);border:1px solid var(--wn);border-radius:8px;padding:20px 24px;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+      <div style="font-family:var(--fh);font-weight:700;font-size:13px;color:var(--tx);margin-bottom:8px">⚠ Tekrar Gönderim Tespit Edildi</div>
+      <div style="font-size:11px;color:var(--mt);line-height:1.6;margin-bottom:16px">${dupeCount} video daha önce gönderilmiş görünüyor. Nasıl devam edelim?</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn bp bsm" id="dupe-skip" style="width:100%;justify-content:center">Yalnız Yenileri Gönder (${newCount})</button>
+        <button class="btn bw bsm" id="dupe-all" style="width:100%;justify-content:center">Hepsini Yine de Gönder</button>
+        <button class="btn bg bsm" id="dupe-cancel" style="width:100%;justify-content:center">Vazgeç</button>
+      </div>
+    </div>`;
+    document.body.appendChild(div);
+    const done = choice => { div.remove(); resolve(choice); };
+    div.querySelector('#dupe-skip').onclick = () => done('skip');
+    div.querySelector('#dupe-all').onclick = () => done('all');
+    div.querySelector('#dupe-cancel').onclick = () => done('cancel');
+    div.onclick = e => { if (e.target === div) done('cancel'); };
+  });
+}
+
 const DEFAULT_CATS = {
   film:    {label:'Film 🎬',    sel_ig:[],sel_yt:[],sel_tt:[]},
   eglence: {label:'Eğlence 🎉', sel_ig:[],sel_yt:[],sel_tt:[]},
@@ -1554,10 +1581,11 @@ async function sendBulkURLs() {
   let urls = raw.split('\n').map(u=>u.trim()).filter(Boolean);
   const dupes = urls.filter(u=>findDupeSend(u));
   if (dupes.length) {
-    const dahilEt = confirm('⚠ '+dupes.length+' video daha önce gönderilmiş görünüyor.\n\nTamam: hepsini yine de gönder\nİptal: sadece daha önce gönderilmemiş '+(urls.length-dupes.length)+' videoyu gönder');
-    if (!dahilEt) urls = urls.filter(u=>!findDupeSend(u));
+    const choice = await dupeChoiceModal(dupes.length, urls.length-dupes.length);
+    if (choice==='cancel') return setEl('bv-st','İşlem vazgeçildi');
+    if (choice==='skip') urls = urls.filter(u=>!findDupeSend(u));
   }
-  if (!urls.length) return showRes('bv-res','Gönderilecek yeni video kalmadı','warn');
+  if (!urls.length) return setEl('bv-st','Gönderilecek yeni video kalmadı');
   setStyle('bv-prog','display','block');
   addLog('info','webhook','Toplu gonderim ['+selCats.join(',')+']:'+urls.length+' URL');
   let sent = 0;
@@ -1724,8 +1752,9 @@ async function yarSendSelected() {
   if (!sel.length) return showRes('ya-res', 'Video seçin', 'warn');
   const dupeSel = sel.filter(raw => findDupeSend('https://www.youtube.com/watch?v=' + yarNormalizeVideo(raw).id));
   if (dupeSel.length) {
-    const dahilEt = confirm('⚠ '+dupeSel.length+' video daha önce gönderilmiş görünüyor.\n\nTamam: hepsini yine de gönder\nİptal: sadece daha önce gönderilmemiş '+(sel.length-dupeSel.length)+' videoyu gönder');
-    if (!dahilEt) sel = sel.filter(raw => !findDupeSend('https://www.youtube.com/watch?v=' + yarNormalizeVideo(raw).id));
+    const choice = await dupeChoiceModal(dupeSel.length, sel.length-dupeSel.length);
+    if (choice==='cancel') return showRes('ya-res','İşlem vazgeçildi','warn');
+    if (choice==='skip') sel = sel.filter(raw => !findDupeSend('https://www.youtube.com/watch?v=' + yarNormalizeVideo(raw).id));
   }
   if (!sel.length) return showRes('ya-res', 'Gönderilecek yeni video kalmadı', 'warn');
   const cats = getSelCatList('ya-cats');
@@ -3357,8 +3386,9 @@ async function ytkSendSelected() {
   if (!sel.length) return showRes('ytk-res', 'Video seçin', 'warn');
   const dupeSel = sel.filter(v => findDupeSend('https://www.youtube.com/watch?v=' + v.id));
   if (dupeSel.length) {
-    const dahilEt = confirm('⚠ '+dupeSel.length+' video daha önce gönderilmiş görünüyor.\n\nTamam: hepsini yine de gönder\nİptal: sadece daha önce gönderilmemiş '+(sel.length-dupeSel.length)+' videoyu gönder');
-    if (!dahilEt) sel = sel.filter(v => !findDupeSend('https://www.youtube.com/watch?v=' + v.id));
+    const choice = await dupeChoiceModal(dupeSel.length, sel.length-dupeSel.length);
+    if (choice==='cancel') return showRes('ytk-res','İşlem vazgeçildi','warn');
+    if (choice==='skip') sel = sel.filter(v => !findDupeSend('https://www.youtube.com/watch?v=' + v.id));
   }
   if (!sel.length) return showRes('ytk-res', 'Gönderilecek yeni video kalmadı', 'warn');
   const cats = getSelCatList('ytk-cats');
