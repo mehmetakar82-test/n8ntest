@@ -252,6 +252,7 @@ tbody td{line-height:1.5}
     <div class="ni" onclick="go('platformlar',this)"><span class="ic">◎</span>Platformlar</div>
     <div class="ni" onclick="go('arsiv',this)"><span class="ic">▣</span>Arşiv</div>
     <div class="ns">Sistem</div>
+    <div class="ni" onclick="go('otoyakala',this)"><span class="ic">🎯</span>Oto Yakala</div>
     <div class="ni" onclick="go('ayarlar',this)"><span class="ic">⊞</span>Ayarlar</div>
     <div class="ni" onclick="go('loglar',this)"><span class="ic">⊟</span>Loglar</div>
   </nav>
@@ -525,6 +526,48 @@ tbody td{line-height:1.5}
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- OTO YAKALA -->
+<div id="page-otoyakala" class="page">
+  <div class="ph"><div class="pt">Oto Yakala</div><div class="ps">YouTube playlist + Instagram mention ile otomatik yakalama ayarları — n8n'de elle düzenleme gerekmez</div></div>
+  <div class="alert ai"><span>ℹ</span><span>Bu ayarlar n8n workflow'unun hafızasına (staticData) kaydedilir. Workflow <b>deaktif edilip yeniden aktif edilirse veya reimport edilirse sıfırlanır</b> — o durumda buradan tekrar Kaydet'e basman gerekir. Kaydettiğin bilgiler ayrıca bu tarayıcıda (localStorage) saklanır, formu her açtığında otomatik doldurulur.</span></div>
+  <div class="g2">
+    <div>
+      <div class="card">
+        <div class="ct">📡 YouTube Playlist</div>
+        <div class="fg"><label>YouTube API Key</label><input id="oy-yt-key" type="text" placeholder="AIza..."/></div>
+        <div class="fg"><label>ShortAl Playlist ID</label><input id="oy-pl-short" type="text" placeholder="PL..."/></div>
+        <div class="fg"><label>VideoAl Playlist ID</label><input id="oy-pl-video" type="text" placeholder="PL..."/></div>
+        <div class="fg"><label>ShortAl Kategorisi</label><select id="oy-kat-short"></select></div>
+        <div class="fg"><label>VideoAl Kategorisi</label><select id="oy-kat-video"></select></div>
+        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="oy-not" type="text" placeholder="oto-yakala"/></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">📸 Instagram Mention</div>
+        <div class="fg"><label>IG Business User ID</label><input id="oy-ig-uid" type="text" placeholder="1784..."/></div>
+        <div class="fg"><label>IG Access Token <span style="color:var(--mt)">(uzun ömürlü, 60gün)</span></label><input id="oy-ig-token" type="password" placeholder="EAAx..."/></div>
+        <div class="fg"><label>Kendi Instagram Kullanıcı Adın</label><input id="oy-ig-user" type="text" placeholder="kullanici_adin"/></div>
+        <div class="fg"><label>Tetik Kelimeler <span style="color:var(--mt)">(virgülle ayır)</span></label><input id="oy-ig-tetik" type="text" placeholder="güzel, short, işle"/></div>
+        <div class="fg"><label>Kategori</label><select id="oy-ig-kat"></select></div>
+        <div class="fg"><label>Dil</label>
+          <div class="cat-chips" id="oy-ig-dil">
+            <span class="cat-chip sel" data-lang="tr" onclick="langChipToggle(this)">🇹🇷 Türkçe</span>
+            <span class="cat-chip" data-lang="en" onclick="langChipToggle(this)">🇬🇧 English</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn bp" onclick="oySave()">💾 Kaydet ve n8n'e Gönder</button>
+      <span id="oy-webhook-display" style="font-size:9px;color:var(--acc)"></span>
+    </div>
+    <div id="oy-res" class="res"></div>
   </div>
 </div>
 
@@ -1362,6 +1405,7 @@ function go(id, el) {
     ytkanal:    initYTKanal,
     yayin:      initYayin,
     parcala:    initParcala,
+    otoyakala:  initOtoYakala,
     ytara:      initYouTubeAra,
     opusclip:   initOpusClip,
     uppost:     initUpPost,
@@ -3759,6 +3803,80 @@ async function vpSend() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// OTO YAKALA — panelden n8n staticData'sına ayar kaydetme
+// ═══════════════════════════════════════════════════════════
+function initOtoYakala() {
+  const catOpts = Object.entries(getCats()).map(([k,c])=>'<option value="'+k+'">'+c.label+'</option>').join('');
+  ['oy-kat-short','oy-kat-video','oy-ig-kat'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = catOpts;
+  });
+
+  const saved = JSON.parse(localStorage.getItem('op_oto_ayarlar')||'{}');
+  const setVal = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
+  setVal('oy-yt-key', saved.YT_API_KEY || S.cfg.ytApiKey || '');
+  setVal('oy-pl-short', saved.PLAYLIST_SHORT);
+  setVal('oy-pl-video', saved.PLAYLIST_VIDEO);
+  setVal('oy-kat-short', saved.SHORT_KATEGORI || 'genel');
+  setVal('oy-kat-video', saved.VIDEO_KATEGORI || 'genel');
+  setVal('oy-not', saved.ACIKLAMA_NOTU);
+  setVal('oy-ig-uid', saved.IG_USER_ID);
+  setVal('oy-ig-token', saved.IG_TOKEN);
+  setVal('oy-ig-user', saved.BENIM_KULLANICI_ADIM);
+  setVal('oy-ig-tetik', Array.isArray(saved.TETIK_KELIMELER) ? saved.TETIK_KELIMELER.join(', ') : saved.TETIK_KELIMELER);
+  setVal('oy-ig-kat', saved.IG_KATEGORI || 'genel');
+  if (saved.IG_DIL === 'en') {
+    document.querySelectorAll('#oy-ig-dil .cat-chip').forEach(c=>c.classList.remove('sel'));
+    const en = document.querySelector('#oy-ig-dil .cat-chip[data-lang="en"]');
+    if (en) en.classList.add('sel');
+  }
+
+  const base = getN8N();
+  setEl('oy-webhook-display', base ? base+'/webhook/oto-yakala-ayarlar' : '/webhook/oto-yakala-ayarlar');
+}
+
+function oyGetDil() {
+  const sel = document.querySelector('#oy-ig-dil .cat-chip.sel');
+  return (sel && sel.dataset.lang) || 'tr';
+}
+
+async function oySave() {
+  const base = getN8N();
+  if (!base) return showRes('oy-res','Ayarlar\'dan n8n URL girin','warn');
+
+  const ayar = {
+    YT_API_KEY: (document.getElementById('oy-yt-key')||{}).value||'',
+    PLAYLIST_SHORT: (document.getElementById('oy-pl-short')||{}).value||'',
+    PLAYLIST_VIDEO: (document.getElementById('oy-pl-video')||{}).value||'',
+    N8N_BASE: base,
+    SHORT_KATEGORI: (document.getElementById('oy-kat-short')||{}).value||'genel',
+    VIDEO_KATEGORI: (document.getElementById('oy-kat-video')||{}).value||'genel',
+    ACIKLAMA_NOTU: (document.getElementById('oy-not')||{}).value||'oto-yakala',
+    IG_USER_ID: (document.getElementById('oy-ig-uid')||{}).value||'',
+    IG_TOKEN: (document.getElementById('oy-ig-token')||{}).value||'',
+    BENIM_KULLANICI_ADIM: (document.getElementById('oy-ig-user')||{}).value||'',
+    TETIK_KELIMELER: ((document.getElementById('oy-ig-tetik')||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean),
+    IG_KATEGORI: (document.getElementById('oy-ig-kat')||{}).value||'genel',
+    IG_DIL: oyGetDil(),
+  };
+
+  if (!ayar.PLAYLIST_SHORT && !ayar.PLAYLIST_VIDEO && !ayar.IG_USER_ID) {
+    return showRes('oy-res','En az bir bölümü (Playlist veya IG) doldurun','warn');
+  }
+
+  localStorage.setItem('op_oto_ayarlar', JSON.stringify(ayar));
+  showRes('oy-res','⏳ n8n\'e gönderiliyor…','info');
+  const r = await faf(base+'/webhook/oto-yakala-ayarlar', ayar);
+  if (r && r.ok) {
+    showRes('oy-res','✓ Ayarlar kaydedildi ve n8n\'e gönderildi','ok');
+    addLog('ok','webhook','Oto Yakala ayarları güncellendi');
+  } else {
+    showRes('oy-res','⚠ Tarayıcıda kaydedildi, n8n\'den yanıt alınamadı (CORS/ağ engeli olabilir — genelde yine de işlenmiş olur). n8n execution log\'undan doğrula.','warn');
+    addLog('warn','webhook','Oto Yakala ayarları — n8n yanıtı alınamadı (CORS olabilir)');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // OPUSCLIP DİREKT
 // ═══════════════════════════════════════════════════════════
 const OPC = { hist: JSON.parse(localStorage.getItem('op_opc_hist')||'[]') };
@@ -3890,6 +4008,7 @@ document.addEventListener('DOMContentLoaded', function() {
       initUpPost,upPostSend,upStatusCheck,renderUpHistory,
       initYayin,strSetPlatform,strTwTest,strSearch,strPickChannel,strRenderVods,strSendVod,
       initParcala,vpFetchDuration,vpComputeSegments,vpRenderSegments,vpSend,
+      initOtoYakala,oySave,
       renderLangToggle,langChipToggle,updateLangVisibility,getSelLang,
       toggleTheme,applyTheme,
       sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
