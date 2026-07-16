@@ -244,6 +244,7 @@ tbody td{line-height:1.5}
     <div class="ns">Ana</div>
     <div class="ni active" onclick="go('dashboard',this)"><span class="ic">▦</span>Dashboard</div>
     <div class="ni" onclick="go('video',this)"><span class="ic">▶</span>Video Gönder</div>
+    <div class="ni" onclick="go('trendonay',this)"><span class="ic">🔥</span>Trend Onay</div>
     <div class="ni" onclick="go('ytara',this)"><span class="ic">⊕</span>YouTube Ara</div>
     <div class="ni" onclick="go('ytkanal',this)"><span class="ic">📺</span>YT Kanal Ara</div>
     <div class="ni" onclick="go('yayin',this)"><span class="ic">📡</span>Yayın Tekrarları</div>
@@ -541,6 +542,24 @@ tbody td{line-height:1.5}
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- TREND ONAY -->
+<div id="page-trendonay" class="page">
+  <div class="ph"><div class="pt">Trend Onay</div><div class="ps">Kworb Trending TR'nin bulduğu yeni videolar — onaylayıp kategori/açıklama belirle ya da reddet</div></div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn bp" onclick="trFetchPending()" id="tr-fetch-btn">🔥 Bekleyenleri Getir</button>
+      <div id="tr-status" style="flex:1;font-size:9px;color:var(--mt)"></div>
+    </div>
+    <div style="font-size:8px;color:var(--mt);margin-top:6px">Kworb her gün 09:00'da trend videoları bulur; otomatik yayınlamak yerine burada onayına sunar. Onayladığın video seçtiğin <b>kategori / dil / platform / açıklama</b> ile işleme alınır. Reddettiğin kuyruktan çıkarılır ve bir daha gelmez.</div>
+  </div>
+  <div id="tr-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px"></div>
+  <div id="tr-empty" class="card" style="display:none;text-align:center;padding:32px;color:var(--mt)">
+    <div style="font-size:32px;margin-bottom:8px">🔥</div>
+    <div style="font-size:11px">Bekleyen trend video yok</div>
+    <div style="font-size:9px;margin-top:6px">Kworb her gün 09:00'da çalışır. <b>Bekleyenleri Getir</b>'e basarak kuyruğu yenile.</div>
   </div>
 </div>
 
@@ -1454,6 +1473,7 @@ function go(id, el) {
     ytara:      initYouTubeAra,
     opusclip:   initOpusClip,
     uppost:     initUpPost,
+    trendonay:  initTrendOnay,
   };
   if (h[id]) try { h[id](); } catch(e) { console.error(id, e); }
 }
@@ -3888,6 +3908,117 @@ async function vpSend() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// TREND ONAY — Kworb'un bulduğu videoları panelden onaya alma
+// ═══════════════════════════════════════════════════════════
+const TR = { pending: [] };
+const TR_PLAT_LABEL = { ig:'IG', yt:'YT', tt:'TT', fb:'FB', x:'X' };
+function trDur(sec){ sec=parseInt(sec)||0; const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); }
+
+function initTrendOnay() {
+  trFetchPending();
+}
+
+async function trFetchPending() {
+  const base = getN8N();
+  if (!base) return showRes('tr-status','Ayarlar\'dan n8n URL girin','warn');
+  const btn = document.getElementById('tr-fetch-btn');
+  if (btn) btn.disabled = true;
+  showRes('tr-status','⏳ Bekleyenler yükleniyor...','info');
+  try {
+    const data = await n8nGet('/webhook/kworb-bekleyenler');
+    if (!data) { showRes('tr-status','✕ Bekleyenler alınamadı — n8n aktif mi / CORS?','err'); return; }
+    TR.pending = Array.isArray(data.pending) ? data.pending.slice().reverse() : [];  // en yeni önce
+    trRenderPending();
+    showRes('tr-status', TR.pending.length ? ('✓ '+TR.pending.length+' bekleyen video') : 'Bekleyen trend video yok', TR.pending.length?'ok':'info');
+    addLog('ok','webhook','Trend onay: '+TR.pending.length+' bekleyen');
+  } catch(e) {
+    showRes('tr-status','✕ Hata: '+e.message,'err');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function trRenderPending() {
+  const grid = document.getElementById('tr-grid');
+  const empty = document.getElementById('tr-empty');
+  if (!grid) return;
+  if (!TR.pending.length) { grid.innerHTML=''; if (empty) empty.style.display='block'; return; }
+  if (empty) empty.style.display='none';
+  const catOpts = Object.entries(getCats()).map(([k,c])=>`<option value="${k}"${k==='genel'?' selected':''}>${c.label}</option>`).join('');
+  grid.innerHTML = TR.pending.map(v => {
+    const vid = v.videoId;
+    const already = findDupeSend(v.youtubeLink || '');
+    const views = (parseInt(v.viewCount)||0).toLocaleString('tr');
+    const platRow = ['ig','yt','tt','fb','x'].map(p=>`<label style="display:flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="tr-plat" value="${p}" checked style="width:auto;margin:0;accent-color:var(--acc)"> ${TR_PLAT_LABEL[p]}</label>`).join('');
+    return `<div class="card" data-trvid="${vid}" style="padding:0;overflow:hidden">
+      <div class="opc-thumb" style="border-radius:8px 8px 0 0">
+        <img src="${v.thumbnail}" style="width:100%;height:150px;object-fit:cover;display:block" onerror="this.style.display='none'">
+        <span class="opc-dur">${trDur(v.durationSec)}</span>
+        ${already?`<span title="Bu video daha önce panelden gönderilmişti" style="position:absolute;left:6px;top:6px;background:#f59e0b;color:#012;font-size:8px;font-weight:800;padding:2px 8px;border-radius:5px;z-index:4;box-shadow:0 2px 6px rgba(0,0,0,.4)">⚠ ÖNCEDEN GÖNDERİLDİ</span>`:''}
+      </div>
+      <div style="padding:10px 12px">
+        <div style="font-size:11px;font-weight:600;color:var(--tx);line-height:1.3;min-height:28px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.title||vid}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:8px;color:var(--mt);margin:6px 0 8px">
+          <span>👁 ${views} görüntülenme</span>
+          <a href="${v.youtubeLink}" target="_blank" rel="noopener" style="color:var(--acc)">YouTube ↗</a>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:6px">
+          <select class="tr-cat" style="flex:1;font-size:9px">${catOpts}</select>
+          <select class="tr-dil" title="Dil (yalnız Genel için etkili)" style="width:60px;font-size:9px"><option value="tr">TR</option><option value="en">EN</option></select>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:8px;color:var(--mt)">${platRow}</div>
+        <input class="tr-desc" type="text" placeholder="Açıklama / not (isteğe bağlı)" style="width:100%;font-size:9px;margin-bottom:8px"/>
+        <div class="tr-actions" style="display:flex;gap:6px">
+          <button class="btn bp bsm" style="flex:1" onclick="trApprove('${vid}')">✓ Onayla ve Gönder</button>
+          <button class="btn bg bsm" onclick="trReject('${vid}')">✗ Reddet</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function trApprove(videoId) {
+  const v = TR.pending.find(x=>x.videoId===videoId);
+  if (!v) return;
+  const base = getN8N();
+  if (!base) return showRes('tr-status','Ayarlar\'dan n8n URL girin','warn');
+  const card = document.querySelector('[data-trvid="'+videoId+'"]');
+  if (!card) return;
+  const kat  = (card.querySelector('.tr-cat')||{}).value || 'genel';
+  const dil  = (card.querySelector('.tr-dil')||{}).value || 'tr';
+  const plats = [...card.querySelectorAll('.tr-plat:checked')].map(c=>c.value);
+  const aciklama = (card.querySelector('.tr-desc')||{}).value || '';
+  const actions = card.querySelector('.tr-actions');
+  if (actions) actions.innerHTML = '<span style="color:var(--mt);font-size:9px">⏳ Gönderiliyor...</span>';
+  const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
+  const path = CAT_WH[kat] || '/webhook/video-gonder';
+  const payload = {'Youtube linki': v.youtubeLink, kaynak:'kworb-onay', kategori:kat, dil, platformlar:plats, aciklama_notu:aciklama};
+  const res = await faf(base + path, payload);
+  if (res && res.ok === true) {
+    recordSend(v.youtubeLink, kat);
+    await faf(base + '/webhook/kworb-pending-sil', {videoId});   // kuyruktan çıkar
+    TR.pending = TR.pending.filter(x=>x.videoId!==videoId);
+    trRenderPending();
+    showRes('tr-status','✓ Onaylandı ve işleme alındı ['+kat+']: '+(v.title||'').slice(0,40),'ok');
+    addLog('ok','webhook','Trend onay gönderildi ['+kat+']: '+(v.title||videoId).slice(0,40));
+  } else {
+    if (actions) actions.innerHTML = '<button class="btn bp bsm" style="flex:1" onclick="trApprove(\''+videoId+'\')">✓ Onayla ve Gönder</button><button class="btn bg bsm" onclick="trReject(\''+videoId+'\')">✗ Reddet</button>';
+    showRes('tr-status','✕ Gönderilemedi (n8n/CORS) — tekrar dene','err');
+  }
+}
+
+async function trReject(videoId) {
+  const v = TR.pending.find(x=>x.videoId===videoId);
+  const base = getN8N();
+  if (!base) return showRes('tr-status','Ayarlar\'dan n8n URL girin','warn');
+  await faf(base + '/webhook/kworb-pending-sil', {videoId});
+  TR.pending = TR.pending.filter(x=>x.videoId!==videoId);
+  trRenderPending();
+  showRes('tr-status','✗ Reddedildi (kuyruktan çıkarıldı)','info');
+  addLog('info','webhook','Trend reddedildi: '+((v&&v.title)||videoId).slice(0,40));
+}
+
+// ═══════════════════════════════════════════════════════════
 // OTO YAKALA — panelden n8n staticData'sına ayar kaydetme
 // ═══════════════════════════════════════════════════════════
 function initOtoYakala() {
@@ -4457,6 +4588,7 @@ document.addEventListener('DOMContentLoaded', function() {
       toggleTheme,applyTheme,
       opcFetchProjects,opcSearchById,opcOpenProject,opcToggleClip,opcSelectAll,opcDeselectAll,opcBackToProjects,opcSendSelected,
       opcMarkSelectedDone,opcUnmarkSelectedDone,
+      initTrendOnay,trFetchPending,trApprove,trReject,
       calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
       loadAllSheetData,loadSheetPage];
