@@ -225,10 +225,56 @@ tbody td{line-height:1.5}
 ::-webkit-scrollbar{width:7px;height:7px}
 ::-webkit-scrollbar-thumb{background:var(--brd);border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:var(--mt)}
+/* ═══ YENİ: Toast bildirimleri ═══ */
+#toast-wrap{position:fixed;top:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:8px;max-width:340px;pointer-events:none}
+.toast{pointer-events:auto;background:var(--sur2);border:1px solid var(--brd);border-left:3px solid var(--acc);border-radius:8px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.4);font-size:11px;color:var(--tx);display:flex;gap:8px;align-items:flex-start;animation:toastIn .22s ease;line-height:1.4}
+.toast.ok{border-left-color:var(--ok)} .toast.err{border-left-color:var(--err)} .toast.warn{border-left-color:#f59e0b} .toast.info{border-left-color:var(--acc)}
+.toast .tx{flex:1;word-break:break-word} .toast .cl{cursor:pointer;color:var(--mt);flex-shrink:0;font-size:13px;line-height:1}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+/* ═══ YENİ: Gönderim kuyruğu paneli ═══ */
+#sq-panel{position:fixed;bottom:16px;right:16px;z-index:9500;width:320px;max-height:60vh;background:var(--sur2);border:1px solid var(--acc);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden}
+#sq-panel.on{display:flex}
+#sq-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--brd);background:rgba(0,229,255,.05)}
+#sq-head b{font-size:11px;color:var(--tx)} #sq-head .sq-x{cursor:pointer;color:var(--mt);font-size:14px}
+#sq-body{overflow-y:auto;padding:6px}
+.sq-item{display:flex;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--brd);font-size:9px}
+.sq-item .sq-st{width:16px;height:16px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
+.sq-st.wait{background:var(--brd);color:var(--mt)} .sq-st.run{background:#f59e0b;color:#000;animation:pulse 1s infinite} .sq-st.ok{background:var(--ok);color:#012} .sq-st.err{background:var(--err);color:#fff}
+.sq-item .sq-tx{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)}
+.sq-item .sq-badge{font-size:7px;padding:1px 5px;border-radius:3px;background:rgba(0,229,255,.12);color:var(--acc)}
+.sq-item .sq-retry{cursor:pointer;color:var(--acc);font-size:8px;border:1px solid var(--acc);border-radius:3px;padding:1px 5px}
+#sq-foot{padding:7px 12px;border-top:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--mt);gap:8px}
+/* ═══ YENİ: Header servis durum noktaları ═══ */
+.svc-dots{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+.svc-dot{display:flex;align-items:center;gap:3px;font-size:8px;color:var(--mt);cursor:default}
+.svc-dot .d{width:7px;height:7px;border-radius:50%;background:var(--mt)}
+.svc-dot .d.ok{background:var(--ok)} .svc-dot .d.err{background:var(--err)} .svc-dot .d.warn{background:#f59e0b}
+/* ═══ YENİ: Menü rozetleri ═══ */
+.ni{position:relative}
+.ni-badge{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--err);color:#fff;font-size:8px;font-weight:700;min-width:15px;height:15px;padding:0 4px;border-radius:8px;display:none;align-items:center;justify-content:center;line-height:1}
+.ni-badge.on{display:flex} .ni-badge.acc{background:var(--acc);color:#012}
+/* ═══ YENİ: Komut paleti ═══ */
+#cmdk{position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:12vh}
+#cmdk.on{display:flex}
+#cmdk-box{width:min(520px,92vw);background:var(--sur2);border:1px solid var(--acc);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.6);overflow:hidden}
+#cmdk-in{width:100%;border:none;border-bottom:1px solid var(--brd);background:transparent;color:var(--tx);font-size:14px;padding:14px 16px;outline:none}
+#cmdk-list{max-height:52vh;overflow-y:auto;padding:6px}
+.cmdk-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--tx)}
+.cmdk-row.sel,.cmdk-row:hover{background:rgba(0,229,255,.1)}
+.cmdk-row .ci{width:18px;text-align:center;color:var(--acc)} .cmdk-row .csub{font-size:9px;color:var(--mt);margin-left:auto}
 </style>
 </head>
 <body>
 <div class="app">
+
+<!-- YENİ: Toast, Gönderim Kuyruğu, Komut Paleti -->
+<div id="toast-wrap"></div>
+<div id="sq-panel">
+  <div id="sq-head"><b>▶ Gönderim Kuyruğu</b><span class="sq-x" onclick="sqHide()" title="Kapat">✕</span></div>
+  <div id="sq-body"></div>
+  <div id="sq-foot"><span id="sq-summary">—</span><span><span class="sq-retry" onclick="sqRetryFailed()" id="sq-retry-all" style="display:none">↻ Başarısızları tekrar dene</span> <span onclick="sqClearDone()" style="cursor:pointer;color:var(--mt)">temizle</span></span></div>
+</div>
+<div id="cmdk"><div id="cmdk-box"><input id="cmdk-in" type="text" placeholder="Sayfa ara veya komut yaz…  (Esc kapat)" oninput="cmdkFilter()" onkeydown="cmdkKey(event)"/><div id="cmdk-list"></div></div></div>
 
 <aside class="sb">
   <div class="sb-logo" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
@@ -240,11 +286,17 @@ tbody td{line-height:1.5}
             style="background:transparent;border:1px solid var(--brd);color:var(--tx);cursor:pointer;padding:5px 8px;border-radius:4px;font-size:14px;line-height:1;flex-shrink:0"
             aria-label="Tema değiştir">🌙</button>
   </div>
+  <div class="svc-dots" id="svc-dots" onclick="svcCheck()" title="Servis durumu — yenilemek için tıkla" style="cursor:pointer;padding:0 4px 4px">
+    <span class="svc-dot" title="n8n bağlantısı"><span class="d" id="svc-n8n"></span>n8n</span>
+    <span class="svc-dot" title="Upload-Post API"><span class="d" id="svc-up"></span>UP</span>
+    <span class="svc-dot" title="OpusClip API"><span class="d" id="svc-opc"></span>OPC</span>
+    <span class="svc-dot" title="YouTube API"><span class="d" id="svc-yt"></span>YT</span>
+  </div>
   <nav>
     <div class="ns">Ana</div>
     <div class="ni active" onclick="go('dashboard',this)"><span class="ic">▦</span>Dashboard</div>
     <div class="ni" onclick="go('video',this)"><span class="ic">▶</span>Video Gönder</div>
-    <div class="ni" onclick="go('trendonay',this)"><span class="ic">🔥</span>Trend Onay</div>
+    <div class="ni" onclick="go('trendonay',this)"><span class="ic">🔥</span>Trend Onay<span class="ni-badge acc" id="badge-tr"></span></div>
     <div class="ni" onclick="go('ytara',this)"><span class="ic">⊕</span>YouTube Ara</div>
     <div class="ni" onclick="go('ytkanal',this)"><span class="ic">📺</span>YT Kanal Ara</div>
     <div class="ni" onclick="go('yayin',this)"><span class="ic">📡</span>Yayın Tekrarları</div>
@@ -260,6 +312,7 @@ tbody td{line-height:1.5}
     <div class="ni" onclick="go('shortlist',this)"><span class="ic">◎</span>Short Listesi</div>
     <div class="ni" onclick="go('urltakip',this)"><span class="ic">⊙</span>URL Takip</div>
     <div class="ns">Analiz</div>
+    <div class="ni" onclick="go('gecmis',this)"><span class="ic">🕘</span>Gönderim Geçmişi</div>
     <div class="ni" onclick="go('raporlar',this)"><span class="ic">◈</span>Raporlar</div>
     <div class="ni" onclick="go('takvim',this)"><span class="ic">◫</span>Takvim</div>
     <div class="ni" onclick="go('platformlar',this)"><span class="ic">◎</span>Platformlar</div>
@@ -267,7 +320,7 @@ tbody td{line-height:1.5}
     <div class="ns">Sistem</div>
     <div class="ni" onclick="go('otoyakala',this)"><span class="ic">🎯</span>Oto Yakala</div>
     <div class="ni" onclick="go('ayarlar',this)"><span class="ic">⊞</span>Ayarlar</div>
-    <div class="ni" onclick="go('loglar',this)"><span class="ic">⊟</span>Loglar</div>
+    <div class="ni" onclick="go('loglar',this)"><span class="ic">⊟</span>Loglar<span class="ni-badge" id="badge-log"></span></div>
   </nav>
   <div class="sb-foot"><span class="dot"></span><span id="conn-status">Hazır</span></div>
 </aside>
@@ -277,6 +330,16 @@ tbody td{line-height:1.5}
 <!-- DASHBOARD -->
 <div id="page-dashboard" class="page active">
   <div class="ph"><div class="pt">Dashboard</div><div class="ps">Canlı veriler — Upload-Post + Google Sheets</div></div>
+  <!-- YENİ: Hızlı Gönder -->
+  <div class="card" style="margin-bottom:14px;border:1px solid rgba(0,229,255,.25)">
+    <div class="ct">⚡ Hızlı Gönder</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="qs-url" type="text" placeholder="YouTube linki yapıştır…" style="flex:1;min-width:200px;margin:0" onkeydown="if(event.key==='Enter')qsSend()"/>
+      <select id="qs-cat" style="width:130px;font-size:10px"></select>
+      <button class="btn bp bsm" onclick="qsSend()">▶ Gönder</button>
+    </div>
+    <div id="qs-res" class="res" style="margin-top:8px"></div>
+  </div>
   <div id="sheets-hint" class="alert aw" style="display:none;margin-bottom:10px">
     <span>⚠</span>
     <div>
@@ -1159,6 +1222,21 @@ tbody td{line-height:1.5}
   </div>
 </div>
 
+<!-- GÖNDERİM GEÇMİŞİ -->
+<div id="page-gecmis" class="page">
+  <div class="ph"><div class="pt">Gönderim Geçmişi</div><div class="ps">Panelden otomasyona gönderilen tüm videolar — tek yerde ara, filtrele, tekrar gönder</div></div>
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input id="gc-search" type="text" placeholder="Link / kategori ara…" style="flex:1;min-width:180px;margin:0" oninput="renderGecmis()"/>
+      <select id="gc-filter" style="width:150px;font-size:10px" onchange="renderGecmis()"><option value="">Tüm kategoriler</option></select>
+      <span id="gc-count" style="font-size:9px;color:var(--mt)"></span>
+      <button class="btn bg bsm" onclick="gcClearAll()" title="Tüm geçmişi sil">🗑 Temizle</button>
+    </div>
+  </div>
+  <div id="gc-list" style="display:flex;flex-direction:column;gap:6px"></div>
+  <div id="gc-empty" class="card" style="display:none;text-align:center;padding:32px;color:var(--mt)"><div style="font-size:28px;margin-bottom:8px">🕘</div><div style="font-size:11px">Henüz gönderim yok</div></div>
+</div>
+
 <!-- TAKVİM -->
 <div id="page-takvim" class="page">
   <div class="ph"><div class="pt">Takvim</div><div class="ps">Upload-Post yayın takvimi — zamanlanmış (⏰) + yayınlanmış (✓) postlar</div></div>
@@ -1462,7 +1540,9 @@ function go(id, el) {
   page.classList.add('active');
   el.classList.add('active');
   const h = {
-    dashboard: refreshDash, loglar: renderLogs,
+    dashboard: ()=>{ refreshDash(); qsInit(); },
+    loglar:     ()=>{ renderLogs(); refreshBadges(); },
+    gecmis:     initGecmis,
     platformlar: loadPlatforms,
     takvim:     loadTakvim,
     kuyruk:     ()=>loadSheetPage('kuyruk'),
@@ -4579,6 +4659,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setEl('dr-sent-cnt', S.sentURLs.size);
     addLog('ok','sistem','Panel v9 baslatildi — Kanal Listesi Arama/Video Detay/Kworb');
     toggleAutoLog();
+    // YENİ: hızlı gönder, servis durumu, rozetler
+    try { qsInit(); } catch(e){}
+    setTimeout(()=>{ try{ svcCheck(); }catch(e){} try{ refreshBadges(); }catch(e){} }, 800);
     // Tüm global fonksiyonları window'a bağla
     const globals = [go,showTab,refreshDash,sendSingle,sendBulkURLs,sendSearch,
       addKW,removeKW,sendBulkKW,loadDriveSheet,sendDriveURLs,clearSentURLs,
@@ -5048,9 +5131,166 @@ document.addEventListener('mousemove', e => {
   if (tip && tip.style.display !== 'none') positionTip(e, tip);
 });
 
-// Escape ile gün modalını kapat
+// ═══════════════════════════════════════════════════════════
+// YENİ ÖZELLİKLER — toast, kuyruk, servis durumu, geçmiş,
+// rozetler, hızlı gönder, komut paleti, kısayollar
+// ═══════════════════════════════════════════════════════════
+// #3 TOAST
+function toast(msg, type, ms) {
+  const wrap = document.getElementById('toast-wrap'); if (!wrap) return;
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type||'info');
+  el.innerHTML = '<span class="tx"></span><span class="cl">✕</span>';
+  el.querySelector('.tx').textContent = msg;
+  el.querySelector('.cl').onclick = () => el.remove();
+  wrap.appendChild(el);
+  const t = ms==null ? (type==='err'?7000:4000) : ms;
+  if (t>0) setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, t);
+}
+// #10 BATCH AYARLARI
+function opBatchMax()   { return parseInt(S.cfg.batchMax) || 15; }
+function opBatchDelay() { return (parseInt(S.cfg.batchDelay) || 8) * 1000; }
+// #2 GÖNDERİM KUYRUĞU
+const SQ = { items: [], seq: 0 };
+function sqShow(){ const p=document.getElementById('sq-panel'); if(p) p.classList.add('on'); }
+function sqHide(){ const p=document.getElementById('sq-panel'); if(p) p.classList.remove('on'); }
+function sqAdd(label, badge, sender) { const id=++SQ.seq; SQ.items.push({id,label,badge:badge||'',status:'wait',sender}); sqRender(); sqShow(); return id; }
+function sqSet(id, status) { const it=SQ.items.find(x=>x.id===id); if(it){ it.status=status; sqRender(); } }
+function sqRender() {
+  const body=document.getElementById('sq-body'); if(!body) return;
+  body.innerHTML = SQ.items.slice(-60).map(it=>{
+    const icon={wait:'•',run:'⋯',ok:'✓',err:'✕'}[it.status]||'•';
+    const retry = it.status==='err' && it.sender ? `<span class="sq-retry" onclick="sqRetryOne(${it.id})">↻</span>` : '';
+    return `<div class="sq-item"><span class="sq-st ${it.status}">${icon}</span><span class="sq-tx" title="${(it.label||'').replace(/"/g,'&quot;')}">${it.label||''}</span>${it.badge?`<span class="sq-badge">${it.badge}</span>`:''}${retry}</div>`;
+  }).join('');
+  const ok=SQ.items.filter(x=>x.status==='ok').length, err=SQ.items.filter(x=>x.status==='err').length, pend=SQ.items.filter(x=>x.status==='wait'||x.status==='run').length;
+  const sum=document.getElementById('sq-summary'); if(sum) sum.textContent=`✓ ${ok} · ✕ ${err} · ⋯ ${pend}`;
+  const ra=document.getElementById('sq-retry-all'); if(ra) ra.style.display = err>0 ? 'inline' : 'none';
+}
+async function sqRetryOne(id) { const it=SQ.items.find(x=>x.id===id); if(!it||!it.sender) return; sqSet(id,'run'); const ok=await it.sender(); sqSet(id, ok?'ok':'err'); refreshBadges(); }
+async function sqRetryFailed() { const f=SQ.items.filter(x=>x.status==='err'&&x.sender); for(const it of f){ await sqRetryOne(it.id); await sleep(opBatchDelay()); } toast('Başarısızlar tekrar denendi','info'); }
+function sqClearDone(){ SQ.items=SQ.items.filter(x=>x.status==='wait'||x.status==='run'); sqRender(); if(!SQ.items.length) sqHide(); }
+// Batch'i kuyruk + pacing + toast ile çalıştır. tasks:[{label,badge,send:async()=>bool}]
+async function sqRunBatch(tasks, opts) {
+  opts=opts||{}; if(!tasks.length) return {ok:0,err:0};
+  if (tasks.length > opBatchMax()) {
+    if(!confirm(`${tasks.length} gönderim yapılacak. Tek seferde çok fazla gönderim n8n Cloud / Upload-Post'u zorlayıp 524/404 hatasına yol açabilir.\n\nDevam edilsin mi?`)){ toast('İptal edildi','warn'); return {ok:0,err:0,cancel:true}; }
+  }
+  const delay = tasks.length>opBatchMax() ? Math.max(opBatchDelay(),20000) : opBatchDelay();
+  let ok=0, err=0;
+  for(let i=0;i<tasks.length;i++){
+    const t=tasks[i]; const id=sqAdd(t.label,t.badge,t.send); sqSet(id,'run');
+    let res=false; try{ res=await t.send(); }catch(e){ res=false; }
+    sqSet(id,res?'ok':'err'); res?ok++:err++;
+    if(i<tasks.length-1) await sleep(delay);
+  }
+  toast(`${opts.name||'Gönderim'}: ✓ ${ok}${err?` · ✕ ${err}`:''}`, err?'warn':'ok');
+  refreshBadges();
+  return {ok,err};
+}
+// #1 SERVİS DURUMU + #13 KOTA
+function svcSet(id, cls, title){ const d=document.getElementById(id); if(d){ d.className='d '+(cls||''); const p=d.closest('.svc-dot'); if(p&&title) p.title=title; } }
+async function svcCheck() {
+  const base=getN8N();
+  if(!base) svcSet('svc-n8n','warn','n8n URL girilmemiş (Ayarlar)');
+  else { try { const r=await fetch(base+'/webhook/kworb-bekleyenler',{method:'GET',mode:'cors'}); svcSet('svc-n8n',r.ok?'ok':'err',r.ok?'n8n bağlı ✓':('n8n HTTP '+r.status+' — workflow Active mi?')); } catch(e){ svcSet('svc-n8n','err','n8n erişilemiyor / CORS — workflow Active mi?'); } }
+  if(!S.cfg.blot) svcSet('svc-up','warn','Upload-Post API Key yok');
+  else { try { const r=await fetch('https://api.upload-post.com/api/uploadposts/users',{headers:{'Authorization':'Apikey '+S.cfg.blot}}); svcSet('svc-up',r.ok?'ok':'err',r.ok?'Upload-Post ✓':'Upload-Post HTTP '+r.status); } catch(e){ svcSet('svc-up','err','Upload-Post erişilemiyor'); } }
+  if(!S.cfg.opus) svcSet('svc-opc','warn','OpusClip API Key yok');
+  else { try { const r=await fetch('https://api.opus.pro/api/clip-projects?pageSize=100',{headers:{'Authorization':'Bearer '+S.cfg.opus}}); if(!r.ok){ svcSet('svc-opc','err','OpusClip HTTP '+r.status); } else { const j=await r.json(); const list=(j.list||j.data||[]); const active=list.filter(p=>String(p.stage||'').toUpperCase()!=='COMPLETE').length; svcSet('svc-opc',active>=10?'warn':'ok',`OpusClip ✓ · ${active}/10 aktif proje`); } } catch(e){ svcSet('svc-opc','err','OpusClip erişilemiyor'); } }
+  const ytk=(S.cfg.ytApiKey||S.cfg.shkey||'');
+  if(!ytk) svcSet('svc-yt','warn','YouTube API Key yok');
+  else { try { const r=await fetch('https://www.googleapis.com/youtube/v3/videos?part=id&chart=mostPopular&maxResults=1&regionCode=TR&key='+ytk); svcSet('svc-yt',r.ok?'ok':'err',r.ok?'YouTube API ✓':'YouTube API HTTP '+r.status+' (kota/anahtar?)'); } catch(e){ svcSet('svc-yt','err','YouTube API erişilemiyor'); } }
+}
+// #6 ROZETLER / SAYAÇLAR
+async function refreshBadges() {
+  const errs=(S.logs||[]).filter(l=>l.sev==='err').length;
+  const bl=document.getElementById('badge-log'); if(bl){ bl.textContent=errs>99?'99+':errs; bl.classList.toggle('on',errs>0); }
+  const base=getN8N();
+  if(base){ try { const d=await n8nGet('/webhook/kworb-bekleyenler'); const n=(d&&d.count!=null)?d.count:((d&&d.pending)?d.pending.length:0); const bt=document.getElementById('badge-tr'); if(bt){ bt.textContent=n>99?'99+':n; bt.classList.toggle('on',n>0); } } catch(e){} }
+}
+// #8 GÖNDERİM GEÇMİŞİ
+function initGecmis() {
+  const f=document.getElementById('gc-filter');
+  if(f){ const cats=[...new Set(Object.values(S.sentLog).map(x=>(x.kategori||'').split(/[, ]+/)[0]).filter(Boolean))]; f.innerHTML='<option value="">Tüm kategoriler</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join(''); }
+  renderGecmis();
+}
+function renderGecmis() {
+  const list=document.getElementById('gc-list'), empty=document.getElementById('gc-empty'); if(!list) return;
+  const q=((document.getElementById('gc-search')||{}).value||'').toLowerCase();
+  const fk=(document.getElementById('gc-filter')||{}).value||'';
+  let rows=Object.entries(S.sentLog).map(([k,v])=>({key:k,...v}));
+  rows.sort((a,b)=> (new Date(b.t)||0)-(new Date(a.t)||0));
+  if(q) rows=rows.filter(r=>(r.url||'').toLowerCase().includes(q)||(r.kategori||'').toLowerCase().includes(q));
+  if(fk) rows=rows.filter(r=>String(r.kategori||'').split(/[, ]+/).includes(fk));
+  const cnt=document.getElementById('gc-count'); if(cnt) cnt.textContent=rows.length+' kayıt';
+  if(!rows.length){ list.innerHTML=''; if(empty) empty.style.display='block'; return; }
+  if(empty) empty.style.display='none';
+  list.innerHTML=rows.slice(0,300).map(r=>`<div class="card" style="padding:8px 12px;display:flex;align-items:center;gap:10px">
+    <div style="flex:1;min-width:0"><div style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${r.url}" target="_blank" rel="noopener" style="color:var(--acc)">${r.url}</a></div><div style="font-size:8px;color:var(--mt);margin-top:2px">${r.kategori||''} · ${r.t||''}</div></div>
+    <button class="btn bg bsm" onclick="gcResend('${encodeURIComponent(r.url)}','${(r.kategori||'genel').split(/[, ]+/)[0]}')">↻ Tekrar</button>
+  </div>`).join('');
+}
+async function gcResend(encUrl, kat) {
+  const url=decodeURIComponent(encUrl); const base=getN8N();
+  if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
+  const path=CAT_WH[kat]||'/webhook/video-gonder';
+  const id=sqAdd('Tekrar: '+url.slice(0,40), kat, null); sqSet(id,'run');
+  const res=await faf(base+path,{'Youtube linki':url, kaynak:'gecmis-tekrar', kategori:kat, dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
+  sqSet(id,(res&&res.ok===true)?'ok':'err');
+  toast((res&&res.ok===true)?('Tekrar gönderildi ['+kat+']'):'Gönderilemedi (n8n/CORS)', (res&&res.ok===true)?'ok':'err');
+}
+function gcClearAll() {
+  if(!confirm('Tüm gönderim geçmişi silinsin mi? (Yalnız paneldeki kaydı siler, n8n\'i etkilemez)')) return;
+  S.sentLog={}; localStorage.setItem('op_sent_log','{}'); S.sentURLs=new Set(); localStorage.setItem('op_sent','[]');
+  initGecmis(); toast('Geçmiş temizlendi','ok');
+}
+// #14 HIZLI GÖNDER
+function qsInit(){ const s=document.getElementById('qs-cat'); if(s) s.innerHTML=Object.entries(getCats()).map(([k,c])=>`<option value="${k}"${k==='genel'?' selected':''}>${c.label}</option>`).join(''); }
+async function qsSend() {
+  const url=((document.getElementById('qs-url')||{}).value||'').trim();
+  if(!url) return showRes('qs-res','Link girin','err');
+  const kat=(document.getElementById('qs-cat')||{}).value||'genel';
+  const base=getN8N(); if(!base) return showRes('qs-res','Ayarlar\'dan n8n URL girin','warn');
+  if(!confirmDupeSend(url)) return showRes('qs-res','İptal — video zaten gönderilmiş','warn');
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
+  const path=CAT_WH[kat]||'/webhook/video-gonder';
+  showRes('qs-res','⏳ Gönderiliyor…','info');
+  const res=await faf(base+path,{'Youtube linki':url, kaynak:'hizli-gonder', kategori:kat, dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
+  if(res&&res.ok===true){ recordSend(url,kat); showRes('qs-res','✓ Gönderildi ['+kat+']','ok'); toast('Hızlı gönderildi ['+kat+']','ok'); document.getElementById('qs-url').value=''; refreshBadges(); }
+  else showRes('qs-res','✕ Gönderilemedi (n8n/CORS)','err');
+}
+// #11 KOMUT PALETİ
+const CMDK={ all:[], items:[], sel:0 };
+function cmdkBuild() {
+  const pages=[...document.querySelectorAll('.ni')].map(ni=>{ const m=(ni.getAttribute('onclick')||'').match(/go\('([^']+)'/); return m?{type:'page',id:m[1],label:ni.textContent.trim(),icon:((ni.querySelector('.ic')||{}).textContent||'▸')}:null; }).filter(Boolean);
+  CMDK.all=[...pages,{type:'act',label:'Servis durumunu yenile',icon:'⟳',run:svcCheck},{type:'act',label:'Gönderim kuyruğunu göster',icon:'▶',run:sqShow}];
+}
+function cmdkOpen(){ cmdkBuild(); document.getElementById('cmdk').classList.add('on'); const inp=document.getElementById('cmdk-in'); inp.value=''; CMDK.sel=0; cmdkFilter(); setTimeout(()=>inp.focus(),30); }
+function cmdkClose(){ document.getElementById('cmdk').classList.remove('on'); }
+function cmdkFilter(){
+  const q=((document.getElementById('cmdk-in')||{}).value||'').toLowerCase();
+  CMDK.items=(CMDK.all||[]).filter(it=>it.label.toLowerCase().includes(q)); CMDK.sel=0;
+  const list=document.getElementById('cmdk-list');
+  list.innerHTML=CMDK.items.map((it,i)=>`<div class="cmdk-row ${i===0?'sel':''}" onclick="cmdkExec(${i})"><span class="ci">${it.icon}</span><span>${it.label}</span><span class="csub">${it.type==='page'?'sayfa':'komut'}</span></div>`).join('')||'<div style="padding:14px;color:var(--mt);font-size:11px">Sonuç yok</div>';
+}
+function cmdkExec(i){ const it=CMDK.items[i]; if(!it) return; cmdkClose(); if(it.type==='page'){ const ni=[...document.querySelectorAll('.ni')].find(n=>(n.getAttribute('onclick')||'').includes("'"+it.id+"'")); if(ni) ni.click(); } else if(it.run) it.run(); }
+function cmdkKey(e){
+  if(e.key==='ArrowDown'){ e.preventDefault(); CMDK.sel=Math.min(CMDK.sel+1,CMDK.items.length-1); cmdkHi(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); CMDK.sel=Math.max(CMDK.sel-1,0); cmdkHi(); }
+  else if(e.key==='Enter'){ e.preventDefault(); cmdkExec(CMDK.sel); }
+  else if(e.key==='Escape'){ cmdkClose(); }
+}
+function cmdkHi(){ document.querySelectorAll('.cmdk-row').forEach((r,i)=>r.classList.toggle('sel',i===CMDK.sel)); const el=document.querySelector('.cmdk-row.sel'); if(el) el.scrollIntoView({block:'nearest'}); }
+
+// Yeni fonksiyonları global yap (inline onclick için)
+[toast,sqShow,sqHide,sqRetryOne,sqRetryFailed,sqClearDone,svcCheck,refreshBadges,initGecmis,renderGecmis,gcResend,gcClearAll,qsSend,cmdkFilter,cmdkKey,cmdkExec].forEach(fn=>{ if(typeof fn==='function') window[fn.name]=fn; });
+
+// #12 KLAVYE KISAYOLLARI + Escape
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeDayModal();
+  if ((e.ctrlKey||e.metaKey) && (e.key==='k'||e.key==='K')) { e.preventDefault(); cmdkOpen(); return; }
+  if (e.key === 'Escape') { cmdkClose(); closeDayModal(); }
 });
 </script>
 </body>
