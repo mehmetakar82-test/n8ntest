@@ -2621,21 +2621,21 @@ function platCloseModal() { const m = document.getElementById('plat-modal'); if 
 // ── Upload-Post analytics + sayfalar/board'lar için ortak fetch ──
 // n8n proxy yoksa doğrudan API'ye gider (S.cfg.blot ile)
 async function upFetch(path) {
-  const base = getN8N();
-  // Öncelik: n8n proxy (CORS izinli); fallback: doğrudan API
-  if (base) {
-    try {
-      const r = await fetch(base + '/webhook/uploadpost-proxy?path=' + encodeURIComponent(path));
-      if (r.ok) return { data: await r.json(), src: 'n8n proxy' };
-    } catch(e) { /* devam */ }
+  if (S.cfg.blot) {
+    const r = await fetch('https://api.upload-post.com/api' + path, {
+      headers: { 'Authorization': 'Apikey ' + S.cfg.blot }
+    });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + (j.message||j.error||'?'));
+    return { data: j, src: 'doğrudan API' };
   }
-  if (!S.cfg.blot) throw new Error('Upload-Post API Key yok (Ayarlar → Upload-Post API Key)');
-  const r = await fetch('https://api.upload-post.com/api' + path, {
-    headers: { 'Authorization': 'Apikey ' + S.cfg.blot }
-  });
-  const j = await r.json().catch(()=>({}));
-  if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + (j.message||j.error||'?'));
-  return { data: j, src: 'doğrudan API' };
+  const base = getN8N();
+  if (base) {
+    const r = await fetch(base + '/webhook/uploadpost-proxy?path=' + encodeURIComponent(path));
+    if (r.ok) return { data: await r.json(), src: 'n8n proxy' };
+    throw new Error('Proxy hatası: HTTP ' + r.status);
+  }
+  throw new Error('Upload-Post API Key yok (Ayarlar → Upload-Post API Key)');
 }
 
 // Analytics endpoint: /analytics/{profile}?platforms=instagram,youtube,...
@@ -2716,20 +2716,14 @@ async function upPostSend() {
   showRes('up-res', '⏳ Yükleniyor…', 'info');
   addLog('info','uploadpost','Yükleme başlatıldı: '+user+' ['+plats.join(',')+']');
   try {
-    // n8n proxy tercih (multipart POST). Yoksa doğrudan API.
-    const base = getN8N();
     let r, src = '';
-    if (base) {
-      r = await fetch(base + '/webhook/uploadpost-proxy', { method:'POST', body: fd });
-      src = 'n8n proxy';
-      if (!r.ok && S.cfg.blot) {
-        // Proxy başarısız, doğrudan API dene
-        r = await fetch('https://api.upload-post.com/api/upload', { method:'POST', body: fd, headers: { 'Authorization': 'Apikey ' + S.cfg.blot } });
-        src = 'doğrudan API (proxy başarısız)';
-      }
-    } else {
+    if (S.cfg.blot) {
       r = await fetch('https://api.upload-post.com/api/upload', { method:'POST', body: fd, headers: { 'Authorization': 'Apikey ' + S.cfg.blot } });
       src = 'doğrudan API';
+    } else {
+      const base = getN8N();
+      r = await fetch(base + '/webhook/uploadpost-proxy', { method:'POST', body: fd });
+      src = 'n8n proxy';
     }
     const j = await r.json().catch(()=>({}));
     if (!r.ok || j.success === false) throw new Error('HTTP ' + r.status + ': ' + (j.message||j.error||JSON.stringify(j).slice(0,120)));
