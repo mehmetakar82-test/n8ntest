@@ -3953,6 +3953,9 @@ function trRenderPending() {
     const vid = v.videoId;
     const already = findDupeSend(v.youtubeLink || '');
     const views = (parseInt(v.viewCount)||0).toLocaleString('tr');
+    const channel = v.channelTitle || '';
+    let pub = '';
+    if (v.publishedAt) { const d = new Date(v.publishedAt); if (!isNaN(d)) pub = d.toLocaleDateString('tr',{day:'2-digit',month:'short',year:'numeric'}); }
     const platRow = ['ig','yt','tt','fb','x'].map(p=>`<label style="display:flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="tr-plat" value="${p}" checked style="width:auto;margin:0;accent-color:var(--acc)"> ${TR_PLAT_LABEL[p]}</label>`).join('');
     return `<div class="card" data-trvid="${vid}" style="padding:0;overflow:hidden">
       <div class="opc-thumb" style="border-radius:8px 8px 0 0">
@@ -3962,8 +3965,9 @@ function trRenderPending() {
       </div>
       <div style="padding:10px 12px">
         <div style="font-size:11px;font-weight:600;color:var(--tx);line-height:1.3;min-height:28px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.title||vid}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:8px;color:var(--mt);margin:6px 0 8px">
-          <span>👁 ${views} görüntülenme</span>
+        ${channel ? `<div style="font-size:8px;color:var(--tx);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${channel.replace(/"/g,'&quot;')}">📺 ${channel}</div>` : ''}
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:8px;color:var(--mt);margin:5px 0 8px">
+          <span>👁 ${views}${pub?` · 📅 ${pub}`:''}</span>
           <a href="${v.youtubeLink}" target="_blank" rel="noopener" style="color:var(--acc)">YouTube ↗</a>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:6px">
