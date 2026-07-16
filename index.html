@@ -3955,7 +3955,8 @@ const OPC = {
   projects: [],
   clips: [],
   selectedClips: new Set(),
-  currentProjectId: null
+  currentProjectId: null,
+  orgId: ''
 };
 
 function getOpusKey() { return S.cfg.opus || ''; }
@@ -3982,11 +3983,14 @@ function extractClipId(raw) {
 async function opcApiFetch(url) {
   const key = getOpusKey();
   if (!key) throw new Error('OpusClip API Key gerekli — Ayarlar sayfasından girin');
-  const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + key } });
+  const hdrs = { 'Authorization': 'Bearer ' + key };
+  if (OPC.orgId) hdrs['x-opus-org-id'] = OPC.orgId;
+  const r = await fetch(url, { headers: hdrs });
   if (!r.ok) {
+    const body = await r.text().catch(()=>'');
     if (r.status === 401) throw new Error('API Key geçersiz — Ayarlar\'dan kontrol edin');
     if (r.status === 403) throw new Error('Erişim reddedildi (403)');
-    throw new Error('API hatası: ' + r.status);
+    throw new Error('API hatası: ' + r.status + (body ? ' — ' + body.substring(0,200) : ''));
   }
   return r.json();
 }
@@ -4000,7 +4004,14 @@ async function opcFetchProjects() {
     if (st) st.innerHTML = '⏳ Projeler yükleniyor...';
     if (btn) btn.disabled = true;
     const data = await opcApiFetch('https://api.opus.pro/api/clip-projects?pageSize=100');
+    console.log('[OPC] raw clip-projects response:', JSON.stringify(data).substring(0,500));
     const projects = Array.isArray(data) ? data : (data.list || data.data || data.projects || data.items || []);
+    if (projects.length) {
+      console.log('[OPC] first project keys:', Object.keys(projects[0]).join(', '));
+      console.log('[OPC] first project:', JSON.stringify(projects[0]).substring(0,500));
+      const org = projects[0].orgId || projects[0].org_id || '';
+      if (org) OPC.orgId = org;
+    }
     OPC.projects = projects;
     if (!projects.length) {
       if (grid) grid.innerHTML = '';
