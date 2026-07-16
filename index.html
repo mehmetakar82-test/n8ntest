@@ -737,7 +737,7 @@ tbody td{line-height:1.5}
       <div class="ct">Seçili Clipleri İşleme Al</div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
         <div class="fg" style="flex:1;min-width:160px"><label>Kategori</label><div class="cat-chips" id="opc-cats"></div></div>
-        <div class="fg" style="min-width:160px"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="opc-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
+        <div class="fg" style="min-width:200px;flex:2"><label>Açıklama <span style="color:var(--mt)">(isteğe bağlı)</span></label><textarea id="opc-aciklama" rows="2" placeholder="Video açıklaması, hashtag vb." style="resize:vertical;min-height:36px"></textarea></div>
         <div class="fg" style="min-width:80px"><label>Aralık (sn)</label><input id="opc-delay" type="number" value="10" min="1" style="width:70px"/></div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
@@ -4185,25 +4185,34 @@ async function opcSendSelected() {
   const delay = parseInt((document.getElementById('opc-delay')||{}).value || 10) * 1000;
   const aciklama = (document.getElementById('opc-aciklama')||{}).value || '';
   const ids = [...OPC.selectedClips];
-  showRes('opc-send-res', `⏳ ${ids.length} clip gönderiliyor...`, 'info');
+  const selectedClipData = OPC.clips.filter(c => ids.includes(c.id || c.clipId || ''));
+  showRes('opc-send-res', `⏳ ${selectedClipData.length} clip gönderiliyor...`, 'info');
   const btn = document.getElementById('opc-send-btn');
   if (btn) btn.disabled = true;
   try {
-    for (let i = 0; i < ids.length; i++) {
+    for (let i = 0; i < selectedClipData.length; i++) {
+      const c = selectedClipData[i];
       await faf(base + '/webhook/opus-clip-direkt', {
-        clip_id: ids[i],
+        clip_id: c.id || c.clipId || '',
+        videoUrl: c.uriForExport || c.exportUrl || c.url || c.uriForPreview || '',
+        title: c.title || c.headline || '',
+        description: c.description || c.summary || c.caption || '',
+        hashtags: c.hashtags || c.keywords || c.tags || '',
+        thumbnailUrl: c.uriForThumbnail || c.thumbnailUrl || '',
+        score: c.score || c.viralScore || 0,
+        durationMs: c.durationMs || 0,
         kategori: kat,
         dil: getSelLang('opc-cats'),
         platformlar: getSelPlatforms('opc-cats'),
         aciklama_notu: aciklama
       });
-      OPC.hist.unshift({id: ids[i], kat, t: new Date().toLocaleString('tr')});
-      if (i < ids.length - 1) await sleep(delay);
+      OPC.hist.unshift({id: c.id||c.clipId||'', kat, t: new Date().toLocaleString('tr')});
+      if (i < selectedClipData.length - 1) await sleep(delay);
     }
     localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
     renderOPCHist();
-    showRes('opc-send-res', `✓ ${ids.length} clip gönderildi [${kat}]`, 'ok');
-    addLog('ok', 'webhook', `OpusClip Galeri: ${ids.length} clip [${kat}]`);
+    showRes('opc-send-res', `✓ ${selectedClipData.length} clip gönderildi [${kat}]`, 'ok');
+    addLog('ok', 'webhook', `OpusClip Galeri: ${selectedClipData.length} clip [${kat}]`);
   } catch(e) {
     showRes('opc-send-res', '✕ Hata: ' + e.message, 'err');
   } finally {
