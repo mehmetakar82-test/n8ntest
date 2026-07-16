@@ -4181,38 +4181,44 @@ async function opcSendSelected() {
   const base = getN8N();
   if (!base) return showRes('opc-send-res', 'Ayarlardan n8n URL girin', 'warn');
   const cats = getSelCatList('opc-cats');
-  const kat = cats[0] || 'genel';
+  if (!cats.length) cats.push('genel');
   const delay = parseInt((document.getElementById('opc-delay')||{}).value || 10) * 1000;
   const aciklama = (document.getElementById('opc-aciklama')||{}).value || '';
   const ids = [...OPC.selectedClips];
   const selectedClipData = OPC.clips.filter(c => ids.includes(c.id || c.clipId || ''));
-  showRes('opc-send-res', `⏳ ${selectedClipData.length} clip gönderiliyor...`, 'info');
+  const totalSend = selectedClipData.length * cats.length;
+  showRes('opc-send-res', `⏳ ${selectedClipData.length} clip × ${cats.length} kategori = ${totalSend} gönderim...`, 'info');
   const btn = document.getElementById('opc-send-btn');
   if (btn) btn.disabled = true;
+  let sent = 0;
   try {
     for (let i = 0; i < selectedClipData.length; i++) {
       const c = selectedClipData[i];
-      await faf(base + '/webhook/opus-clip-direkt', {
-        clip_id: c.id || c.clipId || '',
-        videoUrl: c.uriForExport || c.exportUrl || c.url || c.uriForPreview || '',
-        title: c.title || c.headline || '',
-        description: c.description || c.summary || c.caption || '',
-        hashtags: c.hashtags || c.keywords || c.tags || '',
-        thumbnailUrl: c.uriForThumbnail || c.thumbnailUrl || '',
-        score: c.score || c.viralScore || 0,
-        durationMs: c.durationMs || 0,
-        kategori: kat,
-        dil: getSelLang('opc-cats'),
-        platformlar: getSelPlatforms('opc-cats'),
-        aciklama_notu: aciklama
-      });
-      OPC.hist.unshift({id: c.id||c.clipId||'', kat, t: new Date().toLocaleString('tr')});
-      if (i < selectedClipData.length - 1) await sleep(delay);
+      for (let k = 0; k < cats.length; k++) {
+        const kat = cats[k];
+        await faf(base + '/webhook/opus-clip-direkt', {
+          clip_id: c.id || c.clipId || '',
+          videoUrl: c.uriForExport || c.exportUrl || c.url || c.uriForPreview || '',
+          title: c.title || c.headline || '',
+          description: c.description || c.summary || c.caption || '',
+          hashtags: c.hashtags || c.keywords || c.tags || '',
+          thumbnailUrl: c.uriForThumbnail || c.thumbnailUrl || '',
+          score: c.score || c.viralScore || 0,
+          durationMs: c.durationMs || 0,
+          kategori: kat,
+          dil: getSelLang('opc-cats'),
+          platformlar: getSelPlatforms('opc-cats'),
+          aciklama_notu: aciklama
+        });
+        sent++;
+        OPC.hist.unshift({id: c.id||c.clipId||'', kat, t: new Date().toLocaleString('tr')});
+        if (sent < totalSend) await sleep(delay);
+      }
     }
     localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
     renderOPCHist();
-    showRes('opc-send-res', `✓ ${selectedClipData.length} clip gönderildi [${kat}]`, 'ok');
-    addLog('ok', 'webhook', `OpusClip Galeri: ${selectedClipData.length} clip [${kat}]`);
+    showRes('opc-send-res', `✓ ${selectedClipData.length} clip × ${cats.length} kategori gönderildi [${cats.join(', ')}]`, 'ok');
+    addLog('ok', 'webhook', `OpusClip Galeri: ${selectedClipData.length} clip × ${cats.length} kat [${cats.join(',')}]`);
   } catch(e) {
     showRes('opc-send-res', '✕ Hata: ' + e.message, 'err');
   } finally {
