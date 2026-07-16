@@ -3996,7 +3996,7 @@ async function trApprove(videoId) {
   const res = await faf(base + path, payload);
   if (res && res.ok === true) {
     recordSend(v.youtubeLink, kat);
-    await faf(base + '/webhook/kworb-pending-sil', {videoId});   // kuyruktan çıkar
+    await faf(base + '/webhook/kworb-pending-sil', {videoId, durum:'onaylandı'});   // Sheet'te işaretle
     TR.pending = TR.pending.filter(x=>x.videoId!==videoId);
     trRenderPending();
     showRes('tr-status','✓ Onaylandı ve işleme alındı ['+kat+']: '+(v.title||'').slice(0,40),'ok');
@@ -4011,7 +4011,7 @@ async function trReject(videoId) {
   const v = TR.pending.find(x=>x.videoId===videoId);
   const base = getN8N();
   if (!base) return showRes('tr-status','Ayarlar\'dan n8n URL girin','warn');
-  await faf(base + '/webhook/kworb-pending-sil', {videoId});
+  await faf(base + '/webhook/kworb-pending-sil', {videoId, durum:'reddedildi'});
   TR.pending = TR.pending.filter(x=>x.videoId!==videoId);
   trRenderPending();
   showRes('tr-status','✗ Reddedildi (kuyruktan çıkarıldı)','info');
