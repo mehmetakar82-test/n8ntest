@@ -4415,12 +4415,18 @@ async function opcSendSelected() {
   if (!base) return showRes('opc-send-res', 'Ayarlardan n8n URL girin', 'warn');
   const cats = getSelCatList('opc-cats');
   if (!cats.length) cats.push('genel');
-  const delay = parseInt((document.getElementById('opc-delay')||{}).value || 10) * 1000;
+  let delay = parseInt((document.getElementById('opc-delay')||{}).value || 10) * 1000;
   const aciklama = (document.getElementById('opc-aciklama')||{}).value || '';
   const ids = [...OPC.selectedClips];
   const selectedClipData = OPC.clips.filter(c => ids.includes(c.id || c.clipId || ''));
   const totalSend = selectedClipData.length * cats.length;
-  showRes('opc-send-res', `⏳ ${selectedClipData.length} clip × ${cats.length} kategori = ${totalSend} gönderim...`, 'info');
+  // Büyük batch koruması: çok sayıda gönderim n8n Cloud + Upload-Post'u boğar (524/404)
+  if (totalSend > 15) {
+    const ok = confirm(`${selectedClipData.length} clip × ${cats.length} kategori = ${totalSend} gönderim yapılacak.\n\nHer gönderim ayrı bir OpusClip→Upload-Post işlemi başlatır. Tek seferde çok fazla gönderim n8n Cloud ve Upload-Post'u zorlayıp 524 (zaman aşımı) / 404 hatalarına yol açar.\n\nÖneri: tek seferde ~10-15 gönderimi aşma (daha az clip veya kategori seç).\n\nYine de devam edilsin mi?`);
+    if (!ok) return showRes('opc-send-res','İptal edildi — daha az clip/kategori seçip tekrar dene','warn');
+    if (delay < 20000) delay = 20000;  // büyük batch'te aralığı en az 20sn'ye çıkar (n8n'e nefes aldır)
+  }
+  showRes('opc-send-res', `⏳ ${selectedClipData.length} clip × ${cats.length} kategori = ${totalSend} gönderim (aralık ${Math.round(delay/1000)}sn)...`, 'info');
   const btn = document.getElementById('opc-send-btn');
   if (btn) btn.disabled = true;
   let sent = 0, done = 0, failCount = 0, lastErr = '';
