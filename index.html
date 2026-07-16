@@ -1161,7 +1161,8 @@ tbody td{line-height:1.5}
 
 <!-- TAKVİM -->
 <div id="page-takvim" class="page">
-  <div class="ph"><div class="pt">Takvim</div><div class="ps">Planlanmış short yayınları — aya göre görsel takvim</div></div>
+  <div class="ph"><div class="pt">Takvim</div><div class="ps">Upload-Post yayın takvimi — zamanlanmış (⏰) + yayınlanmış (✓) postlar</div></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den gelir: <b>/uploadposts/schedule</b> (scheduled_date ile zamanlananlar) + <b>/uploadposts/history</b> (yayınlananlar). Ayarlar → Upload-Post API Key gerekli. <b>Not:</b> Kuyruğa atılan (add_to_queue) postların gelecekteki tarihi Upload-Post API'sinden çekilemez — bunlar ancak <b>yayınlandıktan sonra</b> takvimde (geçmiş olarak) görünür.</span></div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
     <button class="btn bg bsm" onclick="takPrev()">← Önceki Ay</button>
     <span id="tak-title" style="font-family:var(--fh);font-size:14px;font-weight:700;color:var(--tx);min-width:140px;text-align:center"></span>
@@ -1172,6 +1173,9 @@ tbody td{line-height:1.5}
       <span class="badge bi" id="tak-f-ig" onclick="takFilter('ig')" style="cursor:pointer">📸 IG</span>
       <span class="badge bi" id="tak-f-yt" onclick="takFilter('yt')" style="cursor:pointer">▶ YT</span>
       <span class="badge bi" id="tak-f-tt" onclick="takFilter('tt')" style="cursor:pointer">♪ TT</span>
+      <span class="badge bi" id="tak-f-fb" onclick="takFilter('fb')" style="cursor:pointer">ⓕ FB</span>
+      <span class="badge bi" id="tak-f-x" onclick="takFilter('x')" style="cursor:pointer">𝕏 X</span>
+      <span class="badge bi" id="tak-f-sch" onclick="takFilter('sch')" style="cursor:pointer">⏰ Planlı</span>
       <span class="badge bgr" id="tak-f-all" onclick="takFilter('all')" style="cursor:pointer">Tümü</span>
     </div>
   </div>
@@ -4609,46 +4613,93 @@ const TAK = {
   year: new Date().getFullYear(),
   month: new Date().getMonth(), // 0-based
   shorts: [],
+  items: [],  // Upload-Post API'den normalize edilmiş {time, plat, r, _url}
   filter: 'all', // 'ig','yt','tt','all'
   byDay: {}, // gün -> items cache (modal için)
 };
 
-const PLAT_COLOR = {ig:'#e1306c', yt:'#ff0000', tt:'#69c9d0'};
-const PLAT_LABEL = {ig:'📸 IG', yt:'▶ YT', tt:'♪ TT'};
+const PLAT_COLOR = {ig:'#e1306c', yt:'#ff0000', tt:'#69c9d0', fb:'#1877f2', x:'#1d9bf0', sch:'#00e5ff'};
+const PLAT_LABEL = {ig:'📸 IG', yt:'▶ YT', tt:'♪ TT', fb:'ⓕ FB', x:'𝕏 X', sch:'⏰ Planlı'};
 
+// Takvim artık Upload-Post API'sinden veri çeker (Sheet'teki schedule kolonları
+// "Upload-Post Queue" metni içeriyor — gerçek tarih yok). İki kaynak:
+//  • /uploadposts/schedule  → scheduled_date ile zamanlanmış (gelecek) postlar
+//  • /uploadposts/history   → yayınlanmış (geçmiş) postlar
+// NOT: add_to_queue (kuyruk) postlarının gelecekteki tarihi API'den ÇEKİLEMEZ;
+// kuyruktakiler ancak yayınlandıktan sonra history'de görünür.
 async function loadTakvim() {
-  let shorts = [];
-  if (S._panelCache) {
-    shorts = S._panelCache.shorts || [];
-  } else {
-    const sid = S.cfg.sheet || '';
-    if (!sid && !S.cfg.shkey) { renderTakvim([]); return; }
-    const sv = await sheetsGet(sid, 'Sheet1!A:Z');
-    shorts = parseSheet(sv);
+  if (!S.cfg.blot && !getN8N()) {
+    setEl('tak-title', 'Upload-Post API Key gerekli');
+    TAK.items = []; renderTakvim(); return;
   }
-  TAK.shorts = shorts;
-  renderTakvim(shorts);
+  TAK.items = [];
+  setEl('tak-title', '⏳ Yükleniyor…');
+  const items = [];
+  const platMap = {instagram:'ig',youtube:'yt',tiktok:'tt',facebook:'fb',x:'x',twitter:'x',threads:'ig',linkedin:'fb'};
+
+  // 1) Zamanlanmış (gelecek) postlar
+  try {
+    const { data } = await upFetch('/uploadposts/schedule');
+    console.log('[TAK] schedule raw:', JSON.stringify(data).slice(0,700));
+    const sched = Array.isArray(data) ? data : (data.scheduled || data.jobs || data.data || data.results || data.posts || data.schedules || []);
+    sched.forEach(s => {
+      const time = s.scheduled_date || s.scheduledDate || s.scheduled_at || s.date || '';
+      if (!time) return;
+      items.push({ time, plat:'sch', r: {
+        title: s.title || s.post_title || '(başlıksız)',
+        'preview-url': s.preview_url || s.previewUrl || '',
+        description: s.caption || s.post_caption || '',
+        'platform-status': 'Planlı ⏰ ' + (s.profile_username || ''),
+        kategori: s.post_type || ''
+      }});
+    });
+  } catch(e) { console.warn('[TAK] schedule hata:', e.message); }
+
+  // 2) Yayın geçmişi
+  try {
+    const { data } = await upFetch('/uploadposts/history?limit=100');
+    console.log('[TAK] history raw:', JSON.stringify(data).slice(0,700));
+    const hist = Array.isArray(data) ? data : (data.history || data.data || data.results || data.posts || data.items || []);
+    hist.forEach(h => {
+      const time = h.upload_timestamp || h.uploaded_at || h.created_at || h.timestamp || h.date || '';
+      if (!time) return;
+      const plat = platMap[String(h.platform || '').toLowerCase()] || 'yt';
+      const ok = h.success !== false;
+      items.push({ time, plat, _url: h.post_url || '', r: {
+        title: h.post_title || h.title || h.post_caption || '(başlıksız)',
+        'preview-url': h.thumbnail || h.preview_url || '',
+        description: h.post_caption || h.caption || '',
+        'platform-status': ok ? 'Yayınlandı ✓' : ('Hata: ' + (h.error_message || '')),
+        kategori: (h.profile_username || '')
+      }});
+    });
+  } catch(e) { console.warn('[TAK] history hata:', e.message); }
+
+  TAK.items = items;
+  console.log('[TAK] toplam item:', items.length);
+  if (!items.length) addLog('warn','sistem','Takvim: Upload-Post API\'den kayıt gelmedi (konsola bak: [TAK])');
+  renderTakvim();
 }
 
 function takFilter(f) {
   TAK.filter = f;
-  ['ig','yt','tt','all'].forEach(k => {
+  ['ig','yt','tt','fb','x','sch','all'].forEach(k => {
     const el = document.getElementById('tak-f-' + k);
     if (!el) return;
     el.style.opacity = (f === k) ? '1' : '0.4';
   });
-  renderTakvim(TAK.shorts);
+  renderTakvim();
 }
 
 function takPrev() {
   TAK.month--;
   if (TAK.month < 0) { TAK.month = 11; TAK.year--; }
-  renderTakvim(TAK.shorts);
+  renderTakvim();
 }
 function takNext() {
   TAK.month++;
   if (TAK.month > 11) { TAK.month = 0; TAK.year++; }
-  renderTakvim(TAK.shorts);
+  renderTakvim();
 }
 
 function renderTakvim(shorts) {
@@ -4682,15 +4733,10 @@ function renderTakvim(shorts) {
   };
 
   const pickK = (r, keys) => { for (const k of keys) { if (r[k]!=null && String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
-  const pIgTime = r => pickK(r, ['ig-schedule','instagram-schedule','ig_scheduled_at','ig-yayin-tarihi','Instagram Schedule']);
-  const pYtTime = r => pickK(r, ['yt-schedule','youtube-schedule','yt_scheduled_at','yt-yayin-tarihi','YouTube Schedule']);
-  const pTtTime = r => pickK(r, ['tt-schedule','tiktok-schedule','tt_scheduled_at','tt-yayin-tarihi','TikTok Schedule']);
 
-  shorts.forEach(r => {
-    const igT = pIgTime(r), ytT = pYtTime(r), ttT = pTtTime(r);
-    if ((TAK.filter === 'all' || TAK.filter === 'ig') && igT) addItem(igT, {r, plat:'ig', time: igT});
-    if ((TAK.filter === 'all' || TAK.filter === 'yt') && ytT) addItem(ytT, {r, plat:'yt', time: ytT});
-    if ((TAK.filter === 'all' || TAK.filter === 'tt') && ttT) addItem(ttT, {r, plat:'tt', time: ttT});
+  // Upload-Post API'den gelen normalize edilmiş item'lar (schedule + history)
+  (TAK.items || []).forEach(it => {
+    if (TAK.filter === 'all' || TAK.filter === it.plat) addItem(it.time, it);
   });
 
   // byDay'i TAK'a kaydet — modal erişimi için
