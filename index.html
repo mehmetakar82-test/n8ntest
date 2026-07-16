@@ -4031,14 +4031,6 @@ async function opcFetchProjects() {
   }
 }
 
-// OpusClip proje objesi (ClipProjectRepresentation) title/thumbnail ALANI İÇERMEZ.
-// Gerçek alanlar: id/projectId, sourceUri, sourceId, sourcePlatform, stage, createdAt.
-function opcYtId(p) {
-  const plat = String(p.sourcePlatform || '').toUpperCase();
-  if ((plat === 'YOUTUBE' || plat === 'YTDLP_LINK') && p.sourceId && /^[\w-]{11}$/.test(p.sourceId)) return p.sourceId;
-  const m = String(p.sourceUri || '').match(/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/);
-  return m ? m[1] : '';
-}
 function opcStageColor(stage) {
   const s = String(stage || '').toUpperCase();
   if (s === 'COMPLETE') return 'var(--ok)';
@@ -4049,25 +4041,24 @@ function opcRenderProjects(projects) {
   const grid = document.getElementById('opc-project-grid');
   if (!grid) return;
   grid.innerHTML = projects.map(p => {
-    const id = p.id || p.projectId || '';
-    const ytId = opcYtId(p);
-    const thumb = ytId ? 'https://img.youtube.com/vi/' + ytId + '/hqdefault.jpg' : '';
-    const plat = String(p.sourcePlatform || '').toUpperCase();
-    const src = p.sourceUri || (ytId ? 'https://youtu.be/' + ytId : '');
-    const title = src || (plat ? plat + ' · ' + (p.sourceId || '') : 'Proje');
-    const date = (p.createdAt || p.created_at || '').slice(0,10);
-    const stage = p.stage || p.status || p.state || '';
+    const si = p.sourceInfo || {};
+    const pid = p.projectId || p.id || '';
+    const thumb = si.thumbnailUrl || '';
+    const plat = String(si.type || '').toUpperCase();
+    const title = si.title || p.title || pid;
+    const date = (p.createdAt || '').slice(0,10);
+    const stage = p.stage || '';
     const statusColor = opcStageColor(stage);
     const thumbHtml = thumb
       ? `<img src="${thumb}" style="width:100%;height:140px;object-fit:cover;border-radius:6px 6px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       : '';
-    return `<div onclick="opcOpenProject('${id}')" style="background:var(--card);border:1px solid var(--brd);border-radius:8px;cursor:pointer;transition:all .15s;overflow:hidden" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--brd)'">
+    return `<div onclick="opcOpenProject('${pid}')" style="background:var(--card);border:1px solid var(--brd);border-radius:8px;cursor:pointer;transition:all .15s;overflow:hidden" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--brd)'">
       ${thumbHtml}
       <div style="display:${thumb?'none':'flex'};align-items:center;justify-content:center;height:140px;background:linear-gradient(135deg,#0a1628,#162a4a);border-radius:6px 6px 0 0;color:var(--acc);font-size:36px">◈</div>
       <div style="padding:10px 12px">
         <div style="font-size:11px;font-weight:600;color:var(--tx);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:9px">
-          <span style="color:var(--mt);font-family:var(--fm)">${String(id).substring(0,12)}</span>
+          <span style="color:var(--mt);font-family:var(--fm)">${String(pid).substring(0,12)}</span>
           ${plat ? `<span class="badge bi">${plat}</span>` : ''}
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:8px">
