@@ -1608,7 +1608,7 @@ async function sendSingle() {
   showRes('sv-res','⏳ Gonderiliyor... ['+selCat+']','info');
   addLog('info','webhook','Video gonderiliyor ['+selCat+']: '+url.slice(0,60));
   const svAciklama = (document.getElementById('sv-aciklama')||{}).value||'';
-  await faf(wh, {'Youtube linki': url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, dil:getSelLang('sv-cats'), aciklama_notu:svAciklama});
+  await faf(wh, {'Youtube linki': url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, dil:getSelLang('sv-cats'), platformlar:getSelPlatforms('sv-cats'), aciklama_notu:svAciklama});
   showRes('sv-res','✓ n8n\'e gonderildi ['+selCat+']','ok');
   recordSend(url, selCat);
   addLog('ok','webhook','Video gonderildi ['+selCat+']');
@@ -1640,7 +1640,7 @@ async function sendBulkURLs() {
       setEl('bv-st',(i+1)+'/'+urls.length+' ['+kat+']: '+u.slice(0,40));
       setStyle('bv-bar','width',((sent+1)/(urls.length*selCats.length)*100)+'%');
       const bvAciklama = (document.getElementById('bv-aciklama')||{}).value||'';
-      await faf(base+path,{'Youtube linki':u, kaynak:'toplu', kategori:kat, dil:getSelLang('bv-cats'), aciklama_notu:bvAciklama});
+      await faf(base+path,{'Youtube linki':u, kaynak:'toplu', kategori:kat, dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama});
       sent++;
     }
     recordSend(u, selCats.join(','));
@@ -1813,7 +1813,7 @@ async function yarSendSelected() {
     for (const kat of cats) {
       const path = CAT_WH[kat] || '/webhook/video-gonder';
       const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
-      await faf(base + path, {'Youtube linki': url, kaynak: 'youtube-arama', kategori: kat, dil: getSelLang('ya-cats'), title: v.title, durationSec: ytkParseDur(v.duration), channelTitle: v.channelTitle||'', aciklama_notu: yaAciklama});
+      await faf(base + path, {'Youtube linki': url, kaynak: 'youtube-arama', kategori: kat, dil: getSelLang('ya-cats'), platformlar: getSelPlatforms('ya-cats'), title: v.title, durationSec: ytkParseDur(v.duration), channelTitle: v.channelTitle||'', aciklama_notu: yaAciklama});
     }
     recordSend(url, cats.join(','));
     sent++;
@@ -1838,7 +1838,7 @@ async function sendSearch() {
   for(const kat of selCats){
     const path = CAT_WH[kat] || '/webhook/youtube-ara';
     const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
-    faf(base+path,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, kategori:kat, dil:getSelLang('ya-cats'), categories:[kat], aciklama_notu:yaAciklama});
+    faf(base+path,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, kategori:kat, dil:getSelLang('ya-cats'), platformlar:getSelPlatforms('ya-cats'), categories:[kat], aciklama_notu:yaAciklama});
   }
   setTimeout(()=>showRes('ya-res','✓ Arama ['+selCats.join(',')+'] baslatildi — n8n arka planda calisiyor','ok'), 1500);
   S.searchHist.unshift({kw, kat:selCats.join(','), t:new Date().toLocaleString('tr')});
@@ -1933,7 +1933,7 @@ async function sendBulkKW() {
       setStyle('bk-pbar','width',((i+1)/kws.length*100)+'%');
       bLog('Gonderiliyor ['+kat+']: "'+kws[i]+'"');
       const bkAciklama = (document.getElementById('bk-aciklama')||{}).value||'';
-      await faf(base+path,{keywords:[kws[i]], anahtar_kelime:kws[i], minDurationSec:parseInt(dur), lang:'tr', kategori:kat, dil:getSelLang('bk-cats'), aciklama_notu:bkAciklama});
+      await faf(base+path,{keywords:[kws[i]], anahtar_kelime:kws[i], minDurationSec:parseInt(dur), lang:'tr', kategori:kat, dil:getSelLang('bk-cats'), platformlar:getSelPlatforms('bk-cats'), aciklama_notu:bkAciklama});
       bLog('✓ "'+kws[i]+'" ['+kat+'] gonderildi');
       addLog('ok','bulk','KW ['+kat+']: '+kws[i]);
     }
@@ -1976,6 +1976,7 @@ function renderCatChips(id) {
   }).join('');
   renderLangToggle(id);
   updateLangVisibility(id);
+  renderPlatToggle(id);
 }
 
 function catChipSingle(el, containerId) {
@@ -2021,6 +2022,37 @@ function updateLangVisibility(containerId) {
 function getSelLang(containerId) {
   const sel = document.querySelector('#'+containerId+'-lang .cat-chip.sel');
   return (sel && sel.dataset.lang) || 'tr';
+}
+
+// ── Yayınlanacak platform seçici (kategori chip'lerinin altında) ────
+// Hepsi varsayılan seçili. Kullanıcı seçimi daraltınca (örn. sadece
+// Facebook) yalnız seçili platformlarda yayın yapılır. n8n tarafında
+// her yayın node'undan önce bir Filter node bu listeyi kontrol eder.
+const PLAT_TOGGLE_LIST = [
+  {k:'ig', label:'📸 Instagram'}, {k:'yt', label:'▶ YouTube'},
+  {k:'tt', label:'♪ TikTok'},    {k:'fb', label:'ⓕ Facebook'},
+  {k:'x',  label:'𝕏 X'}
+];
+function renderPlatToggle(id) {
+  const catsEl = document.getElementById(id);
+  if (!catsEl || document.getElementById(id+'-plat')) return;
+  const div = document.createElement('div');
+  div.id = id+'-plat';
+  div.style.marginTop = '6px';
+  div.innerHTML = '<label style="margin-bottom:3px">Yayınlanacak Platformlar</label><div class="cat-chips">'
+    + PLAT_TOGGLE_LIST.map(p=>'<span class="cat-chip sel" data-plat="'+p.k+'" onclick="platChipToggle(this)">'+p.label+'</span>').join('')
+    + '</div>';
+  // Dil seçici varsa onun altına, yoksa doğrudan kategori chip'lerinin altına ekle
+  const anchor = document.getElementById(id+'-lang') || catsEl;
+  anchor.insertAdjacentElement('afterend', div);
+}
+function platChipToggle(el) { el.classList.toggle('sel'); }
+
+// Seçili platform anahtarlarını döndürür; hiçbiri seçili değilse hepsini
+// döndürür (hiçbir yere yayınlamamak yerine, kaza sonucu tümü kapatılmışsa)
+function getSelPlatforms(containerId) {
+  const sel = [...document.querySelectorAll('#'+containerId+'-plat .cat-chip.sel')].map(c=>c.dataset.plat);
+  return sel.length ? sel : PLAT_TOGGLE_LIST.map(p=>p.k);
 }
 
 // Seçili kategorileri döndür - birden fazla seçim destekler
@@ -2120,7 +2152,7 @@ async function sendDriveURLs() {
     const path=CAT_WH[kat]||'/webhook/video-gonder';
     const drNotCol = (document.getElementById('dr-not-col')||{}).value||'Aciklama Notu';
     const drAciklama = (r[drNotCol]||'').trim();
-    await faf(base+path,{'Youtube linki':url,kaynak:'drive',kategori:kat,dil:getSelLang('dr-cats'),aciklama_notu:drAciklama});
+    await faf(base+path,{'Youtube linki':url,kaynak:'drive',kategori:kat,dil:getSelLang('dr-cats'),platformlar:getSelPlatforms('dr-cats'),aciklama_notu:drAciklama});
     recordSend(url, kat);
     addLog('ok','drive','Drive ['+kat+']: '+url.slice(0,60));
   }
@@ -2178,7 +2210,7 @@ async function sendSheetURLs() {
     setStyle('sh-pbar','width',((i+1)/S.sheetURLs.length*100)+'%');
     const shNotCol = (document.getElementById('sh-not-col')||{}).value||'Aciklama Notu';
     const shAciklama = ((row[shNotCol]||'').trim());
-    await faf(base+path,{'Youtube linki':url,kaynak:'sheets',kategori:kat,dil:getSelLang('sh-cats'),aciklama_notu:shAciklama});
+    await faf(base+path,{'Youtube linki':url,kaynak:'sheets',kategori:kat,dil:getSelLang('sh-cats'),platformlar:getSelPlatforms('sh-cats'),aciklama_notu:shAciklama});
     recordSend(url, kat);
     if(i<S.sheetURLs.length-1) await sleep(mode==='time'?delay:3*60*1000);
   }
@@ -3446,7 +3478,7 @@ async function ytkSendSelected() {
     for (const kat of cats) {
       const path = CAT_WH[kat] || '/webhook/video-gonder';
       const ytkAciklama = (document.getElementById('ytk-aciklama')||{}).value||'';
-      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, dil: getSelLang('ytk-cats'), title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
+      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, dil: getSelLang('ytk-cats'), platformlar: getSelPlatforms('ytk-cats'), title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
     }
     recordSend(url, cats.join(','));
     sent++;
@@ -3695,7 +3727,7 @@ async function strSendVod(i){
   showRes('str-res','⏳ Gönderiliyor: '+v.title.slice(0,40)+'…','info');
   for(const kat of cats){
     const path=CAT_WH[kat]||'/webhook/video-gonder';
-    await faf(base+path,{'Youtube linki':v.url, kaynak:STR.platform, kategori:kat, dil:getSelLang('str-cats'), title:v.title, durationSec:v.sec, channelTitle:(STR.ch&&STR.ch.name)||'', aciklama_notu:note});
+    await faf(base+path,{'Youtube linki':v.url, kaynak:STR.platform, kategori:kat, dil:getSelLang('str-cats'), platformlar:getSelPlatforms('str-cats'), title:v.title, durationSec:v.sec, channelTitle:(STR.ch&&STR.ch.name)||'', aciklama_notu:note});
   }
   showRes('str-res','✓ VOD gönderildi ['+cats.join(',')+'] — '+v.title.slice(0,50),'ok');
   recordSend(v.url, cats.join(','));
@@ -3790,11 +3822,12 @@ async function vpSend() {
   const cats = getSelCatList('vp-cats');
   const kategori = cats[0] || 'genel';
   const dil = getSelLang('vp-cats');
+  const platformlar = getSelPlatforms('vp-cats');
   const aciklama_notu = (document.getElementById('vp-aciklama')||{}).value||'';
   showRes('vp-res','⏳ '+VP.segments.length+' parça gönderiliyor…','info');
   await faf(base+'/webhook/video-parcala', {
     'Youtube linki': url.trim(),
-    kategori, dil, aciklama_notu,
+    kategori, dil, platformlar, aciklama_notu,
     segments: VP.segments,
   });
   showRes('vp-res','✓ '+VP.segments.length+' parça n8n\'e gönderildi ['+kategori+(dil==='en'?'/EN':'')+']','ok');
@@ -3906,7 +3939,7 @@ async function sendOpusClip() {
   if (!base) return showRes('opc-res', 'Ayarlardan n8n URL girin', 'warn');
   showRes('opc-res', `⏳ [${clipId}] işleme alınıyor...`, 'info');
   const opcAciklama = (document.getElementById('opc-aciklama')||{}).value||'';
-  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, dil: getSelLang('opc-cats'), aciklama_notu: opcAciklama});
+  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, dil: getSelLang('opc-cats'), platformlar: getSelPlatforms('opc-cats'), aciklama_notu: opcAciklama});
   OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
   localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
   renderOPCHist();
@@ -3928,7 +3961,7 @@ async function sendOpusClipBulk() {
     const clipId = extractClipId(lines[i]);
     if (!clipId) continue;
     const opcAciklama = (document.getElementById('opc-aciklama')||{}).value||'';
-  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, dil: getSelLang('opc-bulk-cats'), aciklama_notu: opcAciklama});
+  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, dil: getSelLang('opc-bulk-cats'), platformlar: getSelPlatforms('opc-bulk-cats'), aciklama_notu: opcAciklama});
     OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
     if (i < lines.length-1) await sleep(delay);
   }
@@ -4010,6 +4043,7 @@ document.addEventListener('DOMContentLoaded', function() {
       initParcala,vpFetchDuration,vpComputeSegments,vpRenderSegments,vpSend,
       initOtoYakala,oySave,
       renderLangToggle,langChipToggle,updateLangVisibility,getSelLang,
+      renderPlatToggle,platChipToggle,getSelPlatforms,
       toggleTheme,applyTheme,
       sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
