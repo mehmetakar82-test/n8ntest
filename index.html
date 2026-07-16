@@ -330,6 +330,9 @@ tbody td{line-height:1.5}
         <div class="fg"><label>Kategori</label><div class="cat-chips" id="sv-cats"></div></div>
         <div class="fg"><label>Kaynak Notu</label><input id="sv-note" type="text" placeholder="manuel, kampanya..."/></div>
         <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı — short açıklamasına eklenir)</span></label><input id="sv-aciklama" type="text" placeholder="örn. Excalibur Kanalı, Bölüm 1..."/></div>
+        <div style="margin:8px 0;padding:8px 10px;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:6px;display:flex;align-items:center;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10px;white-space:nowrap"><input id="sv-direkt" type="checkbox" style="width:auto;margin:0;accent-color:var(--acc)"> <b>Direkt Yayınla</b> <span style="color:var(--mt)">(OpusClip'i atla — video olduğu gibi yayınlanır)</span></label>
+        </div>
         <div style="display:flex;gap:8px">
           <button class="btn bp" onclick="sendSingle()">▶ Gönder</button>
           <button class="btn bg bsm" onclick="testWH('sv-wh-display','sv-res')">⊙ Test</button>
@@ -1628,17 +1631,27 @@ async function sendSingle() {
   if (!confirmDupeSend(url)) return showRes('sv-res','İptal edildi — video zaten gönderilmişti','warn');
   const selCats = getSelCatList('sv-cats');
   const selCat  = selCats[0] || 'genel';
-  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  const path = CAT_WH[selCat] || '/webhook/video-gonder';
-  const wh   = getN8N() + path;
-  if (!wh.startsWith('http')) return showRes('sv-res','Ayarlar\'dan n8n URL girin','warn');
-  showRes('sv-res','⏳ Gonderiliyor... ['+selCat+']','info');
-  addLog('info','webhook','Video gonderiliyor ['+selCat+']: '+url.slice(0,60));
+  const direkt = (document.getElementById('sv-direkt')||{}).checked;
+  const base = getN8N();
+  if (!base) return showRes('sv-res','Ayarlar\'dan n8n URL girin','warn');
   const svAciklama = (document.getElementById('sv-aciklama')||{}).value||'';
-  await faf(wh, {'Youtube linki': url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, dil:getSelLang('sv-cats'), platformlar:getSelPlatforms('sv-cats'), aciklama_notu:svAciklama});
-  showRes('sv-res','✓ n8n\'e gonderildi ['+selCat+']','ok');
+  const payload = {'Youtube linki': url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, dil:getSelLang('sv-cats'), platformlar:getSelPlatforms('sv-cats'), aciklama_notu:svAciklama};
+  let path;
+  if (direkt) {
+    path = '/webhook/video-direkt';
+    payload.direkt_yayinla = true;
+    showRes('sv-res','⏳ Direkt yayın — video indiriliyor ve yayınlanıyor... ['+selCat+']','info');
+    addLog('info','webhook','Direkt yayın ['+selCat+']: '+url.slice(0,60));
+  } else {
+    const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
+    path = CAT_WH[selCat] || '/webhook/video-gonder';
+    showRes('sv-res','⏳ Gonderiliyor... ['+selCat+']','info');
+    addLog('info','webhook','Video gonderiliyor ['+selCat+']: '+url.slice(0,60));
+  }
+  await faf(base + path, payload);
+  showRes('sv-res', direkt ? '✓ Direkt yayın başlatıldı ['+selCat+']' : '✓ n8n\'e gonderildi ['+selCat+']','ok');
   recordSend(url, selCat);
-  addLog('ok','webhook','Video gonderildi ['+selCat+']');
+  addLog('ok','webhook',(direkt?'Direkt yayın':'Video gonderildi')+' ['+selCat+']');
 }
 
 async function sendBulkURLs() {
