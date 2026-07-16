@@ -3996,20 +3996,22 @@ function opcUnmarkProcessed(clipId) {
 // Seçili clipleri manuel "işlendi" işaretle (göndermeden)
 function opcMarkSelectedDone() {
   if (!OPC.selectedClips.size) return showRes('opc-send-res', 'Önce clip seçin', 'warn');
-  const n = OPC.selectedClips.size;
-  OPC.selectedClips.forEach(id => opcMarkProcessed(id));
+  const ids = [...OPC.selectedClips];
+  ids.forEach(id => opcMarkProcessed(id));
   OPC.selectedClips.clear();
-  opcRenderClips();
-  showRes('opc-send-res', `✓ ${n} clip işlendi olarak işaretlendi`, 'ok');
+  ids.forEach(id => opcUpdateCardState(id));   // sadece işaretlenen kartlar güncellenir
+  opcUpdateSelCount();
+  showRes('opc-send-res', `✓ ${ids.length} clip işlendi olarak işaretlendi`, 'ok');
 }
 // Seçili cliplerin "işlendi" işaretini kaldır
 function opcUnmarkSelectedDone() {
   if (!OPC.selectedClips.size) return showRes('opc-send-res', 'Önce clip seçin', 'warn');
-  const n = OPC.selectedClips.size;
-  OPC.selectedClips.forEach(id => opcUnmarkProcessed(id));
+  const ids = [...OPC.selectedClips];
+  ids.forEach(id => opcUnmarkProcessed(id));
   OPC.selectedClips.clear();
-  opcRenderClips();
-  showRes('opc-send-res', `✗ ${n} clip işareti kaldırıldı`, 'ok');
+  ids.forEach(id => opcUpdateCardState(id));
+  opcUpdateSelCount();
+  showRes('opc-send-res', `✗ ${ids.length} clip işareti kaldırıldı`, 'ok');
 }
 
 function getOpusKey() { return S.cfg.opus || ''; }
@@ -4204,7 +4206,7 @@ function opcRenderClips() {
     const scrim = state
       ? `<div class="opc-scrim on ${state}"><div class="opc-check ${state}">✓</div></div>`
       : `<div class="opc-scrim"></div>`;
-    return `<div onclick="opcToggleClip('${id}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':(done?'var(--ok)':'var(--brd)')};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='${done?'var(--ok)':'var(--brd)'}'" class="${sel?'opc-sel':''}">
+    return `<div data-cid="${id}" onclick="opcToggleClip('${id}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':(done?'var(--ok)':'var(--brd)')};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='${done?'var(--ok)':'var(--brd)'}'" class="${sel?'opc-sel':''}">
       <div class="opc-thumb">
         ${previewThumb ? `<img src="${previewThumb}" style="width:100%;height:120px;object-fit:cover;display:block" onerror="this.style.display='none'">` : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#0a1628,#162a4a);display:flex;align-items:center;justify-content:center;color:var(--acc);font-size:24px">▶</div>`}
         ${score ? `<span class="opc-score">⭐ ${score}</span>` : ''}
@@ -4212,26 +4214,53 @@ function opcRenderClips() {
         ${scrim}
       </div>
       <div style="padding:8px 10px">
-        <div style="font-size:10px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
+        <div class="opc-ctitle" style="font-size:10px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
       </div>
     </div>`;
   }).join('');
 }
 
+// Tek bir kartın seçim/işlendi durumunu yerinde güncelle
+// (tüm grid'i yeniden kurmadan — sadece değişen kartın animasyonu tetiklensin)
+function opcUpdateCardState(id) {
+  const grid = document.getElementById('opc-clip-grid');
+  if (!grid) return;
+  const card = grid.querySelector('[data-cid="' + String(id).replace(/"/g,'\\"') + '"]');
+  if (!card) return;
+  const sel = OPC.selectedClips.has(id);
+  const done = opcProcessedIds().has(id);
+  const state = sel ? 'sel' : (done ? 'done' : '');
+  card.style.borderColor = sel ? 'var(--acc)' : (done ? 'var(--ok)' : 'var(--brd)');
+  card.classList.toggle('opc-sel', sel);
+  const scrim = card.querySelector('.opc-scrim');
+  if (scrim) {
+    scrim.className = 'opc-scrim' + (state ? ' on ' + state : '');
+    scrim.innerHTML = state ? '<div class="opc-check ' + state + '">✓</div>' : '';
+  }
+  const titleEl = card.querySelector('.opc-ctitle');
+  if (titleEl) titleEl.style.color = sel ? 'var(--acc)' : 'var(--tx)';
+}
+
 function opcToggleClip(clipId) {
   if (OPC.selectedClips.has(clipId)) OPC.selectedClips.delete(clipId);
   else OPC.selectedClips.add(clipId);
-  opcRenderClips();
+  opcUpdateCardState(clipId);   // sadece bu kart güncellenir → tek animasyon
+  opcUpdateSelCount();
 }
 
 function opcSelectAll() {
-  OPC.clips.forEach(c => OPC.selectedClips.add(c.id || c.clipId || ''));
-  opcRenderClips();
+  OPC.clips.forEach(c => {
+    const id = c.id || c.clipId || '';
+    if (!OPC.selectedClips.has(id)) { OPC.selectedClips.add(id); opcUpdateCardState(id); }
+  });
+  opcUpdateSelCount();
 }
 
 function opcDeselectAll() {
+  const ids = [...OPC.selectedClips];
   OPC.selectedClips.clear();
-  opcRenderClips();
+  ids.forEach(id => opcUpdateCardState(id));
+  opcUpdateSelCount();
 }
 
 function opcUpdateSelCount() {
@@ -4326,14 +4355,38 @@ async function opcSendSelected() {
   }
 }
 
+// Kategori renkleri (koyu tema için okunur — renkli metin + soluk renkli zemin)
+const OPC_CAT_COLORS = {
+  film:    '#a78bfa',  // mor
+  eglence: '#fbbf24',  // amber
+  bilim:   '#22d3ee',  // cyan
+  vlog:    '#f472b6',  // pembe
+  komedi:  '#fb7185',  // kırmızı-pembe
+  oyun:    '#4ade80',  // yeşil
+  spor:    '#60a5fa',  // mavi
+  genel:   '#94a3b8',  // gri
+};
+function opcCatChip(kat) {
+  const col = OPC_CAT_COLORS[kat] || 'var(--acc)';
+  return `<span style="background:${col}22;color:${col};border:1px solid ${col}55;padding:2px 8px;border-radius:5px;font-size:8px;font-weight:700;letter-spacing:.3px;text-transform:capitalize;line-height:1.4">${kat}</span>`;
+}
 function renderOPCHist() {
   const el = document.getElementById('opc-hist');
   if (!el) return;
   if (!OPC.hist.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Henüz gönderim yok</div>'; return; }
-  el.innerHTML = OPC.hist.slice(0,30).map(h=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--brd);font-size:9px">
-    <span style="color:var(--acc);font-family:var(--fm)">${h.id}</span>
-    <span class="badge bi">${h.kat}</span>
-    <span style="color:var(--mt)">${h.t}</span>
+  // Clip başına grupla: aynı clip'in gönderildiği tüm kategorileri topla
+  // (OPC.hist en yeni başta olduğundan ilk görülen = en yeni; sıralama korunur)
+  const groups = new Map();
+  OPC.hist.forEach(h => {
+    if (!h.id) return;
+    if (!groups.has(h.id)) groups.set(h.id, { id: h.id, kats: [], t: h.t });
+    const g = groups.get(h.id);
+    if (h.kat && !g.kats.includes(h.kat)) g.kats.push(h.kat);
+  });
+  el.innerHTML = [...groups.values()].slice(0,30).map(g => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:9px">
+    <span style="color:var(--acc);font-family:var(--fm);flex-shrink:0">${g.id}</span>
+    <span style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;flex:1">${g.kats.map(opcCatChip).join('')}</span>
+    <span style="color:var(--mt);flex-shrink:0;white-space:nowrap">${g.t}</span>
   </div>`).join('');
 }
 
