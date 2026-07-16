@@ -262,13 +262,18 @@ tbody td{line-height:1.5}
 .cmdk-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--tx)}
 .cmdk-row.sel,.cmdk-row:hover{background:rgba(0,229,255,.1)}
 .cmdk-row .ci{width:18px;text-align:center;color:var(--acc)} .cmdk-row .csub{font-size:9px;color:var(--mt);margin-left:auto}
+/* ═══ YENİ: Hover video önizleme ═══ */
+#hover-prev{position:fixed;z-index:10500;display:none;pointer-events:none;background:var(--sur2);border:1px solid var(--acc);border-radius:8px;padding:5px;box-shadow:0 8px 28px rgba(0,0,0,.55);max-width:340px}
+#hover-prev img{width:320px;max-width:76vw;border-radius:5px;display:block}
+#hover-prev .hp-t{font-size:10px;color:var(--tx);padding:5px 4px 2px;line-height:1.3;max-width:320px}
 </style>
 </head>
 <body>
 <div class="app">
 
-<!-- YENİ: Toast, Gönderim Kuyruğu, Komut Paleti -->
+<!-- YENİ: Toast, Gönderim Kuyruğu, Komut Paleti, Hover Önizleme -->
 <div id="toast-wrap"></div>
+<div id="hover-prev"><img src="" alt=""><div class="hp-t"></div></div>
 <div id="sq-panel">
   <div id="sq-head"><b>▶ Gönderim Kuyruğu</b><span class="sq-x" onclick="sqHide()" title="Kapat">✕</span></div>
   <div id="sq-body"></div>
@@ -1372,6 +1377,10 @@ tbody td{line-height:1.5}
         <div class="fg"><label>Upload-Post API Key</label><input id="cfg-blot" type="text" placeholder="blt_..."/></div>
         <div class="fg"><label>OpusClip API Key</label><input id="cfg-opus" type="text" placeholder="sk-..."/><div style="font-size:8px;color:var(--mt);margin-top:3px">opus.pro → Settings → API → API Key</div></div>
         <div class="fg"><label>Cobalt API Key</label><input id="cfg-cobalt" type="text" placeholder="..."/><div style="font-size:8px;color:var(--mt);margin-top:3px">cobalt.tools → API Key (Direkt Yayınla için gerekli)</div></div>
+        <div style="display:flex;gap:10px">
+          <div class="fg" style="flex:1"><label>Toplu Gönderim Uyarı Sınırı</label><input id="cfg-batchmax" type="number" min="1" value="15" placeholder="15"/><div style="font-size:8px;color:var(--mt);margin-top:3px">Bu sayıyı aşınca onay ister</div></div>
+          <div class="fg" style="flex:1"><label>Gönderimler Arası Aralık (sn)</label><input id="cfg-batchdelay" type="number" min="0" value="8" placeholder="8"/><div style="font-size:8px;color:var(--mt);margin-top:3px">n8n/Upload-Post'u yormamak için</div></div>
+        </div>
         <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
         <div id="cfg-ok" style="display:none;font-size:9px;color:var(--ok);margin-top:6px">✓ Kaydedildi</div>
       </div>
@@ -3057,6 +3066,8 @@ function saveSettings() {
     blot:  (document.getElementById('cfg-blot')||{}).value||'',
     opus:  (document.getElementById('cfg-opus')||{}).value||'',
     cobalt:(document.getElementById('cfg-cobalt')||{}).value||'',
+    batchMax:(document.getElementById('cfg-batchmax')||{}).value||'15',
+    batchDelay:(document.getElementById('cfg-batchdelay')||{}).value||'8',
   };
   S.limits={
     ig:    parseInt((document.getElementById('cfg-ig-lim')||{}).value||10),
@@ -3084,6 +3095,7 @@ function loadSettings() {
   const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
   set('cfg-n8n',c.n8n); set('cfg-shkey',c.shkey); set('cfg-sheet',c.sheet);
   set('cfg-sheet2',c.sheet2); set('cfg-blot',c.blot); set('cfg-opus',c.opus); set('cfg-cobalt',c.cobalt);
+  set('cfg-batchmax',c.batchMax||'15'); set('cfg-batchdelay',c.batchDelay||'8');
   const ytkEl=document.getElementById('ytk-apikey');if(ytkEl&&c.ytApiKey)ytkEl.value=c.ytApiKey;
   const ytkSh=document.getElementById('ytk-sheetid');if(ytkSh&&(c.sheet2||c.sheet))ytkSh.value=c.sheet2||c.sheet;
   set('cfg-ig-lim',S.limits.ig); set('cfg-yt-lim',S.limits.yt); set('cfg-tt-lim',S.limits.tt);
@@ -4072,7 +4084,7 @@ function trRenderPending() {
     const platRow = ['ig','yt','tt','fb','x'].map(p=>`<label style="display:flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="tr-plat" value="${p}" checked style="width:auto;margin:0;accent-color:var(--acc)"> ${TR_PLAT_LABEL[p]}</label>`).join('');
     return `<div class="card" data-trvid="${vid}" style="padding:0;overflow:hidden">
       <div class="opc-thumb" style="border-radius:8px 8px 0 0">
-        <img src="${v.thumbnail}" style="width:100%;height:150px;object-fit:cover;display:block" onerror="this.style.display='none'">
+        <img src="${v.thumbnail}" style="width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${v.thumbnail}','${(v.title||'').replace(/'/g,'’').replace(/"/g,'&quot;')}')" onmouseleave="hidePrev()">
         <span class="opc-dur">${trDur(v.durationSec)}</span>
         <label onclick="event.stopPropagation()" title="Toplu işlem için seç" style="position:absolute;top:6px;right:6px;z-index:5;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;cursor:pointer;display:flex"><input type="checkbox" class="tr-selbox" ${selChk?'checked':''} onchange="trToggleSel('${vid}')" style="width:16px;height:16px;margin:0;accent-color:var(--acc);cursor:pointer"></label>
         ${already?`<span title="Bu video daha önce panelden gönderilmişti" style="position:absolute;left:6px;top:6px;background:#f59e0b;color:#012;font-size:8px;font-weight:800;padding:2px 8px;border-radius:5px;z-index:4;box-shadow:0 2px 6px rgba(0,0,0,.4)">⚠ ÖNCEDEN GÖNDERİLDİ</span>`:''}
@@ -4500,7 +4512,7 @@ function opcRenderClips() {
       : `<div class="opc-scrim"></div>`;
     return `<div data-cid="${id}" onclick="opcToggleClip('${id}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':(done?'var(--ok)':'var(--brd)')};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='${done?'var(--ok)':'var(--brd)'}'" class="${sel?'opc-sel':''}">
       <div class="opc-thumb">
-        ${previewThumb ? `<img src="${previewThumb}" style="width:100%;height:120px;object-fit:cover;display:block" onerror="this.style.display='none'">` : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#0a1628,#162a4a);display:flex;align-items:center;justify-content:center;color:var(--acc);font-size:24px">▶</div>`}
+        ${previewThumb ? `<img src="${previewThumb}" style="width:100%;height:120px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${previewThumb}','${(title||'').replace(/'/g,'’').replace(/"/g,'&quot;')}')" onmouseleave="hidePrev()">` : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#0a1628,#162a4a);display:flex;align-items:center;justify-content:center;color:var(--acc);font-size:24px">▶</div>`}
         ${score ? `<span class="opc-score">⭐ ${score}</span>` : ''}
         <span class="opc-dur">${durFmt}</span>
         ${scrim}
@@ -4638,8 +4650,10 @@ async function opcSendSelected() {
     opcRenderClips();  // işlenen clip'lere tik göster
     if (failCount) {
       showRes('opc-send-res', `⚠ ${done}/${selectedClipData.length} clip işlendi · ${failCount} gönderim başarısız (son: ${lastErr}). Başarısız clipler işaretlenmedi — tekrar deneyebilir veya elle işaretleyebilirsin.`, 'warn');
+      if(typeof toast==='function') toast(`OpusClip: ${done} clip işlendi · ${failCount} başarısız`,'warn');
     } else {
       showRes('opc-send-res', `✓ ${done} clip × ${cats.length} kategori gönderildi [${cats.join(', ')}]`, 'ok');
+      if(typeof toast==='function') toast(`OpusClip: ${done} clip gönderildi [${cats.join(', ')}]`,'ok');
     }
     addLog(failCount?'warn':'ok', 'webhook', `OpusClip Galeri: ${done}/${selectedClipData.length} clip işlendi, ${failCount} hata [${cats.join(',')}]`);
   } catch(e) {
@@ -4826,6 +4840,7 @@ async function loadTakvim() {
       items.push({ time, plat, _url: h.post_url || '', r: {
         title: h.post_title || h.title || h.post_caption || '(başlıksız)',
         'preview-url': h.thumbnail || h.preview_url || '',
+        'short-url': h.post_url || '',
         description: h.post_caption || h.caption || '',
         'platform-status': ok ? 'Yayınlandı ✓' : ('Hata: ' + (h.error_message || '')),
         kategori: (h.profile_username || '')
@@ -4960,6 +4975,9 @@ const PLAT_META = {
   ig: { label:'Instagram', color:'#e1306c', dot: IG_GRAD,  icon:'📸', accent:'#e1306c' },
   yt: { label:'YouTube',   color:'#ff0000', dot: YT_COLOR, icon:'▶',  accent:'#ff4444' },
   tt: { label:'TikTok',    color:'#69c9d0', dot: TT_GRAD,  icon:'♪',  accent:'#69c9d0' },
+  fb: { label:'Facebook',  color:'#1877f2', dot:'#1877f2', icon:'ⓕ',  accent:'#1877f2' },
+  x:  { label:'X',         color:'#1d9bf0', dot:'#1d9bf0', icon:'𝕏',  accent:'#1d9bf0' },
+  sch:{ label:'Planlı',    color:'#00e5ff', dot:'#00e5ff', icon:'⏰',  accent:'#00e5ff' },
 };
 
 function openDayModal(dayNum) {
@@ -5218,6 +5236,23 @@ function toast(msg, type, ms) {
   const t = ms==null ? (type==='err'?7000:4000) : ms;
   if (t>0) setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, t);
 }
+// #9 HOVER VİDEO ÖNİZLEME
+function hoverPrev(e, url, title) {
+  const box=document.getElementById('hover-prev'); if(!box||!url) return;
+  const big = /i\.ytimg\.com\/vi\//.test(url) ? url.replace(/\/(hq|mq|sd|default|hqdefault|mqdefault)?default\.jpg.*/, '/maxresdefault.jpg') : url;
+  const img=box.querySelector('img'); img.onerror=()=>{ img.src=url; }; img.src=big;
+  box.querySelector('.hp-t').textContent=title||'';
+  box.style.display='block'; hoverPrevMove(e);
+}
+function hoverPrevMove(e) {
+  const box=document.getElementById('hover-prev'); if(!box||box.style.display==='none') return;
+  const w=box.offsetWidth||330, h=box.offsetHeight||220;
+  let x=e.clientX+18, y=e.clientY+18;
+  if(x+w>window.innerWidth-8) x=e.clientX-w-18;
+  if(y+h>window.innerHeight-8) y=window.innerHeight-h-8;
+  box.style.left=Math.max(8,x)+'px'; box.style.top=Math.max(8,y)+'px';
+}
+function hidePrev(){ const box=document.getElementById('hover-prev'); if(box) box.style.display='none'; }
 // #10 BATCH AYARLARI
 function opBatchMax()   { return parseInt(S.cfg.batchMax) || 15; }
 function opBatchDelay() { return (parseInt(S.cfg.batchDelay) || 8) * 1000; }
@@ -5356,7 +5391,8 @@ function cmdkKey(e){
 function cmdkHi(){ document.querySelectorAll('.cmdk-row').forEach((r,i)=>r.classList.toggle('sel',i===CMDK.sel)); const el=document.querySelector('.cmdk-row.sel'); if(el) el.scrollIntoView({block:'nearest'}); }
 
 // Yeni fonksiyonları global yap (inline onclick için)
-[toast,sqShow,sqHide,sqRetryOne,sqRetryFailed,sqClearDone,svcCheck,refreshBadges,initGecmis,renderGecmis,gcResend,gcClearAll,qsSend,cmdkFilter,cmdkKey,cmdkExec].forEach(fn=>{ if(typeof fn==='function') window[fn.name]=fn; });
+[toast,sqShow,sqHide,sqRetryOne,sqRetryFailed,sqClearDone,svcCheck,refreshBadges,initGecmis,renderGecmis,gcResend,gcClearAll,qsSend,cmdkFilter,cmdkKey,cmdkExec,hoverPrev,hidePrev].forEach(fn=>{ if(typeof fn==='function') window[fn.name]=fn; });
+document.addEventListener('mousemove', e => { const b=document.getElementById('hover-prev'); if(b && b.style.display!=='none') hoverPrevMove(e); });
 
 // #12 KLAVYE KISAYOLLARI + Escape
 document.addEventListener('keydown', e => {
