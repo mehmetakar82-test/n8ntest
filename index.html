@@ -618,6 +618,25 @@ tbody td{line-height:1.5}
     </div>
     <div style="font-size:8px;color:var(--mt);margin-top:6px">Kworb her gün 09:00'da trend videoları bulur; otomatik yayınlamak yerine burada onayına sunar. Onayladığın video seçtiğin <b>kategori / dil / platform / açıklama</b> ile işleme alınır. Reddettiğin kuyruktan çıkarılır ve bir daha gelmez.</div>
   </div>
+  <!-- YENİ: filtre/sıralama + toplu işlem -->
+  <div id="tr-toolbar" class="card" style="margin-bottom:12px;display:none">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <input id="tr-search" type="text" placeholder="Başlık / kanal ara…" style="flex:1;min-width:150px;margin:0" oninput="trRenderPending()"/>
+      <select id="tr-sort" style="width:150px;font-size:10px" onchange="trRenderPending()">
+        <option value="views">İzlenme (çok→az)</option>
+        <option value="date">Yayın tarihi (yeni→eski)</option>
+        <option value="dur">Süre (uzun→kısa)</option>
+      </select>
+      <button class="btn bg bsm" onclick="trSelectAll()">Tümünü Seç</button>
+      <button class="btn bg bsm" onclick="trClearSel()">Kaldır</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--brd)">
+      <span style="font-size:9px;color:var(--mt)">Seçili: <b id="tr-selcount">0</b> →</span>
+      <select id="tr-bulk-cat" style="width:130px;font-size:10px"></select>
+      <button class="btn bp bsm" onclick="trBulkApprove()">✓ Seçilenleri Onayla</button>
+      <button class="btn bg bsm" onclick="trBulkReject()">✗ Seçilenleri Reddet</button>
+    </div>
+  </div>
   <div id="tr-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px"></div>
   <div id="tr-empty" class="card" style="display:none;text-align:center;padding:32px;color:var(--mt)">
     <div style="font-size:32px;margin-bottom:8px">🔥</div>
@@ -3994,7 +4013,7 @@ async function vpSend() {
 // ═══════════════════════════════════════════════════════════
 // TREND ONAY — Kworb'un bulduğu videoları panelden onaya alma
 // ═══════════════════════════════════════════════════════════
-const TR = { pending: [] };
+const TR = { pending: [], selected: new Set() };
 const TR_PLAT_LABEL = { ig:'IG', yt:'YT', tt:'TT', fb:'FB', x:'X' };
 function trDur(sec){ sec=parseInt(sec)||0; const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); }
 
@@ -4025,13 +4044,27 @@ async function trFetchPending() {
 function trRenderPending() {
   const grid = document.getElementById('tr-grid');
   const empty = document.getElementById('tr-empty');
+  const toolbar = document.getElementById('tr-toolbar');
   if (!grid) return;
+  if (toolbar) toolbar.style.display = TR.pending.length ? 'block' : 'none';
   if (!TR.pending.length) { grid.innerHTML=''; if (empty) empty.style.display='block'; return; }
   if (empty) empty.style.display='none';
   const catOpts = Object.entries(getCats()).map(([k,c])=>`<option value="${k}"${k==='genel'?' selected':''}>${c.label}</option>`).join('');
-  grid.innerHTML = TR.pending.map(v => {
+  // bulk kategori dropdown'u doldur
+  const bc = document.getElementById('tr-bulk-cat'); if (bc && !bc.options.length) bc.innerHTML = catOpts;
+  // filtre + sıralama
+  const q = ((document.getElementById('tr-search')||{}).value||'').toLowerCase();
+  const sort = (document.getElementById('tr-sort')||{}).value || 'views';
+  let list = TR.pending.slice();
+  if (q) list = list.filter(v => (v.title||'').toLowerCase().includes(q) || (v.channelTitle||'').toLowerCase().includes(q));
+  list.sort((a,b) => sort==='date' ? (new Date(b.publishedAt||0)-new Date(a.publishedAt||0))
+                    : sort==='dur' ? ((parseInt(b.durationSec)||0)-(parseInt(a.durationSec)||0))
+                    : ((parseInt(b.viewCount)||0)-(parseInt(a.viewCount)||0)));
+  trUpdateSelCount();
+  grid.innerHTML = list.map(v => {
     const vid = v.videoId;
     const already = findDupeSend(v.youtubeLink || '');
+    const selChk = TR.selected.has(vid);
     const views = (parseInt(v.viewCount)||0).toLocaleString('tr');
     const channel = v.channelTitle || '';
     let pub = '';
@@ -4041,6 +4074,7 @@ function trRenderPending() {
       <div class="opc-thumb" style="border-radius:8px 8px 0 0">
         <img src="${v.thumbnail}" style="width:100%;height:150px;object-fit:cover;display:block" onerror="this.style.display='none'">
         <span class="opc-dur">${trDur(v.durationSec)}</span>
+        <label onclick="event.stopPropagation()" title="Toplu işlem için seç" style="position:absolute;top:6px;right:6px;z-index:5;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;cursor:pointer;display:flex"><input type="checkbox" class="tr-selbox" ${selChk?'checked':''} onchange="trToggleSel('${vid}')" style="width:16px;height:16px;margin:0;accent-color:var(--acc);cursor:pointer"></label>
         ${already?`<span title="Bu video daha önce panelden gönderilmişti" style="position:absolute;left:6px;top:6px;background:#f59e0b;color:#012;font-size:8px;font-weight:800;padding:2px 8px;border-radius:5px;z-index:4;box-shadow:0 2px 6px rgba(0,0,0,.4)">⚠ ÖNCEDEN GÖNDERİLDİ</span>`:''}
       </div>
       <div style="padding:10px 12px">
@@ -4105,6 +4139,43 @@ async function trReject(videoId) {
   showRes('tr-status','✗ Reddedildi (kuyruktan çıkarıldı)','info');
   addLog('info','webhook','Trend reddedildi: '+((v&&v.title)||videoId).slice(0,40));
 }
+
+// #4 TREND ONAY TOPLU İŞLEMLER
+function trUpdateSelCount(){ const el=document.getElementById('tr-selcount'); if(el) el.textContent=TR.selected.size; }
+function trToggleSel(vid){ if(TR.selected.has(vid)) TR.selected.delete(vid); else TR.selected.add(vid); trUpdateSelCount(); }
+function trSelectAll(){ const q=((document.getElementById('tr-search')||{}).value||'').toLowerCase(); TR.pending.forEach(v=>{ if(!q || (v.title||'').toLowerCase().includes(q) || (v.channelTitle||'').toLowerCase().includes(q)) TR.selected.add(v.videoId); }); trRenderPending(); }
+function trClearSel(){ TR.selected.clear(); trRenderPending(); }
+async function trBulkApprove() {
+  if(!TR.selected.size) return toast('Önce video seç','warn');
+  const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
+  const kat=(document.getElementById('tr-bulk-cat')||{}).value||'genel';
+  const ids=[...TR.selected];
+  const vids=ids.map(id=>TR.pending.find(v=>v.videoId===id)).filter(Boolean);
+  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
+  const path=CAT_WH[kat]||'/webhook/video-gonder';
+  const tasks=vids.map(v=>({ label:(v.title||v.videoId).slice(0,42), badge:kat, send: async()=>{
+    const r=await faf(base+path,{'Youtube linki':v.youtubeLink, kaynak:'kworb-onay', kategori:kat, dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
+    if(r&&r.ok===true){ recordSend(v.youtubeLink,kat); await faf(base+'/webhook/kworb-pending-sil',{videoId:v.videoId,durum:'onaylandı'}); TR.pending=TR.pending.filter(x=>x.videoId!==v.videoId); TR.selected.delete(v.videoId); return true; }
+    return false;
+  }}));
+  const res=await sqRunBatch(tasks,{name:'Trend onay ['+kat+']'});
+  trRenderPending();
+  if(!res.cancel) showRes('tr-status',`✓ ${res.ok} onaylandı${res.err?` · ✕ ${res.err}`:''} [${kat}]`, res.err?'warn':'ok');
+}
+async function trBulkReject() {
+  if(!TR.selected.size) return toast('Önce video seç','warn');
+  const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
+  if(!confirm(`${TR.selected.size} video reddedilsin mi? (kuyruktan çıkar, bir daha gelmez)`)) return;
+  const ids=[...TR.selected];
+  const tasks=ids.map(id=>{ const v=TR.pending.find(x=>x.videoId===id); return { label:'Reddet: '+((v&&v.title)||id).slice(0,36), badge:'red', send: async()=>{
+    const r=await faf(base+'/webhook/kworb-pending-sil',{videoId:id,durum:'reddedildi'});
+    if(r&&r.ok===true){ TR.pending=TR.pending.filter(x=>x.videoId!==id); TR.selected.delete(id); return true; } return false;
+  }}; });
+  const res=await sqRunBatch(tasks,{name:'Trend reddet'});
+  trRenderPending();
+  if(!res.cancel) showRes('tr-status',`✗ ${res.ok} reddedildi${res.err?` · ✕ ${res.err}`:''}`,'info');
+}
+[trToggleSel,trSelectAll,trClearSel,trBulkApprove,trBulkReject].forEach(fn=>{ if(typeof fn==='function') window[fn.name]=fn; });
 
 // ═══════════════════════════════════════════════════════════
 // OTO YAKALA — panelden n8n staticData'sına ayar kaydetme
