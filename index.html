@@ -1237,6 +1237,7 @@ tbody td{line-height:1.5}
         <div class="fg"><label>Sheet ID (URL-Takip)</label><input id="cfg-sheet2" type="text" placeholder="aynı veya farklı"/></div>
         <div class="fg"><label>Upload-Post API Key</label><input id="cfg-blot" type="text" placeholder="blt_..."/></div>
         <div class="fg"><label>OpusClip API Key</label><input id="cfg-opus" type="text" placeholder="sk-..."/><div style="font-size:8px;color:var(--mt);margin-top:3px">opus.pro → Settings → API → API Key</div></div>
+        <div class="fg"><label>Cobalt API Key</label><input id="cfg-cobalt" type="text" placeholder="..."/><div style="font-size:8px;color:var(--mt);margin-top:3px">cobalt.tools → API Key (Direkt Yayınla için gerekli)</div></div>
         <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
         <div id="cfg-ok" style="display:none;font-size:9px;color:var(--ok);margin-top:6px">✓ Kaydedildi</div>
       </div>
@@ -1640,6 +1641,7 @@ async function sendSingle() {
   if (direkt) {
     path = '/webhook/video-direkt';
     payload.direkt_yayinla = true;
+    payload.cobalt_key = S.cfg.cobalt || '';
     showRes('sv-res','⏳ Direkt yayın — video indiriliyor ve yayınlanıyor... ['+selCat+']','info');
     addLog('info','webhook','Direkt yayın ['+selCat+']: '+url.slice(0,60));
   } else {
@@ -2917,6 +2919,7 @@ function saveSettings() {
     sheet2:(document.getElementById('cfg-sheet2')||{}).value||'',
     blot:  (document.getElementById('cfg-blot')||{}).value||'',
     opus:  (document.getElementById('cfg-opus')||{}).value||'',
+    cobalt:(document.getElementById('cfg-cobalt')||{}).value||'',
   };
   S.limits={
     ig:    parseInt((document.getElementById('cfg-ig-lim')||{}).value||10),
@@ -2943,7 +2946,7 @@ function loadSettings() {
   const c=S.cfg;
   const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
   set('cfg-n8n',c.n8n); set('cfg-shkey',c.shkey); set('cfg-sheet',c.sheet);
-  set('cfg-sheet2',c.sheet2); set('cfg-blot',c.blot); set('cfg-opus',c.opus);
+  set('cfg-sheet2',c.sheet2); set('cfg-blot',c.blot); set('cfg-opus',c.opus); set('cfg-cobalt',c.cobalt);
   const ytkEl=document.getElementById('ytk-apikey');if(ytkEl&&c.ytApiKey)ytkEl.value=c.ytApiKey;
   const ytkSh=document.getElementById('ytk-sheetid');if(ytkSh&&(c.sheet2||c.sheet))ytkSh.value=c.sheet2||c.sheet;
   set('cfg-ig-lim',S.limits.ig); set('cfg-yt-lim',S.limits.yt); set('cfg-tt-lim',S.limits.tt);
