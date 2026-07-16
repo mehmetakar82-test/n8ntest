@@ -643,13 +643,14 @@ tbody td{line-height:1.5}
             <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="tiktok" style="width:auto;margin:0"> ♪ TikTok</label>
             <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="facebook" style="width:auto;margin:0"> ⓕ Facebook</label>
             <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="linkedin" style="width:auto;margin:0"> LinkedIn</label>
-            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="twitter" style="width:auto;margin:0"> 𝕏 X</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="x" style="width:auto;margin:0"> 𝕏 X</label>
             <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="threads" style="width:auto;margin:0"> @ Threads</label>
             <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="pinterest" style="width:auto;margin:0"> ⓟ Pinterest</label>
           </div>
         </div>
         <div class="fg"><label>Video URL <span style="color:var(--er)">*</span></label>
-          <input id="up-video-url" type="url" placeholder="https://cdn.opusclip.com/…/short.mp4 (public URL)"/>
+          <input id="up-video-url" type="url" placeholder="https://cdn.opusclip.com/…/short.mp4 (public video URL)"/>
+          <div style="font-size:8px;color:var(--mt);margin-top:3px">Doğrudan video dosyası URL'si gerekli (.mp4, .mov vb.) — YouTube/TikTok watch linkleri <b>desteklenmez</b></div>
         </div>
         <div class="fg"><label>Başlık</label><input id="up-title" type="text" placeholder="Short başlığı"/></div>
         <div class="fg"><label>Açıklama</label><textarea id="up-desc" placeholder="Açıklama, hashtagler…" style="height:70px"></textarea></div>
@@ -2702,6 +2703,7 @@ async function upPostSend() {
   if (!user) return showRes('up-res', 'Profil seç', 'err');
   if (!plats.length) return showRes('up-res', 'En az 1 platform seç', 'err');
   if (!videoUrl) return showRes('up-res', 'Video URL zorunlu', 'err');
+  if (/youtube\.com\/watch|youtu\.be\/|tiktok\.com\/@/.test(videoUrl)) return showRes('up-res', 'YouTube/TikTok watch linki desteklenmez — doğrudan video dosyası URL\'si girin (.mp4, .mov)', 'err');
   if (!S.cfg.blot && !getN8N()) return showRes('up-res', 'Ayarlar → Upload-Post API Key veya n8n URL gerekli', 'warn');
 
   const fd = new FormData();
