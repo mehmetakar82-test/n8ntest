@@ -3956,8 +3956,24 @@ const OPC = {
   clips: [],
   selectedClips: new Set(),
   currentProjectId: null,
-  orgId: ''
+  orgId: '',
+  // projectId -> o projeye ait tüm clip id listesi (proje açıldığında cache'lenir)
+  projClips: JSON.parse(localStorage.getItem('op_opc_projclips')||'{}'),
+  // işlenmiş (gönderilmiş) clip id'leri — sınırsız, kalıcı (geçmiş 50 ile sınırlı olduğu için ayrı tutulur)
+  processed: new Set(JSON.parse(localStorage.getItem('op_opc_processed')||'[]'))
 };
+
+// İşlenmiş clip id'lerinin Set'i (kalıcı set + geçmiş birleşimi)
+function opcProcessedIds() {
+  const s = new Set(OPC.processed);
+  OPC.hist.forEach(h => { if (h.id) s.add(h.id); });
+  return s;
+}
+function opcMarkProcessed(clipId) {
+  if (!clipId) return;
+  OPC.processed.add(clipId);
+  localStorage.setItem('op_opc_processed', JSON.stringify([...OPC.processed]));
+}
 
 function getOpusKey() { return S.cfg.opus || ''; }
 
@@ -4040,6 +4056,7 @@ function opcStageColor(stage) {
 function opcRenderProjects(projects) {
   const grid = document.getElementById('opc-project-grid');
   if (!grid) return;
+  const processed = opcProcessedIds();
   grid.innerHTML = projects.map(p => {
     const si = p.sourceInfo || {};
     const pid = p.projectId || p.id || '';
@@ -4049,10 +4066,18 @@ function opcRenderProjects(projects) {
     const date = (p.createdAt || '').slice(0,10);
     const stage = p.stage || '';
     const statusColor = opcStageColor(stage);
+    // Bu projeye ait tüm clip'ler işlendiyse yeşil tik göster
+    const cachedClips = OPC.projClips[pid];
+    const allDone = Array.isArray(cachedClips) && cachedClips.length > 0 && cachedClips.every(cid => processed.has(cid));
+    const doneBorder = allDone ? 'var(--ok)' : 'var(--brd)';
+    const doneBadge = allDone
+      ? `<div title="Tüm clipler işlendi" style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:var(--ok);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.4);z-index:2"><span style="color:#000;font-size:15px;font-weight:800">✓</span></div>`
+      : '';
     const thumbHtml = thumb
       ? `<img src="${thumb}" style="width:100%;height:140px;object-fit:cover;border-radius:6px 6px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       : '';
-    return `<div onclick="opcOpenProject('${pid}')" style="background:var(--card);border:1px solid var(--brd);border-radius:8px;cursor:pointer;transition:all .15s;overflow:hidden" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--brd)'">
+    return `<div onclick="opcOpenProject('${pid}')" style="position:relative;background:var(--card);border:1px solid ${doneBorder};border-radius:8px;cursor:pointer;transition:all .15s;overflow:hidden" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='${doneBorder}'">
+      ${doneBadge}
       ${thumbHtml}
       <div style="display:${thumb?'none':'flex'};align-items:center;justify-content:center;height:140px;background:linear-gradient(135deg,#0a1628,#162a4a);border-radius:6px 6px 0 0;color:var(--acc);font-size:36px">◈</div>
       <div style="padding:10px 12px">
@@ -4097,6 +4122,10 @@ async function opcOpenProject(projectId) {
     const clips = Array.isArray(data) ? data : (data.list || data.data || data.clips || data.items || []);
     OPC.clips = clips;
 
+    // Bu projeye ait clip id listesini cache'le (proje kartı yeşil tik için)
+    OPC.projClips[projectId] = clips.map(c => c.id || c.clipId || '').filter(Boolean);
+    localStorage.setItem('op_opc_projclips', JSON.stringify(OPC.projClips));
+
     if (projGrid) projGrid.style.display = 'none';
     if (projEmpty) projEmpty.style.display = 'none';
     if (clipPanel) clipPanel.style.display = 'block';
@@ -4120,9 +4149,11 @@ function opcRenderClips() {
   const grid = document.getElementById('opc-clip-grid');
   if (!grid) return;
   opcUpdateSelCount();
+  const processed = opcProcessedIds();
   grid.innerHTML = OPC.clips.map((c, i) => {
     const id = c.id || c.clipId || '';
     const sel = OPC.selectedClips.has(id);
+    const done = processed.has(id);
     const title = c.title || c.headline || 'Clip ' + (i+1);
     const thumb = c.uriForThumbnail || c.thumbnailUrl || '';
     const preview = c.uriForPreview || '';
@@ -4131,9 +4162,13 @@ function opcRenderClips() {
     const durFmt = durSec >= 60 ? Math.floor(durSec/60) + ':' + String(durSec%60).padStart(2,'0') : durSec + 's';
     const score = c.score || c.viralScore || '';
     const previewThumb = thumb || (preview ? preview.replace(/\.mp4$/, '.jpg') : '');
-    return `<div onclick="opcToggleClip('${id}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':'var(--brd)'};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='var(--brd)'" class="${sel?'opc-sel':''}">
+    const doneBadge = done
+      ? `<div title="İşlendi" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:var(--ok);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,.4);z-index:2"><span style="color:#000;font-size:13px;font-weight:800">✓</span></div>`
+      : '';
+    return `<div onclick="opcToggleClip('${id}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':(done?'var(--ok)':'var(--brd)')};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative;${done&&!sel?'opacity:.75':''}" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='${done?'var(--ok)':'var(--brd)'}'" class="${sel?'opc-sel':''}">
       <div style="position:relative">
         ${previewThumb ? `<img src="${previewThumb}" style="width:100%;height:120px;object-fit:cover" onerror="this.style.display='none'">` : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#0a1628,#162a4a);display:flex;align-items:center;justify-content:center;color:var(--acc);font-size:24px">▶</div>`}
+        ${doneBadge}
         <span style="position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.85);color:#fff;font-size:8px;padding:2px 6px;border-radius:3px">${durFmt}</span>
         ${score ? `<span style="position:absolute;left:4px;top:4px;background:rgba(0,229,255,.9);color:#000;font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px">⭐ ${score}</span>` : ''}
         <div style="position:absolute;left:4px;bottom:4px;width:18px;height:18px;border-radius:50%;border:2px solid ${sel?'var(--acc)':'rgba(255,255,255,.4)'};background:${sel?'var(--acc)':'rgba(0,0,0,.5)'};display:flex;align-items:center;justify-content:center">
@@ -4172,7 +4207,7 @@ function opcBackToProjects() {
   document.getElementById('opc-clip-panel').style.display = 'none';
   const grid = document.getElementById('opc-project-grid');
   const empty = document.getElementById('opc-project-empty');
-  if (OPC.projects.length) { if (grid) grid.style.display = 'grid'; }
+  if (OPC.projects.length) { if (grid) grid.style.display = 'grid'; opcRenderProjects(OPC.projects); }
   else { if (empty) empty.style.display = 'block'; }
 }
 
@@ -4212,11 +4247,13 @@ async function opcSendSelected() {
         });
         sent++;
         OPC.hist.unshift({id: c.id||c.clipId||'', kat, t: new Date().toLocaleString('tr')});
+        opcMarkProcessed(c.id||c.clipId||'');
         if (sent < totalSend) await sleep(delay);
       }
     }
     localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
     renderOPCHist();
+    opcRenderClips();  // işlenen clip'lere tik göster
     showRes('opc-send-res', `✓ ${selectedClipData.length} clip × ${cats.length} kategori gönderildi [${cats.join(', ')}]`, 'ok');
     addLog('ok', 'webhook', `OpusClip Galeri: ${selectedClipData.length} clip × ${cats.length} kat [${cats.join(',')}]`);
   } catch(e) {
