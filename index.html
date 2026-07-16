@@ -724,6 +724,8 @@ tbody td{line-height:1.5}
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button class="btn bg bsm" onclick="opcSelectAll()">Tümünü Seç</button>
           <button class="btn bg bsm" onclick="opcDeselectAll()">Seçimi Kaldır</button>
+          <button class="btn bg bsm" onclick="opcMarkSelectedDone()" title="Seçili clipleri işlendi olarak işaretle (göndermeden)">✓ İşlendi İşaretle</button>
+          <button class="btn bg bsm" onclick="opcUnmarkSelectedDone()" title="Seçili cliplerin işlendi işaretini kaldır">✗ İşareti Kaldır</button>
           <button class="btn bp bsm" onclick="opcBackToProjects()">← Projelere Dön</button>
         </div>
       </div>
@@ -3974,6 +3976,29 @@ function opcMarkProcessed(clipId) {
   OPC.processed.add(clipId);
   localStorage.setItem('op_opc_processed', JSON.stringify([...OPC.processed]));
 }
+function opcUnmarkProcessed(clipId) {
+  if (!clipId) return;
+  OPC.processed.delete(clipId);
+  localStorage.setItem('op_opc_processed', JSON.stringify([...OPC.processed]));
+}
+// Seçili clipleri manuel "işlendi" işaretle (göndermeden)
+function opcMarkSelectedDone() {
+  if (!OPC.selectedClips.size) return showRes('opc-send-res', 'Önce clip seçin', 'warn');
+  const n = OPC.selectedClips.size;
+  OPC.selectedClips.forEach(id => opcMarkProcessed(id));
+  OPC.selectedClips.clear();
+  opcRenderClips();
+  showRes('opc-send-res', `✓ ${n} clip işlendi olarak işaretlendi`, 'ok');
+}
+// Seçili cliplerin "işlendi" işaretini kaldır
+function opcUnmarkSelectedDone() {
+  if (!OPC.selectedClips.size) return showRes('opc-send-res', 'Önce clip seçin', 'warn');
+  const n = OPC.selectedClips.size;
+  OPC.selectedClips.forEach(id => opcUnmarkProcessed(id));
+  OPC.selectedClips.clear();
+  opcRenderClips();
+  showRes('opc-send-res', `✗ ${n} clip işareti kaldırıldı`, 'ok');
+}
 
 function getOpusKey() { return S.cfg.opus || ''; }
 
@@ -4225,38 +4250,65 @@ async function opcSendSelected() {
   showRes('opc-send-res', `⏳ ${selectedClipData.length} clip × ${cats.length} kategori = ${totalSend} gönderim...`, 'info');
   const btn = document.getElementById('opc-send-btn');
   if (btn) btn.disabled = true;
-  let sent = 0;
+  let sent = 0, done = 0, failCount = 0, lastErr = '';
   try {
     for (let i = 0; i < selectedClipData.length; i++) {
       const c = selectedClipData[i];
+      const cid = c.id || c.clipId || '';
+      let clipOk = false;      // bu clip en az bir kategoriye başarıyla gitti mi
       for (let k = 0; k < cats.length; k++) {
         const kat = cats[k];
-        await faf(base + '/webhook/opus-clip-direkt', {
-          clip_id: c.id || c.clipId || '',
-          videoUrl: c.uriForExport || c.exportUrl || c.url || c.uriForPreview || '',
-          title: c.title || c.headline || '',
-          description: c.description || c.summary || c.caption || '',
-          hashtags: c.hashtags || c.keywords || c.tags || '',
-          thumbnailUrl: c.uriForThumbnail || c.thumbnailUrl || '',
-          score: c.score || c.viralScore || 0,
-          durationMs: c.durationMs || 0,
-          kategori: kat,
-          dil: getSelLang('opc-cats'),
-          platformlar: getSelPlatforms('opc-cats'),
-          aciklama_notu: aciklama
-        });
+        let res;
+        try {
+          res = await faf(base + '/webhook/opus-clip-direkt', {
+            clip_id: cid,
+            videoUrl: c.uriForExport || c.exportUrl || c.url || c.uriForPreview || '',
+            title: c.title || c.headline || '',
+            description: c.description || c.summary || c.caption || '',
+            hashtags: c.hashtags || c.keywords || c.tags || '',
+            thumbnailUrl: c.uriForThumbnail || c.thumbnailUrl || '',
+            score: c.score || c.viralScore || 0,
+            durationMs: c.durationMs || 0,
+            kategori: kat,
+            dil: getSelLang('opc-cats'),
+            platformlar: getSelPlatforms('opc-cats'),
+            aciklama_notu: aciklama
+          });
+        } catch(err) {
+          res = {ok:false, thrown:true, message:err.message||String(err)};
+        }
+        // faf throw etmez; başarı için dönüş değerini kontrol et (Response.ok === true)
+        if (res && res.ok === true) {
+          clipOk = true;
+          OPC.hist.unshift({id: cid, kat, t: new Date().toLocaleString('tr')});
+        } else {
+          // Tek bir gönderim hatası tüm akışı durdurmasın — atla, devam et
+          failCount++;
+          lastErr = (res && (res.message || (res.timeout?'zaman aşımı':res.corsOrNetwork?'CORS/ağ engeli':res.invalidUrl?'geçersiz URL':('HTTP '+(res.status||'?'))))) || 'bilinmeyen hata';
+          addLog('err', 'webhook', `OpusClip Galeri gönderim hatası [${cid} · ${kat}]: ${lastErr}`);
+        }
         sent++;
-        OPC.hist.unshift({id: c.id||c.clipId||'', kat, t: new Date().toLocaleString('tr')});
-        opcMarkProcessed(c.id||c.clipId||'');
-        if (sent < totalSend) await sleep(delay);
+        if (sent < totalSend) {
+          showRes('opc-send-res', `⏳ ${sent}/${totalSend} gönderildi${failCount?` · ${failCount} hata`:''}...`, 'info');
+          await sleep(delay);
+        }
       }
+      if (clipOk) { opcMarkProcessed(cid); done++; }
     }
     localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
     renderOPCHist();
     opcRenderClips();  // işlenen clip'lere tik göster
-    showRes('opc-send-res', `✓ ${selectedClipData.length} clip × ${cats.length} kategori gönderildi [${cats.join(', ')}]`, 'ok');
-    addLog('ok', 'webhook', `OpusClip Galeri: ${selectedClipData.length} clip × ${cats.length} kat [${cats.join(',')}]`);
+    if (failCount) {
+      showRes('opc-send-res', `⚠ ${done}/${selectedClipData.length} clip işlendi · ${failCount} gönderim başarısız (son: ${lastErr}). Başarısız clipler işaretlenmedi — tekrar deneyebilir veya elle işaretleyebilirsin.`, 'warn');
+    } else {
+      showRes('opc-send-res', `✓ ${done} clip × ${cats.length} kategori gönderildi [${cats.join(', ')}]`, 'ok');
+    }
+    addLog(failCount?'warn':'ok', 'webhook', `OpusClip Galeri: ${done}/${selectedClipData.length} clip işlendi, ${failCount} hata [${cats.join(',')}]`);
   } catch(e) {
+    // Beklenmeyen (döngü dışı) hata — yine de işaretlenenleri kaydet
+    localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
+    renderOPCHist();
+    opcRenderClips();
     showRes('opc-send-res', '✕ Hata: ' + e.message, 'err');
   } finally {
     if (btn) btn.disabled = false;
@@ -4338,6 +4390,7 @@ document.addEventListener('DOMContentLoaded', function() {
       renderPlatToggle,platChipToggle,getSelPlatforms,
       toggleTheme,applyTheme,
       opcFetchProjects,opcSearchById,opcOpenProject,opcToggleClip,opcSelectAll,opcDeselectAll,opcBackToProjects,opcSendSelected,
+      opcMarkSelectedDone,opcUnmarkSelectedDone,
       calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
       loadAllSheetData,loadSheetPage];
