@@ -49,6 +49,18 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 .page{display:none;animation:fi .18s ease}
 .page.active{display:block}
 @keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* ── OpusClip clip kartı: seçim / işlendi perdesi + tik ── */
+@keyframes opcPop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.14)}100%{transform:scale(1);opacity:1}}
+.opc-thumb{position:relative;overflow:hidden}
+.opc-scrim{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:3}
+.opc-scrim.on{opacity:1}
+.opc-scrim.sel{background:radial-gradient(circle at center,rgba(0,229,255,.30),rgba(2,18,28,.74))}
+.opc-scrim.done{background:radial-gradient(circle at center,rgba(16,185,129,.28),rgba(2,24,18,.74))}
+.opc-check{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:27px;font-weight:900;box-shadow:0 4px 16px rgba(0,0,0,.5);border:2.5px solid rgba(255,255,255,.9);animation:opcPop .24s cubic-bezier(.2,.9,.3,1.35) both;line-height:1}
+.opc-check.sel{background:var(--acc);color:#012}
+.opc-check.done{background:var(--ok);color:#012}
+.opc-score{position:absolute;left:6px;top:6px;display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#00e5ff,#00b8d4);color:#012;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;box-shadow:0 2px 7px rgba(0,0,0,.4);z-index:4;line-height:1;letter-spacing:.2px}
+.opc-dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.85);color:#fff;font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;z-index:4;line-height:1.4}
 .ph{margin-bottom:20px}
 .pt{font-family:var(--fh);font-size:22px;font-weight:800;color:var(--tx)}
 .ps{color:var(--mt);font-size:10px;margin-top:2px}
@@ -4187,18 +4199,17 @@ function opcRenderClips() {
     const durFmt = durSec >= 60 ? Math.floor(durSec/60) + ':' + String(durSec%60).padStart(2,'0') : durSec + 's';
     const score = c.score || c.viralScore || '';
     const previewThumb = thumb || (preview ? preview.replace(/\.mp4$/, '.jpg') : '');
-    const doneBadge = done
-      ? `<div title="İşlendi" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:var(--ok);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 5px rgba(0,0,0,.4);z-index:2"><span style="color:#000;font-size:13px;font-weight:800">✓</span></div>`
-      : '';
-    return `<div onclick="opcToggleClip('${id}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':(done?'var(--ok)':'var(--brd)')};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative;${done&&!sel?'opacity:.75':''}" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='${done?'var(--ok)':'var(--brd)'}'" class="${sel?'opc-sel':''}">
-      <div style="position:relative">
-        ${previewThumb ? `<img src="${previewThumb}" style="width:100%;height:120px;object-fit:cover" onerror="this.style.display='none'">` : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#0a1628,#162a4a);display:flex;align-items:center;justify-content:center;color:var(--acc);font-size:24px">▶</div>`}
-        ${doneBadge}
-        <span style="position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.85);color:#fff;font-size:8px;padding:2px 6px;border-radius:3px">${durFmt}</span>
-        ${score ? `<span style="position:absolute;left:4px;top:4px;background:rgba(0,229,255,.9);color:#000;font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px">⭐ ${score}</span>` : ''}
-        <div style="position:absolute;left:4px;bottom:4px;width:18px;height:18px;border-radius:50%;border:2px solid ${sel?'var(--acc)':'rgba(255,255,255,.4)'};background:${sel?'var(--acc)':'rgba(0,0,0,.5)'};display:flex;align-items:center;justify-content:center">
-          ${sel ? '<span style="color:#000;font-size:10px;font-weight:700">✓</span>' : ''}
-        </div>
+    // Perde önceliği: seçili (mavi) > işlendi (yeşil)
+    const state = sel ? 'sel' : (done ? 'done' : '');
+    const scrim = state
+      ? `<div class="opc-scrim on ${state}"><div class="opc-check ${state}">✓</div></div>`
+      : `<div class="opc-scrim"></div>`;
+    return `<div onclick="opcToggleClip('${id}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':(done?'var(--ok)':'var(--brd)')};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='${done?'var(--ok)':'var(--brd)'}'" class="${sel?'opc-sel':''}">
+      <div class="opc-thumb">
+        ${previewThumb ? `<img src="${previewThumb}" style="width:100%;height:120px;object-fit:cover;display:block" onerror="this.style.display='none'">` : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#0a1628,#162a4a);display:flex;align-items:center;justify-content:center;color:var(--acc);font-size:24px">▶</div>`}
+        ${score ? `<span class="opc-score">⭐ ${score}</span>` : ''}
+        <span class="opc-dur">${durFmt}</span>
+        ${scrim}
       </div>
       <div style="padding:8px 10px">
         <div style="font-size:10px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
