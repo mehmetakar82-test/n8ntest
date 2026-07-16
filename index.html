@@ -4289,11 +4289,29 @@ function opcMarkProcessed(clipId) {
   if (!clipId) return;
   OPC.processed.add(clipId);
   localStorage.setItem('op_opc_processed', JSON.stringify([...OPC.processed]));
+  opcSyncProcessed(clipId, 'islendi');
 }
 function opcUnmarkProcessed(clipId) {
   if (!clipId) return;
   OPC.processed.delete(clipId);
   localStorage.setItem('op_opc_processed', JSON.stringify([...OPC.processed]));
+  opcSyncProcessed(clipId, 'kaldirildi');
+}
+// #5 KALICI CLIP TAKİBİ — n8n/Sheets'e best-effort senkron (localStorage birincil kalır)
+function opcSyncProcessed(clipId, durum) {
+  const base = getN8N(); if (!base || !clipId) return;
+  try { faf(base + '/webhook/opus-islenen-yaz', { clipId, durum }); } catch(e) {}
+}
+async function opcLoadProcessedRemote() {
+  const base = getN8N(); if (!base) return;
+  try {
+    const d = await n8nGet('/webhook/opus-islenen');
+    const ids = d && (d.ids || d.list || (Array.isArray(d)?d:[]));
+    if (Array.isArray(ids) && ids.length) {
+      ids.forEach(id => OPC.processed.add(String(id)));
+      localStorage.setItem('op_opc_processed', JSON.stringify([...OPC.processed]));
+    }
+  } catch(e) {}
 }
 // Seçili clipleri manuel "işlendi" işaretle (göndermeden)
 function opcMarkSelectedDone() {
@@ -4320,6 +4338,7 @@ function getOpusKey() { return S.cfg.opus || ''; }
 
 function initOpusClip() {
   renderOPCHist();
+  opcLoadProcessedRemote();  // #5 kalıcı işlendi takibini n8n/Sheets'ten çek (best-effort)
   const wh = document.getElementById('opc-wh-display');
   if (wh) wh.textContent = getN8N() ? getN8N() + '/webhook/opus-clip-direkt' : '/webhook/opus-clip-direkt';
   const grid = document.getElementById('opc-project-grid');
