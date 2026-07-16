@@ -236,7 +236,7 @@ tbody td{line-height:1.5}
     <div class="ni" onclick="go('ytkanal',this)"><span class="ic">📺</span>YT Kanal Ara</div>
     <div class="ni" onclick="go('yayin',this)"><span class="ic">📡</span>Yayın Tekrarları</div>
     <div class="ni" onclick="go('parcala',this)"><span class="ic">✂</span>Video Parçala</div>
-    <div class="ni" onclick="go('opusclip',this)"><span class="ic">◈</span>OpusClip Direkt</div>
+    <div class="ni" onclick="go('opusclip',this)"><span class="ic">◈</span>OpusClip Galeri</div>
     <div class="ni" onclick="go('uppost',this)"><span class="ic">⇑</span>Upload-Post</div>
     <div class="ni" onclick="go('bulk',this)"><span class="ic">≋</span>Toplu Kelimeler</div>
     <div class="ns">Kaynaklar</div>
@@ -687,49 +687,74 @@ tbody td{line-height:1.5}
 
 <!-- OPUS CLIP DİREKT -->
 <div id="page-opusclip" class="page">
-  <div class="ph"><div class="pt">OpusClip Direkt</div><div class="ps">Opus Pro'daki mevcut projeleri clip ID ile işleme al</div></div>
-  <div class="g2">
-    <div>
-      <div class="card">
-        <div class="ct">Clip ID ile Gönder</div>
-        <div class="alert ai"><span>ℹ</span><span>Opus Pro'daki bir projenin URL'sinden ID'yi alın: <code>clip.opus.pro/clip/<b>P3061022AkhR</b></code> → <b>P3061022AkhR</b> girin</span></div>
-        <div class="fg">
-          <label>Clip/Proje URL veya ID</label>
-          <input id="opc-clipid" type="text" placeholder="P3061022AkhR veya https://clip.opus.pro/clip/P3061022AkhR"/>
-        </div>
-        <div class="fg"><label>Kategori</label><div class="cat-chips" id="opc-cats"></div></div>
-        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="opc-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn bp" onclick="sendOpusClip()">▶ İşleme Al</button>
-        </div>
-        <div id="opc-res" class="res"></div>
+  <div class="ph"><div class="pt">OpusClip Galeri</div><div class="ps">Opus Pro projelerini görsel olarak göster, seç ve işleme al</div></div>
+
+  <!-- ÜST BAR: Proje getir + Proje ID ile ara -->
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn bp" onclick="opcFetchProjects()" id="opc-fetch-btn">◈ Projelerimi Getir</button>
+      <div style="flex:1;min-width:180px;display:flex;gap:6px;align-items:center">
+        <input id="opc-pid-search" type="text" placeholder="Proje ID ile ara (P3061022AkhR)" style="flex:1;margin:0"/>
+        <button class="btn bg bsm" onclick="opcSearchById()">Ara</button>
       </div>
-      <div class="card">
-        <div class="ct">Toplu Clip ID</div>
-        <div class="fg"><label>Her satıra bir ID veya URL</label>
-          <textarea id="opc-bulk" style="height:100px" placeholder="P3061022AkhR&#10;P1234567Abcd&#10;https://clip.opus.pro/clip/P9999XxYz"></textarea>
+      <div id="opc-status" style="font-size:9px;color:var(--mt)"></div>
+    </div>
+  </div>
+
+  <!-- PROJE GRID -->
+  <div id="opc-project-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:12px"></div>
+  <div id="opc-project-empty" class="card" style="display:none;text-align:center;padding:32px;color:var(--mt)">
+    <div style="font-size:32px;margin-bottom:8px">◈</div>
+    <div style="font-size:11px">Projelerinizi görmek için <b>Projelerimi Getir</b>'e tıklayın veya Proje ID girin</div>
+    <div style="font-size:9px;margin-top:6px;color:var(--mt)">Ayarlar → OpusClip API Key gereklidir</div>
+  </div>
+
+  <!-- CLIP DETAY PANEL (proje seçilince açılır) -->
+  <div id="opc-clip-panel" style="display:none">
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="ct" style="margin:0" id="opc-clip-title">Proje Clipleri</div>
+          <div style="font-size:9px;color:var(--mt)" id="opc-clip-sub"></div>
         </div>
-        <div class="fg"><label>Kategori</label><div class="cat-chips" id="opc-bulk-cats"></div></div>
-        <div class="fg"><label>Gönderim Aralığı (saniye)</label><input id="opc-delay" type="number" value="10" min="1"/></div>
-        <button class="btn bp" onclick="sendOpusClipBulk()">≋ Tümünü Gönder</button>
-        <div id="opc-bulk-res" class="res"></div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="btn bg bsm" onclick="opcSelectAll()">Tümünü Seç</button>
+          <button class="btn bg bsm" onclick="opcDeselectAll()">Seçimi Kaldır</button>
+          <button class="btn bp bsm" onclick="opcBackToProjects()">← Projelere Dön</button>
+        </div>
       </div>
     </div>
-    <div>
-      <div class="card">
-        <div class="ct">Gönderim Geçmişi</div>
-        <div id="opc-hist" style="max-height:300px;overflow-y:auto">
-          <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Henüz gönderim yok</div>
-        </div>
+
+    <!-- Clip grid -->
+    <div id="opc-clip-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:12px"></div>
+
+    <!-- Gönderim ayarları -->
+    <div class="card">
+      <div class="ct">Seçili Clipleri İşleme Al</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+        <div class="fg" style="flex:1;min-width:160px"><label>Kategori</label><div class="cat-chips" id="opc-cats"></div></div>
+        <div class="fg" style="min-width:160px"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="opc-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
+        <div class="fg" style="min-width:80px"><label>Aralık (sn)</label><input id="opc-delay" type="number" value="10" min="1" style="width:70px"/></div>
       </div>
-      <div class="card">
-        <div class="ct">Webhook Adresi</div>
-        <div id="opc-wh-display" style="font-size:10px;color:var(--acc);word-break:break-all;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:8px 10px;margin-bottom:8px">/webhook/opus-clip-direkt</div>
-        <button class="btn bg bsm" onclick="copyText(document.getElementById('opc-wh-display').textContent)">Kopyala</button>
-        <div style="margin-top:10px;font-size:9px;color:var(--mt)">
-          POST body: <code>{"clip_id": "P3061022AkhR", "kategori": "film"}</code>
-        </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+        <button class="btn bp" onclick="opcSendSelected()" id="opc-send-btn">▶ Seçilenleri Gönder (<span id="opc-sel-count">0</span>)</button>
+        <div id="opc-send-res" class="res" style="flex:1"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- GEÇMIŞ + WEBHOOK (altta) -->
+  <div class="g2" style="margin-top:12px">
+    <div class="card">
+      <div class="ct">Gönderim Geçmişi</div>
+      <div id="opc-hist" style="max-height:200px;overflow-y:auto">
+        <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Henüz gönderim yok</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="ct">Webhook Adresi</div>
+      <div id="opc-wh-display" style="font-size:10px;color:var(--acc);word-break:break-all;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:8px 10px;margin-bottom:8px">/webhook/opus-clip-direkt</div>
+      <button class="btn bg bsm" onclick="copyText(document.getElementById('opc-wh-display').textContent)">Kopyala</button>
     </div>
   </div>
 </div>
@@ -1207,6 +1232,7 @@ tbody td{line-height:1.5}
         <div class="fg"><label>Sheet ID (Short Kaydet)</label><input id="cfg-sheet" type="text" placeholder="1eAm6yyasd_..."/></div>
         <div class="fg"><label>Sheet ID (URL-Takip)</label><input id="cfg-sheet2" type="text" placeholder="aynı veya farklı"/></div>
         <div class="fg"><label>Upload-Post API Key</label><input id="cfg-blot" type="text" placeholder="blt_..."/></div>
+        <div class="fg"><label>OpusClip API Key</label><input id="cfg-opus" type="text" placeholder="sk-..."/><div style="font-size:8px;color:var(--mt);margin-top:3px">opus.pro → Settings → API → API Key</div></div>
         <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
         <div id="cfg-ok" style="display:none;font-size:9px;color:var(--ok);margin-top:6px">✓ Kaydedildi</div>
       </div>
@@ -1962,7 +1988,6 @@ function renderCatGrid() {
   renderCatChips('str-cats');
   renderCatChips('vp-cats');
   renderCatChips('opc-cats');
-  renderCatChips('opc-bulk-cats');
 }
 
 function renderCatChips(id) {
@@ -2882,6 +2907,7 @@ function saveSettings() {
     sheet: (document.getElementById('cfg-sheet')||{}).value||'',
     sheet2:(document.getElementById('cfg-sheet2')||{}).value||'',
     blot:  (document.getElementById('cfg-blot')||{}).value||'',
+    opus:  (document.getElementById('cfg-opus')||{}).value||'',
   };
   S.limits={
     ig:    parseInt((document.getElementById('cfg-ig-lim')||{}).value||10),
@@ -2908,7 +2934,7 @@ function loadSettings() {
   const c=S.cfg;
   const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
   set('cfg-n8n',c.n8n); set('cfg-shkey',c.shkey); set('cfg-sheet',c.sheet);
-  set('cfg-sheet2',c.sheet2); set('cfg-blot',c.blot);
+  set('cfg-sheet2',c.sheet2); set('cfg-blot',c.blot); set('cfg-opus',c.opus);
   const ytkEl=document.getElementById('ytk-apikey');if(ytkEl&&c.ytApiKey)ytkEl.value=c.ytApiKey;
   const ytkSh=document.getElementById('ytk-sheetid');if(ytkSh&&(c.sheet2||c.sheet))ytkSh.value=c.sheet2||c.sheet;
   set('cfg-ig-lim',S.limits.ig); set('cfg-yt-lim',S.limits.yt); set('cfg-tt-lim',S.limits.tt);
@@ -3910,14 +3936,26 @@ async function oySave() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// OPUSCLIP DİREKT
+// OPUSCLIP GALERİ
 // ═══════════════════════════════════════════════════════════
-const OPC = { hist: JSON.parse(localStorage.getItem('op_opc_hist')||'[]') };
+const OPC = {
+  hist: JSON.parse(localStorage.getItem('op_opc_hist')||'[]'),
+  projects: [],
+  clips: [],
+  selectedClips: new Set(),
+  currentProjectId: null
+};
+
+function getOpusKey() { return S.cfg.opus || ''; }
 
 function initOpusClip() {
   renderOPCHist();
   const wh = document.getElementById('opc-wh-display');
   if (wh) wh.textContent = getN8N() ? getN8N() + '/webhook/opus-clip-direkt' : '/webhook/opus-clip-direkt';
+  const grid = document.getElementById('opc-project-grid');
+  const empty = document.getElementById('opc-project-empty');
+  if (grid) grid.innerHTML = '';
+  if (empty) empty.style.display = 'block';
 }
 
 function extractClipId(raw) {
@@ -3929,46 +3967,218 @@ function extractClipId(raw) {
   return s;
 }
 
-async function sendOpusClip() {
-  const raw = (document.getElementById('opc-clipid')||{}).value || '';
-  const clipId = extractClipId(raw);
-  if (!clipId) return showRes('opc-res', 'Clip ID girin', 'err');
-  const cats = getSelCatList('opc-cats');
-  const kat = cats[0] || 'genel';
-  const base = getN8N();
-  if (!base) return showRes('opc-res', 'Ayarlardan n8n URL girin', 'warn');
-  showRes('opc-res', `⏳ [${clipId}] işleme alınıyor...`, 'info');
-  const opcAciklama = (document.getElementById('opc-aciklama')||{}).value||'';
-  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, dil: getSelLang('opc-cats'), platformlar: getSelPlatforms('opc-cats'), aciklama_notu: opcAciklama});
-  OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
-  localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
-  renderOPCHist();
-  showRes('opc-res', `✓ [${clipId}] n8n'e gönderildi [${kat}]`, 'ok');
-  addLog('ok', 'webhook', `OpusClip: ${clipId} [${kat}]`);
+async function opcApiFetch(url) {
+  const key = getOpusKey();
+  if (!key) throw new Error('OpusClip API Key gerekli — Ayarlar sayfasından girin');
+  const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + key } });
+  if (!r.ok) {
+    if (r.status === 401) throw new Error('API Key geçersiz — Ayarlar\'dan kontrol edin');
+    if (r.status === 403) throw new Error('Erişim reddedildi (403)');
+    throw new Error('API hatası: ' + r.status);
+  }
+  return r.json();
 }
 
-async function sendOpusClipBulk() {
-  const raw = (document.getElementById('opc-bulk')||{}).value || '';
-  const delay = parseInt((document.getElementById('opc-delay')||{}).value || 10) * 1000;
-  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
-  if (!lines.length) return showRes('opc-bulk-res', 'ID listesi boş', 'err');
-  const cats = getSelCatList('opc-bulk-cats');
-  const kat = cats[0] || 'genel';
-  const base = getN8N();
-  if (!base) return showRes('opc-bulk-res', 'n8n URL girin', 'warn');
-  showRes('opc-bulk-res', `⏳ ${lines.length} ID gönderiliyor...`, 'info');
-  for (let i=0; i<lines.length; i++) {
-    const clipId = extractClipId(lines[i]);
-    if (!clipId) continue;
-    const opcAciklama = (document.getElementById('opc-aciklama')||{}).value||'';
-  await faf(base + '/webhook/opus-clip-direkt', {clip_id: clipId, kategori: kat, dil: getSelLang('opc-bulk-cats'), platformlar: getSelPlatforms('opc-bulk-cats'), aciklama_notu: opcAciklama});
-    OPC.hist.unshift({id: clipId, kat, t: new Date().toLocaleString('tr')});
-    if (i < lines.length-1) await sleep(delay);
+async function opcFetchProjects() {
+  const st = document.getElementById('opc-status');
+  const grid = document.getElementById('opc-project-grid');
+  const empty = document.getElementById('opc-project-empty');
+  const btn = document.getElementById('opc-fetch-btn');
+  try {
+    if (st) st.innerHTML = '⏳ Projeler yükleniyor...';
+    if (btn) btn.disabled = true;
+    const data = await opcApiFetch('https://api.opus.pro/api/clip-projects');
+    const projects = Array.isArray(data) ? data : (data.data || data.projects || data.items || []);
+    OPC.projects = projects;
+    if (!projects.length) {
+      if (grid) grid.innerHTML = '';
+      if (empty) { empty.style.display = 'block'; empty.querySelector('div:nth-child(2)').textContent = 'Henüz OpusClip projeniz yok'; }
+      if (st) st.innerHTML = 'Proje bulunamadı';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    opcRenderProjects(projects);
+    if (st) st.innerHTML = `✓ ${projects.length} proje yüklendi`;
+    addLog('ok', 'sistem', `OpusClip: ${projects.length} proje yüklendi`);
+  } catch(e) {
+    if (st) st.innerHTML = '<span style="color:var(--err)">✕ ' + e.message + '</span>';
+    addLog('err', 'sistem', 'OpusClip proje yükleme hatası: ' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
   }
-  localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
-  renderOPCHist();
-  showRes('opc-bulk-res', `✓ ${lines.length} ID gönderildi [${kat}]`, 'ok');
-  addLog('ok', 'webhook', `OpusClip Toplu: ${lines.length} ID [${kat}]`);
+}
+
+function opcRenderProjects(projects) {
+  const grid = document.getElementById('opc-project-grid');
+  if (!grid) return;
+  grid.innerHTML = projects.map(p => {
+    const title = p.title || p.name || p.videoTitle || p.sourceVideoTitle || 'Proje';
+    const id = p.id || p.projectId || '';
+    const thumb = p.thumbnailUrl || p.uriForThumbnail || p.thumbnail || '';
+    const date = (p.createdAt || p.created_at || '').slice(0,10);
+    const clipCount = p.clipCount || p.totalClips || p.numClips || '';
+    const status = p.status || p.state || '';
+    const statusColor = status === 'COMPLETED' || status === 'completed' ? 'var(--ok)' : status === 'PROCESSING' || status === 'processing' ? '#f59e0b' : 'var(--mt)';
+    const thumbHtml = thumb
+      ? `<img src="${thumb}" style="width:100%;height:140px;object-fit:cover;border-radius:6px 6px 0 0" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      : '';
+    return `<div onclick="opcOpenProject('${id}')" style="background:var(--card);border:1px solid var(--brd);border-radius:8px;cursor:pointer;transition:all .15s;overflow:hidden" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--brd)'">
+      ${thumbHtml}
+      <div style="display:${thumb?'none':'flex'};align-items:center;justify-content:center;height:140px;background:linear-gradient(135deg,#0a1628,#162a4a);border-radius:6px 6px 0 0;color:var(--acc);font-size:36px">◈</div>
+      <div style="padding:10px 12px">
+        <div style="font-size:11px;font-weight:600;color:var(--tx);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:9px">
+          <span style="color:var(--mt);font-family:var(--fm)">${id.substring(0,12)}</span>
+          ${clipCount ? `<span class="badge bi">${clipCount} clip</span>` : ''}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:8px">
+          <span style="color:var(--mt)">${date}</span>
+          ${status ? `<span style="color:${statusColor};text-transform:uppercase;letter-spacing:.5px">${status}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function opcSearchById() {
+  const raw = (document.getElementById('opc-pid-search')||{}).value || '';
+  const pid = extractClipId(raw);
+  if (!pid) return;
+  const st = document.getElementById('opc-status');
+  if (st) st.innerHTML = '⏳ Proje aranıyor...';
+  try {
+    await opcOpenProject(pid);
+  } catch(e) {
+    if (st) st.innerHTML = '<span style="color:var(--err)">✕ ' + e.message + '</span>';
+  }
+}
+
+async function opcOpenProject(projectId) {
+  const st = document.getElementById('opc-status');
+  const clipPanel = document.getElementById('opc-clip-panel');
+  const projGrid = document.getElementById('opc-project-grid');
+  const projEmpty = document.getElementById('opc-project-empty');
+  OPC.currentProjectId = projectId;
+  OPC.selectedClips.clear();
+
+  try {
+    if (st) st.innerHTML = '⏳ Clipler yükleniyor...';
+    const data = await opcApiFetch('https://api.opus.pro/api/exportable-clips?q=findByProjectId&projectId=' + projectId);
+    const clips = Array.isArray(data) ? data : (data.data || data.clips || data.items || []);
+    OPC.clips = clips;
+
+    if (projGrid) projGrid.style.display = 'none';
+    if (projEmpty) projEmpty.style.display = 'none';
+    if (clipPanel) clipPanel.style.display = 'block';
+
+    const titleEl = document.getElementById('opc-clip-title');
+    const subEl = document.getElementById('opc-clip-sub');
+    const proj = OPC.projects.find(p => (p.id||p.projectId) === projectId);
+    if (titleEl) titleEl.textContent = proj ? (proj.title||proj.name||proj.videoTitle||proj.sourceVideoTitle||projectId) : projectId;
+    if (subEl) subEl.textContent = `${clips.length} clip · ${projectId}`;
+
+    opcRenderClips();
+    if (st) st.innerHTML = `✓ ${clips.length} clip yüklendi`;
+    addLog('ok', 'sistem', `OpusClip proje ${projectId}: ${clips.length} clip`);
+  } catch(e) {
+    if (st) st.innerHTML = '<span style="color:var(--err)">✕ ' + e.message + '</span>';
+    throw e;
+  }
+}
+
+function opcRenderClips() {
+  const grid = document.getElementById('opc-clip-grid');
+  if (!grid) return;
+  opcUpdateSelCount();
+  grid.innerHTML = OPC.clips.map((c, i) => {
+    const id = c.id || c.clipId || '';
+    const sel = OPC.selectedClips.has(id);
+    const title = c.title || c.headline || 'Clip ' + (i+1);
+    const thumb = c.uriForThumbnail || c.thumbnailUrl || '';
+    const preview = c.uriForPreview || '';
+    const durMs = c.durationMs || 0;
+    const durSec = Math.round(durMs / 1000);
+    const durFmt = durSec >= 60 ? Math.floor(durSec/60) + ':' + String(durSec%60).padStart(2,'0') : durSec + 's';
+    const score = c.score || c.viralScore || '';
+    const previewThumb = thumb || (preview ? preview.replace(/\.mp4$/, '.jpg') : '');
+    return `<div onclick="opcToggleClip('${id}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':'var(--brd)'};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='var(--brd)'" class="${sel?'opc-sel':''}">
+      <div style="position:relative">
+        ${previewThumb ? `<img src="${previewThumb}" style="width:100%;height:120px;object-fit:cover" onerror="this.style.display='none'">` : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#0a1628,#162a4a);display:flex;align-items:center;justify-content:center;color:var(--acc);font-size:24px">▶</div>`}
+        <span style="position:absolute;right:4px;bottom:4px;background:rgba(0,0,0,.85);color:#fff;font-size:8px;padding:2px 6px;border-radius:3px">${durFmt}</span>
+        ${score ? `<span style="position:absolute;left:4px;top:4px;background:rgba(0,229,255,.9);color:#000;font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px">⭐ ${score}</span>` : ''}
+        <div style="position:absolute;left:4px;bottom:4px;width:18px;height:18px;border-radius:50%;border:2px solid ${sel?'var(--acc)':'rgba(255,255,255,.4)'};background:${sel?'var(--acc)':'rgba(0,0,0,.5)'};display:flex;align-items:center;justify-content:center">
+          ${sel ? '<span style="color:#000;font-size:10px;font-weight:700">✓</span>' : ''}
+        </div>
+      </div>
+      <div style="padding:8px 10px">
+        <div style="font-size:10px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function opcToggleClip(clipId) {
+  if (OPC.selectedClips.has(clipId)) OPC.selectedClips.delete(clipId);
+  else OPC.selectedClips.add(clipId);
+  opcRenderClips();
+}
+
+function opcSelectAll() {
+  OPC.clips.forEach(c => OPC.selectedClips.add(c.id || c.clipId || ''));
+  opcRenderClips();
+}
+
+function opcDeselectAll() {
+  OPC.selectedClips.clear();
+  opcRenderClips();
+}
+
+function opcUpdateSelCount() {
+  const el = document.getElementById('opc-sel-count');
+  if (el) el.textContent = OPC.selectedClips.size;
+}
+
+function opcBackToProjects() {
+  document.getElementById('opc-clip-panel').style.display = 'none';
+  const grid = document.getElementById('opc-project-grid');
+  const empty = document.getElementById('opc-project-empty');
+  if (OPC.projects.length) { if (grid) grid.style.display = 'grid'; }
+  else { if (empty) empty.style.display = 'block'; }
+}
+
+async function opcSendSelected() {
+  if (!OPC.selectedClips.size) return showRes('opc-send-res', 'Clip seçin', 'err');
+  const base = getN8N();
+  if (!base) return showRes('opc-send-res', 'Ayarlardan n8n URL girin', 'warn');
+  const cats = getSelCatList('opc-cats');
+  const kat = cats[0] || 'genel';
+  const delay = parseInt((document.getElementById('opc-delay')||{}).value || 10) * 1000;
+  const aciklama = (document.getElementById('opc-aciklama')||{}).value || '';
+  const ids = [...OPC.selectedClips];
+  showRes('opc-send-res', `⏳ ${ids.length} clip gönderiliyor...`, 'info');
+  const btn = document.getElementById('opc-send-btn');
+  if (btn) btn.disabled = true;
+  try {
+    for (let i = 0; i < ids.length; i++) {
+      await faf(base + '/webhook/opus-clip-direkt', {
+        clip_id: ids[i],
+        kategori: kat,
+        dil: getSelLang('opc-cats'),
+        platformlar: getSelPlatforms('opc-cats'),
+        aciklama_notu: aciklama
+      });
+      OPC.hist.unshift({id: ids[i], kat, t: new Date().toLocaleString('tr')});
+      if (i < ids.length - 1) await sleep(delay);
+    }
+    localStorage.setItem('op_opc_hist', JSON.stringify(OPC.hist.slice(0,50)));
+    renderOPCHist();
+    showRes('opc-send-res', `✓ ${ids.length} clip gönderildi [${kat}]`, 'ok');
+    addLog('ok', 'webhook', `OpusClip Galeri: ${ids.length} clip [${kat}]`);
+  } catch(e) {
+    showRes('opc-send-res', '✕ Hata: ' + e.message, 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 function renderOPCHist() {
@@ -4045,9 +4255,10 @@ document.addEventListener('DOMContentLoaded', function() {
       renderLangToggle,langChipToggle,updateLangVisibility,getSelLang,
       renderPlatToggle,platChipToggle,getSelPlatforms,
       toggleTheme,applyTheme,
-      sendOpusClip,sendOpusClipBulk,calcWait,parseDriveSheetID,addSearchHist,
+      opcFetchProjects,opcSearchById,opcOpenProject,opcToggleClip,opcSelectAll,opcDeselectAll,opcBackToProjects,opcSendSelected,
+      calcWait,parseDriveSheetID,addSearchHist,
       toggleBKMode,toggleAutoLog,addCustomCat,saveCats,genLimCode,updateAcc,
-      loadAllSheetData,loadSheetPage,sendOpusClipBulk];
+      loadAllSheetData,loadSheetPage];
     globals.forEach(fn => { if(typeof fn === 'function') window[fn.name] = fn; });
   }catch(e){console.error('Init hatasi:',e);}
 });
