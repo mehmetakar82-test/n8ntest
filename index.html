@@ -2027,11 +2027,10 @@ async function sendSearch() {
   if (!base) return showRes('ya-res','Ayarlar\'dan n8n URL girin','warn');
   showRes('ya-res','⏳ Gonderiliyor... ['+selCats.join(',')+']','info');
   addLog('info','webhook','YouTube arama ['+selCats.join(',')+']:'+kw);
-  for(const kat of selCats){
-    const path = CAT_WH[kat] || '/webhook/youtube-ara';
-    const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
-    faf(base+path,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, kategori:kat, dil:getSelLang('ya-cats'), platformlar:getSelPlatforms('ya-cats'), categories:[kat], aciklama_notu:yaAciklama});
-  }
+  // Çoklu kategoride bile TEK gönderim (kategoriler dizisi ile)
+  const path = selCats.length>1 ? '/webhook/youtube-ara' : (CAT_WH[selCats[0]] || '/webhook/youtube-ara');
+  const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
+  faf(base+path,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, ...mcFields(selCats), dil:getSelLang('ya-cats'), platformlar:getSelPlatforms('ya-cats'), categories:selCats, aciklama_notu:yaAciklama});
   setTimeout(()=>showRes('ya-res','✓ Arama ['+selCats.join(',')+'] baslatildi — n8n arka planda calisiyor','ok'), 1500);
   S.searchHist.unshift({kw, kat:selCats.join(','), t:new Date().toLocaleString('tr')});
   S.searchHist = S.searchHist.slice(0,20);
@@ -2119,16 +2118,16 @@ async function sendBulkKW() {
   const bLog=msg=>{if(logEl)logEl.innerHTML+='<div>'+new Date().toLocaleTimeString('tr')+' — '+msg+'</div>';};
   const kws=[...S.kwList];
   for(let i=0;i<kws.length;i++){
-    for(const kat of selCats){
-      const path = CAT_WH[kat] || '/webhook/youtube-ara';
-      setEl('bk-cur',(i+1)+'/'+kws.length+' ['+kat+']: "'+kws[i]+'"');
-      setStyle('bk-pbar','width',((i+1)/kws.length*100)+'%');
-      bLog('Gonderiliyor ['+kat+']: "'+kws[i]+'"');
-      const bkAciklama = (document.getElementById('bk-aciklama')||{}).value||'';
-      await faf(base+path,{keywords:[kws[i]], anahtar_kelime:kws[i], minDurationSec:parseInt(dur), lang:'tr', kategori:kat, dil:getSelLang('bk-cats'), platformlar:getSelPlatforms('bk-cats'), aciklama_notu:bkAciklama});
-      bLog('✓ "'+kws[i]+'" ['+kat+'] gonderildi');
-      addLog('ok','bulk','KW ['+kat+']: '+kws[i]);
-    }
+    // Çoklu kategoride bile TEK gönderim — bulunan videolar OpusClip'te bir kez
+    // işlenir, klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
+    const path = selCats.length>1 ? '/webhook/youtube-ara' : (CAT_WH[selCats[0]] || '/webhook/youtube-ara');
+    setEl('bk-cur',(i+1)+'/'+kws.length+' ['+selCats.join(',')+']: "'+kws[i]+'"');
+    setStyle('bk-pbar','width',((i+1)/kws.length*100)+'%');
+    bLog('Gonderiliyor ['+selCats.join(',')+']: "'+kws[i]+'"');
+    const bkAciklama = (document.getElementById('bk-aciklama')||{}).value||'';
+    await faf(base+path,{keywords:[kws[i]], anahtar_kelime:kws[i], minDurationSec:parseInt(dur), lang:'tr', ...mcFields(selCats), dil:getSelLang('bk-cats'), platformlar:getSelPlatforms('bk-cats'), aciklama_notu:bkAciklama});
+    bLog('✓ "'+kws[i]+'" ['+selCats.join(',')+'] gonderildi');
+    addLog('ok','bulk','KW ['+selCats.join(',')+']: '+kws[i]);
     if (i<kws.length-1) {
       if (mode==='status') { bLog('n8n bekleniyor (3dk)...'); await sleep(3*60*1000); }
       else { bLog(delay/60000+'dk bekleniyor...'); await sleep(delay); }
@@ -3919,13 +3918,11 @@ async function strSendVod(i){
   const base=getN8N();
   if(!base) return showRes('str-res','Ayarlar\'dan n8n URL girin','warn');
   const cats=getSelCatList('str-cats');
-  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const note=(document.getElementById('str-aciklama')||{}).value||'';
   showRes('str-res','⏳ Gönderiliyor: '+v.title.slice(0,40)+'…','info');
-  for(const kat of cats){
-    const path=CAT_WH[kat]||'/webhook/video-gonder';
-    await faf(base+path,{'Youtube linki':v.url, kaynak:STR.platform, kategori:kat, dil:getSelLang('str-cats'), platformlar:getSelPlatforms('str-cats'), title:v.title, durationSec:v.sec, channelTitle:(STR.ch&&STR.ch.name)||'', aciklama_notu:note});
-  }
+  // Çoklu kategoride bile TEK gönderim — OpusClip aynı VOD'u bir kez işler,
+  // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
+  await faf(base+mcPath(cats),{'Youtube linki':v.url, kaynak:STR.platform, ...mcFields(cats), dil:getSelLang('str-cats'), platformlar:getSelPlatforms('str-cats'), title:v.title, durationSec:v.sec, channelTitle:(STR.ch&&STR.ch.name)||'', aciklama_notu:note});
   showRes('str-res','✓ VOD gönderildi ['+cats.join(',')+'] — '+v.title.slice(0,50),'ok');
   recordSend(v.url, cats.join(','));
   addLog('ok','yayin',STR.platform+' VOD gönderildi: '+v.title.slice(0,60));
@@ -4017,18 +4014,19 @@ async function vpSend() {
   const base = getN8N();
   if (!base) return showRes('vp-res','Ayarlar\'dan n8n URL girin','warn');
   const cats = getSelCatList('vp-cats');
-  const kategori = cats[0] || 'genel';
   const dil = getSelLang('vp-cats');
   const platformlar = getSelPlatforms('vp-cats');
   const aciklama_notu = (document.getElementById('vp-aciklama')||{}).value||'';
   showRes('vp-res','⏳ '+VP.segments.length+' parça gönderiliyor…','info');
+  // Çoklu kategoride bile TEK gönderim — her parça OpusClip'te bir kez işlenir,
+  // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
   await faf(base+'/webhook/video-parcala', {
     'Youtube linki': url.trim(),
-    kategori, dil, platformlar, aciklama_notu,
+    ...mcFields(cats), dil, platformlar, aciklama_notu,
     segments: VP.segments,
   });
-  showRes('vp-res','✓ '+VP.segments.length+' parça n8n\'e gönderildi ['+kategori+(dil==='en'?'/EN':'')+']','ok');
-  recordSend(url, kategori+' (parçalı)');
+  showRes('vp-res','✓ '+VP.segments.length+' parça n8n\'e gönderildi ['+cats.join(', ')+(dil==='en'?'/EN':'')+']','ok');
+  recordSend(url, cats.join(',')+' (parçalı)');
   addLog('ok','webhook','Video Parçala: '+VP.segments.length+' parça gönderildi — '+url.slice(0,50));
 }
 
