@@ -1829,14 +1829,13 @@ async function sendBulkURLs() {
   let sent = 0;
   for (let i=0;i<urls.length;i++) {
     const u=urls[i];
-    for (const kat of selCats) {
-      const path = CAT_WH[kat] || '/webhook/video-gonder';
-      setEl('bv-st',(i+1)+'/'+urls.length+' ['+kat+']: '+u.slice(0,40));
-      setStyle('bv-bar','width',((sent+1)/(urls.length*selCats.length)*100)+'%');
-      const bvAciklama = (document.getElementById('bv-aciklama')||{}).value||'';
-      await faf(base+path,{'Youtube linki':u, kaynak:'toplu', kategori:kat, dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama});
-      sent++;
-    }
+    // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
+    // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
+    setEl('bv-st',(i+1)+'/'+urls.length+' ['+selCats.join(',')+']: '+u.slice(0,40));
+    setStyle('bv-bar','width',((i+1)/urls.length*100)+'%');
+    const bvAciklama = (document.getElementById('bv-aciklama')||{}).value||'';
+    await faf(base+mcPath(selCats),{'Youtube linki':u, kaynak:'toplu', ...mcFields(selCats), dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama});
+    sent++;
     recordSend(u, selCats.join(','));
     if (i<urls.length-1) await sleep(delay);
   }
@@ -2004,11 +2003,10 @@ async function yarSendSelected() {
     const v = yarNormalizeVideo(raw);
     showRes('ya-res', `⏳ ${sent+1}/${sel.length} gönderiliyor: ${(v.title||'').slice(0,40)}...`, 'info');
     const url = 'https://www.youtube.com/watch?v=' + v.id;
-    for (const kat of cats) {
-      const path = CAT_WH[kat] || '/webhook/video-gonder';
-      const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
-      await faf(base + path, {'Youtube linki': url, kaynak: 'youtube-arama', kategori: kat, dil: getSelLang('ya-cats'), platformlar: getSelPlatforms('ya-cats'), title: v.title, durationSec: ytkParseDur(v.duration), channelTitle: v.channelTitle||'', aciklama_notu: yaAciklama});
-    }
+    // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
+    // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
+    const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
+    await faf(base + mcPath(cats), {'Youtube linki': url, kaynak: 'youtube-arama', ...mcFields(cats), dil: getSelLang('ya-cats'), platformlar: getSelPlatforms('ya-cats'), title: v.title, durationSec: ytkParseDur(v.duration), channelTitle: v.channelTitle||'', aciklama_notu: yaAciklama});
     recordSend(url, cats.join(','));
     sent++;
     await sleep(500);
@@ -2253,6 +2251,14 @@ function getSelCatList(containerId) {
   const chips = [...document.querySelectorAll('#'+containerId+' .cat-chip.sel')];
   return chips.length ? chips.map(c=>c.dataset.cat) : ['genel'];
 }
+
+// ── Çoklu kategoride TEK gönderim ─────────────────────────────────
+// Aynı video birden çok kategori seçilse bile OpusClip'e BİR KEZ gönderilir:
+// payload'a `kategoriler` dizisi eklenir; n8n'de Clips Parse Et üretilen
+// klipleri her kategori için ayrı profille yayınlar. Tek kategoride eski davranış.
+const MC_CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
+function mcPath(cats){ return cats.length>1 ? '/webhook/video-gonder' : (MC_CAT_WH[cats[0]]||'/webhook/video-gonder'); }
+function mcFields(cats){ const f={kategori:(cats[0]||'genel')}; if(cats.length>1) f.kategoriler=cats; return f; }
 
 function updateBVWHDisplay() {
   const cats = getSelCatList('bv-cats');
@@ -3668,11 +3674,9 @@ async function ytkSendSelected() {
   for (const v of sel) {
     showRes('ytk-res', `⏳ ${sent+1}/${sel.length} gönderiliyor: ${v.snippet.title.slice(0,40)}...`, 'info');
     const url = 'https://www.youtube.com/watch?v=' + v.id;
-    for (const kat of cats) {
-      const path = CAT_WH[kat] || '/webhook/video-gonder';
-      const ytkAciklama = (document.getElementById('ytk-aciklama')||{}).value||'';
-      await faf(base + path, {'Youtube linki': url, kaynak: 'ytkanal', kategori: kat, dil: getSelLang('ytk-cats'), platformlar: getSelPlatforms('ytk-cats'), title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
-    }
+    // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler.
+    const ytkAciklama = (document.getElementById('ytk-aciklama')||{}).value||'';
+    await faf(base + mcPath(cats), {'Youtube linki': url, kaynak: 'ytkanal', ...mcFields(cats), dil: getSelLang('ytk-cats'), platformlar: getSelPlatforms('ytk-cats'), title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
     recordSend(url, cats.join(','));
     sent++;
     await sleep(500);
@@ -4132,29 +4136,22 @@ async function trApprove(videoId) {
   const plats = [...card.querySelectorAll('.tr-plat:checked')].map(c=>c.value);
   const aciklama = (card.querySelector('.tr-desc')||{}).value || '';
   const actions = card.querySelector('.tr-actions');
-  const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  let okKats = [], failKats = [];
-  for (let i = 0; i < kats.length; i++) {
-    const kat = kats[i];
-    if (actions) actions.innerHTML = '<span style="color:var(--mt);font-size:9px">⏳ '+(i+1)+'/'+kats.length+' ['+kat+'] gönderiliyor...</span>';
-    const path = CAT_WH[kat] || '/webhook/video-gonder';
-    const payload = {'Youtube linki': v.youtubeLink, kaynak:'kworb-onay', kategori:kat, dil, platformlar:plats, aciklama_notu:aciklama};
-    const res = await faf(base + path, payload);
-    if (res && res.ok === true) okKats.push(kat); else failKats.push(kat);
-    if (i < kats.length - 1) await sleep(1500);
-  }
-  if (okKats.length) {
-    recordSend(v.youtubeLink, okKats.join(','));
+  // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
+  // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
+  if (actions) actions.innerHTML = '<span style="color:var(--mt);font-size:9px">⏳ ['+kats.join(', ')+'] gönderiliyor...</span>';
+  const payload = {'Youtube linki': v.youtubeLink, kaynak:'kworb-onay', ...mcFields(kats), dil, platformlar:plats, aciklama_notu:aciklama};
+  const res = await faf(base + mcPath(kats), payload);
+  if (res && res.ok === true) {
+    recordSend(v.youtubeLink, kats.join(','));
     await faf(base + '/webhook/kworb-pending-sil', {videoId, durum:'onaylandı'});   // Sheet'te işaretle
     TR.pending = TR.pending.filter(x=>x.videoId!==videoId);
     trRenderPending();
-    const msg = '✓ Onaylandı ['+okKats.join(', ')+']'+(failKats.length?' · ✕ başarısız: '+failKats.join(', '):'')+': '+(v.title||'').slice(0,40);
-    showRes('tr-status', msg, failKats.length?'warn':'ok');
-    if (typeof toast==='function') toast('Trend onay: '+okKats.join(', ')+(failKats.length?' · ✕ '+failKats.join(','):''), failKats.length?'warn':'ok');
-    addLog(failKats.length?'warn':'ok','webhook','Trend onay ['+okKats.join(',')+']'+(failKats.length?' hata:['+failKats.join(',')+']':'')+': '+(v.title||videoId).slice(0,40));
+    showRes('tr-status','✓ Onaylandı ['+kats.join(', ')+']: '+(v.title||'').slice(0,40),'ok');
+    if (typeof toast==='function') toast('Trend onay: '+kats.join(', '),'ok');
+    addLog('ok','webhook','Trend onay ['+kats.join(',')+']: '+(v.title||videoId).slice(0,40));
   } else {
     if (actions) actions.innerHTML = '<button class="btn bp bsm" style="flex:1" onclick="trApprove(\''+videoId+'\')">✓ Onayla ve Gönder</button><button class="btn bg bsm" onclick="trReject(\''+videoId+'\')">✗ Reddet</button>';
-    showRes('tr-status','✕ Hiçbir kategoriye gönderilemedi (n8n/CORS) — tekrar dene','err');
+    showRes('tr-status','✕ Gönderilemedi (n8n/CORS) — tekrar dene','err');
   }
 }
 
@@ -4182,17 +4179,11 @@ async function trBulkApprove() {
   if(!kats.length) kats.push('genel');
   const ids=[...TR.selected];
   const vids=ids.map(id=>TR.pending.find(v=>v.videoId===id)).filter(Boolean);
-  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
   const tasks=vids.map(v=>({ label:(v.title||v.videoId).slice(0,42), badge:kats.join(','), send: async()=>{
-    let anyOk=false;
-    for(let k=0;k<kats.length;k++){
-      const kat=kats[k];
-      const path=CAT_WH[kat]||'/webhook/video-gonder';
-      const r=await faf(base+path,{'Youtube linki':v.youtubeLink, kaynak:'kworb-onay', kategori:kat, dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
-      if(r&&r.ok===true) anyOk=true;
-      if(k<kats.length-1) await sleep(1500);
-    }
-    if(anyOk){ recordSend(v.youtubeLink,kats.join(',')); await faf(base+'/webhook/kworb-pending-sil',{videoId:v.videoId,durum:'onaylandı'}); TR.pending=TR.pending.filter(x=>x.videoId!==v.videoId); TR.selected.delete(v.videoId); return true; }
+    // Çoklu kategoride bile TEK gönderim — OpusClip video başına bir kez çalışır,
+    // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
+    const r=await faf(base+mcPath(kats),{'Youtube linki':v.youtubeLink, kaynak:'kworb-onay', ...mcFields(kats), dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
+    if(r&&r.ok===true){ recordSend(v.youtubeLink,kats.join(',')); await faf(base+'/webhook/kworb-pending-sil',{videoId:v.videoId,durum:'onaylandı'}); TR.pending=TR.pending.filter(x=>x.videoId!==v.videoId); TR.selected.delete(v.videoId); return true; }
     return false;
   }}));
   const res=await sqRunBatch(tasks,{name:'Trend onay ['+kats.join(', ')+']'});
@@ -5433,24 +5424,17 @@ async function qsSend() {
   const base=getN8N(); if(!base) return showRes('qs-res','Ayarlar\'dan n8n URL girin','warn');
   if(!confirmDupeSend(url)) return showRes('qs-res','İptal — video zaten gönderilmiş','warn');
   const ddp=document.getElementById('qs-dd-panel'); if(ddp) ddp.style.display='none';   // menü açıksa kapat
-  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  let okKats=[], failKats=[];
-  for(let i=0;i<kats.length;i++){
-    const kat=kats[i];
-    showRes('qs-res','⏳ '+(i+1)+'/'+kats.length+' ['+kat+'] gönderiliyor…','info');
-    const path=CAT_WH[kat]||'/webhook/video-gonder';
-    const res=await faf(base+path,{'Youtube linki':url, kaynak:'hizli-gonder', kategori:kat, dil, platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
-    if(res&&res.ok===true) okKats.push(kat); else failKats.push(kat);
-    if(i<kats.length-1) await sleep(1500);
-  }
-  if(okKats.length){
-    recordSend(url,okKats.join(','));
-    const msg='✓ Gönderildi ['+okKats.join(', ')+(dil==='en'?'/EN':'')+']'+(failKats.length?' · ✕ '+failKats.join(', '):'');
-    showRes('qs-res',msg,failKats.length?'warn':'ok');
-    toast('Hızlı gönder: '+okKats.join(', ')+(failKats.length?' · ✕ '+failKats.join(','):''), failKats.length?'warn':'ok');
+  // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
+  // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
+  showRes('qs-res','⏳ ['+kats.join(', ')+'] gönderiliyor…','info');
+  const res=await faf(base+mcPath(kats),{'Youtube linki':url, kaynak:'hizli-gonder', ...mcFields(kats), dil, platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
+  if(res&&res.ok===true){
+    recordSend(url,kats.join(','));
+    showRes('qs-res','✓ Gönderildi ['+kats.join(', ')+(dil==='en'?'/EN':'')+']'+(kats.length>1?' — tek OpusClip işlemi, '+kats.length+' kategoriye yayın':''),'ok');
+    toast('Hızlı gönder: '+kats.join(', '),'ok');
     document.getElementById('qs-url').value='';
     refreshBadges();
-  } else showRes('qs-res','✕ Hiçbir kategoriye gönderilemedi (n8n/CORS)','err');
+  } else showRes('qs-res','✕ Gönderilemedi (n8n/CORS)','err');
 }
 // #11 KOMUT PALETİ
 const CMDK={ all:[], items:[], sel:0 };
