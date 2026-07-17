@@ -338,11 +338,11 @@ tbody td{line-height:1.5}
   <!-- YENİ: Hızlı Gönder -->
   <div class="card" style="margin-bottom:14px;border:1px solid rgba(0,229,255,.25)">
     <div class="ct">⚡ Hızlı Gönder</div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
       <input id="qs-url" type="text" placeholder="YouTube linki yapıştır…" style="flex:1;min-width:200px;margin:0" onkeydown="if(event.key==='Enter')qsSend()"/>
-      <select id="qs-cat" style="width:130px;font-size:10px"></select>
       <button class="btn bp bsm" onclick="qsSend()">▶ Gönder</button>
     </div>
+    <div class="fg" style="margin:0"><label>Kategori <span style="color:var(--mt)">(çoklu seçim — her kategori için ayrı gönderim)</span></label><div class="cat-chips" id="qs-cats"></div></div>
     <div id="qs-res" class="res" style="margin-top:8px"></div>
   </div>
   <div id="sheets-hint" class="alert aw" style="display:none;margin-bottom:10px">
@@ -5390,20 +5390,39 @@ function gcClearAll() {
   S.sentLog={}; localStorage.setItem('op_sent_log','{}'); S.sentURLs=new Set(); localStorage.setItem('op_sent','[]');
   initGecmis(); toast('Geçmiş temizlendi','ok');
 }
-// #14 HIZLI GÖNDER
-function qsInit(){ const s=document.getElementById('qs-cat'); if(s) s.innerHTML=Object.entries(getCats()).map(([k,c])=>`<option value="${k}"${k==='genel'?' selected':''}>${c.label}</option>`).join(''); }
+// #14 HIZLI GÖNDER — çoklu kategori chip'leri + Genel için TR/EN dil seçici
+function qsInit(){
+  const el=document.getElementById('qs-cats'); if(!el || el.dataset.ready) return;
+  el.innerHTML=Object.entries(getCats()).map(([k,c])=>'<span class="cat-chip'+(k==='genel'?' sel':'')+'" data-cat="'+k+'" onclick="catChipToggle(this,\'qs-cats\')">'+c.label+'</span>').join('');
+  el.dataset.ready='1';
+  renderLangToggle('qs-cats');       // Genel seçiliyken TR/EN chip'i görünür
+  updateLangVisibility('qs-cats');
+}
 async function qsSend() {
   const url=((document.getElementById('qs-url')||{}).value||'').trim();
   if(!url) return showRes('qs-res','Link girin','err');
-  const kat=(document.getElementById('qs-cat')||{}).value||'genel';
+  const kats=getSelCatList('qs-cats');           // çoklu seçim (boşsa ['genel'])
+  const dil=getSelLang('qs-cats');               // Genel için TR/EN
   const base=getN8N(); if(!base) return showRes('qs-res','Ayarlar\'dan n8n URL girin','warn');
   if(!confirmDupeSend(url)) return showRes('qs-res','İptal — video zaten gönderilmiş','warn');
   const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  const path=CAT_WH[kat]||'/webhook/video-gonder';
-  showRes('qs-res','⏳ Gönderiliyor…','info');
-  const res=await faf(base+path,{'Youtube linki':url, kaynak:'hizli-gonder', kategori:kat, dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
-  if(res&&res.ok===true){ recordSend(url,kat); showRes('qs-res','✓ Gönderildi ['+kat+']','ok'); toast('Hızlı gönderildi ['+kat+']','ok'); document.getElementById('qs-url').value=''; refreshBadges(); }
-  else showRes('qs-res','✕ Gönderilemedi (n8n/CORS)','err');
+  let okKats=[], failKats=[];
+  for(let i=0;i<kats.length;i++){
+    const kat=kats[i];
+    showRes('qs-res','⏳ '+(i+1)+'/'+kats.length+' ['+kat+'] gönderiliyor…','info');
+    const path=CAT_WH[kat]||'/webhook/video-gonder';
+    const res=await faf(base+path,{'Youtube linki':url, kaynak:'hizli-gonder', kategori:kat, dil, platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
+    if(res&&res.ok===true) okKats.push(kat); else failKats.push(kat);
+    if(i<kats.length-1) await sleep(1500);
+  }
+  if(okKats.length){
+    recordSend(url,okKats.join(','));
+    const msg='✓ Gönderildi ['+okKats.join(', ')+(dil==='en'?'/EN':'')+']'+(failKats.length?' · ✕ '+failKats.join(', '):'');
+    showRes('qs-res',msg,failKats.length?'warn':'ok');
+    toast('Hızlı gönder: '+okKats.join(', ')+(failKats.length?' · ✕ '+failKats.join(','):''), failKats.length?'warn':'ok');
+    document.getElementById('qs-url').value='';
+    refreshBadges();
+  } else showRes('qs-res','✕ Hiçbir kategoriye gönderilemedi (n8n/CORS)','err');
 }
 // #11 KOMUT PALETİ
 const CMDK={ all:[], items:[], sel:0 };
