@@ -637,7 +637,7 @@ tbody td{line-height:1.5}
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--brd)">
       <span style="font-size:9px;color:var(--mt)">Seçili: <b id="tr-selcount">0</b> →</span>
-      <select id="tr-bulk-cat" style="width:130px;font-size:10px"></select>
+      <div id="tr-bulk-cats" class="cat-chips" style="display:inline-flex;flex-wrap:wrap;gap:4px" title="Birden fazla kategori seçebilirsin — her video her kategori için ayrı gönderilir"></div>
       <button class="btn bp bsm" onclick="trBulkApprove()">✓ Seçilenleri Onayla</button>
       <button class="btn bg bsm" onclick="trBulkReject()">✗ Seçilenleri Reddet</button>
     </div>
@@ -4061,9 +4061,10 @@ function trRenderPending() {
   if (toolbar) toolbar.style.display = TR.pending.length ? 'block' : 'none';
   if (!TR.pending.length) { grid.innerHTML=''; if (empty) empty.style.display='block'; return; }
   if (empty) empty.style.display='none';
-  const catOpts = Object.entries(getCats()).map(([k,c])=>`<option value="${k}"${k==='genel'?' selected':''}>${c.label}</option>`).join('');
-  // bulk kategori dropdown'u doldur
-  const bc = document.getElementById('tr-bulk-cat'); if (bc && !bc.options.length) bc.innerHTML = catOpts;
+  // Çoklu seçim: kategori chip'leri (diğer sayfalardaki cat-chip deseniyle aynı)
+  const catChips = Object.entries(getCats()).map(([k,c])=>`<span class="cat-chip${k==='genel'?' sel':''}" data-cat="${k}" onclick="this.classList.toggle('sel')" style="font-size:8px;padding:2px 7px">${c.label}</span>`).join('');
+  // bulk kategori chip'lerini doldur (bir kez)
+  const bc = document.getElementById('tr-bulk-cats'); if (bc && !bc.children.length) bc.innerHTML = catChips;
   // filtre + sıralama
   const q = ((document.getElementById('tr-search')||{}).value||'').toLowerCase();
   const sort = (document.getElementById('tr-sort')||{}).value || 'views';
@@ -4096,9 +4097,9 @@ function trRenderPending() {
           <span>👁 ${views}${pub?` · 📅 ${pub}`:''}</span>
           <a href="${v.youtubeLink}" target="_blank" rel="noopener" style="color:var(--acc)">YouTube ↗</a>
         </div>
-        <div style="display:flex;gap:6px;margin-bottom:6px">
-          <select class="tr-cat" style="flex:1;font-size:9px">${catOpts}</select>
-          <select class="tr-dil" title="Dil (yalnız Genel için etkili)" style="width:60px;font-size:9px"><option value="tr">TR</option><option value="en">EN</option></select>
+        <div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
+          <div class="tr-cats cat-chips" style="flex:1;display:flex;flex-wrap:wrap;gap:3px" title="Birden fazla kategori seçebilirsin — her kategori için ayrı gönderim yapılır">${catChips}</div>
+          <select class="tr-dil" title="Dil (yalnız Genel için etkili)" style="width:60px;font-size:9px;flex-shrink:0"><option value="tr">TR</option><option value="en">EN</option></select>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:8px;color:var(--mt)">${platRow}</div>
         <input class="tr-desc" type="text" placeholder="Açıklama / not (isteğe bağlı)" style="width:100%;font-size:9px;margin-bottom:8px"/>
@@ -4118,26 +4119,36 @@ async function trApprove(videoId) {
   if (!base) return showRes('tr-status','Ayarlar\'dan n8n URL girin','warn');
   const card = document.querySelector('[data-trvid="'+videoId+'"]');
   if (!card) return;
-  const kat  = (card.querySelector('.tr-cat')||{}).value || 'genel';
+  // Çoklu kategori: seçilen HER kategori için ayrı gönderim yapılır
+  const kats = [...card.querySelectorAll('.tr-cats .cat-chip.sel')].map(c=>c.dataset.cat);
+  if (!kats.length) kats.push('genel');
   const dil  = (card.querySelector('.tr-dil')||{}).value || 'tr';
   const plats = [...card.querySelectorAll('.tr-plat:checked')].map(c=>c.value);
   const aciklama = (card.querySelector('.tr-desc')||{}).value || '';
   const actions = card.querySelector('.tr-actions');
-  if (actions) actions.innerHTML = '<span style="color:var(--mt);font-size:9px">⏳ Gönderiliyor...</span>';
   const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  const path = CAT_WH[kat] || '/webhook/video-gonder';
-  const payload = {'Youtube linki': v.youtubeLink, kaynak:'kworb-onay', kategori:kat, dil, platformlar:plats, aciklama_notu:aciklama};
-  const res = await faf(base + path, payload);
-  if (res && res.ok === true) {
-    recordSend(v.youtubeLink, kat);
+  let okKats = [], failKats = [];
+  for (let i = 0; i < kats.length; i++) {
+    const kat = kats[i];
+    if (actions) actions.innerHTML = '<span style="color:var(--mt);font-size:9px">⏳ '+(i+1)+'/'+kats.length+' ['+kat+'] gönderiliyor...</span>';
+    const path = CAT_WH[kat] || '/webhook/video-gonder';
+    const payload = {'Youtube linki': v.youtubeLink, kaynak:'kworb-onay', kategori:kat, dil, platformlar:plats, aciklama_notu:aciklama};
+    const res = await faf(base + path, payload);
+    if (res && res.ok === true) okKats.push(kat); else failKats.push(kat);
+    if (i < kats.length - 1) await sleep(1500);
+  }
+  if (okKats.length) {
+    recordSend(v.youtubeLink, okKats.join(','));
     await faf(base + '/webhook/kworb-pending-sil', {videoId, durum:'onaylandı'});   // Sheet'te işaretle
     TR.pending = TR.pending.filter(x=>x.videoId!==videoId);
     trRenderPending();
-    showRes('tr-status','✓ Onaylandı ve işleme alındı ['+kat+']: '+(v.title||'').slice(0,40),'ok');
-    addLog('ok','webhook','Trend onay gönderildi ['+kat+']: '+(v.title||videoId).slice(0,40));
+    const msg = '✓ Onaylandı ['+okKats.join(', ')+']'+(failKats.length?' · ✕ başarısız: '+failKats.join(', '):'')+': '+(v.title||'').slice(0,40);
+    showRes('tr-status', msg, failKats.length?'warn':'ok');
+    if (typeof toast==='function') toast('Trend onay: '+okKats.join(', ')+(failKats.length?' · ✕ '+failKats.join(','):''), failKats.length?'warn':'ok');
+    addLog(failKats.length?'warn':'ok','webhook','Trend onay ['+okKats.join(',')+']'+(failKats.length?' hata:['+failKats.join(',')+']':'')+': '+(v.title||videoId).slice(0,40));
   } else {
     if (actions) actions.innerHTML = '<button class="btn bp bsm" style="flex:1" onclick="trApprove(\''+videoId+'\')">✓ Onayla ve Gönder</button><button class="btn bg bsm" onclick="trReject(\''+videoId+'\')">✗ Reddet</button>';
-    showRes('tr-status','✕ Gönderilemedi (n8n/CORS) — tekrar dene','err');
+    showRes('tr-status','✕ Hiçbir kategoriye gönderilemedi (n8n/CORS) — tekrar dene','err');
   }
 }
 
@@ -4160,19 +4171,27 @@ function trClearSel(){ TR.selected.clear(); trRenderPending(); }
 async function trBulkApprove() {
   if(!TR.selected.size) return toast('Önce video seç','warn');
   const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
-  const kat=(document.getElementById('tr-bulk-cat')||{}).value||'genel';
+  // Çoklu kategori: toolbar chip'lerinden seçilenler (her video her kategoriye ayrı gönderilir)
+  const kats=[...document.querySelectorAll('#tr-bulk-cats .cat-chip.sel')].map(c=>c.dataset.cat);
+  if(!kats.length) kats.push('genel');
   const ids=[...TR.selected];
   const vids=ids.map(id=>TR.pending.find(v=>v.videoId===id)).filter(Boolean);
   const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  const path=CAT_WH[kat]||'/webhook/video-gonder';
-  const tasks=vids.map(v=>({ label:(v.title||v.videoId).slice(0,42), badge:kat, send: async()=>{
-    const r=await faf(base+path,{'Youtube linki':v.youtubeLink, kaynak:'kworb-onay', kategori:kat, dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
-    if(r&&r.ok===true){ recordSend(v.youtubeLink,kat); await faf(base+'/webhook/kworb-pending-sil',{videoId:v.videoId,durum:'onaylandı'}); TR.pending=TR.pending.filter(x=>x.videoId!==v.videoId); TR.selected.delete(v.videoId); return true; }
+  const tasks=vids.map(v=>({ label:(v.title||v.videoId).slice(0,42), badge:kats.join(','), send: async()=>{
+    let anyOk=false;
+    for(let k=0;k<kats.length;k++){
+      const kat=kats[k];
+      const path=CAT_WH[kat]||'/webhook/video-gonder';
+      const r=await faf(base+path,{'Youtube linki':v.youtubeLink, kaynak:'kworb-onay', kategori:kat, dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
+      if(r&&r.ok===true) anyOk=true;
+      if(k<kats.length-1) await sleep(1500);
+    }
+    if(anyOk){ recordSend(v.youtubeLink,kats.join(',')); await faf(base+'/webhook/kworb-pending-sil',{videoId:v.videoId,durum:'onaylandı'}); TR.pending=TR.pending.filter(x=>x.videoId!==v.videoId); TR.selected.delete(v.videoId); return true; }
     return false;
   }}));
-  const res=await sqRunBatch(tasks,{name:'Trend onay ['+kat+']'});
+  const res=await sqRunBatch(tasks,{name:'Trend onay ['+kats.join(', ')+']'});
   trRenderPending();
-  if(!res.cancel) showRes('tr-status',`✓ ${res.ok} onaylandı${res.err?` · ✕ ${res.err}`:''} [${kat}]`, res.err?'warn':'ok');
+  if(!res.cancel) showRes('tr-status',`✓ ${res.ok} onaylandı${res.err?` · ✕ ${res.err}`:''} [${kats.join(', ')}]`, res.err?'warn':'ok');
 }
 async function trBulkReject() {
   if(!TR.selected.size) return toast('Önce video seç','warn');
