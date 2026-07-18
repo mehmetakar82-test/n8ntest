@@ -398,10 +398,11 @@ tbody td{line-height:1.5}
       <div class="ct" style="margin:0">📊 Profil Başına Short</div>
       <div style="display:flex;gap:8px;align-items:center">
         <span id="pl-status" style="font-size:9px;color:var(--mt)"></span>
+        <button class="btn bg bsm" onclick="seedProfileLoad()" title="Mevcut Sheet short sayılarını n8n'e 'yük' olarak yaz — geride kalan profiller öncelik alıp dengelenir">⚖ Dengele</button>
         <button class="btn bg bsm" onclick="loadProfileLoad()">↻ Yenile</button>
       </div>
     </div>
-    <div style="font-size:8px;color:var(--mt);margin:4px 0 10px">Hangi Upload-Post profiline kaç short atandığını gösterir (short-kaydetme sayfasındaki <b>profil</b> kolonu). Varsa Upload-Post'ta zamanlanmış (⏰) sayısı da eklenir.</div>
+    <div style="font-size:8px;color:var(--mt);margin:4px 0 10px">Aynı kategorideki profiller <b>short bazında orantılı</b> ilerler (en az short almış profile öncelik). Mevcut dengesizliği kapatmak için <b>⚖ Dengele</b>'ye bas: Sheet sayıları n8n'e yük olarak yazılır, sonraki short'lar geride kalanlara gider.</div>
     <div id="pl-list"><div style="color:var(--mt);font-size:10px;text-align:center;padding:12px">Yenile'ye tıklayın</div></div>
   </div>
   <div class="card">
@@ -5439,6 +5440,23 @@ async function loadProfileLoad() {
   if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}`;
 }
 window.loadProfileLoad=loadProfileLoad;
+// Mevcut Sheet short sayılarını n8n staticData.profilLoad'a "yük" olarak yaz →
+// en-az-yüklü profil seçimi geride kalan profilleri yakalatıp dengeler.
+async function seedProfileLoad() {
+  const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
+  let shorts=(S.sheetData&&S.sheetData.shorts)||[];
+  if(!shorts.length){ const n8n=getN8N(); if(n8n){ const d=await n8nGet('/webhook/panel-data'); if(d){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } } }
+  if(!shorts.length) return toast('Short verisi yok — önce Dashboard\'ı yenile','warn');
+  const load={};
+  shorts.forEach(r=>{ const p=String(r['profil']||r['Profil']||r['profile']||'').trim(); if(p) load[p]=(load[p]||0)+1; });
+  const nP=Object.keys(load).length;
+  if(!nP) return toast('short-kaydetme\'de \'profil\' kolonu bulunamadı','warn');
+  if(!confirm(nP+' profilin mevcut short sayısı n8n\'e "yük" olarak yazılacak.\n\nBundan sonra üretilen short\'lar en az short almış profillere öncelik verilerek dağıtılır (aynı kategoride orantılı ilerleme).\n\nDevam edilsin mi?')) return;
+  const res=await faf(base+'/webhook/profil-yuk-seed',{load});
+  if(res&&res.ok===true){ toast('✓ Profil yükleri dengelendi ('+nP+' profil) — sonraki short\'lar geride kalanlara gidecek','ok'); }
+  else toast('✕ Gönderilemedi — n8n Active mi / profil-yuk-seed webhook\'u var mı?','err');
+}
+window.seedProfileLoad=seedProfileLoad;
 
 // #14 HIZLI GÖNDER — açılır menüde çoklu kategori + Genel için TR/EN dil seçici
 function qsInit(){
