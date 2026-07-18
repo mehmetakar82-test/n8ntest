@@ -336,6 +336,19 @@ tbody td{line-height:1.5}
 <!-- DASHBOARD -->
 <div id="page-dashboard" class="page active">
   <div class="ph"><div class="pt">Dashboard</div><div class="ps">Canlı veriler — Upload-Post + Google Sheets</div></div>
+  <!-- #4 AKSİYON MERKEZİ — bugün neye dokunmam lazım? -->
+  <div class="card" id="ac-card" style="margin-bottom:14px;border:1px solid rgba(248,113,113,.28)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="ct" style="margin:0">🚨 Aksiyon Merkezi</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="ac-status" style="font-size:9px;color:var(--mt)"></span>
+        <button class="btn bg bsm" onclick="loadActionCenter()">↻ Yenile</button>
+      </div>
+    </div>
+    <div id="ac-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">
+      <div style="color:var(--mt);font-size:10px;padding:8px">Yenile'ye bas</div>
+    </div>
+  </div>
   <!-- YENİ: Hızlı Gönder -->
   <div class="card" style="margin-bottom:14px;border:1px solid rgba(0,229,255,.25)">
     <div class="ct">⚡ Hızlı Gönder</div>
@@ -1633,7 +1646,7 @@ function go(id, el) {
   page.classList.add('active');
   el.classList.add('active');
   const h = {
-    dashboard: ()=>{ refreshDash(); qsInit(); },
+    dashboard: ()=>{ refreshDash(); qsInit(); loadActionCenter(); },
     loglar:     ()=>{ renderLogs(); refreshBadges(); },
     gecmis:     initGecmis,
     platformlar: loadPlatforms,
@@ -5476,18 +5489,25 @@ async function loadProfileLoad() {
   // render
   const profs=[...new Set([...Object.keys(byP),...Object.keys(upBy)])];
   if(!profs.length){ listEl.innerHTML='<div style="color:var(--mt);font-size:10px;text-align:center;padding:14px">Veri yok — Ayarlar\'da Sheet ID / n8n URL girili mi? (short-kaydetme sayfası \'profil\' kolonu okunur)</div>'; if(st) st.textContent=''; return; }
+  // #3 profil hesap sağlığı (Upload-Post /users) — her profile durum noktası
+  let health={}; try { health=phCompute(await phFetchAccounts(), new Set(profs)); } catch(e){ console.warn('[ProfilSaglik]', e.message); }
   const rows=profs.map(p=>({p, total:(byP[p]&&byP[p].total)||0, pending:(byP[p]&&byP[p].pending)||0, sched:upBy[p]||0}));
   rows.sort((a,b)=>(b.total+b.sched)-(a.total+a.sched));
   const max=Math.max(1,...rows.map(r=>Math.max(r.total,r.sched)));
-  listEl.innerHTML=rows.map(r=>`<div style="margin-bottom:8px">
+  listEl.innerHTML=rows.map(r=>{
+    const h=health[r.p]||null; const hm=h?(PH_META[h.status]||PH_META.live):null;
+    const dot=hm?`<span title="${(hm.txt||'Bağlı').replace(/"/g,'')}" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${hm.dot};margin-right:5px;vertical-align:middle"></span>`:'';
+    const warn=(hm&&hm.txt)?` <span style="color:${hm.dot};font-size:8px">${hm.txt}</span>`:'';
+    return `<div style="margin-bottom:8px">
     <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;margin-bottom:3px">
-      <span style="color:var(--tx);font-family:var(--fm)">${r.p}</span>
+      <span style="color:var(--tx);font-family:var(--fm)">${dot}${r.p}${warn}</span>
       <span style="color:var(--mt)"><b style="color:var(--acc)">${r.total}</b> short${r.pending&&r.pending!==r.total?` (${r.pending} bekliyor)`:''}${r.sched?` · ⏰ ${r.sched} zamanlı`:''}</span>
     </div>
     <div class="prog"><div class="pf" style="background:var(--acc);width:${Math.round(Math.max(r.total,r.sched)/max*100)}%"></div></div>
-  </div>`).join('');
+  </div>`;}).join('');
   const tShort=rows.reduce((s,r)=>s+r.total,0), tSched=rows.reduce((s,r)=>s+r.sched,0);
-  if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}`;
+  const badN=Object.values(health).filter(h=>h.status!=='live').length;
+  if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}${badN?` · ⚠ ${badN} sağlık sorunu`:''}`;
 }
 window.loadProfileLoad=loadProfileLoad;
 // Mevcut Sheet short sayılarını n8n staticData.profilLoad'a "yük" olarak yaz →
@@ -5541,19 +5561,9 @@ function ydFindSource(title, thumb, profile){
   };
 }
 
-async function loadYayinDurumu(){
-  const listEl = document.getElementById('yd-list');
-  const stEl   = document.getElementById('yd-status');
-  if (!listEl) return;
-  if (!S.cfg.blot && !getN8N()){
-    listEl.innerHTML = '<div style="color:var(--wn);text-align:center;padding:24px;font-size:11px">Ayarlar → <b>Upload-Post API Key</b> (veya n8n URL) gerekli</div>';
-    return;
-  }
-  listEl.innerHTML = '<div style="color:var(--mt);text-align:center;padding:24px;font-size:11px">⏳ Yükleniyor…</div>';
-  if (stEl) stEl.textContent = '';
+// Upload-Post history + schedule → normalize (DOM'a dokunmaz; Aksiyon Merkezi de kullanır)
+async function ydFetchItems(){
   const items = [];
-
-  // 1) Yayın geçmişi — yayınlanan (permalink) + başarısız (hata sebebi)
   try {
     const { data } = await upFetch('/uploadposts/history?limit=100');
     const hist = Array.isArray(data) ? data : (data.history || data.data || data.results || data.posts || data.items || []);
@@ -5561,8 +5571,7 @@ async function loadYayinDurumu(){
       const ok = h.success !== false && !h.error_message;
       const plat = YD_PLATMAP[String(h.platform||'').toLowerCase()] || (String(h.platform||'').toLowerCase() || 'yt');
       items.push({
-        status: ok ? 'published' : 'failed',
-        plat,
+        status: ok ? 'published' : 'failed', plat,
         profile: h.profile_username || h.user || '',
         title:   h.post_title || h.title || h.post_caption || '(başlıksız)',
         caption: h.post_caption || h.caption || '',
@@ -5573,8 +5582,6 @@ async function loadYayinDurumu(){
       });
     });
   } catch(e){ console.warn('[YD] history:', e.message); }
-
-  // 2) Planlı (schedule) — add_to_queue nedeniyle çoğunlukla boş ama tamlık için
   try {
     const { data } = await upFetch('/uploadposts/schedule');
     const sched = Array.isArray(data) ? data : (data.scheduled || data.jobs || data.data || data.results || data.posts || data.schedules || []);
@@ -5590,16 +5597,27 @@ async function loadYayinDurumu(){
       });
     });
   } catch(e){ console.warn('[YD] schedule:', e.message); }
-
-  // Başarısızlar için kaynak videoyu şimdiden eşleştir (retry hazır)
   items.forEach(it => {
     if (it.status === 'failed'){
       const src = ydFindSource(it.title, it.thumb, it.profile);
       if (src){ it._video = src.video; it._profil = src.profil || it.profile; it._caption = src.caption || it.caption; }
     }
   });
-
   items.sort((a,b)=>{ const ta=Date.parse(a.time)||0, tb=Date.parse(b.time)||0; return tb-ta; });
+  return items;
+}
+
+async function loadYayinDurumu(){
+  const listEl = document.getElementById('yd-list');
+  const stEl   = document.getElementById('yd-status');
+  if (!listEl) return;
+  if (!S.cfg.blot && !getN8N()){
+    listEl.innerHTML = '<div style="color:var(--wn);text-align:center;padding:24px;font-size:11px">Ayarlar → <b>Upload-Post API Key</b> (veya n8n URL) gerekli</div>';
+    return;
+  }
+  listEl.innerHTML = '<div style="color:var(--mt);text-align:center;padding:24px;font-size:11px">⏳ Yükleniyor…</div>';
+  if (stEl) stEl.textContent = '';
+  const items = await ydFetchItems();
   YD.items = items;
   ydUpdateCounts();
   if (stEl) stEl.textContent = items.length ? (items.length+' gönderim') : '';
@@ -5724,6 +5742,113 @@ async function ydDoRetry(payload, idx){
 }
 window.loadYayinDurumu=loadYayinDurumu;
 window.ydFilter=ydFilter; window.ydRetry=ydRetry; window.ydRetryClose=ydRetryClose; window.ydRetryConfirm=ydRetryConfirm;
+
+// ═══════════════════════════════════════════════════════════
+// #3 PROFİL HESAP SAĞLIĞI  +  #4 AKSİYON MERKEZİ
+// ═══════════════════════════════════════════════════════════
+// Upload-Post /users → profil başına bağlı hesap / süresi dolmuş tespiti
+async function phFetchAccounts(){
+  if (S.uploadPostAccounts) return S.uploadPostAccounts;
+  if (S._panelCache && S._panelCache.accounts && Object.keys(S._panelCache.accounts).length) return S._panelCache.accounts;
+  const base = getN8N();
+  if (base){ try { const d = await n8nGet('/webhook/uploadpost-profiller'); if (d){ S.uploadPostAccounts=d; return d; } } catch(e){} }
+  if (S.cfg.blot){ try { const { data } = await upFetch('/uploadposts/users'); S.uploadPostAccounts=data; return data; } catch(e){} }
+  return null;
+}
+function phAcctConnected(a){ return !!(a && typeof a==='object' && (a.username||a.handle||a.id||a.display_name||a.displayName||a.name)); }
+function phAcctExpired(a){
+  if (!a || typeof a!=='object') return false;
+  if (a.expired===true||a.is_expired===true||a.token_expired===true||a.needs_reconnect===true||a.reconnect_required===true) return true;
+  const s = String(a.status||a.connection_status||a.state||'').toLowerCase();
+  return /expir|reconnect|disconnect|invalid|revoked/.test(s);
+}
+// raw: /users; shortProfiles: Set (short alan profil adları) → { username:{accounts,platforms,expired,status} }
+function phCompute(raw, shortProfiles){
+  const by = {};
+  const profs = (raw && Array.isArray(raw.profiles)) ? raw.profiles : [];
+  profs.forEach(p => {
+    const uname = String(p.username || p.user || '').trim(); if (!uname) return;
+    const sa = p.social_accounts || p.socialAccounts || {};
+    let count=0, expired=0; const plats=[];
+    Object.keys(sa).forEach(k => {
+      const v = sa[k]; const list = Array.isArray(v)?v:[v];
+      list.forEach(a => { if (phAcctConnected(a)){ count++; plats.push(k); if (phAcctExpired(a)) expired++; } });
+    });
+    by[uname] = { accounts:count, platforms:plats, expired, status: count===0?'noaccounts':(expired>0?'expired':'live') };
+  });
+  (shortProfiles||[]).forEach(pn => { if (pn && !by[pn]) by[pn] = { accounts:0, platforms:[], expired:0, status:'missing' }; });
+  return by;
+}
+const PH_META = {
+  live:      { dot:'var(--ok)', txt:'' },
+  expired:   { dot:'var(--er)', txt:'⚠ süresi dolmuş hesap — yeniden bağla' },
+  noaccounts:{ dot:'var(--wn)', txt:'⚠ bağlı sosyal hesap yok' },
+  missing:   { dot:'var(--er)', txt:'⚠ Upload-Post\'ta profil yok / bağlantı kopuk' }
+};
+
+// ── #4 AKSİYON MERKEZİ ─────────────────────────────────────
+// URL-Takip: OpusClip'e gidip belli sürede (>6s) short dönmeyen takılı video
+function acIsStuck(r){
+  const durum = String(r['durum']||r['status']||r['Durum']||r['yayin-durumu']||'').toLowerCase();
+  if (/tamam|işlen|islen|bitti|hata|başar|basar|iptal|yayın|yayin/.test(durum)) return false; // terminal
+  const shortsN = parseInt(r['uretilen-short-sayisi']||r['short-sayisi']||r['shorts']||'0',10) || 0;
+  if (shortsN>0) return false;
+  const t = r['istek-tarihi']||r['tarih']||r['created-at']||r['date']||'';
+  const ts = Date.parse(t); if (!ts) return false;
+  return (Date.now()-ts)/3600000 > 6;
+}
+function acGo(id){ const el=[...document.querySelectorAll('.ni')].find(n=>(n.getAttribute('onclick')||'').includes("'"+id+"'")); if (el) el.click(); }
+function acTileClick(target){
+  if (target==='failed'){ acGo('yayindurumu'); setTimeout(()=>{ try{ ydFilter('failed'); }catch(e){} }, 350); }
+  else if (target==='health'){ acGo('platformlar'); }
+  else if (target==='stuck'){ acGo('urltakip'); }
+  else if (target==='trend'){ acGo('trendonay'); }
+}
+async function loadActionCenter(){
+  const listEl = document.getElementById('ac-list'); if (!listEl) return;
+  const stEl = document.getElementById('ac-status'); if (stEl) stEl.textContent='⏳';
+  const pFail = (async()=>{ try { if(!S.cfg.blot && !getN8N()) return null; const items = await ydFetchItems(); return items.filter(i=>i.status==='failed').length; } catch(e){ return null; } })();
+  const pHealth = (async()=>{ try {
+    const shorts = (S.sheetData&&S.sheetData.shorts)||(S._panelCache&&S._panelCache.shorts)||[];
+    const sp = new Set(shorts.map(r=>String(r['profil']||r['Profil']||'').trim()).filter(Boolean));
+    const by = phCompute(await phFetchAccounts(), sp);
+    if (!Object.keys(by).length) return null;
+    return Object.values(by).filter(h=>h.status!=='live').length;
+  } catch(e){ return null; } })();
+  const pStuck = (async()=>{ try {
+    let urls = (S._panelCache&&S._panelCache.urls)||(S.sheetData&&S.sheetData.urls)||[];
+    if (!urls.length){ const base=getN8N(); if(base){ const d=await n8nGet('/webhook/panel-data'); if(d) urls=d.urls||[]; } }
+    return urls.length ? urls.filter(acIsStuck).length : null;
+  } catch(e){ return null; } })();
+  const pTrend = (async()=>{ try { const base=getN8N(); if(!base) return null; const d=await n8nGet('/webhook/kworb-bekleyenler'); return d?(d.count!=null?d.count:(d.pending?d.pending.length:0)):null; } catch(e){ return null; } })();
+
+  const [fail, health, stuck, trend] = await Promise.all([pFail,pHealth,pStuck,pTrend]);
+  const tiles = [
+    { n:fail,   target:'failed', icon:'❌', label:'Başarısız gönderim', hint:'yeniden gönder',       sev:'var(--er)' },
+    { n:health, target:'health', icon:'⚠',  label:'Profil sağlık sorunu', hint:'süresi dolmuş/hesapsız', sev:'var(--er)' },
+    { n:stuck,  target:'stuck',  icon:'⏳', label:'Takılı video (>6s)',   hint:'short dönmedi',        sev:'var(--gld)' },
+    { n:trend,  target:'trend',  icon:'🔥', label:'Onay bekleyen trend',  hint:'kararını ver',         sev:'var(--acc)' }
+  ];
+  listEl.innerHTML = tiles.map(t=>{
+    const unknown = (t.n==null);
+    const has = (typeof t.n==='number' && t.n>0);
+    const col = unknown ? 'var(--mt)' : (has ? t.sev : 'var(--ok)');
+    const val = unknown ? '–' : t.n;
+    const sub = unknown ? 'veri yok' : (has ? t.hint : 'temiz ✓');
+    return `<div onclick="acTileClick('${t.target}')" title="${t.label}" style="cursor:pointer;border:1px solid ${has?col:'var(--brd)'};border-left:3px solid ${col};border-radius:6px;padding:10px 12px;background:var(--sur);display:flex;align-items:center;gap:10px">
+      <span style="font-size:17px;flex-shrink:0">${t.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:19px;font-weight:800;color:${col};font-family:var(--fh);line-height:1">${val}</div>
+        <div style="font-size:9px;color:var(--mt);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.label} · ${sub}</div>
+      </div>
+    </div>`;
+  }).join('');
+  const vals=[fail,health,stuck,trend];
+  const known=vals.filter(v=>typeof v==='number').length;
+  const totalAct=vals.reduce((s,v)=>s+(typeof v==='number'?v:0),0);
+  if (stEl) stEl.textContent = known===0 ? 'veri yok — Ayarlar (API key / n8n)' : (totalAct>0 ? (totalAct+' aksiyon bekliyor') : 'tümü temiz ✓');
+}
+window.loadActionCenter=loadActionCenter; window.acTileClick=acTileClick;
 
 // #14 HIZLI GÖNDER — açılır menüde çoklu kategori + Genel için TR/EN dil seçici
 function qsInit(){
