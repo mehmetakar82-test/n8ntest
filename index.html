@@ -320,6 +320,7 @@ tbody td{line-height:1.5}
     <div class="ni" onclick="go('gecmis',this)"><span class="ic">🕘</span>Gönderim Geçmişi</div>
     <div class="ni" onclick="go('raporlar',this)"><span class="ic">◈</span>Raporlar</div>
     <div class="ni" onclick="go('takvim',this)"><span class="ic">◫</span>Takvim</div>
+    <div class="ni" onclick="go('yayindurumu',this)"><span class="ic">🚦</span>Yayın Durumu<span class="ni-badge" id="badge-fail" style="background:var(--er)"></span></div>
     <div class="ni" onclick="go('platformlar',this)"><span class="ic">◎</span>Platformlar</div>
     <div class="ni" onclick="go('arsiv',this)"><span class="ic">▣</span>Arşiv</div>
     <div class="ns">Sistem</div>
@@ -1320,6 +1321,51 @@ tbody td{line-height:1.5}
   </div>
 </div>
 
+<!-- YAYIN DURUMU (Delivery Status + Retry) -->
+<div id="page-yayindurumu" class="page">
+  <div class="ph"><div class="pt">Yayın Durumu</div><div class="ps">Başladı ≠ bitti — her gönderimin platform bazlı gerçek sonucu (yayınlandı / başarısız) + permalink + hedefli yeniden gönder</div></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veri kaynağı <b>Upload-Post</b> <b>/uploadposts/history</b>'dir (yayınlanan = permalink, başarısız = hata sebebi). Kuyruğa atılan (add_to_queue) postlar ancak Upload-Post işledikten <b>sonra</b> burada görünür. <b>Yeniden Gönder</b>, başarısız gönderimi aynı profil/platforma tekrar iletir; kaynak videoyu short-kaydetme (<code>short-url</code>) sayfasından bulur, bulamazsa video URL'si ister.</span></div>
+
+  <!-- Özet kutuları -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+    <div class="card" style="padding:12px"><div style="font-size:9px;color:var(--mt);letter-spacing:1px">YAYINLANDI</div><div id="yd-c-pub" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--ok)">–</div></div>
+    <div class="card" style="padding:12px"><div style="font-size:9px;color:var(--mt);letter-spacing:1px">BAŞARISIZ</div><div id="yd-c-fail" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--er)">–</div></div>
+    <div class="card" style="padding:12px"><div style="font-size:9px;color:var(--mt);letter-spacing:1px">BAŞARI ORANI</div><div id="yd-c-rate" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--acc)">–</div></div>
+    <div class="card" style="padding:12px"><div style="font-size:9px;color:var(--mt);letter-spacing:1px">PLANLI ⏰</div><div id="yd-c-sch" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--wn)">–</div></div>
+  </div>
+
+  <!-- Araç çubuğu -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <button class="btn bp bsm" onclick="loadYayinDurumu()">↻ Yenile</button>
+    <span id="yd-status" style="font-size:10px;color:var(--mt);font-family:var(--fm)"></span>
+    <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
+      <span class="badge bgr" id="yd-f-all"    onclick="ydFilter('all')"    style="cursor:pointer">Tümü</span>
+      <span class="badge bi"  id="yd-f-failed" onclick="ydFilter('failed')" style="cursor:pointer">❌ Başarısız</span>
+      <span class="badge bi"  id="yd-f-published" onclick="ydFilter('published')" style="cursor:pointer">✅ Yayınlandı</span>
+      <span class="badge bi"  id="yd-f-scheduled" onclick="ydFilter('scheduled')" style="cursor:pointer">⏰ Planlı</span>
+    </div>
+  </div>
+
+  <div id="yd-list"><div style="color:var(--mt);text-align:center;padding:30px;font-size:11px">Yüklemek için <b>↻ Yenile</b>'ye bas</div></div>
+
+  <!-- Yeniden gönder — kaynak video bilinmiyorsa manuel giriş modalı -->
+  <div id="yd-retry-modal" style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:16px">
+    <div style="width:min(460px,94vw);background:var(--sur2);border:1px solid var(--acc);border-radius:12px;padding:18px;box-shadow:0 16px 48px rgba(0,0,0,.6)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-family:var(--fh);font-size:14px;font-weight:700;color:var(--tx)">↻ Yeniden Gönder</div>
+        <span onclick="ydRetryClose()" style="cursor:pointer;color:var(--mt);font-size:16px">✕</span>
+      </div>
+      <div id="yd-retry-info" style="font-size:10px;color:var(--mt);margin-bottom:10px;line-height:1.5"></div>
+      <label style="font-size:10px;color:var(--mt);display:block;margin-bottom:4px">Kaynak video URL'si (.mp4 / doğrudan dosya)</label>
+      <input id="yd-retry-video" type="text" placeholder="https://…/short.mp4" style="width:100%;margin:0 0 12px"/>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn bg bsm" onclick="ydRetryClose()">İptal</button>
+        <button class="btn bp bsm" onclick="ydRetryConfirm()">↻ Gönder</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- GÜN DETAY MODALI -->
 <div id="tak-day-modal" onclick="if(event.target===this)closeDayModal()" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;padding:40px 16px 40px;overflow-y:auto">
   <div style="background:var(--sur);border:1px solid var(--brd);border-radius:14px;width:min(780px,98vw);position:relative;box-shadow:var(--shadow-lg)">
@@ -1592,6 +1638,7 @@ function go(id, el) {
     gecmis:     initGecmis,
     platformlar: loadPlatforms,
     takvim:     loadTakvim,
+    yayindurumu: loadYayinDurumu,
     kuyruk:     ()=>loadSheetPage('kuyruk'),
     shortlist:  ()=>loadSheetPage('shortlist'),
     urltakip:   ()=>loadSheetPage('urltakip'),
@@ -4879,11 +4926,13 @@ async function loadTakvim() {
     const { data } = await upFetch('/uploadposts/history?limit=100');
     console.log('[TAK] history raw:', JSON.stringify(data).slice(0,700));
     const hist = Array.isArray(data) ? data : (data.history || data.data || data.results || data.posts || data.items || []);
+    let failN = 0;
     hist.forEach(h => {
       const time = h.upload_timestamp || h.uploaded_at || h.created_at || h.timestamp || h.date || '';
       if (!time) return;
       const plat = platMap[String(h.platform || '').toLowerCase()] || 'yt';
-      const ok = h.success !== false;
+      const ok = h.success !== false && !h.error_message;
+      if (!ok) failN++;
       items.push({ time, plat, _url: h.post_url || '', r: {
         title: h.post_title || h.title || h.post_caption || '(başlıksız)',
         'preview-url': h.thumbnail || h.preview_url || '',
@@ -4893,6 +4942,7 @@ async function loadTakvim() {
         kategori: (h.profile_username || '')
       }});
     });
+    try { ydSetFailBadge(failN); } catch(e) {}
   } catch(e) { console.warn('[TAK] history hata:', e.message); }
 
   TAK.items = items;
@@ -5457,6 +5507,223 @@ async function seedProfileLoad() {
   else toast('✕ Gönderilemedi — n8n Active mi / profil-yuk-seed webhook\'u var mı?','err');
 }
 window.seedProfileLoad=seedProfileLoad;
+
+// ═══════════════════════════════════════════════════════════
+// YAYIN DURUMU — teslimat sonucu (yayınlandı/başarısız + permalink) + hedefli retry
+//  #1  Upload-Post /history → her gönderimin platform bazlı GERÇEK sonucu
+//  #2  Başarısızı aynı profil/platforma yeniden gönder (kaynak mp4 = short-kaydetme 'short-url')
+// ═══════════════════════════════════════════════════════════
+const YD = { items: [], filter: 'all', retry: null };
+const YD_PLATMAP   = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb', x:'x', twitter:'x', threads:'ig', linkedin:'fb' };
+const YD_PLAT_LABEL= { ig:'📸 Instagram', yt:'▶ YouTube', tt:'♪ TikTok', fb:'ⓕ Facebook', x:'𝕏 X' };
+function ydPlatApi(p){ return ({ig:'instagram',yt:'youtube',tt:'tiktok',fb:'facebook',x:'x'})[p] || p; }
+function ydNorm(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9ğüşöçı]+/gi,' ').trim(); }
+
+// short-kaydetme satırlarından kaynak mp4 + profil bul (başlık / thumbnail eşleşmesi)
+function ydFindSource(title, thumb, profile){
+  const shorts = (S._panelCache && S._panelCache.shorts) || (S.sheetData && S.sheetData.shorts) || [];
+  const nt = ydNorm(title);
+  const thumbFile = String(thumb||'').split('?')[0].split('/').pop();
+  let best = null;
+  for (const r of shorts){
+    const rurl = r['short-url'] || r['shortUrl'] || r['uriForExport'] || '';
+    if (!rurl) continue;
+    const rt = ydNorm(r['title']||r['Title']||r['baslik']||'');
+    if (nt && rt && nt === rt) { best = r; break; }
+    const rthumb = String(r['thumbnail-url']||r['thumbnail']||'').split('?')[0].split('/').pop();
+    if (thumbFile && rthumb && thumbFile === rthumb) { best = r; break; }
+  }
+  if (!best) return null;
+  return {
+    video:  best['short-url'] || best['shortUrl'] || best['uriForExport'] || '',
+    profil: String(best['profil']||best['Profil']||profile||'').trim(),
+    caption:best['safe-description'] || best['safeDescription'] || best['description'] || ''
+  };
+}
+
+async function loadYayinDurumu(){
+  const listEl = document.getElementById('yd-list');
+  const stEl   = document.getElementById('yd-status');
+  if (!listEl) return;
+  if (!S.cfg.blot && !getN8N()){
+    listEl.innerHTML = '<div style="color:var(--wn);text-align:center;padding:24px;font-size:11px">Ayarlar → <b>Upload-Post API Key</b> (veya n8n URL) gerekli</div>';
+    return;
+  }
+  listEl.innerHTML = '<div style="color:var(--mt);text-align:center;padding:24px;font-size:11px">⏳ Yükleniyor…</div>';
+  if (stEl) stEl.textContent = '';
+  const items = [];
+
+  // 1) Yayın geçmişi — yayınlanan (permalink) + başarısız (hata sebebi)
+  try {
+    const { data } = await upFetch('/uploadposts/history?limit=100');
+    const hist = Array.isArray(data) ? data : (data.history || data.data || data.results || data.posts || data.items || []);
+    (hist||[]).forEach(h => {
+      const ok = h.success !== false && !h.error_message;
+      const plat = YD_PLATMAP[String(h.platform||'').toLowerCase()] || (String(h.platform||'').toLowerCase() || 'yt');
+      items.push({
+        status: ok ? 'published' : 'failed',
+        plat,
+        profile: h.profile_username || h.user || '',
+        title:   h.post_title || h.title || h.post_caption || '(başlıksız)',
+        caption: h.post_caption || h.caption || '',
+        thumb:   h.thumbnail || h.preview_url || '',
+        permalink: h.post_url || h.url || '',
+        error:   h.error_message || h.error || '',
+        time:    h.upload_timestamp || h.uploaded_at || h.created_at || h.timestamp || h.date || ''
+      });
+    });
+  } catch(e){ console.warn('[YD] history:', e.message); }
+
+  // 2) Planlı (schedule) — add_to_queue nedeniyle çoğunlukla boş ama tamlık için
+  try {
+    const { data } = await upFetch('/uploadposts/schedule');
+    const sched = Array.isArray(data) ? data : (data.scheduled || data.jobs || data.data || data.results || data.posts || data.schedules || []);
+    (sched||[]).forEach(s => {
+      items.push({
+        status:'scheduled', plat:'sch',
+        profile: s.profile_username || s.profile || s.user || '',
+        title:   s.title || s.post_title || '(başlıksız)',
+        caption: s.caption || s.post_caption || '',
+        thumb:   s.preview_url || s.previewUrl || '',
+        permalink:'', error:'',
+        time: s.scheduled_date || s.scheduledDate || s.scheduled_at || s.date || ''
+      });
+    });
+  } catch(e){ console.warn('[YD] schedule:', e.message); }
+
+  // Başarısızlar için kaynak videoyu şimdiden eşleştir (retry hazır)
+  items.forEach(it => {
+    if (it.status === 'failed'){
+      const src = ydFindSource(it.title, it.thumb, it.profile);
+      if (src){ it._video = src.video; it._profil = src.profil || it.profile; it._caption = src.caption || it.caption; }
+    }
+  });
+
+  items.sort((a,b)=>{ const ta=Date.parse(a.time)||0, tb=Date.parse(b.time)||0; return tb-ta; });
+  YD.items = items;
+  ydUpdateCounts();
+  if (stEl) stEl.textContent = items.length ? (items.length+' gönderim') : '';
+  if (!items.length) addLog('warn','sistem','Yayın Durumu: Upload-Post history boş (konsol: [YD])');
+  renderYayinDurumu();
+}
+
+function ydUpdateCounts(){
+  const pub  = YD.items.filter(i=>i.status==='published').length;
+  const fail = YD.items.filter(i=>i.status==='failed').length;
+  const sch  = YD.items.filter(i=>i.status==='scheduled').length;
+  const total= pub+fail;
+  setEl('yd-c-pub', pub);
+  setEl('yd-c-fail', fail);
+  setEl('yd-c-rate', total ? Math.round(pub/total*100)+'%' : '–');
+  setEl('yd-c-sch', sch);
+  ydSetFailBadge(fail);
+}
+
+function ydSetFailBadge(n){
+  const b = document.getElementById('badge-fail'); if (!b) return;
+  if (n>0){ b.textContent = n>99?'99+':String(n); b.classList.add('on'); }
+  else { b.textContent=''; b.classList.remove('on'); }
+}
+
+function ydFilter(f){
+  YD.filter = f;
+  ['all','failed','published','scheduled'].forEach(k=>{ const el=document.getElementById('yd-f-'+k); if(el) el.style.opacity=(f===k)?'1':'0.45'; });
+  renderYayinDurumu();
+}
+
+function renderYayinDurumu(){
+  const el = document.getElementById('yd-list'); if (!el) return;
+  const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  let list = YD.items;
+  if (YD.filter !== 'all') list = list.filter(i=>i.status===YD.filter);
+  if (!list.length){ el.innerHTML='<div style="color:var(--mt);text-align:center;padding:30px;font-size:11px">Bu filtrede kayıt yok</div>'; return; }
+  el.innerHTML = list.map(it=>{
+    const realIdx = YD.items.indexOf(it);
+    const stColor = it.status==='published'?'var(--ok)':it.status==='failed'?'var(--er)':it.status==='retried'?'var(--acc)':'var(--wn)';
+    const stLabel = it.status==='published'?'✅ Yayınlandı':it.status==='failed'?'❌ Başarısız':it.status==='retried'?'↻ Tekrar denendi':'⏰ Planlı';
+    const platLabel = YD_PLAT_LABEL[it.plat] || (it.plat==='sch'?'':it.plat);
+    const t = it.time ? new Date(it.time).toLocaleString('tr',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+    const thumb = it.thumb ? `<img src="${esc(it.thumb)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0" onerror="this.style.display='none'"/>` : '';
+    let right = '';
+    if ((it.status==='published') && it.permalink) right = `<a href="${esc(it.permalink)}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ Aç</a>`;
+    else if (it.status==='failed'){
+      const known = it._video ? ' title="Kaynak video bulundu — tek tık"' : ' title="Kaynak bilinmiyor — mp4 sorulacak"';
+      right = `<button class="btn bp bsm" onclick="ydRetry(${realIdx})"${known}>↻ Yeniden Gönder${it._video?'':' *'}</button>`;
+    }
+    return `<div style="display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--brd);border-left:3px solid ${stColor};border-radius:6px;margin-bottom:6px;background:var(--sur)">
+      ${thumb}
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;color:var(--tx);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.title)}</div>
+        <div style="font-size:9px;color:var(--mt);margin-top:2px">${platLabel} · ${esc(it.profile||'—')} ${t?'· '+t:''}</div>
+        ${it.status==='failed'&&it.error?`<div style="font-size:9px;color:var(--er);margin-top:3px">⚠ ${esc(it.error).slice(0,140)}</div>`:''}
+      </div>
+      <span style="font-size:9px;color:${stColor};font-weight:700;white-space:nowrap">${stLabel}</span>
+      ${right}
+    </div>`;
+  }).join('');
+}
+
+// ── Retry ──────────────────────────────────────────────────
+async function ydRetry(idx){
+  const it = YD.items[idx]; if (!it) return;
+  if (it._video){
+    await ydDoRetry({ profil: it._profil||it.profile, platform: ydPlatApi(it.plat), video: it._video, title: it.title, description: it._caption||it.caption }, idx);
+  } else {
+    YD.retry = { idx };
+    document.getElementById('yd-retry-info').innerHTML = `<b>${(it.title||'').slice(0,60)}</b><br>${YD_PLAT_LABEL[it.plat]||it.plat} · ${it.profile||'—'}<br>Kaynak video short-kaydetme'de bulunamadı; mp4 URL'sini gir.`;
+    document.getElementById('yd-retry-video').value = '';
+    document.getElementById('yd-retry-modal').style.display = 'flex';
+  }
+}
+function ydRetryClose(){ const m=document.getElementById('yd-retry-modal'); if(m) m.style.display='none'; YD.retry=null; }
+async function ydRetryConfirm(){
+  if (!YD.retry) return;
+  const it = YD.items[YD.retry.idx]; if (!it) return ydRetryClose();
+  const v = (document.getElementById('yd-retry-video').value||'').trim();
+  if (!v) return toast('Video URL gir','warn');
+  if (/youtube\.com\/watch|youtu\.be\/|tiktok\.com\/@/.test(v)) return toast('Doğrudan mp4/mov URL gir — watch linki değil','err');
+  const idx = YD.retry.idx; ydRetryClose();
+  await ydDoRetry({ profil: it.profile, platform: ydPlatApi(it.plat), video: v, title: it.title, description: it.caption }, idx);
+}
+async function ydDoRetry(payload, idx){
+  if (!payload.video) return toast('Kaynak video yok','err');
+  toast('↻ Yeniden gönderiliyor: '+(payload.profil||'')+' ['+payload.platform+']','info');
+  addLog('info','uploadpost','Retry: '+payload.profil+' ['+payload.platform+'] '+payload.title);
+  try {
+    let ok=false, msg='';
+    if (S.cfg.blot){
+      const fd = new FormData();
+      fd.append('user', payload.profil);
+      fd.append('platform[]', payload.platform);
+      fd.append('video', payload.video);
+      if (payload.title)       fd.append('title', String(payload.title).slice(0,95));
+      if (payload.description)  fd.append('description', payload.description);
+      fd.append('async_upload','true');
+      fd.append('add_to_queue','true');
+      const r = await fetch('https://api.upload-post.com/api/upload',{ method:'POST', body:fd, headers:{'Authorization':'Apikey '+S.cfg.blot} });
+      const j = await r.json().catch(()=>({}));
+      ok = r.ok && j.success !== false; msg = j.message||j.error||('HTTP '+r.status);
+    } else {
+      const base = getN8N();
+      const res  = await faf(base+'/webhook/yeniden-gonder', payload);
+      ok = res && res.ok === true; msg = ok?'':'n8n Active mi / yeniden-gonder webhook\'u var mı?';
+    }
+    if (ok){
+      toast('✓ Yeniden gönderildi — '+(payload.profil||'')+' ['+payload.platform+']','ok');
+      addLog('ok','uploadpost','Retry OK: '+payload.profil+' ['+payload.platform+']');
+      const it = YD.items[idx]; if (it){ it.status='retried'; it.error=(it.error?it.error+' · ':'')+'↻ yeniden gönderildi'; }
+      ydUpdateCounts(); renderYayinDurumu();
+    } else {
+      toast('✕ Gönderilemedi: '+msg,'err');
+      addLog('err','uploadpost','Retry hata: '+msg);
+    }
+  } catch(e){
+    toast('✕ Hata: '+e.message,'err');
+    addLog('err','uploadpost','Retry hata: '+e.message);
+  }
+}
+window.loadYayinDurumu=loadYayinDurumu;
+window.ydFilter=ydFilter; window.ydRetry=ydRetry; window.ydRetryClose=ydRetryClose; window.ydRetryConfirm=ydRetryConfirm;
 
 // #14 HIZLI GÖNDER — açılır menüde çoklu kategori + Genel için TR/EN dil seçici
 function qsInit(){
