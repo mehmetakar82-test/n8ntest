@@ -253,6 +253,11 @@ tbody td{line-height:1.5}
 .ni{position:relative}
 .ni-badge{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--err);color:#fff;font-size:8px;font-weight:700;min-width:15px;height:15px;padding:0 4px;border-radius:8px;display:none;align-items:center;justify-content:center;line-height:1}
 .ni-badge.on{display:flex} .ni-badge.acc{background:var(--acc);color:#012}
+.utab-bar{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;border-bottom:1px solid var(--brd);padding-bottom:12px}
+.utab{padding:8px 16px;border-radius:8px;background:var(--sur2);border:1px solid var(--brd);color:var(--mt);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s,color .15s,border-color .15s;font-family:var(--fh)}
+.utab:hover{color:var(--tx);border-color:var(--acc)}
+.utab.on{background:var(--acc);color:#012;border-color:var(--acc)}
+.utab .ui{font-size:13px}
 /* ═══ YENİ: Komut paleti ═══ */
 #cmdk{position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:12vh}
 #cmdk.on{display:flex}
@@ -300,18 +305,13 @@ tbody td{line-height:1.5}
   <nav>
     <div class="ns">Ana</div>
     <div class="ni active" onclick="go('dashboard',this)"><span class="ic">▦</span>Dashboard</div>
-    <div class="ni" onclick="go('video',this)"><span class="ic">▶</span>Video Gönder</div>
+    <div class="ni" onclick="go('video',this)"><span class="ic">▶</span>Video Gönder & Ara</div>
     <div class="ni" onclick="go('trendonay',this)"><span class="ic">🔥</span>Trend Onay<span class="ni-badge acc" id="badge-tr"></span></div>
-    <div class="ni" onclick="go('ytara',this)"><span class="ic">⊕</span>YouTube Ara</div>
-    <div class="ni" onclick="go('ytkanal',this)"><span class="ic">📺</span>YT Kanal Ara</div>
-    <div class="ni" onclick="go('yayin',this)"><span class="ic">📡</span>Yayın Tekrarları</div>
     <div class="ni" onclick="go('parcala',this)"><span class="ic">✂</span>Video Parçala</div>
     <div class="ni" onclick="go('opusclip',this)"><span class="ic">◈</span>OpusClip Galeri</div>
     <div class="ni" onclick="go('uppost',this)"><span class="ic">⇑</span>Upload-Post</div>
-    <div class="ni" onclick="go('bulk',this)"><span class="ic">≋</span>Toplu Kelimeler</div>
     <div class="ns">Kaynaklar</div>
-    <div class="ni" onclick="go('drive',this)"><span class="ic">◉</span>Google Drive</div>
-    <div class="ni" onclick="go('sheets',this)"><span class="ic">▤</span>Google Sheets</div>
+    <div class="ni" onclick="go('drive',this)"><span class="ic">◉</span>Google Drive &amp; Sheets</div>
     <div class="ns">Takip</div>
     <div class="ni" onclick="go('kuyruk',this)"><span class="ic">≡</span>Kuyruk</div>
     <div class="ni" onclick="go('shortlist',this)"><span class="ic">◎</span>Short Listesi</div>
@@ -436,6 +436,7 @@ tbody td{line-height:1.5}
 <!-- VIDEO GÖNDER -->
 <div id="page-video" class="page">
   <div class="ph"><div class="pt">Video Gönder</div><div class="ps">YouTube linkini doğrudan sisteme gönder</div></div>
+  <div class="utab-bar" data-utab="video"></div>
   <div class="g2">
     <div>
       <div class="card">
@@ -494,6 +495,7 @@ tbody td{line-height:1.5}
 <!-- YT KANAL ARA -->
 <div id="page-ytkanal" class="page">
   <div class="ph"><div class="pt">YouTube Kanal Ara</div><div class="ps">Anahtar kelime ile kanal bul, kanalın tüm videolarını incele ve seçtiklerini tek tek işleme al</div></div>
+  <div class="utab-bar" data-utab="ytkanal"></div>
   <div class="g2">
     <div>
       <div class="card">
@@ -543,6 +545,7 @@ tbody td{line-height:1.5}
 <!-- YAYIN TEKRARLARI (TWITCH / KICK VOD) -->
 <div id="page-yayin" class="page">
   <div class="ph"><div class="pt">Yayın Tekrarları</div><div class="ps">Twitch / Kick kanallarını ara, yayın tekrarlarından (VOD) short oluştur</div></div>
+  <div class="utab-bar" data-utab="yayin"></div>
   <div class="g2">
     <div>
       <div class="card">
@@ -919,6 +922,7 @@ tbody td{line-height:1.5}
 <!-- YOUTUBE ARA -->
 <div id="page-ytara" class="page">
   <div class="ph"><div class="pt">YouTube Ara</div><div class="ps">Anahtar kelimeye göre 10 video listele, seçtiklerini tek tek işleme al</div></div>
+  <div class="utab-bar" data-utab="ytara"></div>
   <div class="g2">
     <div class="card">
       <div class="ct">Arama</div>
@@ -985,67 +989,6 @@ tbody td{line-height:1.5}
   </div>
 </div>
 
-<!-- TOPLU KELIMELER -->
-<div id="page-bulk" class="page">
-  <div class="ph"><div class="pt">Toplu Anahtar Kelimeler</div><div class="ps">Sıralı arama — önceki tamamlanana kadar bekler</div></div>
-  <div class="g2">
-    <div>
-      <div class="card">
-        <div class="ct">Kelime Listesi</div>
-        <div class="alert ai"><span>ℹ</span><span>Her kelime gönderildikten sonra sistem <b>n8n durum güncellemesini</b> bekler. Önceki işlem bitmeden yeni kelime gönderilmez.</span></div>
-        <div class="fg">
-          <label>Yeni Kelime</label>
-          <div style="display:flex;gap:6px">
-            <input id="bk-in" type="text" placeholder="anahtar kelime..." onkeydown="if(event.key==='Enter')addKW()"/>
-            <button class="btn bp bsm" onclick="addKW()">+</button>
-          </div>
-        </div>
-        <label style="margin-bottom:5px;display:block">Eklenenler</label>
-        <div class="kw-tags" id="kw-tags"><span style="color:var(--mt);font-size:9px">Kelime ekleyin...</span></div>
-        <div style="margin-top:10px" class="g2" style="gap:8px">
-          <div class="fg"><label>Min. Süre</label>
-            <select id="bk-dur">
-              <option value="600">10 dk</option>
-              <option value="1200">20 dk</option>
-              <option value="1800">30 dk</option>
-              <option value="3600">60 dk</option>
-              <option value="5400">90 dk</option>
-            </select>
-          </div>
-          <div class="fg"><label>Bekleme Modu</label>
-            <select id="bk-mode" onchange="toggleBKMode()">
-              <option value="status">Durum Bekle (n8n)</option>
-              <option value="time">Süre Bekle (dk)</option>
-            </select>
-          </div>
-        </div>
-        <div class="fg" id="bk-delay-wrap" style="display:none"><label>Bekleme Süresi (dakika)</label><input id="bk-delay" type="number" value="30" min="1"/></div>
-        <div class="fg"><label>Kategori <span style="color:var(--mt)">(birden fazla seçebilirsin)</span></label><div class="cat-chips" id="bk-cats"></div></div>
-        <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="bk-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          <button class="btn bp" onclick="sendBulkKW()">≋ Tümünü Gönder</button>
-          <button class="btn bg bsm" onclick="S.kwList=[];renderKWTags()">✕ Temizle</button>
-        </div>
-        <div id="bk-res" class="res"></div>
-      </div>
-    </div>
-    <div>
-      <div class="card">
-        <div class="ct">İlerleme</div>
-        <div id="bk-prog-empty" style="color:var(--mt);font-size:10px;text-align:center;padding:16px">Gönderim başlatıldığında görünür</div>
-        <div id="bk-prog-wrap" style="display:none">
-          <div id="bk-cur" style="font-size:10px;margin-bottom:6px"></div>
-          <div class="prog" style="height:6px;margin-bottom:8px"><div class="pf" id="bk-pbar" style="background:var(--acc);width:0%"></div></div>
-          <div id="bk-log" style="font-size:9px;max-height:150px;overflow-y:auto;line-height:1.8"></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="ct">Geçmiş Gönderimler</div>
-        <div id="bk-hist" style="font-size:10px"><div style="color:var(--mt);text-align:center;padding:12px">Henüz gönderim yok</div></div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- KATEGORİLER -->
 
@@ -1053,6 +996,7 @@ tbody td{line-height:1.5}
 <!-- GOOGLE DRIVE -->
 <div id="page-drive" class="page">
   <div class="ph"><div class="pt">Google Drive</div><div class="ps">Drive sheet'inden URL listesi al ve gönder</div></div>
+  <div class="utab-bar" data-group="kaynak" data-utab="drive"></div>
   <div class="alert aw" style="margin-bottom:12px"><span>⚠</span><span>Tekrar koruma aktif — işlenmiş URL'ler listede gösterilir ve tekrar gönderilmez.</span></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>film</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
   <div class="g2">
@@ -1089,6 +1033,7 @@ tbody td{line-height:1.5}
 <!-- GOOGLE SHEETS -->
 <div id="page-sheets" class="page">
   <div class="ph"><div class="pt">Google Sheets</div><div class="ps">Sheet'teki URL'leri oku ve gönder</div></div>
+  <div class="utab-bar" data-group="kaynak" data-utab="sheets"></div>
   <div class="alert aw" style="margin-bottom:12px"><span>⚠</span><span>Tarama ve gönderme ayrı — önce tara, kontrol et, sonra gönder.</span></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>film</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
   <div class="g2">
@@ -1676,6 +1621,36 @@ function showTab(id, el) {
   p.querySelectorAll('.tc').forEach(c=>c.classList.remove('active'));
   const tc = document.getElementById('tab-'+id);
   if (tc) tc.classList.add('active');
+}
+
+// ── Sekmeli hub'lar: İçerik (Video Gönder/Ara) + Kaynaklar (Drive/Sheets) tek yüzeyde ──
+const UTAB_GROUPS = {
+  uretim: [
+    { id:'video',   icon:'▶',  label:'Video Gönder' },
+    { id:'ytara',   icon:'⊕',  label:'YouTube Ara' },
+    { id:'ytkanal', icon:'📺', label:'YT Kanal Ara' },
+    { id:'yayin',   icon:'📡', label:'Yayın Tekrarları' }
+  ],
+  kaynak: [
+    { id:'drive',  icon:'◉', label:'Google Drive' },
+    { id:'sheets', icon:'▤', label:'Google Sheets' }
+  ]
+};
+const UTAB_ANCHOR = { uretim:'video', kaynak:'drive' }; // kenar çubuğundaki hub öğesinin id'si
+function renderUretimTabs(){
+  document.querySelectorAll('.utab-bar').forEach(bar=>{
+    const group  = bar.getAttribute('data-group') || 'uretim';
+    const active = bar.getAttribute('data-utab');
+    const anchor = UTAB_ANCHOR[group] || 'video';
+    bar.innerHTML = (UTAB_GROUPS[group]||[]).map(t=>
+      `<div class="utab${t.id===active?' on':''}" onclick="goUretim('${t.id}','${anchor}')"><span class="ui">${t.icon}</span>${t.label}</div>`
+    ).join('');
+  });
+}
+function goUretim(id, anchor){
+  anchor = anchor || 'video';
+  const navEl = [...document.querySelectorAll('.ni')].find(n=>(n.getAttribute('onclick')||'').includes("'"+anchor+"'")) || document.querySelector('.ni');
+  go(id, navEl);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -4853,9 +4828,10 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleAutoLog();
     // YENİ: hızlı gönder, servis durumu, rozetler
     try { qsInit(); } catch(e){}
+    try { renderUretimTabs(); } catch(e){}
     setTimeout(()=>{ try{ svcCheck(); }catch(e){} try{ refreshBadges(); }catch(e){} }, 800);
     // Tüm global fonksiyonları window'a bağla
-    const globals = [go,showTab,refreshDash,sendSingle,sendBulkURLs,sendSearch,
+    const globals = [go,showTab,goUretim,renderUretimTabs,refreshDash,sendSingle,sendBulkURLs,sendSearch,
       addKW,removeKW,sendBulkKW,loadDriveSheet,sendDriveURLs,clearSentURLs,
       scanSheet,sendSheetURLs,filterTbl,exportCSV,loadReports,loadPlatforms,
       renderAccInputs,genAccCode,saveSettings,updateWHs,copyText,renderLogs,
@@ -5903,7 +5879,10 @@ async function qsSend() {
 const CMDK={ all:[], items:[], sel:0 };
 function cmdkBuild() {
   const pages=[...document.querySelectorAll('.ni')].map(ni=>{ const m=(ni.getAttribute('onclick')||'').match(/go\('([^']+)'/); return m?{type:'page',id:m[1],label:ni.textContent.trim(),icon:((ni.querySelector('.ic')||{}).textContent||'▸')}:null; }).filter(Boolean);
-  CMDK.all=[...pages,{type:'act',label:'Servis durumunu yenile',icon:'⟳',run:svcCheck},{type:'act',label:'Gönderim kuyruğunu göster',icon:'▶',run:sqShow}];
+  // Hub alt sekmeleri sidebar'da ayrı öğe değil — Ctrl+K'dan yine erişilsin
+  const hubTabs=[];
+  Object.keys(typeof UTAB_GROUPS!=='undefined'?UTAB_GROUPS:{}).forEach(g=>{ const anchor=UTAB_ANCHOR[g]||'video'; UTAB_GROUPS[g].filter(t=>t.id!==anchor).forEach(t=>hubTabs.push({type:'act',label:t.label,icon:t.icon,run:()=>goUretim(t.id,anchor)})); });
+  CMDK.all=[...pages,...hubTabs,{type:'act',label:'Servis durumunu yenile',icon:'⟳',run:svcCheck},{type:'act',label:'Gönderim kuyruğunu göster',icon:'▶',run:sqShow}];
 }
 function cmdkOpen(){ cmdkBuild(); document.getElementById('cmdk').classList.add('on'); const inp=document.getElementById('cmdk-in'); inp.value=''; CMDK.sel=0; cmdkFilter(); setTimeout(()=>inp.focus(),30); }
 function cmdkClose(){ document.getElementById('cmdk').classList.remove('on'); }
