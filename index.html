@@ -392,6 +392,18 @@ tbody td{line-height:1.5}
       <div class="bar-lbl"><span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span></div>
     </div>
   </div>
+  <!-- YENİ: Profil başına short dağılımı -->
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div class="ct" style="margin:0">📊 Profil Başına Short</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="pl-status" style="font-size:9px;color:var(--mt)"></span>
+        <button class="btn bg bsm" onclick="loadProfileLoad()">↻ Yenile</button>
+      </div>
+    </div>
+    <div style="font-size:8px;color:var(--mt);margin:4px 0 10px">Hangi Upload-Post profiline kaç short atandığını gösterir (short-kaydetme sayfasındaki <b>profil</b> kolonu). Varsa Upload-Post'ta zamanlanmış (⏰) sayısı da eklenir.</div>
+    <div id="pl-list"><div style="color:var(--mt);font-size:10px;text-align:center;padding:12px">Yenile'ye tıklayın</div></div>
+  </div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="ct" style="margin:0">Son İşlemler</div>
@@ -1761,6 +1773,7 @@ async function refreshDash() {
 
   if (lastEl) lastEl.textContent = 'Son: '+new Date().toLocaleTimeString('tr');
   addLog('ok','sistem','Dashboard guncellendi');
+  try { loadProfileLoad(); } catch(e) {}   // profil başına short dağılımını da güncelle
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5385,6 +5398,48 @@ function gcClearAll() {
   S.sentLog={}; localStorage.setItem('op_sent_log','{}'); S.sentURLs=new Set(); localStorage.setItem('op_sent','[]');
   initGecmis(); toast('Geçmiş temizlendi','ok');
 }
+// PROFİL BAŞINA SHORT — hangi Upload-Post profiline kaç short atandı
+async function loadProfileLoad() {
+  const listEl=document.getElementById('pl-list'), st=document.getElementById('pl-status');
+  if(!listEl) return;
+  if(st) st.textContent='⏳ yükleniyor…';
+  // 1) short-kaydetme profil dağılımı (dashboard yüklüyse cache, değilse çek)
+  let shorts=(S.sheetData&&S.sheetData.shorts)||[];
+  if(!shorts.length){
+    const n8n=getN8N();
+    if(n8n){ const d=await n8nGet('/webhook/panel-data'); if(d){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } }
+    if(!shorts.length){ const sid=S.cfg.sheet||''; if(sid||S.cfg.shkey){ try{ shorts=parseSheet(await sheetsGet(sid,'Sheet1!A:Z')); }catch(e){} } }
+  }
+  const byP={};
+  const pickProfil=r=>String(r['profil']||r['Profil']||r['profile']||'').trim();
+  const isPending=r=>{ const s=String(r['platform-status']||r['durum']||'').toLowerCase(); return s.includes('bekli')||s==='' ; };
+  shorts.forEach(r=>{ const p=pickProfil(r); if(!p) return; if(!byP[p]) byP[p]={total:0,pending:0}; byP[p].total++; if(isPending(r)) byP[p].pending++; });
+  // 2) Upload-Post'ta zamanlanmış (varsa) — profile_username başına
+  const upBy={};
+  try{
+    const {data}=await upFetch('/uploadposts/schedule');
+    console.log('[ProfilYuk] schedule raw:', JSON.stringify(data).slice(0,500));
+    const arr=Array.isArray(data)?data:(data.scheduled||data.jobs||data.data||data.results||data.posts||data.schedules||[]);
+    (arr||[]).forEach(s=>{ const p=String(s.profile_username||s.profile||s.user||'').trim(); if(p) upBy[p]=(upBy[p]||0)+1; });
+  }catch(e){ console.warn('[ProfilYuk] schedule alınamadı:', e.message); }
+  // render
+  const profs=[...new Set([...Object.keys(byP),...Object.keys(upBy)])];
+  if(!profs.length){ listEl.innerHTML='<div style="color:var(--mt);font-size:10px;text-align:center;padding:14px">Veri yok — Ayarlar\'da Sheet ID / n8n URL girili mi? (short-kaydetme sayfası \'profil\' kolonu okunur)</div>'; if(st) st.textContent=''; return; }
+  const rows=profs.map(p=>({p, total:(byP[p]&&byP[p].total)||0, pending:(byP[p]&&byP[p].pending)||0, sched:upBy[p]||0}));
+  rows.sort((a,b)=>(b.total+b.sched)-(a.total+a.sched));
+  const max=Math.max(1,...rows.map(r=>Math.max(r.total,r.sched)));
+  listEl.innerHTML=rows.map(r=>`<div style="margin-bottom:8px">
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;margin-bottom:3px">
+      <span style="color:var(--tx);font-family:var(--fm)">${r.p}</span>
+      <span style="color:var(--mt)"><b style="color:var(--acc)">${r.total}</b> short${r.pending&&r.pending!==r.total?` (${r.pending} bekliyor)`:''}${r.sched?` · ⏰ ${r.sched} zamanlı`:''}</span>
+    </div>
+    <div class="prog"><div class="pf" style="background:var(--acc);width:${Math.round(Math.max(r.total,r.sched)/max*100)}%"></div></div>
+  </div>`).join('');
+  const tShort=rows.reduce((s,r)=>s+r.total,0), tSched=rows.reduce((s,r)=>s+r.sched,0);
+  if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}`;
+}
+window.loadProfileLoad=loadProfileLoad;
+
 // #14 HIZLI GÖNDER — açılır menüde çoklu kategori + Genel için TR/EN dil seçici
 function qsInit(){
   const el=document.getElementById('qs-cats'); if(!el || el.dataset.ready) return;
