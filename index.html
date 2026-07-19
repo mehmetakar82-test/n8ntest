@@ -1315,7 +1315,7 @@ tbody td{line-height:1.5}
   <div id="rd-res" class="res"></div>
 
   <div class="card">
-    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend</span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— müzik ve 5 dk altı hariç</span></span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-trend" class="rd-grid"><div class="rd-empty">↻ Bugünü Getir'e bas</div></div>
   </div>
   <div class="card">
@@ -5902,7 +5902,7 @@ function initRadar(){
   loadRadar(false);
 }
 function rdCacheGet(){
-  try{ const c=JSON.parse(localStorage.getItem('op_radar_cache')||'null'); if(c && Date.now()-c.ts<3*3600*1000) return c; }catch(e){}
+  try{ const c=JSON.parse(localStorage.getItem('op_radar_cache')||'null'); if(c && c.v===2 && Date.now()-c.ts<3*3600*1000) return c; }catch(e){}
   return null;
 }
 
@@ -5927,7 +5927,7 @@ async function loadRadar(force){
       src='YouTube API (canlı)';
     }
     RD.data=data; RD.src=src;
-    try{ localStorage.setItem('op_radar_cache',JSON.stringify({ts:Date.now(),src,data})); }catch(e){}
+    try{ localStorage.setItem('op_radar_cache',JSON.stringify({v:2,ts:Date.now(),src,data})); }catch(e){}
     renderRadar();
     const rEl=document.getElementById('rd-res'); if(rEl) rEl.style.display='none';
     addLog('ok','sistem','Trend Radar güncellendi ('+src+'): '+data.trend.length+' trend, '+data.rising.length+' yükselen, '+data.potential.length+' potansiyel');
@@ -5967,12 +5967,13 @@ async function rdClientCompute(key, st){
     const subs=subsBy[sn.channelId]||0;
     const it={ id:v.id, url:'https://www.youtube.com/watch?v='+v.id, title:sn.title||'', channel:sn.channelTitle||'', channelId:sn.channelId||'',
       thumb:((sn.thumbnails||{}).medium||{}).url||((sn.thumbnails||{}).default||{}).url||'',
-      views, subs, ageH:Math.round(ageH), durSec:ytkParseDur((v.contentDetails||{}).duration),
+      views, subs, ageH:Math.round(ageH), durSec:ytkParseDur((v.contentDetails||{}).duration), catId:sn.categoryId||'',
       vph:Math.round(views/ageH), ratio:subs>0?+(views/subs).toFixed(1):0, delta:0, deltaH:0 };
     if(useSnap&&snap.v[v.id]!=null){ const dd=views-snap.v[v.id]; if(dd>0){ it.delta=dd; it.deltaH=Math.round(snapAgeH); } }
     return it;
   };
-  const trend=(trendRaw.items||[]).map(norm).slice(0,12);
+  // Trend: müzik (categoryId 10) ve 5 dk altı videolar hariç
+  const trend=(trendRaw.items||[]).map(norm).filter(x=>x.catId!=='10'&&x.durSec>=300).slice(0,12);
   const freshAll=(freshRaw.items||[]).map(norm).filter(x=>x.views>=1000);
   const rising=[...freshAll].sort((a,b)=>b.vph-a.vph).slice(0,12);
   const potential=freshAll.filter(x=>x.subs>0&&x.subs<=250000&&x.ratio>=1.5&&x.ageH<=72).sort((a,b)=>(b.ratio*b.vph)-(a.ratio*a.vph)).slice(0,8);
