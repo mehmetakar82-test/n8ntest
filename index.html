@@ -4,17 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OPUS PRO v9</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
   /* Dark tema (varsayılan) — mt (muted text) kontrastı arttırıldı */
   --bg:#07090e;--sur:#0c1018;--sur2:#111822;--brd:#243247;
   --acc:#00e5ff;--acc2:#ff3566;--acc3:#a78bfa;--gld:#fbbf24;
-  --tx:#f1f5fb;--mt:#8fa1b6;--ok:#34d399;--wn:#fbbf24;--er:#f87171;
+  --tx:#f1f5fb;--mt:#9fb2c8;--ok:#34d399;--wn:#fbbf24;--er:#f87171;
   --grid-line:rgba(0,229,255,.03);
   --input-bg:#0d131c;--input-brd:#2a3a52;
   --shadow-lg:0 8px 40px rgba(0,229,255,.15);
-  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;
+  --fh:'Syne',sans-serif;--fm:'DM Mono',monospace;--ft:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
 }
 /* Light tema — WCAG AA uyumlu kontrastlar */
 html.light-theme{
@@ -26,21 +26,21 @@ html.light-theme{
   --shadow-lg:0 8px 40px rgba(0,132,199,.15);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--tx);font-family:var(--fm);min-height:100vh;overflow-x:hidden}
+body{background:var(--bg);color:var(--tx);font-family:var(--ft);font-size:13.5px;line-height:1.5;min-height:100vh;overflow-x:hidden}
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0}
 .app{display:flex;min-height:100vh;position:relative;z-index:1}
 /* SIDEBAR */
-.sb{width:200px;background:var(--sur);border-right:1px solid var(--brd);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0}
+.sb{width:230px;background:var(--sur);border-right:1px solid var(--brd);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;flex-shrink:0}
 .sb-logo{padding:16px 14px;border-bottom:1px solid var(--brd)}
-.sb-badge{font-family:var(--fh);font-size:8px;font-weight:700;letter-spacing:4px;color:var(--acc);text-transform:uppercase}
+.sb-badge{font-family:var(--fh);font-size:11px;font-weight:700;letter-spacing:4px;color:var(--acc);text-transform:uppercase}
 .sb-name{font-family:var(--fh);font-size:18px;font-weight:800;color:var(--tx);line-height:1.1;margin-top:2px}
 nav{flex:1;padding:8px 0;overflow-y:auto}
-.ns{padding:8px 14px 2px;font-size:7px;letter-spacing:3px;color:var(--mt);text-transform:uppercase}
-.ni{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:10px;color:var(--mt);transition:all .15s;border-left:2px solid transparent}
+.ns{padding:10px 14px 3px;font-size:10px;letter-spacing:2px;color:var(--mt);text-transform:uppercase}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;font-size:13px;color:var(--mt);transition:all .15s;border-left:2px solid transparent}
 .ni:hover{color:var(--tx);background:rgba(0,229,255,.04)}
 .ni.active{color:var(--acc);border-left-color:var(--acc);background:rgba(0,229,255,.06)}
-.ni .ic{width:12px;text-align:center;font-size:11px}
-.sb-foot{padding:10px 14px;border-top:1px solid var(--brd);font-size:9px;color:var(--mt)}
+.ni .ic{width:16px;text-align:center;font-size:14px}
+.sb-foot{padding:10px 14px;border-top:1px solid var(--brd);font-size:12px;color:var(--mt)}
 .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--ok);margin-right:4px;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* MAIN */
@@ -59,52 +59,53 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 .opc-check{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:27px;font-weight:900;box-shadow:0 4px 16px rgba(0,0,0,.5);border:2.5px solid rgba(255,255,255,.9);animation:opcPop .24s cubic-bezier(.2,.9,.3,1.35) both;line-height:1}
 .opc-check.sel{background:var(--acc);color:#012}
 .opc-check.done{background:var(--ok);color:#012}
-.opc-score{position:absolute;left:6px;top:6px;display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#00e5ff,#00b8d4);color:#012;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px;box-shadow:0 2px 7px rgba(0,0,0,.4);z-index:4;line-height:1;letter-spacing:.2px}
-.opc-dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.85);color:#fff;font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;z-index:4;line-height:1.4}
+.opc-score{position:absolute;left:6px;top:6px;display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#00e5ff,#00b8d4);color:#012;font-size:14px;font-weight:800;padding:3px 8px;border-radius:6px;box-shadow:0 2px 7px rgba(0,0,0,.4);z-index:4;line-height:1;letter-spacing:.2px}
+.opc-dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.85);color:#fff;font-size:12px;font-weight:600;padding:2px 7px;border-radius:4px;z-index:4;line-height:1.4}
 .ph{margin-bottom:20px}
-.pt{font-family:var(--fh);font-size:22px;font-weight:800;color:var(--tx)}
-.ps{color:var(--mt);font-size:10px;margin-top:2px}
+.pt{font-family:var(--fh);font-size:24px;font-weight:800;color:var(--tx)}
+.ps{color:var(--mt);font-size:13px;margin-top:2px}
 /* CARDS */
 .card{background:var(--sur);border:1px solid var(--brd);border-radius:8px;padding:16px 20px;margin-bottom:12px}
-.ct{font-family:var(--fh);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--mt);margin-bottom:12px}
+.ct{font-family:var(--fh);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--mt);margin-bottom:12px}
 /* STATS */
 .sg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
 .sc{background:var(--sur);border:1px solid var(--brd);border-radius:8px;padding:14px 16px;position:relative;overflow:hidden}
 .sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px}
 .sc.c1::after{background:var(--acc)}.sc.c2::after{background:var(--acc2)}
 .sc.c3::after{background:var(--acc3)}.sc.c4::after{background:var(--gld)}
-.sl{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--mt)}
+.sl{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--mt)}
 .sv{font-family:var(--fh);font-size:26px;font-weight:800;color:var(--tx);margin:3px 0 1px;line-height:1}
-.ss{font-size:9px;color:var(--mt)}
+.ss{font-size:12px;color:var(--mt)}
 /* FORMS */
 .fg{margin-bottom:11px}
-label{display:block;font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--mt);margin-bottom:5px}
-input,select,textarea{width:100%;background:var(--input-bg);border:1px solid var(--input-brd);border-radius:4px;padding:8px 10px;color:var(--tx);font-family:var(--fm);font-size:11px;outline:none;transition:border-color .15s}
+label{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:5px}
+input,select,textarea{width:100%;background:var(--input-bg);border:1px solid var(--input-brd);border-radius:6px;padding:9px 11px;color:var(--tx);font-family:var(--ft);font-size:14px;outline:none;transition:border-color .15s}
 input::placeholder,textarea::placeholder{color:var(--mt);opacity:.7}
-input:focus,select:focus,textarea:focus{border-color:var(--acc)}
-input:focus,select:focus,textarea:focus{border-color:var(--acc)}
+input:focus,select:focus,textarea:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(0,229,255,.13)}
 textarea{resize:vertical;min-height:60px}
 select option{background:var(--sur2)}
 input[type=checkbox]{width:auto;accent-color:var(--acc)}
 /* BUTTONS */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:4px;border:none;cursor:pointer;font-family:var(--fm);font-size:10px;font-weight:500;transition:all .15s}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:6px;border:none;cursor:pointer;font-family:var(--ft);font-size:13px;font-weight:600;transition:all .15s}
+.btn:active{transform:scale(.96)}
+.btn:focus-visible,.ni:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .bp{background:var(--acc);color:#000}.bp:hover{background:#33eaff;transform:translateY(-1px)}
 .bd{background:var(--er);color:var(--tx)}
 .bg{background:transparent;border:1px solid var(--brd);color:var(--tx)}.bg:hover{border-color:var(--acc);color:var(--acc)}
 .bs{background:var(--ok);color:#000}
 .bw{background:var(--wn);color:#000}
-.bsm{padding:5px 10px;font-size:9px}
+.bsm{padding:6px 11px;font-size:12px}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 /* TOGGLE */
 .trow{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--brd)}
 .trow:last-child{border-bottom:none}
-.tn{font-size:11px;color:var(--tx)}.td{font-size:9px;color:var(--mt);margin-top:1px}
+.tn{font-size:14px;color:var(--tx)}.td{font-size:12px;color:var(--mt);margin-top:1px}
 .tg{position:relative;width:34px;height:18px;background:var(--brd);border-radius:9px;cursor:pointer;transition:background .2s;flex-shrink:0}
 .tg.on{background:var(--acc)}
 .tg::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s}
 .tg.on::after{transform:translateX(16px)}
 /* BADGES */
-.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:8px;letter-spacing:.5px;font-weight:500}
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:11px;letter-spacing:.5px;font-weight:500}
 .bi{background:rgba(0,229,255,.1);color:var(--acc)}
 .bs2{background:rgba(16,185,129,.12);color:var(--ok)}
 .bw2{background:rgba(245,158,11,.12);color:var(--wn)}
@@ -113,8 +114,8 @@ input[type=checkbox]{width:auto;accent-color:var(--acc)}
 .bgr{background:rgba(100,116,139,.12);color:var(--mt)}
 /* TABLE */
 .tw{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:10px}
-thead th{text-align:left;padding:6px 8px;font-size:7px;letter-spacing:2px;text-transform:uppercase;color:var(--mt);border-bottom:1px solid var(--brd)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{text-align:left;padding:7px 8px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);border-bottom:1px solid var(--brd)}
 tbody td{padding:8px 8px;border-bottom:1px solid rgba(26,37,53,.7);vertical-align:middle}
 tbody tr:hover{background:rgba(0,229,255,.02)}
 tbody tr:last-child td{border-bottom:none}
@@ -124,11 +125,11 @@ tbody tr:last-child td{border-bottom:none}
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 /* LOGS */
-.ls{background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:12px;font-size:9px;line-height:1.9;height:320px;overflow-y:auto;font-family:var(--fm)}
+.ls{background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:12px;font-size:12px;line-height:1.9;height:320px;overflow-y:auto;font-family:var(--fm)}
 .ll{display:flex;gap:8px;align-items:flex-start;padding:2px 0;border-bottom:1px solid rgba(26,37,53,.4)}
 .ll:last-child{border-bottom:none}
-.lt{color:var(--mt);flex-shrink:0;width:130px;font-size:8px}
-.lcat{flex-shrink:0;width:60px;font-size:8px}
+.lt{color:var(--mt);flex-shrink:0;width:150px;font-size:11px}
+.lcat{flex-shrink:0;width:60px;font-size:11px}
 .lv{flex-shrink:0;width:40px}
 .lv.info{color:var(--acc)}.lv.ok{color:var(--ok)}.lv.warn{color:var(--wn)}.lv.err{color:var(--er)}
 .lm{color:var(--tx);flex:1}
@@ -137,23 +138,23 @@ tbody tr:last-child td{border-bottom:none}
 .pf{height:100%;border-radius:3px;transition:width .4s ease}
 /* TABS */
 .tabs{display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid var(--brd)}
-.tab{padding:6px 12px;font-size:9px;letter-spacing:1px;cursor:pointer;color:var(--mt);border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase}
+.tab{padding:6px 12px;font-size:12px;letter-spacing:1px;cursor:pointer;color:var(--mt);border-bottom:2px solid transparent;transition:all .15s;text-transform:uppercase}
 .tab.active{color:var(--acc);border-bottom-color:var(--acc)}
 .tc{display:none}.tc.active{display:block}
 /* RESULT */
-.res{padding:8px 12px;border-radius:4px;font-size:10px;margin-top:8px;display:none}
+.res{padding:10px 13px;border-radius:6px;font-size:13px;font-weight:500;margin-top:8px;display:none}
 .res.ok{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);color:var(--ok)}
 .res.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--er)}
 .res.info{background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2);color:var(--acc)}
 .res.warn{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);color:var(--wn)}
 /* ALERT */
-.alert{padding:9px 12px;border-radius:4px;font-size:10px;display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}
+.alert{padding:9px 12px;border-radius:4px;font-size:13px;display:flex;align-items:flex-start;gap:8px;margin-bottom:10px}
 .ai{background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2)}
 .aw{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2)}
 /* KW TAGS */
 .kw-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;min-height:32px;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:6px}
-.kw-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(0,229,255,.1);color:var(--acc);border-radius:3px;padding:2px 7px;font-size:9px}
-.kw-tag button{background:none;border:none;color:var(--acc);cursor:pointer;font-size:11px;line-height:1}
+.kw-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(0,229,255,.1);color:var(--acc);border-radius:3px;padding:2px 7px;font-size:12px}
+.kw-tag button{background:none;border:none;color:var(--acc);cursor:pointer;font-size:14px;line-height:1}
 /* ACCOUNT CARD */
 .acc-card{background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:border-color .15s}
 .acc-card:hover{border-color:var(--acc)}
@@ -161,14 +162,14 @@ tbody tr:last-child td{border-bottom:none}
 .acc-icon{width:28px;height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
 .pi-ig{background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888)}
 .pi-yt{background:#ff0000}.pi-tt{background:#010101;border:1px solid var(--brd)}
-.acc-name{font-size:11px;color:var(--tx)}.acc-id{font-size:9px;color:var(--mt)}
+.acc-name{font-size:14px;color:var(--tx)}.acc-id{font-size:12px;color:var(--mt)}
 /* CAT CHIPS */
 .cat-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
-.cat-chip{padding:3px 9px;border-radius:3px;font-size:9px;cursor:pointer;border:1px solid var(--brd);color:var(--mt);transition:all .15s}
+.cat-chip{padding:3px 9px;border-radius:3px;font-size:12px;cursor:pointer;border:1px solid var(--brd);color:var(--mt);transition:all .15s}
 .cat-chip.sel{border-color:var(--acc);color:var(--acc);background:rgba(0,229,255,.08)}
 /* URL LIST */
 .url-list{max-height:160px;overflow-y:auto;border:1px solid var(--brd);border-radius:4px;background:var(--bg)}
-.url-item{padding:6px 10px;border-bottom:1px solid rgba(26,37,53,.5);font-size:9px;display:flex;justify-content:space-between;align-items:center}
+.url-item{padding:6px 10px;border-bottom:1px solid rgba(26,37,53,.5);font-size:12px;display:flex;justify-content:space-between;align-items:center}
 .url-item:last-child{border-bottom:none}
 .url-item.done{opacity:.5}
 .url-item .url-text{color:var(--acc);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px}
@@ -176,8 +177,8 @@ tbody tr:last-child td{border-bottom:none}
 .bars{display:flex;align-items:flex-end;gap:3px;height:50px}
 .bar{flex:1;background:var(--acc);border-radius:2px 2px 0 0;opacity:.6;transition:opacity .2s;min-width:8px}
 .bar:hover{opacity:1}
-.bar-lbl{display:flex;justify-content:space-between;font-size:7px;color:var(--mt);margin-top:3px}
-code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radius:3px;font-size:9px}
+.bar-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--mt);margin-top:3px}
+code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radius:3px;font-size:12px}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--brd);border-radius:2px}
@@ -189,12 +190,12 @@ code{background:rgba(0,229,255,.08);color:var(--acc);padding:1px 4px;border-radi
 html.light-theme{--focus-ring:rgba(2,132,199,.15);--hover-bg:rgba(2,132,199,.05)}
 /* Sayfa başlığı: alt çizgi ile içerikten ayrılır, açıklama biraz büyütüldü */
 .ph{border-bottom:1px solid var(--brd);padding-bottom:12px}
-.ps{font-size:11px;margin-top:4px;line-height:1.5}
+.ps{font-size:14px;margin-top:4px;line-height:1.5}
 /* Menü: daha okunur, aktif öğe belirgin */
-.ni{font-size:11px;padding:8px 14px}
+.ni{font-size:14px;padding:8px 14px}
 .ni:hover{padding-left:17px}
 .ni.active{background:linear-gradient(90deg,var(--hover-bg),transparent);font-weight:500}
-.ns{font-size:8px;padding-top:12px}
+.ns{font-size:11px;padding-top:12px}
 /* Kart: başlıkta renkli nokta, hover'da kenarlık vurgusu */
 .card{transition:border-color .2s ease}
 .card:hover{border-color:var(--input-brd)}
@@ -227,37 +228,54 @@ tbody td{line-height:1.5}
 ::-webkit-scrollbar-thumb:hover{background:var(--mt)}
 /* ═══ YENİ: Toast bildirimleri ═══ */
 #toast-wrap{position:fixed;top:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:8px;max-width:340px;pointer-events:none}
-.toast{pointer-events:auto;background:var(--sur2);border:1px solid var(--brd);border-left:3px solid var(--acc);border-radius:8px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.4);font-size:11px;color:var(--tx);display:flex;gap:8px;align-items:flex-start;animation:toastIn .22s ease;line-height:1.4}
-.toast.ok{border-left-color:var(--ok)} .toast.err{border-left-color:var(--err)} .toast.warn{border-left-color:#f59e0b} .toast.info{border-left-color:var(--acc)}
+.toast{pointer-events:auto;background:var(--sur2);border:1px solid var(--brd);border-left:3px solid var(--acc);border-radius:8px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.4);font-size:14px;color:var(--tx);display:flex;gap:8px;align-items:flex-start;animation:toastIn .22s ease;line-height:1.4}
+.toast.ok{border-left-color:var(--ok)} .toast.err{border-left-color:var(--er)} .toast.warn{border-left-color:#f59e0b} .toast.info{border-left-color:var(--acc)}
 .toast .tx{flex:1;word-break:break-word} .toast .cl{cursor:pointer;color:var(--mt);flex-shrink:0;font-size:13px;line-height:1}
 @keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
 /* ═══ YENİ: Gönderim kuyruğu paneli ═══ */
 #sq-panel{position:fixed;bottom:16px;right:16px;z-index:9500;width:320px;max-height:60vh;background:var(--sur2);border:1px solid var(--acc);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.5);display:none;flex-direction:column;overflow:hidden}
 #sq-panel.on{display:flex}
 #sq-head{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-bottom:1px solid var(--brd);background:rgba(0,229,255,.05)}
-#sq-head b{font-size:11px;color:var(--tx)} #sq-head .sq-x{cursor:pointer;color:var(--mt);font-size:14px}
+#sq-head b{font-size:14px;color:var(--tx)} #sq-head .sq-x{cursor:pointer;color:var(--mt);font-size:14px}
 #sq-body{overflow-y:auto;padding:6px}
-.sq-item{display:flex;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--brd);font-size:9px}
-.sq-item .sq-st{width:16px;height:16px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800}
-.sq-st.wait{background:var(--brd);color:var(--mt)} .sq-st.run{background:#f59e0b;color:#000;animation:pulse 1s infinite} .sq-st.ok{background:var(--ok);color:#012} .sq-st.err{background:var(--err);color:#fff}
+.sq-item{display:flex;gap:8px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--brd);font-size:12px}
+.sq-item .sq-st{width:16px;height:16px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800}
+.sq-st.wait{background:var(--brd);color:var(--mt)} .sq-st.run{background:#f59e0b;color:#000;animation:pulse 1s infinite} .sq-st.ok{background:var(--ok);color:#012} .sq-st.err{background:var(--er);color:#fff}
 .sq-item .sq-tx{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)}
-.sq-item .sq-badge{font-size:7px;padding:1px 5px;border-radius:3px;background:rgba(0,229,255,.12);color:var(--acc)}
-.sq-item .sq-retry{cursor:pointer;color:var(--acc);font-size:8px;border:1px solid var(--acc);border-radius:3px;padding:1px 5px}
-#sq-foot{padding:7px 12px;border-top:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--mt);gap:8px}
+.sq-item .sq-badge{font-size:10px;padding:1px 5px;border-radius:3px;background:rgba(0,229,255,.12);color:var(--acc)}
+.sq-item .sq-retry{cursor:pointer;color:var(--acc);font-size:11px;border:1px solid var(--acc);border-radius:3px;padding:1px 5px}
+#sq-foot{padding:7px 12px;border-top:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--mt);gap:8px}
 /* ═══ YENİ: Header servis durum noktaları ═══ */
 .svc-dots{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
-.svc-dot{display:flex;align-items:center;gap:3px;font-size:8px;color:var(--mt);cursor:default}
+.svc-dot{display:flex;align-items:center;gap:3px;font-size:11px;color:var(--mt);cursor:default}
 .svc-dot .d{width:7px;height:7px;border-radius:50%;background:var(--mt)}
-.svc-dot .d.ok{background:var(--ok)} .svc-dot .d.err{background:var(--err)} .svc-dot .d.warn{background:#f59e0b}
+.svc-dot .d.ok{background:var(--ok)} .svc-dot .d.err{background:var(--er)} .svc-dot .d.warn{background:#f59e0b}
 /* ═══ YENİ: Menü rozetleri ═══ */
 .ni{position:relative}
-.ni-badge{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--err);color:#fff;font-size:8px;font-weight:700;min-width:15px;height:15px;padding:0 4px;border-radius:8px;display:none;align-items:center;justify-content:center;line-height:1}
+.ni-badge{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:var(--er);color:#fff;font-size:11px;font-weight:700;min-width:15px;height:15px;padding:0 4px;border-radius:8px;display:none;align-items:center;justify-content:center;line-height:1}
 .ni-badge.on{display:flex} .ni-badge.acc{background:var(--acc);color:#012}
 .utab-bar{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap;border-bottom:1px solid var(--brd);padding-bottom:12px}
-.utab{padding:8px 16px;border-radius:8px;background:var(--sur2);border:1px solid var(--brd);color:var(--mt);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s,color .15s,border-color .15s;font-family:var(--fh)}
+.utab{padding:9px 17px;border-radius:8px;background:var(--sur2);border:1px solid var(--brd);color:var(--mt);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:background .15s,color .15s,border-color .15s;font-family:var(--fh)}
 .utab:hover{color:var(--tx);border-color:var(--acc)}
 .utab.on{background:var(--acc);color:#012;border-color:var(--acc)}
 .utab .ui{font-size:13px}
+/* ═══ Trend Radar ═══ */
+.rd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px}
+.rd-empty{grid-column:1/-1;color:var(--mt);font-size:12px;text-align:center;padding:18px}
+.rd-card{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .12s;position:relative}
+.rd-card:hover{border-color:var(--acc);transform:translateY(-2px)}
+.rd-card.sel{border-color:var(--acc);box-shadow:0 0 0 2px rgba(0,229,255,.3)}
+.rd-card .rd-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000}
+.rd-card .rd-body{padding:9px 10px 10px}
+.rd-card .rd-title{font-size:12.5px;font-weight:600;color:var(--tx);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px}
+.rd-card .rd-meta{font-size:11px;color:var(--mt);margin-top:4px;display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums}
+.rd-card .rd-sel-tick{position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:var(--acc);color:#012;display:none;align-items:center;justify-content:center;font-weight:800;font-size:13px;z-index:2;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.rd-card.sel .rd-sel-tick{display:flex}
+.rd-badge-delta{position:absolute;top:6px;right:6px;background:rgba(16,185,129,.92);color:#012;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;z-index:2;font-variant-numeric:tabular-nums}
+.rd-badge-ratio{position:absolute;top:6px;right:6px;background:rgba(251,191,36,.94);color:#221a00;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;z-index:2;font-variant-numeric:tabular-nums}
+.rd-ch-card{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:11px 13px}
+.rd-ch-name{font-size:13px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd-ch-meta{font-size:11px;color:var(--mt);margin:3px 0 7px;font-variant-numeric:tabular-nums}
 /* ═══ YENİ: Komut paleti ═══ */
 #cmdk{position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.55);display:none;align-items:flex-start;justify-content:center;padding-top:12vh}
 #cmdk.on{display:flex}
@@ -266,11 +284,12 @@ tbody td{line-height:1.5}
 #cmdk-list{max-height:52vh;overflow-y:auto;padding:6px}
 .cmdk-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--tx)}
 .cmdk-row.sel,.cmdk-row:hover{background:rgba(0,229,255,.1)}
-.cmdk-row .ci{width:18px;text-align:center;color:var(--acc)} .cmdk-row .csub{font-size:9px;color:var(--mt);margin-left:auto}
+.cmdk-row .ci{width:18px;text-align:center;color:var(--acc)} .cmdk-row .csub{font-size:12px;color:var(--mt);margin-left:auto}
 /* ═══ YENİ: Hover video önizleme ═══ */
 #hover-prev{position:fixed;z-index:10500;display:none;pointer-events:none;background:var(--sur2);border:1px solid var(--acc);border-radius:8px;padding:5px;box-shadow:0 8px 28px rgba(0,0,0,.55);max-width:340px}
 #hover-prev img{max-width:min(300px,76vw);max-height:52vh;width:auto;height:auto;border-radius:5px;display:block;margin:0 auto}
-#hover-prev .hp-t{font-size:10px;color:var(--tx);padding:5px 4px 2px;line-height:1.3;max-width:320px}
+#hover-prev .hp-t{font-size:13px;color:var(--tx);padding:5px 4px 2px;line-height:1.3;max-width:320px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -289,7 +308,7 @@ tbody td{line-height:1.5}
 <aside class="sb">
   <div class="sb-logo" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
     <div>
-      <div class="sb-badge">◆ v9</div>
+      <div class="sb-badge">◆ v9.5</div>
       <div class="sb-name">OPUS<br>PRO</div>
     </div>
     <button id="theme-toggle" onclick="toggleTheme()" title="Tema değiştir (light/dark)"
@@ -307,6 +326,7 @@ tbody td{line-height:1.5}
     <div class="ni active" onclick="go('dashboard',this)"><span class="ic">▦</span>Dashboard</div>
     <div class="ni" onclick="go('video',this)"><span class="ic">▶</span>Video Gönder & Ara</div>
     <div class="ni" onclick="go('trendonay',this)"><span class="ic">🔥</span>Trend Onay<span class="ni-badge acc" id="badge-tr"></span></div>
+    <div class="ni" onclick="go('radar',this)"><span class="ic">📡</span>Trend Radar</div>
     <div class="ni" onclick="go('parcala',this)"><span class="ic">✂</span>Video Parçala</div>
     <div class="ni" onclick="go('opusclip',this)"><span class="ic">◈</span>OpusClip Galeri</div>
     <div class="ni" onclick="go('uppost',this)"><span class="ic">⇑</span>Upload-Post</div>
@@ -341,12 +361,12 @@ tbody td{line-height:1.5}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
       <div class="ct" style="margin:0">🚨 Aksiyon Merkezi</div>
       <div style="display:flex;gap:8px;align-items:center">
-        <span id="ac-status" style="font-size:9px;color:var(--mt)"></span>
+        <span id="ac-status" style="font-size:12px;color:var(--mt)"></span>
         <button class="btn bg bsm" onclick="loadActionCenter()">↻ Yenile</button>
       </div>
     </div>
     <div id="ac-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">
-      <div style="color:var(--mt);font-size:10px;padding:8px">Yenile'ye bas</div>
+      <div style="color:var(--mt);font-size:13px;padding:8px">Yenile'ye bas</div>
     </div>
   </div>
   <!-- YENİ: Hızlı Gönder -->
@@ -357,7 +377,7 @@ tbody td{line-height:1.5}
       <div style="position:relative" id="qs-dd">
         <button class="btn bg bsm" onclick="qsDDToggle(event)" id="qs-dd-btn" title="Kategori seç (çoklu seçim — her kategori için ayrı gönderim)">Kategori: Genel ▾</button>
         <div id="qs-dd-panel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--sur2);border:1px solid var(--acc);border-radius:8px;padding:10px 12px;min-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.5)">
-          <label style="font-size:8px;color:var(--mt);display:block;margin-bottom:4px">Kategori (çoklu seçim — her kategori için ayrı gönderim)</label>
+          <label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Kategori (çoklu seçim — her kategori için ayrı gönderim)</label>
           <div class="cat-chips" id="qs-cats"></div>
         </div>
       </div>
@@ -380,7 +400,7 @@ tbody td{line-height:1.5}
   </div>
   <div style="display:flex;gap:8px;margin-bottom:14px">
     <button class="btn bp bsm" onclick="refreshDash()">↻ Yenile</button>
-    <span id="dash-last" style="font-size:9px;color:var(--mt);align-self:center"></span>
+    <span id="dash-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
   </div>
   <div class="sg">
     <div class="sc c1"><div class="sl">İşlenen URL</div><div class="sv" id="d-url">—</div><div class="ss">URL-Takip sayfası</div></div>
@@ -391,9 +411,9 @@ tbody td{line-height:1.5}
   <div class="g2">
     <div class="card">
       <div class="ct">Platform Dağılımı</div>
-      <div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:3px"><span>📸 Instagram</span><span id="ig-cnt">—</span></div><div class="prog"><div class="pf" id="ig-bar" style="background:#e1306c;width:0%"></div></div></div>
-      <div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:3px"><span>▶ YouTube</span><span id="yt-cnt">—</span></div><div class="prog"><div class="pf" id="yt-bar" style="background:#ff0000;width:0%"></div></div></div>
-      <div><div style="display:flex;justify-content:space-between;font-size:9px;margin-bottom:3px"><span>♪ TikTok</span><span id="tt-cnt">—</span></div><div class="prog"><div class="pf" id="tt-bar" style="background:#69c9d0;width:0%"></div></div></div>
+      <div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>📸 Instagram</span><span id="ig-cnt">—</span></div><div class="prog"><div class="pf" id="ig-bar" style="background:#e1306c;width:0%"></div></div></div>
+      <div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>▶ YouTube</span><span id="yt-cnt">—</span></div><div class="prog"><div class="pf" id="yt-bar" style="background:#ff0000;width:0%"></div></div></div>
+      <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>♪ TikTok</span><span id="tt-cnt">—</span></div><div class="prog"><div class="pf" id="tt-bar" style="background:#69c9d0;width:0%"></div></div></div>
     </div>
     <div class="card">
       <div class="ct">Son 7 Gün</div>
@@ -411,18 +431,18 @@ tbody td{line-height:1.5}
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div class="ct" style="margin:0">📊 Profil Başına Short</div>
       <div style="display:flex;gap:8px;align-items:center">
-        <span id="pl-status" style="font-size:9px;color:var(--mt)"></span>
+        <span id="pl-status" style="font-size:12px;color:var(--mt)"></span>
         <button class="btn bg bsm" onclick="seedProfileLoad()" title="Mevcut Sheet short sayılarını n8n'e 'yük' olarak yaz — geride kalan profiller öncelik alıp dengelenir">⚖ Dengele</button>
         <button class="btn bg bsm" onclick="loadProfileLoad()">↻ Yenile</button>
       </div>
     </div>
-    <div style="font-size:8px;color:var(--mt);margin:4px 0 10px">Aynı kategorideki profiller <b>short bazında orantılı</b> ilerler (en az short almış profile öncelik). Mevcut dengesizliği kapatmak için <b>⚖ Dengele</b>'ye bas: Sheet sayıları n8n'e yük olarak yazılır, sonraki short'lar geride kalanlara gider.</div>
-    <div id="pl-list"><div style="color:var(--mt);font-size:10px;text-align:center;padding:12px">Yenile'ye tıklayın</div></div>
+    <div style="font-size:11px;color:var(--mt);margin:4px 0 10px">Aynı kategorideki profiller <b>short bazında orantılı</b> ilerler (en az short almış profile öncelik). Mevcut dengesizliği kapatmak için <b>⚖ Dengele</b>'ye bas: Sheet sayıları n8n'e yük olarak yazılır, sonraki short'lar geride kalanlara gider.</div>
+    <div id="pl-list"><div style="color:var(--mt);font-size:13px;text-align:center;padding:12px">Yenile'ye tıklayın</div></div>
   </div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="ct" style="margin:0">Son İşlemler</div>
-      <div style="font-size:9px;color:var(--mt)" id="dash-src">Kaynak: —</div>
+      <div style="font-size:12px;color:var(--mt)" id="dash-src">Kaynak: —</div>
     </div>
     <div class="tw">
       <table>
@@ -446,7 +466,7 @@ tbody td{line-height:1.5}
         <div class="fg"><label>Kaynak Notu</label><input id="sv-note" type="text" placeholder="manuel, kampanya..."/></div>
         <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı — short açıklamasına eklenir)</span></label><input id="sv-aciklama" type="text" placeholder="örn. Excalibur Kanalı, Bölüm 1..."/></div>
         <div style="margin:8px 0;padding:8px 10px;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:6px;display:flex;align-items:center;gap:8px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:10px;white-space:nowrap"><input id="sv-direkt" type="checkbox" style="width:auto;margin:0;accent-color:var(--acc)"> <b>Direkt Yayınla</b> <span style="color:var(--mt)">(OpusClip'i atla — video olduğu gibi yayınlanır)</span></label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap"><input id="sv-direkt" type="checkbox" style="width:auto;margin:0;accent-color:var(--acc)"> <b>Direkt Yayınla</b> <span style="color:var(--mt)">(OpusClip'i atla — video olduğu gibi yayınlanır)</span></label>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn bp" onclick="sendSingle()">▶ Gönder</button>
@@ -462,7 +482,7 @@ tbody td{line-height:1.5}
         <div class="fg"><label>Gönderim Aralığı (dakika)</label><input id="bv-delay" type="number" value="1" min="1"/></div>
         <button class="btn bp" onclick="sendBulkURLs()">▶ Tümünü Gönder</button>
         <div id="bv-prog" style="display:none;margin-top:8px">
-          <div id="bv-st" style="font-size:9px;color:var(--mt);margin-bottom:4px"></div>
+          <div id="bv-st" style="font-size:12px;color:var(--mt);margin-bottom:4px"></div>
           <div class="prog"><div class="pf" id="bv-bar" style="background:var(--acc);width:0%"></div></div>
         </div>
       </div>
@@ -472,19 +492,19 @@ tbody td{line-height:1.5}
         <div class="ct">Bekleme Süresi Hesaplayıcı</div>
         <div class="fg"><label>Video Süresi (dakika)</label><input type="number" id="calc-m" placeholder="60" oninput="calcWait()"/></div>
         <div style="background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:12px;text-align:center">
-          <div style="font-size:8px;letter-spacing:2px;color:var(--mt);text-transform:uppercase">Tahmini Bekleme</div>
+          <div style="font-size:11px;letter-spacing:2px;color:var(--mt);text-transform:uppercase">Tahmini Bekleme</div>
           <div style="font-family:var(--fh);font-size:28px;font-weight:800;color:var(--acc);margin:4px 0" id="calc-res">—</div>
-          <div style="font-size:9px;color:var(--mt)" id="calc-sub">Süre gir</div>
+          <div style="font-size:12px;color:var(--mt)" id="calc-sub">Süre gir</div>
         </div>
       </div>
       <div class="card">
         <div class="ct">Webhook</div>
-        <div style="font-size:8px;letter-spacing:2px;color:var(--mt);text-transform:uppercase;margin-bottom:4px">Seçili Kategori</div>
-        <div id="sv-wh-display" style="font-size:10px;color:var(--acc);word-break:break-all;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:8px 10px;margin-bottom:8px">/webhook/video-gonder</div>
+        <div style="font-size:11px;letter-spacing:2px;color:var(--mt);text-transform:uppercase;margin-bottom:4px">Seçili Kategori</div>
+        <div id="sv-wh-display" style="font-size:13px;color:var(--acc);word-break:break-all;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:8px 10px;margin-bottom:8px">/webhook/video-gonder</div>
         <button class="btn bg bsm" onclick="copyText(document.getElementById('sv-wh-display').textContent)">Kopyala</button>
         <div style="margin-top:10px">
-          <div style="font-size:8px;letter-spacing:2px;color:var(--mt);text-transform:uppercase;margin-bottom:6px">Tüm Kategori Webhook'ları</div>
-          <div id="cat-wh-list" style="font-size:9px;line-height:2"></div>
+          <div style="font-size:11px;letter-spacing:2px;color:var(--mt);text-transform:uppercase;margin-bottom:6px">Tüm Kategori Webhook'ları</div>
+          <div id="cat-wh-list" style="font-size:12px;line-height:2"></div>
         </div>
       </div>
     </div>
@@ -501,7 +521,7 @@ tbody td{line-height:1.5}
       <div class="card">
         <div class="ct">Kanal Arama</div>
         <div class="alert ai"><span>ℹ</span><span>Anahtar kelime veya @handle girin. Eşleşen kanallar abone / izlenme / video sayısı ile listelenir; bir kanala tıklayınca videoları sağda açılır.</span></div>
-        <div class="fg"><label>YouTube API Key <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--acc);font-size:9px;margin-left:6px">Console ↗</a></label>
+        <div class="fg"><label>YouTube API Key <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--acc);font-size:12px;margin-left:6px">Console ↗</a></label>
           <div style="display:flex;gap:6px">
             <input id="ytk-apikey" type="text" placeholder="AIza..." style="flex:1" oninput="if(S.cfg.ytApiKey!==this.value){S.cfg.ytApiKey=this.value;localStorage.setItem('op_cfg',JSON.stringify(S.cfg));}"/>
             <button class="btn bg bsm" onclick="ytkTestApi()" title="API Key'i test et">✓ Test</button>
@@ -515,7 +535,7 @@ tbody td{line-height:1.5}
         </div>
         <div class="fg"><label>Bulunan Kanallar <span id="ytk-ch-count" style="color:var(--acc)"></span></label>
           <div id="ytk-channel-list" style="max-height:340px;overflow-y:auto;border:1px solid var(--brd);border-radius:4px">
-            <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Arama yapın</div>
+            <div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Arama yapın</div>
           </div>
         </div>
         <div class="fg"><label>Kategori</label><div class="cat-chips" id="ytk-cats"></div></div>
@@ -529,13 +549,13 @@ tbody td{line-height:1.5}
     <div>
       <div class="card">
         <div class="ct">Seçili Kanal</div>
-        <div id="ytk-channel-info" style="color:var(--mt);font-size:10px;text-align:center;padding:16px">Sol listeden bir kanalın "Videoları Getir" butonuna bas</div>
-        <div class="alert ai" style="margin-top:12px;font-size:9px"><span>ℹ</span><span>Her kanal satırındaki <b>▶ Videoları Getir</b> butonuna bastığında videolar API'den çekilir ve büyük modal olarak açılır. Otomatik çekim yok — kota harcamaz.</span></div>
+        <div id="ytk-channel-info" style="color:var(--mt);font-size:13px;text-align:center;padding:16px">Sol listeden bir kanalın "Videoları Getir" butonuna bas</div>
+        <div class="alert ai" style="margin-top:12px;font-size:12px"><span>ℹ</span><span>Her kanal satırındaki <b>▶ Videoları Getir</b> butonuna bastığında videolar API'den çekilir ve büyük modal olarak açılır. Otomatik çekim yok — kota harcamaz.</span></div>
       </div>
       <div class="card">
-        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>Kanal Geçmişi</span><span style="font-size:8px;color:var(--mt);font-weight:400">Tıkla → videoları aç</span></div>
+        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>Kanal Geçmişi</span><span style="font-size:11px;color:var(--mt);font-weight:400">Tıkla → videoları aç</span></div>
         <div id="ytk-hist-list" style="max-height:340px;overflow-y:auto">
-          <div style="color:var(--mt);font-size:9px;text-align:center;padding:12px">Henüz kanal incelenmedi</div>
+          <div style="color:var(--mt);font-size:12px;text-align:center;padding:12px">Henüz kanal incelenmedi</div>
         </div>
       </div>
     </div>
@@ -557,7 +577,7 @@ tbody td{line-height:1.5}
           </div>
         </div>
         <div id="str-tw-cfg">
-          <div class="fg"><label>Twitch Client ID <a href="https://dev.twitch.tv/console/apps" target="_blank" style="color:var(--acc);font-size:9px;margin-left:6px">Console ↗</a></label>
+          <div class="fg"><label>Twitch Client ID <a href="https://dev.twitch.tv/console/apps" target="_blank" style="color:var(--acc);font-size:12px;margin-left:6px">Console ↗</a></label>
             <input id="str-tw-cid" type="text" placeholder="Twitch uygulaması Client ID" oninput="S.cfg.twClientId=this.value;S.cfg.twTok='';localStorage.setItem('op_cfg',JSON.stringify(S.cfg))"/>
           </div>
           <div class="fg"><label>Twitch Client Secret</label>
@@ -566,10 +586,10 @@ tbody td{line-height:1.5}
               <button class="btn bg bsm" onclick="strTwTest()" title="Bağlantıyı test et">✓ Test</button>
             </div>
           </div>
-          <div class="alert ai" style="font-size:9px"><span>ℹ</span><span><b>dev.twitch.tv/console/apps</b> → "Register Your Application" ile ücretsiz Client ID + Secret al. Bilgiler yalnızca bu tarayıcıda (localStorage) saklanır.</span></div>
+          <div class="alert ai" style="font-size:12px"><span>ℹ</span><span><b>dev.twitch.tv/console/apps</b> → "Register Your Application" ile ücretsiz Client ID + Secret al. Bilgiler yalnızca bu tarayıcıda (localStorage) saklanır.</span></div>
         </div>
         <div id="str-kick-cfg" style="display:none">
-          <div class="alert ai" style="font-size:9px"><span>ℹ</span><span>Kick'in arama API'si tarayıcıdan erişime kapalı (Cloudflare). Kanal adını doğrudan yaz: kick.com/<b>kanaladi</b> → "kanaladi". Veri önce n8n proxy'den (<code>/webhook/kick-proxy</code>) denenir, yoksa doğrudan istek yapılır.</span></div>
+          <div class="alert ai" style="font-size:12px"><span>ℹ</span><span>Kick'in arama API'si tarayıcıdan erişime kapalı (Cloudflare). Kanal adını doğrudan yaz: kick.com/<b>kanaladi</b> → "kanaladi". Veri önce n8n proxy'den (<code>/webhook/kick-proxy</code>) denenir, yoksa doğrudan istek yapılır.</span></div>
         </div>
         <div class="fg"><label id="str-q-label">Kanal Adı / Anahtar Kelime</label>
           <div style="display:flex;gap:6px">
@@ -579,7 +599,7 @@ tbody td{line-height:1.5}
         </div>
         <div class="fg"><label>Bulunan Kanallar <span id="str-ch-count" style="color:var(--acc)"></span></label>
           <div id="str-ch-list" style="max-height:300px;overflow-y:auto;border:1px solid var(--brd);border-radius:4px">
-            <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Arama yapın</div>
+            <div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Arama yapın</div>
           </div>
         </div>
         <div class="fg"><label>Kategori</label><div class="cat-chips" id="str-cats"></div></div>
@@ -589,7 +609,7 @@ tbody td{line-height:1.5}
     </div>
     <div>
       <div class="card">
-        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>Yayın Tekrarları (VOD)</span><span id="str-ch-name" style="font-size:9px;color:var(--acc);font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>Yayın Tekrarları (VOD)</span><span id="str-ch-name" style="font-size:12px;color:var(--acc);font-weight:400;text-transform:none;letter-spacing:0"></span></div>
         <div id="str-vod-controls" style="display:none;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
           <select id="str-dur" onchange="strRenderVods()" style="width:110px">
             <option value="0">Tüm süreler</option>
@@ -603,12 +623,12 @@ tbody td{line-height:1.5}
             <option value="views">İzlenme ↓</option>
             <option value="dur">Süre ↓</option>
           </select>
-          <span id="str-vod-count" style="font-size:9px;color:var(--mt)"></span>
+          <span id="str-vod-count" style="font-size:12px;color:var(--mt)"></span>
         </div>
         <div id="str-vod-list" style="max-height:560px;overflow-y:auto">
-          <div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">Soldan bir kanal arayıp "▶ VOD'lar" butonuna bas</div>
+          <div style="color:var(--mt);font-size:13px;text-align:center;padding:20px">Soldan bir kanal arayıp "▶ VOD'lar" butonuna bas</div>
         </div>
-        <div class="alert ai" style="margin-top:10px;font-size:9px"><span>ℹ</span><span><b>▶ İşleme Al</b>: VOD linki, seçili kategoriye göre n8n webhook'una (<code>video-gonder[-kategori]</code>) <code>kaynak: twitch/kick</code> ile gönderilir. OpusClip Twitch VOD linklerini destekler; Kick linkleri için workflow tarafında ek indirme adımı gerekebilir.</span></div>
+        <div class="alert ai" style="margin-top:10px;font-size:12px"><span>ℹ</span><span><b>▶ İşleme Al</b>: VOD linki, seçili kategoriye göre n8n webhook'una (<code>video-gonder[-kategori]</code>) <code>kaynak: twitch/kick</code> ile gönderilir. OpusClip Twitch VOD linklerini destekler; Kick linkleri için workflow tarafında ek indirme adımı gerekebilir.</span></div>
       </div>
     </div>
   </div>
@@ -627,7 +647,7 @@ tbody td{line-height:1.5}
         </div>
         <div class="fg">
           <button class="btn bg bsm" onclick="vpFetchDuration()">⏱ Süreyi Getir</button>
-          <span id="vp-dur-display" style="font-size:10px;color:var(--acc);margin-left:8px"></span>
+          <span id="vp-dur-display" style="font-size:13px;color:var(--acc);margin-left:8px"></span>
         </div>
         <div class="fg"><label>Parça Uzunluğu (sn)</label><input id="vp-seglen" type="number" value="120" min="10"/></div>
         <div class="fg"><label>Parçalar Arası Örtüşme (sn) <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="vp-overlap" type="number" value="5" min="0"/></div>
@@ -640,9 +660,9 @@ tbody td{line-height:1.5}
     </div>
     <div>
       <div class="card">
-        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>Parça Önizleme</span><span id="vp-seg-count" style="font-size:9px;color:var(--mt);font-weight:400"></span></div>
+        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>Parça Önizleme</span><span id="vp-seg-count" style="font-size:12px;color:var(--mt);font-weight:400"></span></div>
         <div id="vp-seg-list" style="max-height:520px;overflow-y:auto">
-          <div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">Süreyi getir → Parçaları Hesapla'ya bas</div>
+          <div style="color:var(--mt);font-size:13px;text-align:center;padding:20px">Süreyi getir → Parçaları Hesapla'ya bas</div>
         </div>
       </div>
     </div>
@@ -655,15 +675,15 @@ tbody td{line-height:1.5}
   <div class="card" style="margin-bottom:12px">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn bp" onclick="trFetchPending()" id="tr-fetch-btn">🔥 Bekleyenleri Getir</button>
-      <div id="tr-status" style="flex:1;font-size:9px;color:var(--mt)"></div>
+      <div id="tr-status" style="flex:1;font-size:12px;color:var(--mt)"></div>
     </div>
-    <div style="font-size:8px;color:var(--mt);margin-top:6px">Kworb her gün 09:00'da trend videoları bulur; otomatik yayınlamak yerine burada onayına sunar. Onayladığın video seçtiğin <b>kategori / dil / platform / açıklama</b> ile işleme alınır. Reddettiğin kuyruktan çıkarılır ve bir daha gelmez.</div>
+    <div style="font-size:11px;color:var(--mt);margin-top:6px">Kworb her gün 09:00'da trend videoları bulur; otomatik yayınlamak yerine burada onayına sunar. Onayladığın video seçtiğin <b>kategori / dil / platform / açıklama</b> ile işleme alınır. Reddettiğin kuyruktan çıkarılır ve bir daha gelmez.</div>
   </div>
   <!-- YENİ: filtre/sıralama + toplu işlem -->
   <div id="tr-toolbar" class="card" style="margin-bottom:12px;display:none">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
       <input id="tr-search" type="text" placeholder="Başlık / kanal ara…" style="flex:1;min-width:150px;margin:0" oninput="trRenderPending()"/>
-      <select id="tr-sort" style="width:150px;font-size:10px" onchange="trRenderPending()">
+      <select id="tr-sort" style="width:150px;font-size:13px" onchange="trRenderPending()">
         <option value="views">İzlenme (çok→az)</option>
         <option value="date">Yayın tarihi (yeni→eski)</option>
         <option value="dur">Süre (uzun→kısa)</option>
@@ -672,7 +692,7 @@ tbody td{line-height:1.5}
       <button class="btn bg bsm" onclick="trClearSel()">Kaldır</button>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--brd)">
-      <span style="font-size:9px;color:var(--mt)">Seçili: <b id="tr-selcount">0</b> →</span>
+      <span style="font-size:12px;color:var(--mt)">Seçili: <b id="tr-selcount">0</b> →</span>
       <div id="tr-bulk-cats" class="cat-chips" style="display:inline-flex;flex-wrap:wrap;gap:4px" title="Birden fazla kategori seçebilirsin — her video her kategori için ayrı gönderilir"></div>
       <button class="btn bp bsm" onclick="trBulkApprove()">✓ Seçilenleri Onayla</button>
       <button class="btn bg bsm" onclick="trBulkReject()">✗ Seçilenleri Reddet</button>
@@ -681,8 +701,8 @@ tbody td{line-height:1.5}
   <div id="tr-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px"></div>
   <div id="tr-empty" class="card" style="display:none;text-align:center;padding:32px;color:var(--mt)">
     <div style="font-size:32px;margin-bottom:8px">🔥</div>
-    <div style="font-size:11px">Bekleyen trend video yok</div>
-    <div style="font-size:9px;margin-top:6px">Kworb her gün 09:00'da çalışır. <b>Bekleyenleri Getir</b>'e basarak kuyruğu yenile.</div>
+    <div style="font-size:14px">Bekleyen trend video yok</div>
+    <div style="font-size:12px;margin-top:6px">Kworb her gün 09:00'da çalışır. <b>Bekleyenleri Getir</b>'e basarak kuyruğu yenile.</div>
   </div>
 </div>
 
@@ -722,7 +742,7 @@ tbody td{line-height:1.5}
   <div class="card">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn bp" onclick="oySave()">💾 Kaydet ve n8n'e Gönder</button>
-      <span id="oy-webhook-display" style="font-size:9px;color:var(--acc)"></span>
+      <span id="oy-webhook-display" style="font-size:12px;color:var(--acc)"></span>
     </div>
     <div id="oy-res" class="res"></div>
   </div>
@@ -734,7 +754,7 @@ tbody td{line-height:1.5}
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--brd);gap:12px">
       <div style="min-width:0;flex:1">
         <div style="font-family:var(--fh);font-weight:700;font-size:14px;color:var(--tx)" id="ytk-modal-title">Kanal Videoları</div>
-        <div style="font-size:9px;color:var(--mt);margin-top:2px" id="ytk-modal-sub"></div>
+        <div style="font-size:12px;color:var(--mt);margin-top:2px" id="ytk-modal-sub"></div>
       </div>
       <button class="btn bg bsm" onclick="ytkCloseModal()">✕ Kapat</button>
     </div>
@@ -753,8 +773,8 @@ tbody td{line-height:1.5}
           <option value="likes">Beğeni ↓</option>
           <option value="comments">Yorum ↓</option>
         </select>
-        <span id="ytk-vid-count" style="font-size:9px;color:var(--mt)"></span>
-        <span id="ytk-sel-count" style="color:var(--acc);font-size:10px;margin-left:auto">(0 seçili)</span>
+        <span id="ytk-vid-count" style="font-size:12px;color:var(--mt)"></span>
+        <span id="ytk-sel-count" style="color:var(--acc);font-size:13px;margin-left:auto">(0 seçili)</span>
       </div>
       <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
         <button class="btn bg bsm" onclick="ytkSelectAll()">Tümünü Seç</button>
@@ -795,19 +815,19 @@ tbody td{line-height:1.5}
         </div>
         <div class="fg"><label>Platformlar <span style="color:var(--er)">*</span> <span style="color:var(--mt)">(birden fazla)</span></label>
           <div id="up-platforms" style="display:flex;gap:6px;flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="instagram" style="width:auto;margin:0"> 📸 Instagram</label>
-            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="youtube" style="width:auto;margin:0"> ▶ YouTube</label>
-            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="tiktok" style="width:auto;margin:0"> ♪ TikTok</label>
-            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="facebook" style="width:auto;margin:0"> ⓕ Facebook</label>
-            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="linkedin" style="width:auto;margin:0"> LinkedIn</label>
-            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="x" style="width:auto;margin:0"> 𝕏 X</label>
-            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="threads" style="width:auto;margin:0"> @ Threads</label>
-            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:10px"><input type="checkbox" value="pinterest" style="width:auto;margin:0"> ⓟ Pinterest</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:13px"><input type="checkbox" value="instagram" style="width:auto;margin:0"> 📸 Instagram</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:13px"><input type="checkbox" value="youtube" style="width:auto;margin:0"> ▶ YouTube</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:13px"><input type="checkbox" value="tiktok" style="width:auto;margin:0"> ♪ TikTok</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:13px"><input type="checkbox" value="facebook" style="width:auto;margin:0"> ⓕ Facebook</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:13px"><input type="checkbox" value="linkedin" style="width:auto;margin:0"> LinkedIn</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:13px"><input type="checkbox" value="x" style="width:auto;margin:0"> 𝕏 X</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:13px"><input type="checkbox" value="threads" style="width:auto;margin:0"> @ Threads</label>
+            <label style="display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--sur2);border:1px solid var(--brd);border-radius:3px;cursor:pointer;font-size:13px"><input type="checkbox" value="pinterest" style="width:auto;margin:0"> ⓟ Pinterest</label>
           </div>
         </div>
         <div class="fg"><label>Video URL <span style="color:var(--er)">*</span></label>
           <input id="up-video-url" type="url" placeholder="https://cdn.opusclip.com/…/short.mp4 (public video URL)"/>
-          <div style="font-size:8px;color:var(--mt);margin-top:3px">Doğrudan video dosyası URL'si gerekli (.mp4, .mov vb.) — YouTube/TikTok watch linkleri <b>desteklenmez</b></div>
+          <div style="font-size:11px;color:var(--mt);margin-top:3px">Doğrudan video dosyası URL'si gerekli (.mp4, .mov vb.) — YouTube/TikTok watch linkleri <b>desteklenmez</b></div>
         </div>
         <div class="fg"><label>Başlık</label><input id="up-title" type="text" placeholder="Short başlığı"/></div>
         <div class="fg"><label>Açıklama</label><textarea id="up-desc" placeholder="Açıklama, hashtagler…" style="height:70px"></textarea></div>
@@ -816,7 +836,7 @@ tbody td{line-height:1.5}
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button class="btn bp" onclick="upPostSend()">▶ Gönder</button>
-          <label style="display:flex;align-items:center;gap:5px;font-size:10px;cursor:pointer">
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer">
             <input id="up-async" type="checkbox" checked style="width:auto;margin:0"> Async upload
           </label>
         </div>
@@ -826,18 +846,18 @@ tbody td{line-height:1.5}
     <div>
       <div class="card">
         <div class="ct">İş Durumu Kontrol</div>
-        <div class="alert ai" style="font-size:9px"><span>ℹ</span><span>Bir uploadın <code>request_id</code>'sini (async) veya <code>job_id</code>'sini (zamanlanmış) girip Kontrol Et'e bas.</span></div>
+        <div class="alert ai" style="font-size:12px"><span>ℹ</span><span>Bir uploadın <code>request_id</code>'sini (async) veya <code>job_id</code>'sini (zamanlanmış) girip Kontrol Et'e bas.</span></div>
         <div class="fg"><label>Request ID veya Job ID</label>
           <div style="display:flex;gap:6px">
             <input id="up-status-id" type="text" placeholder="req_… veya job_…" style="flex:1"/>
             <button class="btn bp bsm" onclick="upStatusCheck()">🔍 Kontrol</button>
           </div>
         </div>
-        <div id="up-status-res" style="margin-top:8px;font-size:10px"></div>
+        <div id="up-status-res" style="margin-top:8px;font-size:13px"></div>
       </div>
       <div class="card">
         <div class="ct">Son Gönderimler</div>
-        <div id="up-history" style="font-size:9px;max-height:280px;overflow-y:auto"><div style="color:var(--mt);text-align:center;padding:12px">Henüz gönderim yok</div></div>
+        <div id="up-history" style="font-size:12px;max-height:280px;overflow-y:auto"><div style="color:var(--mt);text-align:center;padding:12px">Henüz gönderim yok</div></div>
       </div>
     </div>
   </div>
@@ -855,7 +875,7 @@ tbody td{line-height:1.5}
         <input id="opc-pid-search" type="text" placeholder="Proje ID ile ara (P3061022AkhR)" style="flex:1;margin:0"/>
         <button class="btn bg bsm" onclick="opcSearchById()">Ara</button>
       </div>
-      <div id="opc-status" style="font-size:9px;color:var(--mt)"></div>
+      <div id="opc-status" style="font-size:12px;color:var(--mt)"></div>
     </div>
   </div>
 
@@ -863,8 +883,8 @@ tbody td{line-height:1.5}
   <div id="opc-project-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:12px"></div>
   <div id="opc-project-empty" class="card" style="display:none;text-align:center;padding:32px;color:var(--mt)">
     <div style="font-size:32px;margin-bottom:8px">◈</div>
-    <div style="font-size:11px">Projelerinizi görmek için <b>Projelerimi Getir</b>'e tıklayın veya Proje ID girin</div>
-    <div style="font-size:9px;margin-top:6px;color:var(--mt)">Ayarlar → OpusClip API Key gereklidir</div>
+    <div style="font-size:14px">Projelerinizi görmek için <b>Projelerimi Getir</b>'e tıklayın veya Proje ID girin</div>
+    <div style="font-size:12px;margin-top:6px;color:var(--mt)">Ayarlar → OpusClip API Key gereklidir</div>
   </div>
 
   <!-- CLIP DETAY PANEL (proje seçilince açılır) -->
@@ -873,7 +893,7 @@ tbody td{line-height:1.5}
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div>
           <div class="ct" style="margin:0" id="opc-clip-title">Proje Clipleri</div>
-          <div style="font-size:9px;color:var(--mt)" id="opc-clip-sub"></div>
+          <div style="font-size:12px;color:var(--mt)" id="opc-clip-sub"></div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button class="btn bg bsm" onclick="opcSelectAll()">Tümünü Seç</button>
@@ -908,12 +928,12 @@ tbody td{line-height:1.5}
     <div class="card">
       <div class="ct">Gönderim Geçmişi</div>
       <div id="opc-hist" style="max-height:200px;overflow-y:auto">
-        <div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Henüz gönderim yok</div>
+        <div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Henüz gönderim yok</div>
       </div>
     </div>
     <div class="card">
       <div class="ct">Webhook Adresi</div>
-      <div id="opc-wh-display" style="font-size:10px;color:var(--acc);word-break:break-all;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:8px 10px;margin-bottom:8px">/webhook/opus-clip-direkt</div>
+      <div id="opc-wh-display" style="font-size:13px;color:var(--acc);word-break:break-all;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:8px 10px;margin-bottom:8px">/webhook/opus-clip-direkt</div>
       <button class="btn bg bsm" onclick="copyText(document.getElementById('opc-wh-display').textContent)">Kopyala</button>
     </div>
   </div>
@@ -960,8 +980,8 @@ tbody td{line-height:1.5}
     </div>
     <div>
       <div class="card">
-        <div class="ct">Arama Geçmişi <span style="font-size:9px;color:var(--mt);font-weight:400">(başlığa tıkla → sonuçları modal olarak aç)</span></div>
-        <div id="ya-hist" style="font-size:10px;max-height:640px;overflow-y:auto"><div style="color:var(--mt);text-align:center;padding:12px">Henüz arama yapılmadı</div></div>
+        <div class="ct">Arama Geçmişi <span style="font-size:12px;color:var(--mt);font-weight:400">(başlığa tıkla → sonuçları modal olarak aç)</span></div>
+        <div id="ya-hist" style="font-size:13px;max-height:640px;overflow-y:auto"><div style="color:var(--mt);text-align:center;padding:12px">Henüz arama yapılmadı</div></div>
       </div>
     </div>
   </div>
@@ -973,13 +993,13 @@ tbody td{line-height:1.5}
     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--brd)">
       <div style="min-width:0;flex:1">
         <div style="font-family:var(--fh);font-weight:700;font-size:14px;color:var(--tx)" id="ya-modal-title">Arama Sonuçları</div>
-        <div style="font-size:9px;color:var(--mt);margin-top:2px" id="ya-modal-sub"></div>
+        <div style="font-size:12px;color:var(--mt);margin-top:2px" id="ya-modal-sub"></div>
       </div>
       <button class="btn bg bsm" onclick="yarCloseModal()" style="margin-left:12px">✕ Kapat</button>
     </div>
     <div style="padding:14px 18px">
       <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-        <span id="ya-sel-count" style="color:var(--acc);font-size:10px">(0 seçili)</span>
+        <span id="ya-sel-count" style="color:var(--acc);font-size:13px">(0 seçili)</span>
         <button class="btn bg bsm" onclick="yarSelectAll()">Tümünü Seç</button>
         <button class="btn bg bsm" onclick="yarClearAll()">Seçimi Temizle</button>
         <button class="btn bs bsm" onclick="yarSendSelected()" style="margin-left:auto">▶ Seçilenleri Gönder</button>
@@ -1013,18 +1033,18 @@ tbody td{line-height:1.5}
         <button class="btn bg bsm" onclick="clearSentURLs()">✕ Geçmişi Sil</button>
       </div>
       <div id="dr-res" class="res"></div>
-      <div style="margin-top:8px;font-size:9px;color:var(--mt)">
+      <div style="margin-top:8px;font-size:12px;color:var(--mt)">
         İşlenmiş: <b id="dr-sent-cnt">0</b> URL | Yeni: <b id="dr-new-cnt">0</b> URL
       </div>
     </div>
     <div>
       <div class="card">
         <div class="ct">Bulunan URL'ler</div>
-        <div class="url-list" id="dr-url-list"><div style="padding:10px;color:var(--mt);font-size:9px;text-align:center">Sheet tarandıktan sonra görünür</div></div>
+        <div class="url-list" id="dr-url-list"><div style="padding:10px;color:var(--mt);font-size:12px;text-align:center">Sheet tarandıktan sonra görünür</div></div>
       </div>
       <div class="card">
         <div class="ct">İşlenmiş URL'ler (Tekrar Koruma)</div>
-        <div class="url-list" id="dr-sent-list"><div style="padding:10px;color:var(--mt);font-size:9px;text-align:center">Henüz işlenmiş URL yok</div></div>
+        <div class="url-list" id="dr-sent-list"><div style="padding:10px;color:var(--mt);font-size:12px;text-align:center">Henüz işlenmiş URL yok</div></div>
       </div>
     </div>
   </div>
@@ -1057,18 +1077,18 @@ tbody td{line-height:1.5}
         <button class="btn bp bsm" onclick="sendSheetURLs()">▶ Gönder</button>
       </div>
       <div id="sh-res" class="res"></div>
-      <div style="margin-top:6px;font-size:9px;color:var(--mt)">
+      <div style="margin-top:6px;font-size:12px;color:var(--mt)">
         Toplam: <b id="sh-total">0</b> | Yeni: <b id="sh-new">0</b> | Atlandı: <b id="sh-skip">0</b>
       </div>
       <div id="sh-prog" style="display:none;margin-top:6px">
-        <div id="sh-cur" style="font-size:9px;color:var(--mt);margin-bottom:4px"></div>
+        <div id="sh-cur" style="font-size:12px;color:var(--mt);margin-bottom:4px"></div>
         <div class="prog"><div class="pf" id="sh-pbar" style="background:var(--acc);width:0%"></div></div>
       </div>
     </div>
     <div>
       <div class="card">
         <div class="ct">Taranan URL'ler</div>
-        <div class="url-list" id="sh-url-list"><div style="padding:10px;color:var(--mt);font-size:9px;text-align:center">Tara'ya tıklayın</div></div>
+        <div class="url-list" id="sh-url-list"><div style="padding:10px;color:var(--mt);font-size:12px;text-align:center">Tara'ya tıklayın</div></div>
       </div>
     </div>
   </div>
@@ -1079,7 +1099,7 @@ tbody td{line-height:1.5}
   <div class="ph"><div class="pt">İşlem Kuyruğu</div><div class="ps">URL-Takip sayfasındaki "İşlemde" kayıtlar</div></div>
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <button class="btn bg bsm" onclick="loadAllSheetData('kuyruk')">↻ Yenile</button>
-    <span style="font-size:9px;color:var(--mt);align-self:center" id="kuyruk-last"></span>
+    <span style="font-size:12px;color:var(--mt);align-self:center" id="kuyruk-last"></span>
   </div>
   <div class="card">
     <div class="tw">
@@ -1174,7 +1194,7 @@ tbody td{line-height:1.5}
   </div>
   <div id="tab-r-p" class="tc">
     <div class="card"><div class="ct">Platform Başına Short</div>
-      <div id="rp-content" style="color:var(--mt);font-size:10px">Veri yükle butonuna tıklayın</div>
+      <div id="rp-content" style="color:var(--mt);font-size:13px">Veri yükle butonuna tıklayın</div>
     </div>
   </div>
 </div>
@@ -1185,11 +1205,11 @@ tbody td{line-height:1.5}
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den (api.upload-post.com/api/uploadposts/users) gelir. Ayarlar → <b>Upload-Post API Key</b> gerekli. n8n bağlıysa proxy üzerinden gelir (CORS sorunu olmaz), değilse doğrudan API'ye istek atılır.</span></div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms()">↻ Yenile</button>
-    <span id="plat-last" style="font-size:9px;color:var(--mt);align-self:center"></span>
-    <span id="plat-src" style="font-size:9px;color:var(--acc);align-self:center;margin-left:auto"></span>
+    <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
+    <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
   <div id="pl-grid" class="g3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
-    <div style="color:var(--mt);font-size:10px;padding:16px;text-align:center;grid-column:1/-1">Yenile'ye bas veya Ayarlar → API Key gir</div>
+    <div style="color:var(--mt);font-size:13px;padding:16px;text-align:center;grid-column:1/-1">Yenile'ye bas veya Ayarlar → API Key gir</div>
   </div>
 </div>
 
@@ -1230,13 +1250,13 @@ tbody td{line-height:1.5}
   <div class="card" style="margin-bottom:12px">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <input id="gc-search" type="text" placeholder="Link / kategori ara…" style="flex:1;min-width:180px;margin:0" oninput="renderGecmis()"/>
-      <select id="gc-filter" style="width:150px;font-size:10px" onchange="renderGecmis()"><option value="">Tüm kategoriler</option></select>
-      <span id="gc-count" style="font-size:9px;color:var(--mt)"></span>
+      <select id="gc-filter" style="width:150px;font-size:13px" onchange="renderGecmis()"><option value="">Tüm kategoriler</option></select>
+      <span id="gc-count" style="font-size:12px;color:var(--mt)"></span>
       <button class="btn bg bsm" onclick="gcClearAll()" title="Tüm geçmişi sil">🗑 Temizle</button>
     </div>
   </div>
   <div id="gc-list" style="display:flex;flex-direction:column;gap:6px"></div>
-  <div id="gc-empty" class="card" style="display:none;text-align:center;padding:32px;color:var(--mt)"><div style="font-size:28px;margin-bottom:8px">🕘</div><div style="font-size:11px">Henüz gönderim yok</div></div>
+  <div id="gc-empty" class="card" style="display:none;text-align:center;padding:32px;color:var(--mt)"><div style="font-size:28px;margin-bottom:8px">🕘</div><div style="font-size:14px">Henüz gönderim yok</div></div>
 </div>
 
 <!-- TAKVİM -->
@@ -1249,7 +1269,7 @@ tbody td{line-height:1.5}
     <button class="btn bg bsm" onclick="takNext()">Sonraki Ay →</button>
     <button class="btn bp bsm" onclick="loadTakvim()">↻ Yenile</button>
     <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
-      <span style="font-size:9px;color:var(--mt);align-self:center">Platform:</span>
+      <span style="font-size:12px;color:var(--mt);align-self:center">Platform:</span>
       <span class="badge bi" id="tak-f-ig" onclick="takFilter('ig')" style="cursor:pointer">📸 IG</span>
       <span class="badge bi" id="tak-f-yt" onclick="takFilter('yt')" style="cursor:pointer">▶ YT</span>
       <span class="badge bi" id="tak-f-tt" onclick="takFilter('tt')" style="cursor:pointer">♪ TT</span>
@@ -1260,22 +1280,55 @@ tbody td{line-height:1.5}
     </div>
   </div>
   <div id="tak-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px">
-    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">PTZ</div>
-    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">SAL</div>
-    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">ÇAR</div>
-    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">PER</div>
-    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">CUM</div>
-    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">CMT</div>
-    <div style="text-align:center;font-size:8px;letter-spacing:2px;color:var(--mt);padding:4px">PAZ</div>
+    <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">PTZ</div>
+    <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">SAL</div>
+    <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">ÇAR</div>
+    <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">PER</div>
+    <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">CUM</div>
+    <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">CMT</div>
+    <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">PAZ</div>
   </div>
   <div id="tak-days" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px"></div>
   <!-- Tooltip overlay -->
   <div id="tak-tooltip" style="display:none;position:fixed;z-index:9999;background:var(--sur2);border:1px solid var(--acc);border-radius:8px;padding:12px 14px;max-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none">
     <div id="ttt-title" style="font-family:var(--fh);font-size:12px;font-weight:700;color:var(--tx);margin-bottom:6px;line-height:1.3"></div>
     <div id="ttt-thumb" style="margin-bottom:8px"></div>
-    <div id="ttt-desc" style="font-size:10px;color:var(--mt);margin-bottom:8px;line-height:1.5;max-height:60px;overflow:hidden"></div>
+    <div id="ttt-desc" style="font-size:13px;color:var(--mt);margin-bottom:8px;line-height:1.5;max-height:60px;overflow:hidden"></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap" id="ttt-badges"></div>
-    <div id="ttt-time" style="font-size:9px;color:var(--acc);margin-top:6px"></div>
+    <div id="ttt-time" style="font-size:12px;color:var(--acc);margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- TREND RADAR (günlük keşif: trend + yükselen + potansiyel + kanallar) -->
+<div id="page-radar" class="page">
+  <div class="ph"><div class="pt">Trend Radar</div><div class="ps">Günlük keşif — YouTube'da trend olan, hızla yükselen ve patlama potansiyeli taşıyan video &amp; kanallar</div></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veri önce <b>n8n günlük radar</b>'dan (<code>/webhook/trend-radar</code>, her sabah hesaplanır) alınır; yoksa <b>YouTube API</b> ile canlı hesaplanır (Ayarlar → YouTube API Key). <b>Hız</b> = izlenme/saat. <b>▲ artış</b> = son ziyaretten bu yana kazanılan izlenme. <b>💎 Potansiyel</b> = abone sayısına göre izlenmesi patlamış taze video (küçük kanal, büyük ivme).</span></div>
+
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+    <button class="btn bp bsm" onclick="loadRadar(true)">↻ Bugünü Getir</button>
+    <span id="rd-status" style="font-size:12px;color:var(--mt)"></span>
+    <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
+      <div class="cat-chips" id="rd-cats" style="margin:0"></div>
+      <button class="btn bs bsm" onclick="rdSendSelected()">▶ Seçilenleri İşleme Al (<span id="rd-selcount">0</span>)</button>
+    </div>
+  </div>
+  <div id="rd-res" class="res"></div>
+
+  <div class="card">
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend</span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div id="rd-trend" class="rd-grid"><div class="rd-empty">↻ Bugünü Getir'e bas</div></div>
+  </div>
+  <div class="card">
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🚀 Hızlı Yükselenler <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— son 48 saatte yayınlandı, izlenme hızı en yüksek</span></span><span id="rd-rising-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div id="rd-rising" class="rd-grid"><div class="rd-empty">—</div></div>
+  </div>
+  <div class="card" style="border-color:rgba(251,191,36,.3)">
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--gld)">💎 Potansiyel <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— küçük kanaldan patlayan taze video (izlenme ≥ abone)</span></span><span id="rd-potential-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div id="rd-potential" class="rd-grid"><div class="rd-empty">—</div></div>
+  </div>
+  <div class="card">
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>📺 Yükselen Kanallar <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— bugün birden çok sıcak videosu olan kanallar</span></span><span id="rd-channels-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div id="rd-channels" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"><div class="rd-empty">—</div></div>
   </div>
 </div>
 
@@ -1286,16 +1339,16 @@ tbody td{line-height:1.5}
 
   <!-- Özet kutuları -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
-    <div class="card" style="padding:12px"><div style="font-size:9px;color:var(--mt);letter-spacing:1px">YAYINLANDI</div><div id="yd-c-pub" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--ok)">–</div></div>
-    <div class="card" style="padding:12px"><div style="font-size:9px;color:var(--mt);letter-spacing:1px">BAŞARISIZ</div><div id="yd-c-fail" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--er)">–</div></div>
-    <div class="card" style="padding:12px"><div style="font-size:9px;color:var(--mt);letter-spacing:1px">BAŞARI ORANI</div><div id="yd-c-rate" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--acc)">–</div></div>
-    <div class="card" style="padding:12px"><div style="font-size:9px;color:var(--mt);letter-spacing:1px">PLANLI ⏰</div><div id="yd-c-sch" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--wn)">–</div></div>
+    <div class="card" style="padding:12px"><div style="font-size:12px;color:var(--mt);letter-spacing:1px">YAYINLANDI</div><div id="yd-c-pub" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--ok)">–</div></div>
+    <div class="card" style="padding:12px"><div style="font-size:12px;color:var(--mt);letter-spacing:1px">BAŞARISIZ</div><div id="yd-c-fail" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--er)">–</div></div>
+    <div class="card" style="padding:12px"><div style="font-size:12px;color:var(--mt);letter-spacing:1px">BAŞARI ORANI</div><div id="yd-c-rate" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--acc)">–</div></div>
+    <div class="card" style="padding:12px"><div style="font-size:12px;color:var(--mt);letter-spacing:1px">PLANLI ⏰</div><div id="yd-c-sch" style="font-family:var(--fh);font-size:24px;font-weight:800;color:var(--wn)">–</div></div>
   </div>
 
   <!-- Araç çubuğu -->
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button class="btn bp bsm" onclick="loadYayinDurumu()">↻ Yenile</button>
-    <span id="yd-status" style="font-size:10px;color:var(--mt);font-family:var(--fm)"></span>
+    <span id="yd-status" style="font-size:13px;color:var(--mt);font-family:var(--fm)"></span>
     <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
       <span class="badge bgr" id="yd-f-all"    onclick="ydFilter('all')"    style="cursor:pointer">Tümü</span>
       <span class="badge bi"  id="yd-f-failed" onclick="ydFilter('failed')" style="cursor:pointer">❌ Başarısız</span>
@@ -1304,7 +1357,7 @@ tbody td{line-height:1.5}
     </div>
   </div>
 
-  <div id="yd-list"><div style="color:var(--mt);text-align:center;padding:30px;font-size:11px">Yüklemek için <b>↻ Yenile</b>'ye bas</div></div>
+  <div id="yd-list"><div style="color:var(--mt);text-align:center;padding:30px;font-size:14px">Yüklemek için <b>↻ Yenile</b>'ye bas</div></div>
 
   <!-- Yeniden gönder — kaynak video bilinmiyorsa manuel giriş modalı -->
   <div id="yd-retry-modal" style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:16px">
@@ -1313,8 +1366,8 @@ tbody td{line-height:1.5}
         <div style="font-family:var(--fh);font-size:14px;font-weight:700;color:var(--tx)">↻ Yeniden Gönder</div>
         <span onclick="ydRetryClose()" style="cursor:pointer;color:var(--mt);font-size:16px">✕</span>
       </div>
-      <div id="yd-retry-info" style="font-size:10px;color:var(--mt);margin-bottom:10px;line-height:1.5"></div>
-      <label style="font-size:10px;color:var(--mt);display:block;margin-bottom:4px">Kaynak video URL'si (.mp4 / doğrudan dosya)</label>
+      <div id="yd-retry-info" style="font-size:13px;color:var(--mt);margin-bottom:10px;line-height:1.5"></div>
+      <label style="font-size:13px;color:var(--mt);display:block;margin-bottom:4px">Kaynak video URL'si (.mp4 / doğrudan dosya)</label>
       <input id="yd-retry-video" type="text" placeholder="https://…/short.mp4" style="width:100%;margin:0 0 12px"/>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="btn bg bsm" onclick="ydRetryClose()">İptal</button>
@@ -1333,27 +1386,27 @@ tbody td{line-height:1.5}
       <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px">
         <div>
           <div id="dm-title" style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--tx);line-height:1.1"></div>
-          <div id="dm-sub" style="font-size:10px;color:#4a5e72;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap"></div>
+          <div id="dm-sub" style="font-size:13px;color:#4a5e72;margin-top:4px;display:flex;gap:12px;flex-wrap:wrap"></div>
         </div>
-        <button onclick="closeDayModal()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:10px;font-family:'DM Mono',monospace;flex-shrink:0;margin-left:12px;transition:all .15s" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">✕ Kapat</button>
+        <button onclick="closeDayModal()" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;font-family:'DM Mono',monospace;flex-shrink:0;margin-left:12px;transition:all .15s" onmouseover="this.style.background='rgba(239,68,68,.2)'" onmouseout="this.style.background='rgba(239,68,68,.1)'">✕ Kapat</button>
       </div>
 
       <!-- PLATFORM FİLTRE SEKMELERİ -->
       <div style="display:flex;gap:0;margin-bottom:-1px">
-        <button id="dm-tab-all" onclick="dmFilter('all')" style="padding:8px 16px;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid #00e5ff;background:transparent;color:#00e5ff;text-transform:uppercase;transition:all .15s">Tümü</button>
-        <button id="dm-tab-ig"  onclick="dmFilter('ig')"  style="padding:8px 16px;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#4a5e72;text-transform:uppercase;transition:all .15s">
+        <button id="dm-tab-all" onclick="dmFilter('all')" style="padding:8px 16px;font-size:12px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid #00e5ff;background:transparent;color:#00e5ff;text-transform:uppercase;transition:all .15s">Tümü</button>
+        <button id="dm-tab-ig"  onclick="dmFilter('ig')"  style="padding:8px 16px;font-size:12px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#4a5e72;text-transform:uppercase;transition:all .15s">
           <span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366)"></span>Instagram</span>
         </button>
-        <button id="dm-tab-yt"  onclick="dmFilter('yt')"  style="padding:8px 16px;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#4a5e72;text-transform:uppercase;transition:all .15s">
+        <button id="dm-tab-yt"  onclick="dmFilter('yt')"  style="padding:8px 16px;font-size:12px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#4a5e72;text-transform:uppercase;transition:all .15s">
           <span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff0000"></span>YouTube</span>
         </button>
-        <button id="dm-tab-tt"  onclick="dmFilter('tt')"  style="padding:8px 16px;font-size:9px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#4a5e72;text-transform:uppercase;transition:all .15s">
+        <button id="dm-tab-tt"  onclick="dmFilter('tt')"  style="padding:8px 16px;font-size:12px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:#4a5e72;text-transform:uppercase;transition:all .15s">
           <span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:linear-gradient(135deg,#69c9d0,#010101)"></span>TikTok</span>
         </button>
         <!-- SIRALAMA -->
         <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding-bottom:6px">
-          <span style="font-size:8px;letter-spacing:1px;color:#4a5e72;text-transform:uppercase">Sırala</span>
-          <button id="dm-sort-btn" onclick="dmToggleSort()" style="background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.2);color:#00e5ff;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:9px;font-family:'DM Mono',monospace;display:flex;align-items:center;gap:4px" title="Sıralama değiştir">
+          <span style="font-size:11px;letter-spacing:1px;color:#4a5e72;text-transform:uppercase">Sırala</span>
+          <button id="dm-sort-btn" onclick="dmToggleSort()" style="background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.2);color:#00e5ff;border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;font-family:'DM Mono',monospace;display:flex;align-items:center;gap:4px" title="Sıralama değiştir">
             <span id="dm-sort-icon">↑↓</span><span id="dm-sort-label">Saat ↑</span>
           </button>
         </div>
@@ -1364,7 +1417,7 @@ tbody td{line-height:1.5}
     <div id="dm-list" style="padding:16px 24px 20px;max-height:60vh;overflow-y:auto"></div>
 
     <!-- MODAL FOOTER -->
-    <div id="dm-footer" style="padding:10px 24px;border-top:1px solid #1a2535;display:flex;gap:16px;font-size:9px;color:#4a5e72"></div>
+    <div id="dm-footer" style="padding:10px 24px;border-top:1px solid #1a2535;display:flex;gap:16px;font-size:12px;color:#4a5e72"></div>
   </div>
 </div>
 
@@ -1375,37 +1428,37 @@ tbody td{line-height:1.5}
     <div>
       <div class="card">
         <div class="ct">n8n Bağlantısı</div>
-        <div class="fg"><label>n8n Base URL (Cloudflare Worker)</label><input id="cfg-n8n" type="url" placeholder="https://opus-proxy.xxx.workers.dev" oninput="updateWHs()"/><div style="font-size:9px;color:var(--mt);margin-top:4px">Sadece n8n adresi — workflow düzenleme linkini (…/workflow/xxxx) DEĞİL, sadece domain kısmını yapıştır (örn. https://xxx.app.n8n.cloud)</div></div>
-        <div class="fg"><label>Webhook: Video Gönder (Genel)</label><div id="wh-video" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder</div></div>
-        <div class="fg"><label>Webhook: Film</label><div id="wh-film" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-film</div></div>
-        <div class="fg"><label>Webhook: Eğlence</label><div id="wh-eglence" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-eglence</div></div>
-        <div class="fg"><label>Webhook: Bilim</label><div id="wh-bilim" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-bilim</div></div>
-        <div class="fg"><label>Webhook: Vlog</label><div id="wh-vlog" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-vlog</div></div>
-        <div class="fg"><label>Webhook: Komedi</label><div id="wh-komedi" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-komedi</div></div>
-        <div class="fg"><label>Webhook: Oyun</label><div id="wh-oyun" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-oyun</div></div>
-        <div class="fg"><label>Webhook: Spor</label><div id="wh-spor" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-spor</div></div>
-        <div class="fg"><label>Webhook: OpusClip Direkt</label><div id="wh-opusclip" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/opus-clip-direkt</div></div>
-        <div class="fg"><label>Webhook: YouTube Ara</label><div id="wh-ytara" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/youtube-ara</div></div>
-        <div class="fg"><label>Webhook: Toplu Kelime</label><div id="wh-bulk" style="font-size:9px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/bulk-keywords</div></div>
+        <div class="fg"><label>n8n Base URL (Cloudflare Worker)</label><input id="cfg-n8n" type="url" placeholder="https://opus-proxy.xxx.workers.dev" oninput="updateWHs()"/><div style="font-size:12px;color:var(--mt);margin-top:4px">Sadece n8n adresi — workflow düzenleme linkini (…/workflow/xxxx) DEĞİL, sadece domain kısmını yapıştır (örn. https://xxx.app.n8n.cloud)</div></div>
+        <div class="fg"><label>Webhook: Video Gönder (Genel)</label><div id="wh-video" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder</div></div>
+        <div class="fg"><label>Webhook: Film</label><div id="wh-film" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-film</div></div>
+        <div class="fg"><label>Webhook: Eğlence</label><div id="wh-eglence" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-eglence</div></div>
+        <div class="fg"><label>Webhook: Bilim</label><div id="wh-bilim" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-bilim</div></div>
+        <div class="fg"><label>Webhook: Vlog</label><div id="wh-vlog" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-vlog</div></div>
+        <div class="fg"><label>Webhook: Komedi</label><div id="wh-komedi" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-komedi</div></div>
+        <div class="fg"><label>Webhook: Oyun</label><div id="wh-oyun" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-oyun</div></div>
+        <div class="fg"><label>Webhook: Spor</label><div id="wh-spor" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-spor</div></div>
+        <div class="fg"><label>Webhook: OpusClip Direkt</label><div id="wh-opusclip" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/opus-clip-direkt</div></div>
+        <div class="fg"><label>Webhook: YouTube Ara</label><div id="wh-ytara" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/youtube-ara</div></div>
+        <div class="fg"><label>Webhook: Toplu Kelime</label><div id="wh-bulk" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/bulk-keywords</div></div>
       </div>
       <div class="card">
         <div class="ct">API Anahtarları</div>
         <div class="fg">
-  <label>Google Sheets API Key <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--acc);font-size:8px">→ Oluştur</a></label>
+  <label>Google Sheets API Key <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--acc);font-size:11px">→ Oluştur</a></label>
   <input id="cfg-shkey" type="text" placeholder="AIza..."/>
-  <div style="font-size:8px;color:var(--mt);margin-top:3px">console.cloud.google.com → Sheets API → Etkinleştir → API Anahtarı</div>
+  <div style="font-size:11px;color:var(--mt);margin-top:3px">console.cloud.google.com → Sheets API → Etkinleştir → API Anahtarı</div>
 </div>
         <div class="fg"><label>Sheet ID (Short Kaydet)</label><input id="cfg-sheet" type="text" placeholder="1eAm6yyasd_..."/></div>
         <div class="fg"><label>Sheet ID (URL-Takip)</label><input id="cfg-sheet2" type="text" placeholder="aynı veya farklı"/></div>
         <div class="fg"><label>Upload-Post API Key</label><input id="cfg-blot" type="text" placeholder="blt_..."/></div>
-        <div class="fg"><label>OpusClip API Key</label><input id="cfg-opus" type="text" placeholder="sk-..."/><div style="font-size:8px;color:var(--mt);margin-top:3px">opus.pro → Settings → API → API Key</div></div>
-        <div class="fg"><label>Cobalt API Key</label><input id="cfg-cobalt" type="text" placeholder="..."/><div style="font-size:8px;color:var(--mt);margin-top:3px">cobalt.tools → API Key (Direkt Yayınla için gerekli)</div></div>
+        <div class="fg"><label>OpusClip API Key</label><input id="cfg-opus" type="text" placeholder="sk-..."/><div style="font-size:11px;color:var(--mt);margin-top:3px">opus.pro → Settings → API → API Key</div></div>
+        <div class="fg"><label>Cobalt API Key</label><input id="cfg-cobalt" type="text" placeholder="..."/><div style="font-size:11px;color:var(--mt);margin-top:3px">cobalt.tools → API Key (Direkt Yayınla için gerekli)</div></div>
         <div style="display:flex;gap:10px">
-          <div class="fg" style="flex:1"><label>Toplu Gönderim Uyarı Sınırı</label><input id="cfg-batchmax" type="number" min="1" value="15" placeholder="15"/><div style="font-size:8px;color:var(--mt);margin-top:3px">Bu sayıyı aşınca onay ister</div></div>
-          <div class="fg" style="flex:1"><label>Gönderimler Arası Aralık (sn)</label><input id="cfg-batchdelay" type="number" min="0" value="8" placeholder="8"/><div style="font-size:8px;color:var(--mt);margin-top:3px">n8n/Upload-Post'u yormamak için</div></div>
+          <div class="fg" style="flex:1"><label>Toplu Gönderim Uyarı Sınırı</label><input id="cfg-batchmax" type="number" min="1" value="15" placeholder="15"/><div style="font-size:11px;color:var(--mt);margin-top:3px">Bu sayıyı aşınca onay ister</div></div>
+          <div class="fg" style="flex:1"><label>Gönderimler Arası Aralık (sn)</label><input id="cfg-batchdelay" type="number" min="0" value="8" placeholder="8"/><div style="font-size:11px;color:var(--mt);margin-top:3px">n8n/Upload-Post'u yormamak için</div></div>
         </div>
         <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
-        <div id="cfg-ok" style="display:none;font-size:9px;color:var(--ok);margin-top:6px">✓ Kaydedildi</div>
+        <div id="cfg-ok" style="display:none;font-size:12px;color:var(--ok);margin-top:6px">✓ Kaydedildi</div>
       </div>
     </div>
     <div>
@@ -1419,7 +1472,7 @@ tbody td{line-height:1.5}
         <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet + n8n Kodu Üret</button>
         <div id="lim-code-wrap" style="display:none;margin-top:10px">
           <div class="ct">Code in JavaScript3'e kopyala:</div>
-          <textarea id="lim-code" style="height:80px;font-size:9px;background:var(--bg);margin-top:4px"></textarea>
+          <textarea id="lim-code" style="height:80px;font-size:12px;background:var(--bg);margin-top:4px"></textarea>
         </div>
       </div>
       <div class="card">
@@ -1458,7 +1511,7 @@ tbody td{line-height:1.5}
     <input type="text" id="log-search" placeholder="Ara..." style="width:140px" oninput="renderLogs()"/>
     <button class="btn bg bsm" onclick="clearLogs()">✕ Temizle</button>
     <button class="btn bg bsm" onclick="exportLogs()">⬇ İndir</button>
-    <label style="display:flex;align-items:center;gap:5px;font-size:9px;cursor:pointer;margin-left:auto">
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;margin-left:auto">
       <input type="checkbox" id="log-auto" checked onchange="toggleAutoLog()"> Canlı
     </label>
   </div>
@@ -1552,7 +1605,7 @@ function dupeChoiceModal(dupeCount, newCount) {
     div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center';
     div.innerHTML = `<div style="background:var(--sur);border:1px solid var(--wn);border-radius:8px;padding:20px 24px;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.4)">
       <div style="font-family:var(--fh);font-weight:700;font-size:13px;color:var(--tx);margin-bottom:8px">⚠ Tekrar Gönderim Tespit Edildi</div>
-      <div style="font-size:11px;color:var(--mt);line-height:1.6;margin-bottom:16px">${dupeCount} video daha önce gönderilmiş görünüyor. Nasıl devam edelim?</div>
+      <div style="font-size:14px;color:var(--mt);line-height:1.6;margin-bottom:16px">${dupeCount} video daha önce gönderilmiş görünüyor. Nasıl devam edelim?</div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <button class="btn bp bsm" id="dupe-skip" style="width:100%;justify-content:center">Yalnız Yenileri Gönder (${newCount})</button>
         <button class="btn bw bsm" id="dupe-all" style="width:100%;justify-content:center">Hepsini Yine de Gönder</button>
@@ -1610,6 +1663,7 @@ function go(id, el) {
     opusclip:   initOpusClip,
     uppost:     initUpPost,
     trendonay:  initTrendOnay,
+    radar:      initRadar,
   };
   if (h[id]) try { h[id](); } catch(e) { console.error(id, e); }
 }
@@ -1980,7 +2034,7 @@ function renderYARVideos() {
   if (!el) return;
   const cnt = document.getElementById('ya-sel-count');
   if (cnt) cnt.textContent = `(${YAR.selected.size} seçili)`;
-  if (!YAR.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Video yok</div>'; return; }
+  if (!YAR.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Video yok</div>'; return; }
   el.innerHTML = YAR.videos.map(raw => {
     const v = yarNormalizeVideo(raw);
     const sel = YAR.selected.has(v.id);
@@ -1990,13 +2044,13 @@ function renderYARVideos() {
       <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();yarToggle('${v.id}')">
       <div style="position:relative;flex-shrink:0">
         ${v.thumb?`<img src="${v.thumb}" style="width:100px;height:60px;object-fit:cover;border-radius:3px">` : '<div style="width:100px;height:60px;background:var(--brd);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
-        <span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.8);color:var(--tx);font-size:8px;padding:1px 4px;border-radius:2px">${ytkDurFmt(durS)}</span>
+        <span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.8);color:var(--tx);font-size:11px;padding:1px 4px;border-radius:2px">${ytkDurFmt(durS)}</span>
       </div>
       <div style="min-width:0;flex:1">
-        <div style="font-size:11px;font-weight:600;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.title}</div>
-        <div style="font-size:9px;color:var(--mt);margin-top:4px">📺 ${v.channelTitle||''} &nbsp;👁 ${ytkFmt(v.viewCount)} &nbsp;👍 ${v.likeCount!=null?ytkFmt(v.likeCount):'–'} &nbsp;💬 ${v.commentCount!=null?ytkFmt(v.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
+        <div style="font-size:14px;font-weight:600;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.title}</div>
+        <div style="font-size:12px;color:var(--mt);margin-top:4px">📺 ${v.channelTitle||''} &nbsp;👁 ${ytkFmt(v.viewCount)} &nbsp;👍 ${v.likeCount!=null?ytkFmt(v.likeCount):'–'} &nbsp;💬 ${v.commentCount!=null?ytkFmt(v.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
       </div>
-      <a href="https://www.youtube.com/watch?v=${v.id}" target="_blank" onclick="event.stopPropagation()" style="align-self:center;color:var(--acc);font-size:9px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px;text-decoration:none;flex-shrink:0">↗ Aç</a>
+      <a href="https://www.youtube.com/watch?v=${v.id}" target="_blank" onclick="event.stopPropagation()" style="align-self:center;color:var(--acc);font-size:12px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px;text-decoration:none;flex-shrink:0">↗ Aç</a>
     </div>`;
   }).join('');
 }
@@ -2103,12 +2157,12 @@ function renderSearchHist() {
   el.innerHTML = S.searchHist.map((s,idx)=>{
     const vidCnt = Array.isArray(s.videos) ? s.videos.length : 0;
     const canOpen = vidCnt > 0;
-    return `<div class="ya-hist-item" data-idx="${idx}" style="padding:8px;border-bottom:1px solid var(--brd);font-size:10px;cursor:pointer" title="${canOpen?'Tıkla → geçmiş sonuçları modal olarak aç':'Bu kaydın video listesi saklı değil, tıklayınca sadece anahtar kelime dolar'}">
+    return `<div class="ya-hist-item" data-idx="${idx}" style="padding:8px;border-bottom:1px solid var(--brd);font-size:13px;cursor:pointer" title="${canOpen?'Tıkla → geçmiş sonuçları modal olarak aç':'Bu kaydın video listesi saklı değil, tıklayınca sadece anahtar kelime dolar'}">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <span style="color:${canOpen?'var(--acc)':'#dde4f0'};font-weight:${canOpen?'600':'400'};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.kw)}</span>
-        <span style="color:var(--mt);font-size:8px;white-space:nowrap">${esc(s.t)}</span>
+        <span style="color:var(--mt);font-size:11px;white-space:nowrap">${esc(s.t)}</span>
       </div>
-      <div style="font-size:8px;color:var(--mt);margin-top:2px">${canOpen ? '🎬 '+vidCnt+' video sonuç • tıkla modalda aç' : 'sonuç saklı değil (anahtar kelime doldurulur)'}</div>
+      <div style="font-size:11px;color:var(--mt);margin-top:2px">${canOpen ? '🎬 '+vidCnt+' video sonuç • tıkla modalda aç' : 'sonuç saklı değil (anahtar kelime doldurulur)'}</div>
     </div>`;
   }).join('');
   // Event delegation — inline onclick'in HTML kırılma sorununu bypass eder
@@ -2148,7 +2202,7 @@ function renderKWTags() {
   if(!el)return;
   el.innerHTML=S.kwList.length
     ?S.kwList.map(k=>'<span class="kw-tag">'+k+'<button onclick="removeKW(\''+k.replace(/'/g,"\\'")+'\')">x</button></span>').join('')
-    :'<span style="color:var(--mt);font-size:9px">Kelime ekleyin...</span>';
+    :'<span style="color:var(--mt);font-size:12px">Kelime ekleyin...</span>';
 }
 
 async function sendBulkKW() {
@@ -2370,7 +2424,7 @@ async function loadDriveSheet() {
   setEl('dr-sent-cnt',S.sentURLs.size);
   setEl('dr-new-cnt',newU.length);
   const listEl=document.getElementById('dr-url-list');
-  if(listEl)listEl.innerHTML=allU.map(r=>'<div class="url-item '+(S.sentURLs.has(r.url)?'done':'')+'"><span class="url-text" title="'+r.url+'">'+r.url+'</span><span class="badge bi" style="margin-left:4px">'+(r.kategori||'genel')+'</span><span class="badge '+(S.sentURLs.has(r.url)?'bgr':'bi')+'">'+(S.sentURLs.has(r.url)?'Islendi':'Yeni')+'</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:9px">URL bulunamadi</div>';
+  if(listEl)listEl.innerHTML=allU.map(r=>'<div class="url-item '+(S.sentURLs.has(r.url)?'done':'')+'"><span class="url-text" title="'+r.url+'">'+r.url+'</span><span class="badge bi" style="margin-left:4px">'+(r.kategori||'genel')+'</span><span class="badge '+(S.sentURLs.has(r.url)?'bgr':'bi')+'">'+(S.sentURLs.has(r.url)?'Islendi':'Yeni')+'</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:12px">URL bulunamadi</div>';
   renderSentURLs();
   showRes('dr-res','✓ '+allU.length+' URL ('+newU.length+' yeni)','ok');
   addLog('ok','drive',allU.length+' URL, '+newU.length+' yeni');
@@ -2380,7 +2434,7 @@ function renderSentURLs() {
   const el=document.getElementById('dr-sent-list');
   if(!el)return;
   const arr=[...S.sentURLs];
-  el.innerHTML=arr.slice(0,50).map(u=>'<div class="url-item"><span class="url-text" title="'+u+'">'+u+'</span><span class="badge bgr">Islendi</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:9px">Islenmis URL yok</div>';
+  el.innerHTML=arr.slice(0,50).map(u=>'<div class="url-item"><span class="url-text" title="'+u+'">'+u+'</span><span class="badge bgr">Islendi</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:12px">Islenmis URL yok</div>';
 }
 
 async function sendDriveURLs() {
@@ -2655,7 +2709,7 @@ async function loadReports() {
   const ytC = shorts.filter(pYT).length;
   const ttC = shorts.filter(pTT).length;
   const rpEl=document.getElementById('rp-content');
-  if(rpEl)rpEl.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="text-align:center;padding:8px 16px;background:rgba(225,48,108,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#e1306c">'+igC+'</div><div style="font-size:9px;color:var(--mt)">Instagram</div></div><div style="text-align:center;padding:8px 16px;background:rgba(255,0,0,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#f00">'+ytC+'</div><div style="font-size:9px;color:var(--mt)">YouTube</div></div><div style="text-align:center;padding:8px 16px;background:rgba(105,201,208,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#69c9d0">'+ttC+'</div><div style="font-size:9px;color:var(--mt)">TikTok</div></div></div>';
+  if(rpEl)rpEl.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap"><div style="text-align:center;padding:8px 16px;background:rgba(225,48,108,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#e1306c">'+igC+'</div><div style="font-size:12px;color:var(--mt)">Instagram</div></div><div style="text-align:center;padding:8px 16px;background:rgba(255,0,0,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#f00">'+ytC+'</div><div style="font-size:12px;color:var(--mt)">YouTube</div></div><div style="text-align:center;padding:8px 16px;background:rgba(105,201,208,.1);border-radius:6px"><div style="font-size:24px;font-weight:800;color:#69c9d0">'+ttC+'</div><div style="font-size:12px;color:var(--mt)">TikTok</div></div></div>';
   const dc={};
   urls.forEach(r => { const d = (pTarihUrl(r)||'').slice(0,10); if(d)dc[d]=(dc[d]||0)+1; });
   const maxC=Math.max(...[0,1,2,3,4,5,6].map(i=>{const d=new Date(now);d.setDate(d.getDate()-6+i);return dc[d.toISOString().slice(0,10)]||0;}),1);
@@ -2710,7 +2764,7 @@ async function loadPlatforms() {
   }
   S.uploadPostAccounts = raw;
   if (!raw) {
-    document.getElementById('pl-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mt);font-size:10px">Bağlanılamadı — n8n URL veya Upload-Post API Key girin</div>';
+    document.getElementById('pl-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mt);font-size:13px">Bağlanılamadı — n8n URL veya Upload-Post API Key girin</div>';
     setEl('plat-last','Bağlanılamadı');
     return;
   }
@@ -2757,11 +2811,11 @@ function renderPlatformsGrid(byPlat) {
       return `<div class="card" style="border-top:3px solid ${p.color}">
         <div class="ct" style="color:${p.color};display:flex;justify-content:space-between;align-items:center">
           <span>${p.icon} ${p.label}</span>
-          <span style="font-size:9px;color:var(--mt);font-weight:400">${accs.length} hesap</span>
+          <span style="font-size:12px;color:var(--mt);font-weight:400">${accs.length} hesap</span>
         </div>
         <div>${accs.map((a,i)=>platAccCard(a,p,i)).join('')}</div>
       </div>`;
-    }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mt);font-size:10px">Bu profilde bağlı sosyal hesap yok</div>';
+    }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mt);font-size:13px">Bu profilde bağlı sosyal hesap yok</div>';
 }
 
 function platAccName(a, p) {
@@ -2781,7 +2835,7 @@ function platAccCard(a, p, idx) {
         <div class="acc-id" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${handle ? '@'+handle : ''}${followers!=null ? ' · '+ytkFmt(followers)+' takipçi' : ''}</div>
       </div>
     </div>
-    <span class="badge bi" style="font-size:8px;flex-shrink:0">Detay ▶</span>
+    <span class="badge bi" style="font-size:11px;flex-shrink:0">Detay ▶</span>
   </div>`;
 }
 
@@ -2799,21 +2853,21 @@ function platOpenModal(platKey, idx) {
   const link = p.link(a);
   const t = document.getElementById('plat-modal-title');
   if (t) t.textContent = p.icon + ' ' + p.label + (handle ? ' — @' + handle : '');
-  const stat = (label, val) => val != null && val !== '' ? `<div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">${label}</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${ytkFmt(val)}</div></div>` : '';
+  const stat = (label, val) => val != null && val !== '' ? `<div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:11px;color:var(--mt);text-transform:uppercase">${label}</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${ytkFmt(val)}</div></div>` : '';
   const rows = [];
   if (a._profile)          rows.push(['Upload-Post profili', a._profile]);
   if (name && name!==handle) rows.push(['Görünen ad', name]);
   if (handle)              rows.push(['Kullanıcı adı', '@'+handle]);
   if (a.id)                rows.push(['Hesap ID', a.id]);
   if (a.urn)               rows.push(['URN', a.urn]);
-  const rowsHtml = rows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:10px"><span style="color:var(--mt)">${k}</span><span style="color:var(--tx);font-family:var(--fm);word-break:break-all;text-align:right">${v}</span></div>`).join('');
+  const rowsHtml = rows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:13px"><span style="color:var(--mt)">${k}</span><span style="color:var(--tx);font-family:var(--fm);word-break:break-all;text-align:right">${v}</span></div>`).join('');
   const body = document.getElementById('plat-modal-body');
   if (body) body.innerHTML = `
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
       ${avatar ? `<img src="${avatar}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid ${p.color}" onerror="this.remove()">` : `<div style="width:64px;height:64px;border-radius:50%;background:${p.color}22;color:${p.color};display:flex;align-items:center;justify-content:center;font-size:24px">${p.icon}</div>`}
       <div style="min-width:0;flex:1">
         <div style="font-size:14px;font-weight:700;color:var(--tx)">${name}</div>
-        <div style="font-size:10px;color:var(--mt);margin-top:2px">${p.label}${handle?' · @'+handle:''}</div>
+        <div style="font-size:13px;color:var(--mt);margin-top:2px">${p.label}${handle?' · @'+handle:''}</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-bottom:14px">
@@ -2823,7 +2877,7 @@ function platOpenModal(platKey, idx) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <a href="${link}" target="_blank" rel="noopener" class="btn bp bsm" style="text-decoration:none">↗ ${p.label}'da Aç</a>
       <button class="btn bg bsm" onclick="platCopyLink('${link.replace(/'/g,"\\'")}')">📋 Linki Kopyala</button>
-      <span style="font-size:9px;color:var(--mt);margin-left:auto;word-break:break-all;text-align:right;max-width:60%">${link}</span>
+      <span style="font-size:12px;color:var(--mt);margin-left:auto;word-break:break-all;text-align:right;max-width:60%">${link}</span>
     </div>
     <!-- Analytics — accordion (butonla aç, kota harcamaz) -->
     <div style="margin-top:14px;border-top:1px solid var(--brd);padding-top:12px">
@@ -2864,14 +2918,14 @@ async function upFetch(path) {
 async function platLoadAnalytics(profileUsername, platformKey, containerId) {
   const el = document.getElementById(containerId);
   if (!el || !profileUsername) return;
-  el.innerHTML = '<div style="color:var(--mt);font-size:9px;padding:12px;text-align:center">⏳ Analytics yükleniyor…</div>';
+  el.innerHTML = '<div style="color:var(--mt);font-size:12px;padding:12px;text-align:center">⏳ Analytics yükleniyor…</div>';
   try {
     const { data } = await upFetch('/analytics/' + encodeURIComponent(profileUsername) + '?platforms=' + platformKey);
     const stats = data[platformKey] || data;
     if (!stats || (typeof stats !== 'object')) throw new Error('Analytics veri yok');
     const followers = stats.followers, views = stats.views, impressions = stats.impressions, reach = stats.reach;
     const series = Array.isArray(stats.time_series) ? stats.time_series.slice(-14) : [];
-    const stat = (label, val, col) => val!=null ? `<div style="background:var(--sur2);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">${label}</div><div style="font-size:14px;font-weight:700;color:${col||'var(--tx)'}">${ytkFmt(val)}</div></div>` : '';
+    const stat = (label, val, col) => val!=null ? `<div style="background:var(--sur2);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:11px;color:var(--mt);text-transform:uppercase">${label}</div><div style="font-size:14px;font-weight:700;color:${col||'var(--tx)'}">${ytkFmt(val)}</div></div>` : '';
     // Basit SVG bar chart — son 14 gün
     let chart = '';
     if (series.length) {
@@ -2881,11 +2935,11 @@ async function platLoadAnalytics(profileUsername, platformKey, containerId) {
         const h = Math.max(2, Math.round(v/max*60));
         return `<div title="${series[i].date}: ${v}" style="flex:1;background:var(--acc);height:${h}px;min-width:4px;border-radius:2px 2px 0 0;opacity:${0.4+0.6*v/max}"></div>`;
       }).join('');
-      chart = `<div style="margin-top:10px"><div style="font-size:8px;color:var(--mt);text-transform:uppercase;margin-bottom:6px">Son ${series.length} gün</div><div style="display:flex;align-items:flex-end;gap:2px;height:64px;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:6px">${bars}</div><div style="display:flex;justify-content:space-between;font-size:8px;color:var(--mt);margin-top:3px"><span>${series[0].date}</span><span>${series[series.length-1].date}</span></div></div>`;
+      chart = `<div style="margin-top:10px"><div style="font-size:11px;color:var(--mt);text-transform:uppercase;margin-bottom:6px">Son ${series.length} gün</div><div style="display:flex;align-items:flex-end;gap:2px;height:64px;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:6px">${bars}</div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mt);margin-top:3px"><span>${series[0].date}</span><span>${series[series.length-1].date}</span></div></div>`;
     }
     el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px">${stat('Takipçi',followers,'var(--acc)')}${stat('İzlenme',views)}${stat('Impressions',impressions)}${stat('Reach',reach)}</div>${chart}`;
   } catch(e) {
-    el.innerHTML = '<div style="color:var(--wn);font-size:9px;padding:10px">Analytics çekilemedi: ' + e.message + '</div>';
+    el.innerHTML = '<div style="color:var(--wn);font-size:12px;padding:10px">Analytics çekilemedi: ' + e.message + '</div>';
   }
 }
 
@@ -2978,12 +3032,12 @@ async function upStatusCheck() {
     const badges = Object.keys(results).map(plat => {
       const r = results[plat] || {};
       const ok = r.success;
-      return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd)"><span style="color:${ok?'var(--ok)':'var(--er)'};font-weight:600">${ok?'✓':'✕'} ${plat}</span>${r.url?'<a href="'+r.url+'" target="_blank" style="color:var(--acc);font-size:9px">↗ '+r.post_id+'</a>':'<span style="color:var(--mt);font-size:9px">'+(r.error||'—')+'</span>'}</div>`;
+      return `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd)"><span style="color:${ok?'var(--ok)':'var(--er)'};font-weight:600">${ok?'✓':'✕'} ${plat}</span>${r.url?'<a href="'+r.url+'" target="_blank" style="color:var(--acc);font-size:12px">↗ '+r.post_id+'</a>':'<span style="color:var(--mt);font-size:12px">'+(r.error||'—')+'</span>'}</div>`;
     }).join('');
     el.innerHTML = `<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:4px;padding:10px">
       <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-weight:700;color:var(--tx)">Durum</span><span style="color:${data.status==='COMPLETED'?'var(--ok)':(data.status==='FAILED'?'var(--er)':'var(--wn)')}">${data.status||'?'}</span></div>
       ${badges || '<div style="color:var(--mt)">Henüz sonuç yok</div>'}
-      ${data.error?'<div style="color:var(--er);font-size:9px;margin-top:6px">'+data.error+'</div>':''}
+      ${data.error?'<div style="color:var(--er);font-size:12px;margin-top:6px">'+data.error+'</div>':''}
     </div>`;
   } catch(e) {
     el.innerHTML = '<div style="color:var(--er)">Hata: ' + e.message + '</div>';
@@ -3000,9 +3054,9 @@ function renderUpHistory() {
     return `<div class="up-hist-item" data-idx="${i}" style="padding:6px 8px;border-bottom:1px solid var(--brd);cursor:pointer">
       <div style="display:flex;justify-content:space-between;gap:6px">
         <span style="color:var(--tx);font-weight:600">${esc((h.title||'(başlıksız)').slice(0,40))}</span>
-        <span style="color:var(--mt);font-size:8px">${esc(h.t)}</span>
+        <span style="color:var(--mt);font-size:11px">${esc(h.t)}</span>
       </div>
-      <div style="color:var(--mt);font-size:8px;margin-top:2px">
+      <div style="color:var(--mt);font-size:11px;margin-top:2px">
         @${esc(h.user)} · ${(h.platforms||[]).join(', ')} · <span style="font-family:var(--fm);color:var(--acc)">${esc(id.slice(0,20))}</span>
       </div>
     </div>`;
@@ -3023,18 +3077,18 @@ async function platLoadExtra(platformKey, profileUsername, containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   let path = '', itemsKey = '', renderItem = null;
-  if (platformKey === 'facebook')  { path = '/uploadposts/facebook/pages?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'pages';  renderItem = p => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:10px;font-weight:600;color:var(--tx)">${p.page_name}</div><div style="font-size:8px;color:var(--mt);font-family:var(--fm)">ID: ${p.page_id}</div></div>`; }
-  else if (platformKey === 'linkedin') { path = '/uploadposts/linkedin/pages?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'pages';  renderItem = p => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:10px;font-weight:600;color:var(--tx)">${p.page_name}</div><div style="font-size:8px;color:var(--mt);font-family:var(--fm)">URN: ${p.page_urn}</div></div>`; }
-  else if (platformKey === 'pinterest'){ path = '/uploadposts/pinterest/boards?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'boards'; renderItem = b => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:10px;font-weight:600;color:var(--tx)">${b.board_name}</div>${b.description?'<div style="font-size:8px;color:var(--mt);margin-top:2px">'+b.description+'</div>':''}<div style="font-size:8px;color:var(--mt);font-family:var(--fm)">ID: ${b.board_id}</div></div>`; }
+  if (platformKey === 'facebook')  { path = '/uploadposts/facebook/pages?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'pages';  renderItem = p => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:13px;font-weight:600;color:var(--tx)">${p.page_name}</div><div style="font-size:11px;color:var(--mt);font-family:var(--fm)">ID: ${p.page_id}</div></div>`; }
+  else if (platformKey === 'linkedin') { path = '/uploadposts/linkedin/pages?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'pages';  renderItem = p => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:13px;font-weight:600;color:var(--tx)">${p.page_name}</div><div style="font-size:11px;color:var(--mt);font-family:var(--fm)">URN: ${p.page_urn}</div></div>`; }
+  else if (platformKey === 'pinterest'){ path = '/uploadposts/pinterest/boards?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'boards'; renderItem = b => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:13px;font-weight:600;color:var(--tx)">${b.board_name}</div>${b.description?'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+b.description+'</div>':''}<div style="font-size:11px;color:var(--mt);font-family:var(--fm)">ID: ${b.board_id}</div></div>`; }
   else return;
-  el.innerHTML = '<div style="color:var(--mt);font-size:9px;padding:10px;text-align:center">⏳ Yükleniyor…</div>';
+  el.innerHTML = '<div style="color:var(--mt);font-size:12px;padding:10px;text-align:center">⏳ Yükleniyor…</div>';
   try {
     const { data } = await upFetch(path);
     const items = data[itemsKey] || [];
-    if (!items.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;padding:10px">Bağlı '+itemsKey+' bulunamadı</div>'; return; }
+    if (!items.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;padding:10px">Bağlı '+itemsKey+' bulunamadı</div>'; return; }
     el.innerHTML = items.map(renderItem).join('');
   } catch(e) {
-    el.innerHTML = '<div style="color:var(--wn);font-size:9px;padding:10px">' + e.message + '</div>';
+    el.innerHTML = '<div style="color:var(--wn);font-size:12px;padding:10px">' + e.message + '</div>';
   }
 }
 
@@ -3077,7 +3131,7 @@ function updateWHs() {
     const cats=[['film','Film'],['eglence','Eğlence'],['bilim','Bilim'],['vlog','Vlog'],['komedi','Komedi'],['oyun','Oyun'],['spor','Spor'],['genel','Genel']];
     catEl.innerHTML=cats.map(([k,label])=>{
       const url=b?b+'/webhook/video-gonder'+(k==='genel'?'':'-'+k):'/webhook/video-gonder'+(k==='genel'?'':'-'+k);
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--brd)"><span style="color:var(--mt)">'+label+'</span><span style="color:var(--acc);font-size:8px;cursor:pointer" onclick="copyText(\''+url+'\')" title="Kopyala">'+url.split('/').pop()+' ⊕</span></div>';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--brd)"><span style="color:var(--mt)">'+label+'</span><span style="color:var(--acc);font-size:11px;cursor:pointer" onclick="copyText(\''+url+'\')" title="Kopyala">'+url.split('/').pop()+' ⊕</span></div>';
     }).join('');
   }
   // OpusClip WH display güncelle
@@ -3196,6 +3250,7 @@ const SEV_C={info:'#00e5ff',ok:'#10b981',warn:'#f59e0b',err:'#ef4444'};
 
 function addLog(sev,cat,msg) {
   S.logs.unshift({t:new Date().toISOString(),sev,cat,msg});
+  if (sev==='err') { try { toast(msg,'err'); } catch(e){} }
   if(S.logs.length>500)S.logs.pop();
   try{localStorage.setItem('op_logs',JSON.stringify(S.logs.slice(0,200)));}catch(e){}
   renderLogs(); updateLogStats();
@@ -3226,7 +3281,7 @@ function renderLogs() {
     const catCol = CAT_C[l.cat]||'#64748b';
     const sevCol = SEV_C[l.sev]||'#dde4f0';
     return '<tr>'
-      + '<td style="white-space:nowrap;font-size:9px;color:var(--mt)">'+esc(ts)+'</td>'
+      + '<td style="white-space:nowrap;font-size:12px;color:var(--mt)">'+esc(ts)+'</td>'
       + '<td><span class="badge" style="background:'+catCol+'22;color:'+catCol+'">'+esc(l.cat)+'</span></td>'
       + '<td><span class="badge" style="background:'+sevCol+'22;color:'+sevCol+';font-weight:700">'+esc((l.sev||'').toUpperCase())+'</span></td>'
       + '<td style="word-break:break-word">'+esc(l.msg)+'</td>'
@@ -3389,7 +3444,7 @@ function renderYTKChannels() {
   if (!el) return;
   const cnt = document.getElementById('ytk-ch-count');
   if (cnt) cnt.textContent = YTK.channels.length ? `(${YTK.channels.length})` : '';
-  if (!YTK.channels.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal bulunamadı</div>'; return; }
+  if (!YTK.channels.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Kanal bulunamadı</div>'; return; }
   el.innerHTML = YTK.channels.map(c => {
     const st = c.statistics || {};
     const active = YTK.channelInfo && YTK.channelInfo.channelId === c.id;
@@ -3398,10 +3453,10 @@ function renderYTKChannels() {
     return `<div class="ytk-channel-row" data-cid="${c.id}" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;align-items:center;background:${active?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${active?'var(--acc)':'transparent'};transition:all .15s">
       ${thumb?`<img src="${thumb}" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">`:''}
       <div style="min-width:0;flex:1">
-        <div style="font-size:10px;font-weight:700;color:${active?'var(--acc)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.snippet.title} <span style="color:var(--mt);font-weight:400">${handle}</span></div>
-        <div style="font-size:8px;color:var(--mt);margin-top:2px">👥 ${ytkFmt(st.subscriberCount)} abone &nbsp;👁 ${ytkFmt(st.viewCount)} izlenme &nbsp;🎬 ${ytkFmt(st.videoCount)} video</div>
+        <div style="font-size:13px;font-weight:700;color:${active?'var(--acc)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.snippet.title} <span style="color:var(--mt);font-weight:400">${handle}</span></div>
+        <div style="font-size:11px;color:var(--mt);margin-top:2px">👥 ${ytkFmt(st.subscriberCount)} abone &nbsp;👁 ${ytkFmt(st.viewCount)} izlenme &nbsp;🎬 ${ytkFmt(st.videoCount)} video</div>
       </div>
-      <button class="btn bs bsm ytk-fetch-btn" data-cid="${c.id}" style="flex-shrink:0;font-size:9px;padding:5px 8px">▶ Videoları Getir</button>
+      <button class="btn bs bsm ytk-fetch-btn" data-cid="${c.id}" style="flex-shrink:0;font-size:12px;padding:5px 8px">▶ Videoları Getir</button>
     </div>`;
   }).join('');
   // Event delegation: satıra tıklanınca kanalı seç, "Videoları Getir" butonuna tıklanınca modal aç + fetch
@@ -3447,8 +3502,8 @@ async function ytkPickChannel(chId, openModal) {
       ${YTK.channelInfo.channelThumb ? `<img src="${YTK.channelInfo.channelThumb}" style="width:44px;height:44px;border-radius:50%;border:2px solid var(--acc)">` : ''}
       <div style="min-width:0;flex:1">
         <div style="font-size:13px;font-weight:700;color:var(--tx)">${YTK.channelInfo.channelTitle}</div>
-        <div style="font-size:9px;color:var(--mt);margin-top:3px">👥 ${ytkFmt(st.subscriberCount)} abone &nbsp;👁 ${ytkFmt(st.viewCount)} toplam izlenme &nbsp;🎬 ${ytkFmt(st.videoCount)} video</div>
-        <a href="https://www.youtube.com/channel/${chId}" target="_blank" style="font-size:8px;color:var(--acc)">${chId}</a>
+        <div style="font-size:12px;color:var(--mt);margin-top:3px">👥 ${ytkFmt(st.subscriberCount)} abone &nbsp;👁 ${ytkFmt(st.viewCount)} toplam izlenme &nbsp;🎬 ${ytkFmt(st.videoCount)} video</div>
+        <a href="https://www.youtube.com/channel/${chId}" target="_blank" style="font-size:11px;color:var(--acc)">${chId}</a>
       </div>
       <button class="btn bs bsm" onclick="ytkPickChannel('${chId}', true)" style="align-self:center;flex-shrink:0">▶ Videoları Getir</button>
     </div>`;
@@ -3489,7 +3544,7 @@ function renderYTKHistory() {
   const el = document.getElementById('ytk-hist-list');
   if (!el) return;
   if (!YTK.history.length) {
-    el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:12px">Henüz kanal incelenmedi</div>';
+    el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:12px">Henüz kanal incelenmedi</div>';
     return;
   }
   el.innerHTML = YTK.history.map((h, i) => {
@@ -3497,10 +3552,10 @@ function renderYTKHistory() {
     return `<div class="ytk-hist-item" data-idx="${i}" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;align-items:center;transition:background .15s" title="Tıkla → videoları modal olarak aç">
       ${h.thumb?`<img src="${h.thumb}" style="width:32px;height:32px;border-radius:50%;flex-shrink:0" onerror="this.remove()">`:''}
       <div style="min-width:0;flex:1">
-        <div style="font-size:10px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.title}${h.handle?' <span style="color:var(--mt);font-weight:400">'+h.handle+'</span>':''}</div>
-        <div style="font-size:8px;color:var(--mt);margin-top:2px">👥 ${ytkFmt(h.subscriberCount)} · 🎬 ${ytkFmt(h.videoCount)} · ${timeAgo}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.title}${h.handle?' <span style="color:var(--mt);font-weight:400">'+h.handle+'</span>':''}</div>
+        <div style="font-size:11px;color:var(--mt);margin-top:2px">👥 ${ytkFmt(h.subscriberCount)} · 🎬 ${ytkFmt(h.videoCount)} · ${timeAgo}</div>
       </div>
-      <button class="btn bg bsm ytk-hist-remove" data-idx="${i}" title="Geçmişten sil" style="flex-shrink:0;padding:2px 6px;font-size:9px">✕</button>
+      <button class="btn bg bsm ytk-hist-remove" data-idx="${i}" title="Geçmişten sil" style="flex-shrink:0;padding:2px 6px;font-size:12px">✕</button>
     </div>`;
   }).join('');
   el.querySelectorAll('.ytk-hist-item').forEach(item => {
@@ -3586,16 +3641,16 @@ function ytvOpenModal(vid) {
                 style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px">
-        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">İzlenme</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${ytkFmt(st.viewCount)}</div></div>
-        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">Beğeni</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${st.likeCount!=null?ytkFmt(st.likeCount):'–'}</div></div>
-        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">Yorum</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${st.commentCount!=null?ytkFmt(st.commentCount):'–'}</div></div>
-        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:8px;color:var(--mt);text-transform:uppercase">Süre</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${ytkDurFmt(ytkParseDur(duration))}</div></div>
+        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:11px;color:var(--mt);text-transform:uppercase">İzlenme</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${ytkFmt(st.viewCount)}</div></div>
+        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:11px;color:var(--mt);text-transform:uppercase">Beğeni</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${st.likeCount!=null?ytkFmt(st.likeCount):'–'}</div></div>
+        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:11px;color:var(--mt);text-transform:uppercase">Yorum</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${st.commentCount!=null?ytkFmt(st.commentCount):'–'}</div></div>
+        <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:11px;color:var(--mt);text-transform:uppercase">Süre</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${ytkDurFmt(ytkParseDur(duration))}</div></div>
       </div>
-      <div style="font-size:10px;color:var(--mt);margin-bottom:10px">
+      <div style="font-size:13px;color:var(--mt);margin-bottom:10px">
         📺 <b style="color:var(--tx)">${channelTitle||''}</b> &nbsp; 📅 ${(publishedAt||'').slice(0,10)}
       </div>
-      ${description ? `<div style="font-size:10px;color:#dde4f0;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:10px;max-height:180px;overflow-y:auto;white-space:pre-wrap;margin-bottom:10px">${description.replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>` : ''}
-      ${tags.length ? `<div style="margin-bottom:12px"><div style="font-size:9px;color:var(--mt);margin-bottom:4px">Etiketler</div><div style="display:flex;gap:4px;flex-wrap:wrap">${tags.slice(0,15).map(t=>`<span class="badge bi" style="font-size:8px">${t.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`).join('')}</div></div>` : ''}
+      ${description ? `<div style="font-size:13px;color:#dde4f0;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:10px;max-height:180px;overflow-y:auto;white-space:pre-wrap;margin-bottom:10px">${description.replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>` : ''}
+      ${tags.length ? `<div style="margin-bottom:12px"><div style="font-size:12px;color:var(--mt);margin-bottom:4px">Etiketler</div><div style="display:flex;gap:4px;flex-wrap:wrap">${tags.slice(0,15).map(t=>`<span class="badge bi" style="font-size:11px">${t.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`).join('')}</div></div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <a href="https://www.youtube.com/watch?v=${v.id}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ YouTube'da Aç</a>
         <button class="btn ${YTK.selected.has(v.id)?'bs':'bp'} bsm" onclick="ytkToggle('${v.id}');ytvOpenModal('${v.id}')">${YTK.selected.has(v.id)?'✓ Seçili — kaldır':'+ Seçime Ekle'}</button>
@@ -3671,8 +3726,8 @@ function renderYTKVideos() {
   const list = ytkFilteredVideos();
   const vidCount = document.getElementById('ytk-vid-count');
   if (vidCount) vidCount.textContent = YTK.videos.length ? `${list.length} gösteriliyor / ${YTK.videos.length} yüklü / kanalda ${ytkFmt(YTK.channelInfo ? YTK.channelInfo.videoCount : 0)}` : '';
-  if (!YTK.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal seçin</div>'; return; }
-  if (!list.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Süre filtresine uyan video yok — filtreyi "Tüm süreler" yapın veya daha fazla yükleyin</div>'; return; }
+  if (!YTK.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Kanal seçin</div>'; return; }
+  if (!list.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Süre filtresine uyan video yok — filtreyi "Tüm süreler" yapın veya daha fazla yükleyin</div>'; return; }
   el.innerHTML = list.map(v => {
     const sel = YTK.selected.has(v.id);
     const st = v.statistics || {};
@@ -3683,13 +3738,13 @@ function renderYTKVideos() {
       <input type="checkbox" style="flex-shrink:0;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();ytkToggle('${v.id}');renderYTKVideos()">
       <div style="position:relative;flex-shrink:0">
         ${thumb?`<img src="${thumb}" style="width:120px;height:72px;object-fit:cover;border-radius:4px">` : '<div style="width:120px;height:72px;background:var(--brd);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
-        <span style="position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.85);color:var(--tx);font-size:9px;padding:2px 5px;border-radius:2px">${ytkDurFmt(durS)}</span>
+        <span style="position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.85);color:var(--tx);font-size:12px;padding:2px 5px;border-radius:2px">${ytkDurFmt(durS)}</span>
       </div>
       <div style="min-width:0;flex:1">
-        <div style="font-size:11px;font-weight:700;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.snippet.title}</div>
-        <div style="font-size:9px;color:var(--mt);margin-top:4px">👁 ${ytkFmt(st.viewCount)} &nbsp;👍 ${st.likeCount!=null?ytkFmt(st.likeCount):'–'} &nbsp;💬 ${st.commentCount!=null?ytkFmt(st.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
+        <div style="font-size:14px;font-weight:700;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.snippet.title}</div>
+        <div style="font-size:12px;color:var(--mt);margin-top:4px">👁 ${ytkFmt(st.viewCount)} &nbsp;👍 ${st.likeCount!=null?ytkFmt(st.likeCount):'–'} &nbsp;💬 ${st.commentCount!=null?ytkFmt(st.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
       </div>
-      <span style="flex-shrink:0;color:var(--acc);font-size:9px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px">Detay ▶</span>
+      <span style="flex-shrink:0;color:var(--acc);font-size:12px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px">Detay ▶</span>
     </div>`;
   }).join('');
 }
@@ -3788,11 +3843,11 @@ function strSetPlatform(p){
   const q=document.getElementById('str-q');
   if(q)q.placeholder = p==='twitch'?'örn. elraenn, jahrein...':'örn. xqc (tam kanal adı)';
   const list=document.getElementById('str-ch-list');
-  if(list)list.innerHTML='<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Arama yapın</div>';
+  if(list)list.innerHTML='<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Arama yapın</div>';
   setEl('str-ch-count',''); setEl('str-ch-name','');
   setStyle('str-vod-controls','display','none');
   const vl=document.getElementById('str-vod-list');
-  if(vl)vl.innerHTML='<div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">Soldan bir kanal arayıp "▶ VOD\'lar" butonuna bas</div>';
+  if(vl)vl.innerHTML='<div style="color:var(--mt);font-size:13px;text-align:center;padding:20px">Soldan bir kanal arayıp "▶ VOD\'lar" butonuna bas</div>';
 }
 
 // Twitch app access token (client_credentials) — cache'li, süresi dolunca yenilenir
@@ -3851,7 +3906,7 @@ async function strSearch(){
   const q=((document.getElementById('str-q')||{}).value||'').trim();
   if(!q) return showRes('str-res','Kanal adı girin','warn');
   const list=document.getElementById('str-ch-list');
-  if(list)list.innerHTML='<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">⏳ Aranıyor…</div>';
+  if(list)list.innerHTML='<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">⏳ Aranıyor…</div>';
   try{
     if(STR.platform==='twitch'){
       const j=await twApi('/search/channels?first=15&query='+encodeURIComponent(q));
@@ -3867,21 +3922,21 @@ async function strSearch(){
     strRenderChannels();
     addLog('ok','yayin',STR.platform+' arama: "'+q+'" → '+STR.channels.length+' kanal');
   }catch(e){
-    if(list)list.innerHTML='<div style="color:var(--er);font-size:9px;padding:14px;text-align:center;line-height:1.6">'+strEsc(e.message)+'</div>';
+    if(list)list.innerHTML='<div style="color:var(--er);font-size:12px;padding:14px;text-align:center;line-height:1.6">'+strEsc(e.message)+'</div>';
     addLog('err','yayin',e.message);
   }
 }
 
 function strRenderChannels(){
   const list=document.getElementById('str-ch-list'); if(!list)return;
-  if(!STR.channels.length){ list.innerHTML='<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Kanal bulunamadı</div>'; return; }
+  if(!STR.channels.length){ list.innerHTML='<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Kanal bulunamadı</div>'; return; }
   const site=STR.platform==='twitch'?'twitch.tv/':'kick.com/';
   list.innerHTML=STR.channels.map((c,i)=>`
     <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--brd)">
       ${c.avatar?`<img src="${strEsc(c.avatar)}" style="width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.remove()">`:''}
       <div style="flex:1;min-width:0">
-        <div style="font-size:10px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${strEsc(c.name)} ${c.live?'<span class="badge be">● CANLI</span>':''}</div>
-        <div style="font-size:8px;color:var(--mt)">${site}${strEsc(c.login)}${c.followers!=null?' · '+ytkFmt(c.followers)+' takipçi':''}</div>
+        <div style="font-size:13px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${strEsc(c.name)} ${c.live?'<span class="badge be">● CANLI</span>':''}</div>
+        <div style="font-size:11px;color:var(--mt)">${site}${strEsc(c.login)}${c.followers!=null?' · '+ytkFmt(c.followers)+' takipçi':''}</div>
       </div>
       <button class="btn bg bsm" onclick="strPickChannel(${i})" style="flex-shrink:0">▶ VOD'lar</button>
     </div>`).join('');
@@ -3892,7 +3947,7 @@ async function strPickChannel(i){
   STR.ch=c; STR.vods=[];
   setEl('str-ch-name',(STR.platform==='twitch'?'🟣 ':'🟢 ')+c.name);
   const el=document.getElementById('str-vod-list');
-  if(el)el.innerHTML='<div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">⏳ VOD listesi yükleniyor…</div>';
+  if(el)el.innerHTML='<div style="color:var(--mt);font-size:13px;text-align:center;padding:20px">⏳ VOD listesi yükleniyor…</div>';
   try{
     if(STR.platform==='twitch'){
       const j=await twApi('/videos?type=archive&first=50&user_id='+encodeURIComponent(c.id));
@@ -3913,7 +3968,7 @@ async function strPickChannel(i){
     strRenderVods();
     addLog('ok','yayin',c.name+' → '+STR.vods.length+' VOD bulundu');
   }catch(e){
-    if(el)el.innerHTML='<div style="color:var(--er);font-size:9px;padding:14px;text-align:center;line-height:1.6">'+strEsc(e.message)+'</div>';
+    if(el)el.innerHTML='<div style="color:var(--er);font-size:12px;padding:14px;text-align:center;line-height:1.6">'+strEsc(e.message)+'</div>';
     addLog('err','yayin',e.message);
   }
 }
@@ -3943,14 +3998,14 @@ function strRenderVods(){
   const el=document.getElementById('str-vod-list'); if(!el)return;
   const v=strFilteredVods();
   setEl('str-vod-count',v.length+' / '+STR.vods.length+' VOD');
-  if(!v.length){ el.innerHTML='<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">'+(STR.vods.length?'Süre filtresine uyan VOD yok':'Bu kanalda kayıtlı yayın tekrarı yok')+'</div>'; return; }
+  if(!v.length){ el.innerHTML='<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">'+(STR.vods.length?'Süre filtresine uyan VOD yok':'Bu kanalda kayıtlı yayın tekrarı yok')+'</div>'; return; }
   el.innerHTML=v.map(x=>{
     const i=STR.vods.indexOf(x);
     return `<div style="display:flex;gap:10px;padding:8px;border:1px solid var(--brd);border-radius:6px;margin-bottom:6px;background:var(--bg)">
       ${x.thumb?`<img src="${strEsc(x.thumb)}" style="width:96px;height:54px;border-radius:4px;object-fit:cover;flex-shrink:0" onerror="this.remove()">`:''}
       <div style="flex:1;min-width:0">
-        <div style="font-size:10px;color:var(--tx);line-height:1.4;max-height:28px;overflow:hidden">${strEsc(x.title)}</div>
-        <div style="font-size:8px;color:var(--mt);margin-top:3px">⏱ ${strFmtDur(x.sec)} · 👁 ${ytkFmt(x.views||0)}${x.date?' · '+new Date(x.date).toLocaleDateString('tr'):''}</div>
+        <div style="font-size:13px;color:var(--tx);line-height:1.4;max-height:28px;overflow:hidden">${strEsc(x.title)}</div>
+        <div style="font-size:11px;color:var(--mt);margin-top:3px">⏱ ${strFmtDur(x.sec)} · 👁 ${ytkFmt(x.views||0)}${x.date?' · '+new Date(x.date).toLocaleDateString('tr'):''}</div>
         <div style="display:flex;gap:5px;margin-top:5px">
           <button class="btn bs bsm" onclick="strSendVod(${i})">▶ İşleme Al</button>
           <a class="btn bg bsm" href="${strEsc(x.url)}" target="_blank" style="text-decoration:none">↗ İzle</a>
@@ -4047,11 +4102,11 @@ function vpComputeSegments() {
 function vpRenderSegments() {
   const el = document.getElementById('vp-seg-list'); if(!el) return;
   setEl('vp-seg-count', VP.segments.length+' parça');
-  if (!VP.segments.length) { el.innerHTML='<div style="color:var(--mt);font-size:10px;text-align:center;padding:20px">Süreyi getir → Parçaları Hesapla\'ya bas</div>'; return; }
+  if (!VP.segments.length) { el.innerHTML='<div style="color:var(--mt);font-size:13px;text-align:center;padding:20px">Süreyi getir → Parçaları Hesapla\'ya bas</div>'; return; }
   el.innerHTML = VP.segments.map((s,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid var(--brd);border-radius:6px;margin-bottom:6px;background:var(--bg)">
-    <span style="font-size:10px;color:var(--tx)">Parça ${i+1}/${VP.segments.length}</span>
-    <span style="font-size:10px;color:var(--acc);font-family:var(--fm)">${ytkDurFmt(s.start)} — ${ytkDurFmt(s.end)}</span>
-    <span style="font-size:9px;color:var(--mt)">${s.end-s.start}sn</span>
+    <span style="font-size:13px;color:var(--tx)">Parça ${i+1}/${VP.segments.length}</span>
+    <span style="font-size:13px;color:var(--acc);font-family:var(--fm)">${ytkDurFmt(s.start)} — ${ytkDurFmt(s.end)}</span>
+    <span style="font-size:12px;color:var(--mt)">${s.end-s.start}sn</span>
   </div>`).join('');
 }
 
@@ -4119,7 +4174,7 @@ function trRenderPending() {
   if (!TR.pending.length) { grid.innerHTML=''; if (empty) empty.style.display='block'; return; }
   if (empty) empty.style.display='none';
   // Çoklu seçim: kategori chip'leri (diğer sayfalardaki cat-chip deseniyle aynı)
-  const catChips = Object.entries(getCats()).map(([k,c])=>`<span class="cat-chip${k==='genel'?' sel':''}" data-cat="${k}" onclick="this.classList.toggle('sel')" style="font-size:8px;padding:2px 7px">${c.label}</span>`).join('');
+  const catChips = Object.entries(getCats()).map(([k,c])=>`<span class="cat-chip${k==='genel'?' sel':''}" data-cat="${k}" onclick="this.classList.toggle('sel')" style="font-size:11px;padding:2px 7px">${c.label}</span>`).join('');
   // bulk kategori chip'lerini doldur (bir kez)
   const bc = document.getElementById('tr-bulk-cats'); if (bc && !bc.children.length) bc.innerHTML = catChips;
   // filtre + sıralama
@@ -4145,21 +4200,21 @@ function trRenderPending() {
         <img src="${v.thumbnail}" style="width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${v.thumbnail}','${(v.title||'').replace(/'/g,'’').replace(/"/g,'&quot;')}')" onmouseleave="hidePrev()">
         <span class="opc-dur">${trDur(v.durationSec)}</span>
         <label onclick="event.stopPropagation()" title="Toplu işlem için seç" style="position:absolute;top:6px;right:6px;z-index:5;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;cursor:pointer;display:flex"><input type="checkbox" class="tr-selbox" ${selChk?'checked':''} onchange="trToggleSel('${vid}')" style="width:16px;height:16px;margin:0;accent-color:var(--acc);cursor:pointer"></label>
-        ${already?`<span title="Bu video daha önce panelden gönderilmişti" style="position:absolute;left:6px;top:6px;background:#f59e0b;color:#012;font-size:8px;font-weight:800;padding:2px 8px;border-radius:5px;z-index:4;box-shadow:0 2px 6px rgba(0,0,0,.4)">⚠ ÖNCEDEN GÖNDERİLDİ</span>`:''}
+        ${already?`<span title="Bu video daha önce panelden gönderilmişti" style="position:absolute;left:6px;top:6px;background:#f59e0b;color:#012;font-size:11px;font-weight:800;padding:2px 8px;border-radius:5px;z-index:4;box-shadow:0 2px 6px rgba(0,0,0,.4)">⚠ ÖNCEDEN GÖNDERİLDİ</span>`:''}
       </div>
       <div style="padding:10px 12px">
-        <div style="font-size:11px;font-weight:600;color:var(--tx);line-height:1.3;min-height:28px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.title||vid}</div>
-        ${channel ? `<div style="font-size:8px;color:var(--tx);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${channel.replace(/"/g,'&quot;')}">📺 ${channel}</div>` : ''}
-        <div style="display:flex;justify-content:space-between;align-items:center;font-size:8px;color:var(--mt);margin:5px 0 8px">
+        <div style="font-size:14px;font-weight:600;color:var(--tx);line-height:1.3;min-height:28px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.title||vid}</div>
+        ${channel ? `<div style="font-size:11px;color:var(--tx);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${channel.replace(/"/g,'&quot;')}">📺 ${channel}</div>` : ''}
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--mt);margin:5px 0 8px">
           <span>👁 ${views}${pub?` · 📅 ${pub}`:''}</span>
           <a href="${v.youtubeLink}" target="_blank" rel="noopener" style="color:var(--acc)">YouTube ↗</a>
         </div>
         <div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
           <div class="tr-cats cat-chips" style="flex:1;display:flex;flex-wrap:wrap;gap:3px" title="Birden fazla kategori seçebilirsin — her kategori için ayrı gönderim yapılır">${catChips}</div>
-          <select class="tr-dil" title="Dil (yalnız Genel için etkili)" style="width:60px;font-size:9px;flex-shrink:0"><option value="tr">TR</option><option value="en">EN</option></select>
+          <select class="tr-dil" title="Dil (yalnız Genel için etkili)" style="width:60px;font-size:12px;flex-shrink:0"><option value="tr">TR</option><option value="en">EN</option></select>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:8px;color:var(--mt)">${platRow}</div>
-        <input class="tr-desc" type="text" placeholder="Açıklama / not (isteğe bağlı)" style="width:100%;font-size:9px;margin-bottom:8px"/>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--mt)">${platRow}</div>
+        <input class="tr-desc" type="text" placeholder="Açıklama / not (isteğe bağlı)" style="width:100%;font-size:12px;margin-bottom:8px"/>
         <div class="tr-actions" style="display:flex;gap:6px">
           <button class="btn bp bsm" style="flex:1" onclick="trApprove('${vid}')">✓ Onayla ve Gönder</button>
           <button class="btn bg bsm" onclick="trReject('${vid}')">✗ Reddet</button>
@@ -4185,7 +4240,7 @@ async function trApprove(videoId) {
   const actions = card.querySelector('.tr-actions');
   // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
   // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
-  if (actions) actions.innerHTML = '<span style="color:var(--mt);font-size:9px">⏳ ['+kats.join(', ')+'] gönderiliyor...</span>';
+  if (actions) actions.innerHTML = '<span style="color:var(--mt);font-size:12px">⏳ ['+kats.join(', ')+'] gönderiliyor...</span>';
   const payload = {'Youtube linki': v.youtubeLink, kaynak:'kworb-onay', ...mcFields(kats), dil, platformlar:plats, aciklama_notu:aciklama};
   const res = await faf(base + mcPath(kats), payload);
   if (res && res.ok === true) {
@@ -4463,7 +4518,7 @@ async function opcFetchProjects() {
     if (st) st.innerHTML = `✓ ${projects.length} proje yüklendi`;
     addLog('ok', 'sistem', `OpusClip: ${projects.length} proje yüklendi`);
   } catch(e) {
-    if (st) st.innerHTML = '<span style="color:var(--err)">✕ ' + e.message + '</span>';
+    if (st) st.innerHTML = '<span style="color:var(--er)">✕ ' + e.message + '</span>';
     addLog('err', 'sistem', 'OpusClip proje yükleme hatası: ' + e.message);
   } finally {
     if (btn) btn.disabled = false;
@@ -4473,7 +4528,7 @@ async function opcFetchProjects() {
 function opcStageColor(stage) {
   const s = String(stage || '').toUpperCase();
   if (s === 'COMPLETE') return 'var(--ok)';
-  if (s === 'STALLED') return 'var(--err)';
+  if (s === 'STALLED') return 'var(--er)';
   return '#f59e0b';
 }
 function opcRenderProjects(projects) {
@@ -4506,12 +4561,12 @@ function opcRenderProjects(projects) {
       ${projScrim}
       </div>
       <div style="padding:10px 12px">
-        <div style="font-size:11px;font-weight:600;color:var(--tx);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:9px">
+        <div style="font-size:14px;font-weight:600;color:var(--tx);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px">
           <span style="color:var(--mt);font-family:var(--fm)">${String(pid).substring(0,12)}</span>
           ${plat ? `<span class="badge bi">${plat}</span>` : ''}
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:11px">
           <span style="color:var(--mt)">${date}</span>
           ${stage ? `<span style="color:${statusColor};text-transform:uppercase;letter-spacing:.5px">${stage}</span>` : ''}
         </div>
@@ -4529,7 +4584,7 @@ async function opcSearchById() {
   try {
     await opcOpenProject(pid);
   } catch(e) {
-    if (st) st.innerHTML = '<span style="color:var(--err)">✕ ' + e.message + '</span>';
+    if (st) st.innerHTML = '<span style="color:var(--er)">✕ ' + e.message + '</span>';
   }
 }
 
@@ -4565,7 +4620,7 @@ async function opcOpenProject(projectId) {
     if (st) st.innerHTML = `✓ ${clips.length} clip yüklendi`;
     addLog('ok', 'sistem', `OpusClip proje ${projectId}: ${clips.length} clip`);
   } catch(e) {
-    if (st) st.innerHTML = '<span style="color:var(--err)">✕ ' + e.message + '</span>';
+    if (st) st.innerHTML = '<span style="color:var(--er)">✕ ' + e.message + '</span>';
     throw e;
   }
 }
@@ -4600,7 +4655,7 @@ function opcRenderClips() {
         ${scrim}
       </div>
       <div style="padding:8px 10px">
-        <div class="opc-ctitle" style="font-size:10px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
+        <div class="opc-ctitle" style="font-size:13px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
       </div>
     </div>`;
   }).join('');
@@ -4762,12 +4817,12 @@ const OPC_CAT_COLORS = {
 };
 function opcCatChip(kat) {
   const col = OPC_CAT_COLORS[kat] || 'var(--acc)';
-  return `<span style="background:${col}22;color:${col};border:1px solid ${col}55;padding:2px 8px;border-radius:5px;font-size:8px;font-weight:700;letter-spacing:.3px;text-transform:capitalize;line-height:1.4">${kat}</span>`;
+  return `<span style="background:${col}22;color:${col};border:1px solid ${col}55;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:capitalize;line-height:1.4">${kat}</span>`;
 }
 function renderOPCHist() {
   const el = document.getElementById('opc-hist');
   if (!el) return;
-  if (!OPC.hist.length) { el.innerHTML = '<div style="color:var(--mt);font-size:9px;text-align:center;padding:16px">Henüz gönderim yok</div>'; return; }
+  if (!OPC.hist.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Henüz gönderim yok</div>'; return; }
   // Clip başına grupla: aynı clip'in gönderildiği tüm kategorileri topla
   // (OPC.hist en yeni başta olduğundan ilk görülen = en yeni; sıralama korunur)
   const groups = new Map();
@@ -4777,7 +4832,7 @@ function renderOPCHist() {
     const g = groups.get(h.id);
     if (h.kat && !g.kats.includes(h.kat)) g.kats.push(h.kat);
   });
-  el.innerHTML = [...groups.values()].slice(0,30).map(g => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:9px">
+  el.innerHTML = [...groups.values()].slice(0,30).map(g => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:12px">
     <span style="color:var(--acc);font-family:var(--fm);flex-shrink:0">${g.id}</span>
     <span style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;flex:1">${g.kats.map(opcCatChip).join('')}</span>
     <span style="color:var(--mt);flex-shrink:0;white-space:nowrap">${g.t}</span>
@@ -5022,7 +5077,7 @@ function renderTakvim(shorts) {
 
     const cellClick = items.length > 0 ? `onclick="openDayModal(${dayNum})"` : '';
 
-    let inner = `<div style="font-size:9px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--acc)':'var(--mt)'};margin-bottom:3px">${dayNum}${items.length>0?` <span style="color:var(--acc);opacity:.7">(${items.length})</span>`:''}</div>`;
+    let inner = `<div style="font-size:12px;font-weight:${isToday?'700':'400'};color:${isToday?'var(--acc)':'var(--mt)'};margin-bottom:3px">${dayNum}${items.length>0?` <span style="color:var(--acc);opacity:.7">(${items.length})</span>`:''}</div>`;
 
     // Max 4 item göster, fazlası "+N daha" olarak
     const shown = items.slice(0, 4);
@@ -5038,10 +5093,10 @@ function renderTakvim(shorts) {
       const status = pickK(r, ['platform-status','durum','status','Durum']);
       const kat = pickK(r, ['kategori','category','Kategori']) || 'genel';
       const dataAttrs = `data-plat="${item.plat}" data-time="${item.time||''}" data-title="${(rawTitle||'').replace(/"/g,'&quot;')}" data-desc="${desc.replace(/"/g,'&quot;')}" data-status="${status}" data-thumb="${thumbUrl}" data-kat="${kat}"`;
-      inner += `<div ${dataAttrs} onmouseenter="showTakTip(event,this)" onmouseleave="hideTakTip()" style="background:${col}22;border-left:2px solid ${col};border-radius:2px;padding:2px 4px;margin-bottom:2px;cursor:pointer;font-size:8px;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:${col}"><span style="opacity:.7">${t}</span> ${title}</div>`;
+      inner += `<div ${dataAttrs} onmouseenter="showTakTip(event,this)" onmouseleave="hideTakTip()" style="background:${col}22;border-left:2px solid ${col};border-radius:2px;padding:2px 4px;margin-bottom:2px;cursor:pointer;font-size:11px;line-height:1.3;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:${col}"><span style="opacity:.7">${t}</span> ${title}</div>`;
     });
     if (extra > 0) {
-      inner += `<div onclick="event.stopPropagation();openDayModal(${dayNum})" style="font-size:8px;color:var(--acc);text-align:right;cursor:pointer;text-decoration:underline;padding:1px 0">+${extra} daha</div>`;
+      inner += `<div onclick="event.stopPropagation();openDayModal(${dayNum})" style="font-size:11px;color:var(--acc);text-align:right;cursor:pointer;text-decoration:underline;padding:1px 0">+${extra} daha</div>`;
     }
 
     html += `<div ${cellClick} style="${cellStyle}">${inner}</div>`;
@@ -5142,7 +5197,7 @@ function _dmRenderAll() {
 function _dmRenderList(items) {
   const listEl = document.getElementById('dm-list');
   if (!items.length) {
-    listEl.innerHTML = '<div style="text-align:center;padding:32px;color:var(--mt);font-size:11px">Bu platformda yayın yok</div>';
+    listEl.innerHTML = '<div style="text-align:center;padding:32px;color:var(--mt);font-size:14px">Bu platformda yayın yok</div>';
     return;
   }
   // Sheet kolon adları projeye göre değişebilir — yaygın varyantları dene
@@ -5191,7 +5246,7 @@ function _dmRenderList(items) {
         }
         ${videoUrl ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.35);opacity:0;transition:opacity .15s" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0"><div style="width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.7);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px">▶</div></div>` : ''}
         <!-- saat overlay -->
-        <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);padding:2px 4px;font-size:9px;color:#fff;text-align:center;font-family:'DM Mono',monospace">${timeStr}</div>
+        <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.7);padding:2px 4px;font-size:12px;color:#fff;text-align:center;font-family:'DM Mono',monospace">${timeStr}</div>
       ${videoUrl ? '</a>' : '</div>'}
 
       <!-- İÇERİK -->
@@ -5201,27 +5256,27 @@ function _dmRenderList(items) {
           <!-- DURUM ROZETİ -->
           <div style="flex-shrink:0;display:flex;align-items:center;gap:4px;background:${isPublished?'rgba(16,185,129,.12)':'rgba(245,158,11,.1)'};border:1px solid ${isPublished?'rgba(16,185,129,.3)':'rgba(245,158,11,.25)'};border-radius:20px;padding:2px 9px">
             <span style="width:5px;height:5px;border-radius:50%;background:${statusDot};display:inline-block;flex-shrink:0"></span>
-            <span style="font-size:8px;color:${statusDot};font-family:'DM Mono',monospace;white-space:nowrap">${statusText}</span>
+            <span style="font-size:11px;color:${statusDot};font-family:'DM Mono',monospace;white-space:nowrap">${statusText}</span>
           </div>
         </div>
 
-        <div style="font-size:9px;color:var(--mt);line-height:1.55;margin-bottom:7px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${desc || '(açıklama yok)'}</div>
+        <div style="font-size:12px;color:var(--mt);line-height:1.55;margin-bottom:7px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${desc || '(açıklama yok)'}</div>
 
         <!-- ALT SATIR: platform + saat + hesap + hashtaglar -->
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <!-- Platform + hesap birleşik badge -->
-          <span style="font-size:9px;padding:2px 10px;border-radius:20px;background:${meta.color}22;border:1px solid ${meta.color}55;display:inline-flex;align-items:center;gap:5px">
+          <span style="font-size:12px;padding:2px 10px;border-radius:20px;background:${meta.color}22;border:1px solid ${meta.color}55;display:inline-flex;align-items:center;gap:5px">
             <span style="${platBadgeStyle}">${meta.icon} ${meta.label}</span>
             ${hesap ? `<span style="color:var(--mt);opacity:.6">›</span><span style="color:${meta.color};font-weight:700;font-family:var(--fm);word-break:break-all">${hesap}</span>` : ''}
           </span>
           <!-- Saat -->
-          <span style="font-size:9px;color:var(--acc);display:flex;align-items:center;gap:3px">
+          <span style="font-size:12px;color:var(--acc);display:flex;align-items:center;gap:3px">
             <span style="opacity:.6">🕐</span>${timeStr}
           </span>
           <!-- Video linki (varsa) -->
-          ${videoUrl ? `<a href="${videoUrl}" target="_blank" rel="noopener" style="font-size:9px;color:var(--acc);text-decoration:none;padding:1px 8px;border:1px solid var(--acc);border-radius:3px">▶ Videoyu Aç</a>` : ''}
+          ${videoUrl ? `<a href="${videoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--acc);text-decoration:none;padding:1px 8px;border:1px solid var(--acc);border-radius:3px">▶ Videoyu Aç</a>` : ''}
           <!-- Hashtaglar -->
-          ${hashtags.map(h=>`<span style="font-size:8px;color:var(--acc3);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);border-radius:3px;padding:1px 6px">${h}</span>`).join('')}
+          ${hashtags.map(h=>`<span style="font-size:11px;color:var(--acc3);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);border-radius:3px;padding:1px 6px">${h}</span>`).join('')}
         </div>
       </div>
     </div>`;
@@ -5313,6 +5368,7 @@ document.addEventListener('mousemove', e => {
 // #3 TOAST
 function toast(msg, type, ms) {
   const wrap = document.getElementById('toast-wrap'); if (!wrap) return;
+  if (toast._last===msg && Date.now()-(toast._t||0)<2500) return; toast._last=msg; toast._t=Date.now();
   const el = document.createElement('div');
   el.className = 'toast ' + (type||'info');
   el.innerHTML = '<span class="tx"></span><span class="cl">✕</span>';
@@ -5419,7 +5475,7 @@ function renderGecmis() {
   if(!rows.length){ list.innerHTML=''; if(empty) empty.style.display='block'; return; }
   if(empty) empty.style.display='none';
   list.innerHTML=rows.slice(0,300).map(r=>`<div class="card" style="padding:8px 12px;display:flex;align-items:center;gap:10px">
-    <div style="flex:1;min-width:0"><div style="font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${r.url}" target="_blank" rel="noopener" style="color:var(--acc)">${r.url}</a></div><div style="font-size:8px;color:var(--mt);margin-top:2px">${r.kategori||''} · ${r.t||''}</div></div>
+    <div style="flex:1;min-width:0"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${r.url}" target="_blank" rel="noopener" style="color:var(--acc)">${r.url}</a></div><div style="font-size:11px;color:var(--mt);margin-top:2px">${r.kategori||''} · ${r.t||''}</div></div>
     <button class="btn bg bsm" onclick="gcResend('${encodeURIComponent(r.url)}','${(r.kategori||'genel').split(/[, ]+/)[0]}')">↻ Tekrar</button>
   </div>`).join('');
 }
@@ -5464,7 +5520,7 @@ async function loadProfileLoad() {
   }catch(e){ console.warn('[ProfilYuk] schedule alınamadı:', e.message); }
   // render
   const profs=[...new Set([...Object.keys(byP),...Object.keys(upBy)])];
-  if(!profs.length){ listEl.innerHTML='<div style="color:var(--mt);font-size:10px;text-align:center;padding:14px">Veri yok — Ayarlar\'da Sheet ID / n8n URL girili mi? (short-kaydetme sayfası \'profil\' kolonu okunur)</div>'; if(st) st.textContent=''; return; }
+  if(!profs.length){ listEl.innerHTML='<div style="color:var(--mt);font-size:13px;text-align:center;padding:14px">Veri yok — Ayarlar\'da Sheet ID / n8n URL girili mi? (short-kaydetme sayfası \'profil\' kolonu okunur)</div>'; if(st) st.textContent=''; return; }
   // #3 profil hesap sağlığı (Upload-Post /users) — her profile durum noktası
   let health={}; try { health=phCompute(await phFetchAccounts(), new Set(profs)); } catch(e){ console.warn('[ProfilSaglik]', e.message); }
   const rows=profs.map(p=>({p, total:(byP[p]&&byP[p].total)||0, pending:(byP[p]&&byP[p].pending)||0, sched:upBy[p]||0}));
@@ -5473,9 +5529,9 @@ async function loadProfileLoad() {
   listEl.innerHTML=rows.map(r=>{
     const h=health[r.p]||null; const hm=h?(PH_META[h.status]||PH_META.live):null;
     const dot=hm?`<span title="${(hm.txt||'Bağlı').replace(/"/g,'')}" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${hm.dot};margin-right:5px;vertical-align:middle"></span>`:'';
-    const warn=(hm&&hm.txt)?` <span style="color:${hm.dot};font-size:8px">${hm.txt}</span>`:'';
+    const warn=(hm&&hm.txt)?` <span style="color:${hm.dot};font-size:11px">${hm.txt}</span>`:'';
     return `<div style="margin-bottom:8px">
-    <div style="display:flex;justify-content:space-between;align-items:center;font-size:9px;margin-bottom:3px">
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:3px">
       <span style="color:var(--tx);font-family:var(--fm)">${dot}${r.p}${warn}</span>
       <span style="color:var(--mt)"><b style="color:var(--acc)">${r.total}</b> short${r.pending&&r.pending!==r.total?` (${r.pending} bekliyor)`:''}${r.sched?` · ⏰ ${r.sched} zamanlı`:''}</span>
     </div>
@@ -5588,10 +5644,10 @@ async function loadYayinDurumu(){
   const stEl   = document.getElementById('yd-status');
   if (!listEl) return;
   if (!S.cfg.blot && !getN8N()){
-    listEl.innerHTML = '<div style="color:var(--wn);text-align:center;padding:24px;font-size:11px">Ayarlar → <b>Upload-Post API Key</b> (veya n8n URL) gerekli</div>';
+    listEl.innerHTML = '<div style="color:var(--wn);text-align:center;padding:24px;font-size:14px">Ayarlar → <b>Upload-Post API Key</b> (veya n8n URL) gerekli</div>';
     return;
   }
-  listEl.innerHTML = '<div style="color:var(--mt);text-align:center;padding:24px;font-size:11px">⏳ Yükleniyor…</div>';
+  listEl.innerHTML = '<div style="color:var(--mt);text-align:center;padding:24px;font-size:14px">⏳ Yükleniyor…</div>';
   if (stEl) stEl.textContent = '';
   const items = await ydFetchItems();
   YD.items = items;
@@ -5630,7 +5686,7 @@ function renderYayinDurumu(){
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   let list = YD.items;
   if (YD.filter !== 'all') list = list.filter(i=>i.status===YD.filter);
-  if (!list.length){ el.innerHTML='<div style="color:var(--mt);text-align:center;padding:30px;font-size:11px">Bu filtrede kayıt yok</div>'; return; }
+  if (!list.length){ el.innerHTML='<div style="color:var(--mt);text-align:center;padding:30px;font-size:14px">Bu filtrede kayıt yok</div>'; return; }
   el.innerHTML = list.map(it=>{
     const realIdx = YD.items.indexOf(it);
     const stColor = it.status==='published'?'var(--ok)':it.status==='failed'?'var(--er)':it.status==='retried'?'var(--acc)':'var(--wn)';
@@ -5647,11 +5703,11 @@ function renderYayinDurumu(){
     return `<div style="display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--brd);border-left:3px solid ${stColor};border-radius:6px;margin-bottom:6px;background:var(--sur)">
       ${thumb}
       <div style="flex:1;min-width:0">
-        <div style="font-size:11px;color:var(--tx);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.title)}</div>
-        <div style="font-size:9px;color:var(--mt);margin-top:2px">${platLabel} · ${esc(it.profile||'—')} ${t?'· '+t:''}</div>
-        ${it.status==='failed'&&it.error?`<div style="font-size:9px;color:var(--er);margin-top:3px">⚠ ${esc(it.error).slice(0,140)}</div>`:''}
+        <div style="font-size:14px;color:var(--tx);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.title)}</div>
+        <div style="font-size:12px;color:var(--mt);margin-top:2px">${platLabel} · ${esc(it.profile||'—')} ${t?'· '+t:''}</div>
+        ${it.status==='failed'&&it.error?`<div style="font-size:12px;color:var(--er);margin-top:3px">⚠ ${esc(it.error).slice(0,140)}</div>`:''}
       </div>
-      <span style="font-size:9px;color:${stColor};font-weight:700;white-space:nowrap">${stLabel}</span>
+      <span style="font-size:12px;color:${stColor};font-weight:700;white-space:nowrap">${stLabel}</span>
       ${right}
     </div>`;
   }).join('');
@@ -5815,7 +5871,7 @@ async function loadActionCenter(){
       <span style="font-size:17px;flex-shrink:0">${t.icon}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:19px;font-weight:800;color:${col};font-family:var(--fh);line-height:1">${val}</div>
-        <div style="font-size:9px;color:var(--mt);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.label} · ${sub}</div>
+        <div style="font-size:12px;color:var(--mt);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.label} · ${sub}</div>
       </div>
     </div>`;
   }).join('');
@@ -5825,6 +5881,199 @@ async function loadActionCenter(){
   if (stEl) stEl.textContent = known===0 ? 'veri yok — Ayarlar (API key / n8n)' : (totalAct>0 ? (totalAct+' aksiyon bekliyor') : 'tümü temiz ✓');
 }
 window.loadActionCenter=loadActionCenter; window.acTileClick=acTileClick;
+
+// ═══════════════════════════════════════════════════════════
+// TREND RADAR — günlük keşif: trend + hızlı yükselen + potansiyel + kanallar
+// Veri: 1) n8n /webhook/trend-radar (günlük cron)  2) YouTube API canlı hesap
+// Hız (vph) = izlenme/saat · ▲ = son ziyaretten beri artış (yerel snapshot)
+// ═══════════════════════════════════════════════════════════
+const RD = { data:null, src:'', selected:new Set(), loading:false };
+
+function initRadar(){
+  const chips=document.getElementById('rd-cats');
+  if(chips && !chips.dataset.ready){
+    chips.innerHTML=Object.entries(getCats()).map(([k,c])=>'<span class="cat-chip'+(k==='genel'?' sel':'')+'" data-cat="'+k+'" onclick="catChipToggle(this,\'rd-cats\')">'+c.label+'</span>').join('');
+    chips.dataset.ready='1';
+    try{ renderLangToggle('rd-cats'); updateLangVisibility('rd-cats'); }catch(e){}
+  }
+  if(RD.data){ renderRadar(); return; }
+  const cache=rdCacheGet();
+  if(cache){ RD.data=cache.data; RD.src=cache.src+' (önbellek)'; renderRadar(); return; }
+  loadRadar(false);
+}
+function rdCacheGet(){
+  try{ const c=JSON.parse(localStorage.getItem('op_radar_cache')||'null'); if(c && Date.now()-c.ts<3*3600*1000) return c; }catch(e){}
+  return null;
+}
+
+async function loadRadar(force){
+  if(RD.loading) return;
+  RD.loading=true;
+  const st=document.getElementById('rd-status');
+  if(st) st.textContent='⏳ veriler toplanıyor…';
+  try{
+    let data=null, src='';
+    // 1) n8n günlük radar (her sabah hesaplanmış)
+    const base=getN8N();
+    if(base){
+      const d=await n8nGet('/webhook/trend-radar');
+      if(d && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:''); }
+    }
+    // 2) canlı hesap (YouTube API)
+    if(!data){
+      const key=S.cfg.ytApiKey||S.cfg.shkey||'';
+      if(!key){ if(st) st.textContent=''; showRes('rd-res','YouTube API Key gerekli (YouTube Ara sayfasındaki alan veya Ayarlar → Google API Key) — ya da n8n radar akışını kur','warn'); RD.loading=false; return; }
+      data=await rdClientCompute(key, st);
+      src='YouTube API (canlı)';
+    }
+    RD.data=data; RD.src=src;
+    try{ localStorage.setItem('op_radar_cache',JSON.stringify({ts:Date.now(),src,data})); }catch(e){}
+    renderRadar();
+    const rEl=document.getElementById('rd-res'); if(rEl) rEl.style.display='none';
+    addLog('ok','sistem','Trend Radar güncellendi ('+src+'): '+data.trend.length+' trend, '+data.rising.length+' yükselen, '+data.potential.length+' potansiyel');
+  }catch(e){
+    showRes('rd-res','Hata: '+e.message,'err');
+    addLog('err','sistem','Trend Radar: '+e.message);
+  }
+  RD.loading=false;
+}
+
+// YouTube API'den canlı hesap (mostPopular + son 48 saat + kanal aboneleri)
+async function rdClientCompute(key, st){
+  const YT='https://www.googleapis.com/youtube/v3/';
+  if(st) st.textContent='⏳ 1/4 trend listesi…';
+  const trendRaw=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics&chart=mostPopular&regionCode=TR&maxResults=50&key='+key);
+  if(st) st.textContent='⏳ 2/4 taze videolar…';
+  const after=new Date(Date.now()-48*3600*1000).toISOString();
+  const sr=await ytkFetch(YT+'search?part=snippet&type=video&order=viewCount&publishedAfter='+encodeURIComponent(after)+'&regionCode=TR&maxResults=50&key='+key);
+  const freshIds=(sr.items||[]).map(i=>i.id&&i.id.videoId).filter(Boolean);
+  let freshRaw={items:[]};
+  if(freshIds.length){
+    if(st) st.textContent='⏳ 3/4 video detayları…';
+    freshRaw=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics&id='+freshIds.join(',')+'&key='+key);
+  }
+  const chIds=[...new Set([...(trendRaw.items||[]),...(freshRaw.items||[])].map(v=>(v.snippet||{}).channelId).filter(Boolean))].slice(0,50);
+  if(st) st.textContent='⏳ 4/4 kanal detayları…';
+  const chRaw=chIds.length?await ytkFetch(YT+'channels?part=snippet,statistics&id='+chIds.join(',')+'&maxResults=50&key='+key):{items:[]};
+  const subsBy={}; (chRaw.items||[]).forEach(c=>{ subsBy[c.id]=parseInt((c.statistics||{}).subscriberCount||0); });
+  // yerel snapshot → ▲ artış rozetleri
+  let snap=null; try{ snap=JSON.parse(localStorage.getItem('op_radar_snap')||'null'); }catch(e){}
+  const snapAgeH=snap?(Date.now()-snap.ts)/3.6e6:0;
+  const useSnap=!!(snap&&snap.v&&snapAgeH>=4&&snapAgeH<=72);
+  const norm=v=>{
+    const stx=v.statistics||{}, sn=v.snippet||{};
+    const views=parseInt(stx.viewCount||0);
+    const ageH=Math.max(1,(Date.now()-Date.parse(sn.publishedAt||0))/3.6e6);
+    const subs=subsBy[sn.channelId]||0;
+    const it={ id:v.id, url:'https://www.youtube.com/watch?v='+v.id, title:sn.title||'', channel:sn.channelTitle||'', channelId:sn.channelId||'',
+      thumb:((sn.thumbnails||{}).medium||{}).url||((sn.thumbnails||{}).default||{}).url||'',
+      views, subs, ageH:Math.round(ageH), durSec:ytkParseDur((v.contentDetails||{}).duration),
+      vph:Math.round(views/ageH), ratio:subs>0?+(views/subs).toFixed(1):0, delta:0, deltaH:0 };
+    if(useSnap&&snap.v[v.id]!=null){ const dd=views-snap.v[v.id]; if(dd>0){ it.delta=dd; it.deltaH=Math.round(snapAgeH); } }
+    return it;
+  };
+  const trend=(trendRaw.items||[]).map(norm).slice(0,12);
+  const freshAll=(freshRaw.items||[]).map(norm).filter(x=>x.views>=1000);
+  const rising=[...freshAll].sort((a,b)=>b.vph-a.vph).slice(0,12);
+  const potential=freshAll.filter(x=>x.subs>0&&x.subs<=250000&&x.ratio>=1.5&&x.ageH<=72).sort((a,b)=>(b.ratio*b.vph)-(a.ratio*a.vph)).slice(0,8);
+  const byCh={};
+  [...trend,...rising].forEach(x=>{ if(!x.channelId) return; if(!byCh[x.channelId]) byCh[x.channelId]={channelId:x.channelId,channel:x.channel,subs:x.subs,count:0,sumVph:0,best:x}; const c=byCh[x.channelId]; c.count++; c.sumVph+=x.vph; if(x.vph>c.best.vph) c.best=x; });
+  const channels=Object.values(byCh).sort((a,b)=>(b.count*b.sumVph)-(a.count*a.sumVph)).slice(0,8)
+    .map(c=>({channelId:c.channelId,channel:c.channel,subs:c.subs,count:c.count,sumVph:Math.round(c.sumVph),bestTitle:c.best.title,bestId:c.best.id}));
+  if(!snap||snapAgeH>=20){
+    const v={}; [...trend,...freshAll].forEach(x=>{ v[x.id]=x.views; });
+    try{ localStorage.setItem('op_radar_snap',JSON.stringify({ts:Date.now(),v})); }catch(e){}
+  }
+  return {trend,rising,potential,channels};
+}
+
+function rdEsc(s){ return String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
+function rdAge(h){ return h<24?(h+' sa'):(Math.round(h/24)+' gün'); }
+
+function renderRadar(){
+  const d=RD.data; if(!d) return;
+  const st=document.getElementById('rd-status');
+  if(st) st.textContent='Kaynak: '+RD.src;
+  [['rd-trend',d.trend],['rd-rising',d.rising],['rd-potential',d.potential]].forEach(([elId,list])=>{
+    const el=document.getElementById(elId); if(!el) return;
+    setEl(elId+'-n',(list||[]).length+' video');
+    if(!(list||[]).length){ el.innerHTML='<div class="rd-empty">Bugün bu bölümde sonuç yok</div>'; return; }
+    const maxVph=Math.max(1,...list.map(x=>x.vph||0));
+    el.innerHTML=list.map(x=>{
+      const sel=RD.selected.has(x.id)?' sel':'';
+      const badge=(elId==='rd-potential')
+        ? '<span class="rd-badge-ratio">×'+x.ratio+' abone</span>'
+        : (x.delta>0?'<span class="rd-badge-delta">▲ +'+ytkFmt(x.delta)+' / '+x.deltaH+'sa</span>':'');
+      return '<div class="rd-card'+sel+'" onclick="rdToggle(\''+x.id+'\')">'
+        +'<span class="rd-sel-tick">✓</span>'+badge
+        +'<img class="rd-thumb" src="'+rdEsc(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
+        +'<div class="rd-body">'
+        +'<div class="rd-title">'+rdEsc(x.title)+'</div>'
+        +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span style="flex-shrink:0">'+rdAge(x.ageH)+'</span></div>'
+        +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
+        +'<div class="prog"><div class="pf" style="background:var(--acc);width:'+Math.max(3,Math.round((x.vph||0)/maxVph*100))+'%"></div></div>'
+        +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+rdEsc(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
+        +'</div></div>';
+    }).join('');
+  });
+  const chEl=document.getElementById('rd-channels');
+  if(chEl){
+    setEl('rd-channels-n',(d.channels||[]).length+' kanal');
+    if(!(d.channels||[]).length){ chEl.innerHTML='<div class="rd-empty">Bugün öne çıkan kanal yok</div>'; }
+    else{
+      const maxV=Math.max(1,...d.channels.map(c=>c.sumVph||0));
+      chEl.innerHTML=d.channels.map(c=>'<div class="rd-ch-card">'
+        +'<div class="rd-ch-name" title="'+rdEsc(c.channel)+'">'+rdEsc(c.channel)+'</div>'
+        +'<div class="rd-ch-meta">'+(c.subs?ytkFmt(c.subs)+' abone · ':'')+c.count+' sıcak video · <b style="color:var(--acc)">'+ytkFmt(c.sumVph)+'/sa</b></div>'
+        +'<div class="prog" style="margin-bottom:8px"><div class="pf" style="background:var(--acc3);width:'+Math.max(4,Math.round((c.sumVph||0)/maxV*100))+'%"></div></div>'
+        +'<div style="font-size:11px;color:var(--mt);margin-bottom:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+rdEsc(c.bestTitle)+'">En hızlısı: '+rdEsc(c.bestTitle)+'</div>'
+        +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+        +'<a class="btn bg bsm" style="text-decoration:none" href="https://www.youtube.com/channel/'+rdEsc(c.channelId)+'" target="_blank">↗ Kanal</a>'
+        +'<button class="btn bg bsm" onclick="rdOpenChannel(this.dataset.ch)" data-ch="'+rdEsc(c.channel)+'">⊕ Kanal Ara&#39;da incele</button>'
+        +'</div></div>').join('');
+    }
+  }
+  rdUpdateSelCount();
+}
+
+function rdToggle(id){
+  if(RD.selected.has(id)) RD.selected.delete(id); else RD.selected.add(id);
+  renderRadar();
+}
+function rdUpdateSelCount(){ setEl('rd-selcount',RD.selected.size); }
+function rdOpenChannel(name){
+  goUretim('ytkanal','video');
+  setTimeout(()=>{ const q=document.getElementById('ytk-channel'); if(q){ q.value=name; try{ searchYTChannel(); }catch(e){} } },250);
+}
+
+async function rdSendSelected(){
+  const d=RD.data; if(!d) return;
+  const all=[...(d.trend||[]),...(d.rising||[]),...(d.potential||[])];
+  const seen=new Set();
+  let sel=all.filter(x=>{ if(!RD.selected.has(x.id)||seen.has(x.id)) return false; seen.add(x.id); return true; });
+  if(!sel.length) return showRes('rd-res','Video seçin (kartlara tıkla)','warn');
+  const base=getN8N();
+  if(!base) return showRes('rd-res','Ayarlar\'dan n8n URL girin','warn');
+  const dupes=sel.filter(x=>findDupeSend(x.url));
+  if(dupes.length){
+    const choice=await dupeChoiceModal(dupes.length, sel.length-dupes.length);
+    if(choice==='cancel') return showRes('rd-res','İşlem vazgeçildi','warn');
+    if(choice==='skip') sel=sel.filter(x=>!findDupeSend(x.url));
+  }
+  if(!sel.length) return showRes('rd-res','Gönderilecek yeni video kalmadı','warn');
+  const cats=getSelCatList('rd-cats');
+  let sent=0;
+  for(const x of sel){
+    showRes('rd-res','⏳ '+(sent+1)+'/'+sel.length+' gönderiliyor: '+(x.title||'').slice(0,40)+'…','info');
+    const res=await faf(base+mcPath(cats), Object.assign({'Youtube linki':x.url, kaynak:'trend-radar', dil:getSelLang('rd-cats'), platformlar:getSelPlatforms('rd-cats'), title:x.title, channelTitle:x.channel, durationSec:x.durSec||0}, mcFields(cats)));
+    if(res&&res.ok===true){ sent++; recordSend(x.url,cats.join(',')); RD.selected.delete(x.id); }
+    await sleep(600);
+  }
+  showRes('rd-res',(sent===sel.length?'✓ ':'')+sent+'/'+sel.length+' video işleme alındı ['+cats.join(', ')+']', sent?'ok':'err');
+  if(sent) toast('✓ '+sent+' video işleme alındı — Trend Radar','ok');
+  renderRadar();
+}
+window.initRadar=initRadar; window.loadRadar=loadRadar; window.rdToggle=rdToggle; window.rdSendSelected=rdSendSelected; window.rdOpenChannel=rdOpenChannel;
 
 // #14 HIZLI GÖNDER — açılır menüde çoklu kategori + Genel için TR/EN dil seçici
 function qsInit(){
@@ -5890,7 +6139,7 @@ function cmdkFilter(){
   const q=((document.getElementById('cmdk-in')||{}).value||'').toLowerCase();
   CMDK.items=(CMDK.all||[]).filter(it=>it.label.toLowerCase().includes(q)); CMDK.sel=0;
   const list=document.getElementById('cmdk-list');
-  list.innerHTML=CMDK.items.map((it,i)=>`<div class="cmdk-row ${i===0?'sel':''}" onclick="cmdkExec(${i})"><span class="ci">${it.icon}</span><span>${it.label}</span><span class="csub">${it.type==='page'?'sayfa':'komut'}</span></div>`).join('')||'<div style="padding:14px;color:var(--mt);font-size:11px">Sonuç yok</div>';
+  list.innerHTML=CMDK.items.map((it,i)=>`<div class="cmdk-row ${i===0?'sel':''}" onclick="cmdkExec(${i})"><span class="ci">${it.icon}</span><span>${it.label}</span><span class="csub">${it.type==='page'?'sayfa':'komut'}</span></div>`).join('')||'<div style="padding:14px;color:var(--mt);font-size:14px">Sonuç yok</div>';
 }
 function cmdkExec(i){ const it=CMDK.items[i]; if(!it) return; cmdkClose(); if(it.type==='page'){ const ni=[...document.querySelectorAll('.ni')].find(n=>(n.getAttribute('onclick')||'').includes("'"+it.id+"'")); if(ni) ni.click(); } else if(it.run) it.run(); }
 function cmdkKey(e){
