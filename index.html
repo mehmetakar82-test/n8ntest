@@ -362,22 +362,6 @@ tbody td{line-height:1.5}
       <div style="color:var(--mt);font-size:13px;padding:8px">Yenile'ye bas</div>
     </div>
   </div>
-  <!-- YENİ: Hızlı Gönder -->
-  <div class="card" style="margin-bottom:14px;border:1px solid rgba(0,229,255,.25)">
-    <div class="ct">⚡ Hızlı Gönder</div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <input id="qs-url" type="text" placeholder="YouTube linki yapıştır…" style="flex:1;min-width:200px;margin:0" onkeydown="if(event.key==='Enter')qsSend()"/>
-      <div style="position:relative" id="qs-dd">
-        <button class="btn bg bsm" onclick="qsDDToggle(event)" id="qs-dd-btn" title="Kategori seç (çoklu seçim — her kategori için ayrı gönderim)">Kategori: Genel ▾</button>
-        <div id="qs-dd-panel" style="display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:600;background:var(--sur2);border:1px solid var(--acc);border-radius:8px;padding:10px 12px;min-width:300px;box-shadow:0 8px 24px rgba(0,0,0,.5)">
-          <label style="font-size:11px;color:var(--mt);display:block;margin-bottom:4px">Kategori (çoklu seçim — her kategori için ayrı gönderim)</label>
-          <div class="cat-chips" id="qs-cats"></div>
-        </div>
-      </div>
-      <button class="btn bp bsm" onclick="qsSend()">▶ Gönder</button>
-    </div>
-    <div id="qs-res" class="res" style="margin-top:8px"></div>
-  </div>
   <div id="sheets-hint" class="alert aw" style="display:none;margin-bottom:10px">
     <span>⚠</span>
     <div>
@@ -1615,7 +1599,7 @@ function go(id, el) {
   page.classList.add('active');
   el.classList.add('active');
   const h = {
-    dashboard: ()=>{ refreshDash(); qsInit(); loadActionCenter(); },
+    dashboard: ()=>{ refreshDash(); loadActionCenter(); },
     loglar:     ()=>{ renderLogs(); refreshBadges(); },
     gecmis:     initGecmis,
     platformlar: loadPlatforms,
@@ -4890,7 +4874,6 @@ document.addEventListener('DOMContentLoaded', function() {
     addLog('ok','sistem','Panel v9 baslatildi — Kanal Listesi Arama/Video Detay/Kworb');
     toggleAutoLog();
     // YENİ: hızlı gönder, servis durumu, rozetler
-    try { qsInit(); } catch(e){}
     try { renderUretimTabs(); } catch(e){}
     setTimeout(()=>{ try{ svcCheck(); }catch(e){} try{ refreshBadges(); }catch(e){} }, 800);
     // Tüm global fonksiyonları window'a bağla
@@ -6396,54 +6379,6 @@ async function rdSendSelected(){
 window.initRadar=initRadar; window.loadRadar=loadRadar; window.rdToggle=rdToggle; window.rdSendSelected=rdSendSelected; window.rdOpenChannel=rdOpenChannel;
 
 // #14 HIZLI GÖNDER — açılır menüde çoklu kategori + Genel için TR/EN dil seçici
-function qsInit(){
-  const el=document.getElementById('qs-cats'); if(!el || el.dataset.ready) return;
-  el.innerHTML=Object.entries(getCats()).map(([k,c])=>'<span class="cat-chip'+(k==='genel'?' sel':'')+'" data-cat="'+k+'" onclick="catChipToggle(this,\'qs-cats\')">'+c.label+'</span>').join('');
-  el.dataset.ready='1';
-  renderLangToggle('qs-cats');       // Genel seçiliyken TR/EN chip'i görünür (panel içine eklenir)
-  updateLangVisibility('qs-cats');
-  // Panel içinde her tıklamada buton etiketini güncelle
-  const panel=document.getElementById('qs-dd-panel');
-  if(panel) panel.addEventListener('click', ()=>setTimeout(qsDDLabel,0));
-  // Dışarı tıklayınca menüyü kapat
-  document.addEventListener('click', e=>{ const dd=document.getElementById('qs-dd'); if(dd && !dd.contains(e.target)){ const p=document.getElementById('qs-dd-panel'); if(p) p.style.display='none'; } });
-  qsDDLabel();
-}
-function qsDDToggle(e){
-  if(e) e.stopPropagation();
-  const p=document.getElementById('qs-dd-panel'); if(!p) return;
-  p.style.display = p.style.display==='none' ? 'block' : 'none';
-}
-function qsDDLabel(){
-  const btn=document.getElementById('qs-dd-btn'); if(!btn) return;
-  const kats=getSelCatList('qs-cats');
-  const cats=getCats();
-  // Etikette emoji'siz kısa adlar; 2'den fazlaysa sayı göster
-  const short=k=>((cats[k]&&cats[k].label)||k).replace(/[^\p{L}\p{N} ]/gu,'').trim();
-  const names=kats.length>2 ? kats.length+' kategori' : kats.map(short).join(', ');
-  const enTag=(kats.includes('genel') && getSelLang('qs-cats')==='en') ? ' · EN' : '';
-  btn.textContent='Kategori: '+names+enTag+' ▾';
-}
-async function qsSend() {
-  const url=((document.getElementById('qs-url')||{}).value||'').trim();
-  if(!url) return showRes('qs-res','Link girin','err');
-  const kats=getSelCatList('qs-cats');           // çoklu seçim (boşsa ['genel'])
-  const dil=getSelLang('qs-cats');               // Genel için TR/EN
-  const base=getN8N(); if(!base) return showRes('qs-res','Ayarlar\'dan n8n URL girin','warn');
-  if(!confirmDupeSend(url)) return showRes('qs-res','İptal — video zaten gönderilmiş','warn');
-  const ddp=document.getElementById('qs-dd-panel'); if(ddp) ddp.style.display='none';   // menü açıksa kapat
-  // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
-  // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
-  showRes('qs-res','⏳ ['+kats.join(', ')+'] gönderiliyor…','info');
-  const res=await faf(base+mcPath(kats),{'Youtube linki':url, kaynak:'hizli-gonder', ...mcFields(kats), dil, platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
-  if(res&&res.ok===true){
-    recordSend(url,kats.join(','));
-    showRes('qs-res','✓ Gönderildi ['+kats.join(', ')+(dil==='en'?'/EN':'')+']'+(kats.length>1?' — tek OpusClip işlemi, '+kats.length+' kategoriye yayın':''),'ok');
-    toast('Hızlı gönder: '+kats.join(', '),'ok');
-    document.getElementById('qs-url').value='';
-    refreshBadges();
-  } else showRes('qs-res','✕ Gönderilemedi (n8n/CORS)','err');
-}
 // #11 KOMUT PALETİ
 const CMDK={ all:[], items:[], sel:0 };
 function cmdkBuild() {
@@ -6471,7 +6406,7 @@ function cmdkKey(e){
 function cmdkHi(){ document.querySelectorAll('.cmdk-row').forEach((r,i)=>r.classList.toggle('sel',i===CMDK.sel)); const el=document.querySelector('.cmdk-row.sel'); if(el) el.scrollIntoView({block:'nearest'}); }
 
 // Yeni fonksiyonları global yap (inline onclick için)
-[toast,sqShow,sqHide,sqRetryOne,sqRetryFailed,sqClearDone,svcCheck,refreshBadges,initGecmis,renderGecmis,gcResend,gcClearAll,qsSend,qsDDToggle,qsDDLabel,cmdkFilter,cmdkKey,cmdkExec,hoverPrev,hidePrev].forEach(fn=>{ if(typeof fn==='function') window[fn.name]=fn; });
+[toast,sqShow,sqHide,sqRetryOne,sqRetryFailed,sqClearDone,svcCheck,refreshBadges,initGecmis,renderGecmis,gcResend,gcClearAll,cmdkFilter,cmdkKey,cmdkExec,hoverPrev,hidePrev].forEach(fn=>{ if(typeof fn==='function') window[fn.name]=fn; });
 document.addEventListener('mousemove', e => { const b=document.getElementById('hover-prev'); if(b && b.style.display!=='none') hoverPrevMove(e); });
 
 // #12 KLAVYE KISAYOLLARI + Escape
