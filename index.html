@@ -1291,6 +1291,7 @@ tbody td{line-height:1.5}
     </div>
   </div>
 
+  <div id="yd-fail-ozet" style="display:none;margin-bottom:12px"></div>
   <div id="yd-list"><div style="color:var(--mt);text-align:center;padding:30px;font-size:14px">Yüklemek için <b>↻ Yenile</b>'ye bas</div></div>
 
   <!-- Yeniden gönder — kaynak video bilinmiyorsa manuel giriş modalı -->
@@ -5251,7 +5252,7 @@ function renderTakGun() {
       <span style="flex-shrink:0" title="${pm.label||''}">${pm.icon||''}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:12.5px;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.title||'(başlıksız)')}</div>
-        <div style="font-size:10.5px;color:var(--mt)">${esc(it.profile||'')}${it.error?` · <span style="color:var(--er)">${esc(String(it.error).slice(0,60))}</span>`:''}</div>
+        <div style="font-size:10.5px;color:var(--mt)">${esc(it.profile||'')}${it.error?` · <span style="color:var(--er)" title="${esc(String(it.error).slice(0,120))}">${HATA_IKON[hataCevir(it.error).ciddiyet]||'⚠'} ${esc(hataCevir(it.error).baslik)}</span>`:''}</div>
       </div>
       <span style="font-size:10.5px;color:${col};font-weight:700;flex-shrink:0;white-space:nowrap">${TAK_ST_LABEL[it.status]||''}</span>
     </div>`;
@@ -5282,7 +5283,7 @@ function takOpenPost(gi){
     ? `<img src="${esc(it.thumb)}" style="max-width:200px;max-height:280px;border-radius:8px" onerror="this.remove()"/>` : '';
   setEl('tpm-caption', it.caption || '');
   const errEl = document.getElementById('tpm-error');
-  if (it.status==='fail' && it.error){ errEl.textContent = '⚠ ' + it.error; errEl.style.display='block'; }
+  if (it.status==='fail' && it.error){ const h=hataCevir(it.error); errEl.innerHTML = '<div style="font-weight:700">'+(HATA_IKON[h.ciddiyet]||'⚠')+' '+h.baslik.replace(/[<>]/g,'')+'</div><div style="font-size:11px;color:var(--mt);margin-top:2px">'+h.cozum.replace(/[<>]/g,'')+'</div><div style="font-size:10px;color:var(--mt);opacity:.6;margin-top:3px">Ham: '+String(h.ham).slice(0,120).replace(/[<>]/g,'')+'</div>'; errEl.style.display='block'; }
   else errEl.style.display='none';
   document.getElementById('tpm-actions').innerHTML =
     (it.postUrl?`<a class="btn bp bsm" style="text-decoration:none" href="${esc(it.postUrl)}" target="_blank">↗ Postu Aç</a>`:'')
@@ -5795,6 +5796,44 @@ window.seedProfileLoad=seedProfileLoad;
 // ═══════════════════════════════════════════════════════════
 const YD = { items: [], filter: 'failed', retry: null };
 const YD_PLATMAP   = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb', x:'x', twitter:'x', threads:'ig', linkedin:'fb' };
+
+// ── Ham Upload-Post/platform hata metnini SADE TÜRKÇE'ye çevir ──
+// Dönüş: {baslik, cozum, ciddiyet:'kritik'|'gecici'|'icerik', ham}
+// Sıra önemli: en spesifik kalıp üstte.
+const HATA_KURALLARI = [
+  [/session (has )?expired|reconnect your|token (is )?expired|invalid[_ ]?token|reauth|please reconnect/i,
+    'Hesap bağlantısının süresi dolmuş', 'Bu profilin ilgili sosyal medya hesabını Upload-Post’ta yeniden bağla (app.upload-post.com → Manage Users). Sonra tekrar gönder.', 'kritik'],
+  [/access token|oauth|permission|not authorized|unauthorized|forbidden|403/i,
+    'Yayınlama izni yok / yetki düşmüş', 'Hesabı yeniden bağlarken gerekli izinleri (yayınlama) onayla. İzin eksikse platform gönderime kapatır.', 'kritik'],
+  [/too many requests|rate.?limit|quota|429|throttl/i,
+    'Çok fazla istek — platform geçici olarak kısıtladı', 'Bir süre bekle (genelde birkaç dakika–saat) ve yeniden dene. Toplu gönderimi biraz yavaşlatmak da yardımcı olur.', 'gecici'],
+  [/duplicate|already (been )?(posted|published|uploaded)|same (video|content)/i,
+    'Bu içerik zaten yayınlanmış', 'Platform aynı videoyu tekrar kabul etmiyor. Yeniden göndermene gerek yok.', 'icerik'],
+  [/duration|too long|too short|max.*length|video length|exceeds/i,
+    'Video süresi platform sınırına uymuyor', 'Bu platform için video çok uzun veya çok kısa. Süreyi platformun kabul ettiği aralığa getir.', 'icerik'],
+  [/format|codec|unsupported|invalid (video|media|file)|resolution|aspect|not a valid/i,
+    'Video formatı/çözünürlüğü uygun değil', 'Video kodeği veya en-boy oranı platformca desteklenmiyor. Farklı bir kaynak/klip dene.', 'icerik'],
+  [/file (size|too large)|exceeds.*size|too big/i,
+    'Dosya boyutu çok büyük', 'Video dosyası platform sınırını aşıyor. Daha küçük/kısa bir klip kullan.', 'icerik'],
+  [/(couldn.?t|could not|failed to|unable to) (download|fetch|access).*(video|media|url)|url.*(unreachable|not found|404)|media.*not.*accessible/i,
+    'Kaynak video indirilemedi', 'Videonun mp4 bağlantısı geçersiz/erişilemez. Kaynağın hâlâ yayında olduğunu kontrol et.', 'icerik'],
+  [/page (id|not)|no page|select.*page|target.*missing|board.*required|location.*required/i,
+    'Yayın hedefi seçili değil (Sayfa/Board/Konum)', 'Facebook Sayfası, Pinterest board’u veya Google konumu gibi hedefi Upload-Post’ta seç.', 'kritik'],
+  [/timeout|timed out|took too long|524|gateway/i,
+    'İşlem zaman aşımına uğradı', 'Sunucu yanıt vermeden zaman doldu. Genelde geçici — biraz sonra yeniden dene.', 'gecici'],
+  [/private|restricted|community guidelines|policy|violat|flagged|copyright/i,
+    'İçerik platform kurallarına takıldı', 'Telif, topluluk kuralları veya gizlilik nedeniyle reddedildi. Bu videoyu bu platformda yayınlamak zor olabilir.', 'icerik'],
+  [/network|connection|econn|dns|unreachable/i,
+    'Bağlantı hatası', 'Geçici ağ sorunu. Yeniden dene.', 'gecici'],
+];
+function hataCevir(ham){
+  const s = String(ham||'').trim();
+  if (!s) return { baslik:'Bilinmeyen hata', cozum:'Ayrıntı gelmedi. Yeniden denemeyi dene; sürerse loglara bak.', ciddiyet:'gecici', ham:s };
+  for (const [re, baslik, cozum, ciddiyet] of HATA_KURALLARI)
+    if (re.test(s)) return { baslik, cozum, ciddiyet, ham:s };
+  return { baslik:'Yayın başarısız', cozum:'Platform bu gönderimi kabul etmedi. Yeniden dene; sürerse hesabı yeniden bağlamayı dene.', ciddiyet:'gecici', ham:s };
+}
+const HATA_IKON = { kritik:'🔴', gecici:'🟡', icerik:'🟠' };
 const YD_PLAT_LABEL= { ig:PFAV('instagram.com')+' Instagram', yt:PFAV('youtube.com')+' YouTube', tt:PFAV('tiktok.com')+' TikTok', fb:PFAV('facebook.com')+' Facebook', x:PFAV('x.com')+' X' };
 function ydPlatApi(p){ return ({ig:'instagram',yt:'youtube',tt:'tiktok',fb:'facebook',x:'x'})[p] || p; }
 function ydNorm(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9ğüşöçı]+/gi,' ').trim(); }
@@ -5924,6 +5963,26 @@ function ydUpdateCounts(){
   setEl('yd-c-rate', total ? Math.round(pub/total*100)+'%' : '–');
   setEl('yd-c-sch', sch);
   ydSetFailBadge(fail);
+  ydFailOzet();
+}
+
+// Başarısızların NEDEN dağılımı — tek bakışta "13 hatanın çoğu şu yüzden"
+function ydFailOzet(){
+  const box=document.getElementById('yd-fail-ozet'); if(!box) return;
+  const fails=YD.items.filter(i=>i.status==='failed'&&i.error);
+  if(!fails.length){ box.style.display='none'; return; }
+  const grup={};
+  fails.forEach(i=>{ const h=hataCevir(i.error); if(!grup[h.baslik]) grup[h.baslik]={n:0,ciddiyet:h.ciddiyet,cozum:h.cozum}; grup[h.baslik].n++; });
+  const sirali=Object.entries(grup).sort((a,b)=>b[1].n-a[1].n);
+  const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  box.style.display='block';
+  box.innerHTML='<div style="background:var(--sur2);border:1px solid rgba(248,113,113,.35);border-radius:8px;padding:11px 13px">'
+    +'<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:8px">'+fails.length+' başarısız gönderim — neden dağılımı</div>'
+    +sirali.map(([baslik,d])=>'<div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;border-top:1px solid var(--brd)">'
+      +'<span style="flex-shrink:0;font-size:13px;font-weight:800;color:var(--er);min-width:24px;text-align:right;font-variant-numeric:tabular-nums">'+d.n+'</span>'
+      +'<div style="flex:1;min-width:0"><div style="font-size:12.5px;color:var(--tx);font-weight:600">'+(HATA_IKON[d.ciddiyet]||'⚠')+' '+esc(baslik)+'</div>'
+      +'<div style="font-size:11px;color:var(--mt);margin-top:1px">'+esc(d.cozum)+'</div></div></div>').join('')
+    +'</div>';
 }
 
 function ydSetFailBadge(n){
@@ -5964,7 +6023,7 @@ function renderYayinDurumu(){
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;color:var(--tx);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.title)}</div>
         <div style="font-size:12px;color:var(--mt);margin-top:2px">${platLabel} · ${esc(it.profile||'—')} ${t?'· '+t:''}</div>
-        ${it.status==='failed'&&it.error?`<div style="font-size:12px;color:var(--er);margin-top:3px">⚠ ${esc(it.error).slice(0,140)}</div>`:''}
+        ${it.status==='failed'&&it.error?(()=>{ const h=hataCevir(it.error); return `<div style="margin-top:4px"><div style="font-size:12px;color:var(--er);font-weight:600">${HATA_IKON[h.ciddiyet]||'⚠'} ${esc(h.baslik)}</div><div style="font-size:11px;color:var(--mt);margin-top:1px">${esc(h.cozum)}</div><div style="font-size:10px;color:var(--mt);opacity:.65;margin-top:1px" title="Platformdan gelen ham mesaj">${esc(h.ham).slice(0,90)}</div></div>`; })():''}
       </div>
       <span style="font-size:12px;color:${stColor};font-weight:700;white-space:nowrap">${stLabel}</span>
       ${right}
