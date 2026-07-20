@@ -1450,6 +1450,16 @@ tbody td{line-height:1.5}
         </div>
       </div>
       <div class="card">
+        <div class="ct">🚀 Viral Bildirim Eşiği (platform başına)</div>
+        <div style="font-size:11px;color:var(--mt);margin:-4px 0 10px">Yayınlanan bir short bu izlenmeyi geçince 🔔 <b>bildirim</b> gelir. Her platformun izlenme ölçeği farklı olduğu için ayrı ayrı ayarlanır.</div>
+        <div class="fg"><label>📸 Instagram — izlenme eşiği</label><input id="cfg-viral-ig" type="number" min="0" step="1000" value="10000" placeholder="10000"/></div>
+        <div class="fg"><label>▶ YouTube — izlenme eşiği</label><input id="cfg-viral-yt" type="number" min="0" step="1000" value="10000" placeholder="10000"/></div>
+        <div class="fg"><label>♪ TikTok — izlenme eşiği</label><input id="cfg-viral-tt" type="number" min="0" step="1000" value="10000" placeholder="10000"/></div>
+        <div class="fg"><label>ⓕ Facebook — izlenme eşiği</label><input id="cfg-viral-fb" type="number" min="0" step="1000" value="10000" placeholder="10000"/></div>
+        <div class="fg"><label>𝕏 X — izlenme eşiği</label><input id="cfg-viral-x" type="number" min="0" step="1000" value="10000" placeholder="10000"/></div>
+        <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
+      </div>
+      <div class="card">
         <div class="ct">Otomasyon Toggle</div>
         <div class="trow"><div><div class="tn">Drive Kontrol</div><div class="td">Her 30 dk</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
         <div class="trow"><div><div class="tn">YouTube Arama</div><div class="td">Webhook tetikli</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
@@ -3260,6 +3270,14 @@ function saveSettings() {
     cobalt:(document.getElementById('cfg-cobalt')||{}).value||'',
     batchMax:(document.getElementById('cfg-batchmax')||{}).value||'15',
     batchDelay:(document.getElementById('cfg-batchdelay')||{}).value||'8',
+    ytApiKey:(document.getElementById('ytk-apikey')||{}).value||S.cfg.ytApiKey||'',   // Kaydet'te silinmesin
+    viralEsik:{
+      ig: Math.max(0,parseInt((document.getElementById('cfg-viral-ig')||{}).value||10000)||10000),
+      yt: Math.max(0,parseInt((document.getElementById('cfg-viral-yt')||{}).value||10000)||10000),
+      tt: Math.max(0,parseInt((document.getElementById('cfg-viral-tt')||{}).value||10000)||10000),
+      fb: Math.max(0,parseInt((document.getElementById('cfg-viral-fb')||{}).value||10000)||10000),
+      x:  Math.max(0,parseInt((document.getElementById('cfg-viral-x') ||{}).value||10000)||10000),
+    },
   };
   S.limits={
     ig:    parseInt((document.getElementById('cfg-ig-lim')||{}).value||10),
@@ -3292,6 +3310,8 @@ function loadSettings() {
   const ytkSh=document.getElementById('ytk-sheetid');if(ytkSh&&(c.sheet2||c.sheet))ytkSh.value=c.sheet2||c.sheet;
   set('cfg-ig-lim',S.limits.ig); set('cfg-yt-lim',S.limits.yt); set('cfg-tt-lim',S.limits.tt);
   set('cfg-start',S.limits.start); set('cfg-end',S.limits.end);
+  const ve=c.viralEsik||{};
+  ['ig','yt','tt','fb','x'].forEach(k=>{ const el=document.getElementById('cfg-viral-'+k); if(el) el.value=(ve[k]!=null?ve[k]:10000); });
   if(c.n8n) updateWHs();
 }
 
@@ -5682,7 +5702,12 @@ window.addEventListener('unhandledrejection', e=>{
 window.addEventListener('error', e=>{ if(e.message){ try{ addLog('err','sistem','JS hatası: '+String(e.message).slice(0,120)); }catch(_){} } });
 
 // ═══ BİLDİRİM MERKEZİ ═══════════════════════════════════════
-const VIRAL_ESIK = 10000;   // 1 günde bu izlenmeyi geçen short "viral" bildirilir
+const VIRAL_ESIK = 10000;   // varsayılan — platform başına Ayarlar'dan geçilir
+function viralEsik(plat){
+  const v=(S.cfg&&S.cfg.viralEsik)||{};
+  const n=parseInt(v[plat]);
+  return (isNaN(n)||n<0) ? VIRAL_ESIK : n;
+}
 const NOTIF = {
   items: (()=>{ try{ return JSON.parse(localStorage.getItem('op_notif')||'[]'); }catch(e){ return []; } })(),
   seen:  new Set((()=>{ try{ return JSON.parse(localStorage.getItem('op_notif_seen')||'[]'); }catch(e){ return []; } })()),
@@ -5758,8 +5783,9 @@ async function notifViralTara(items){
       if(!m&&it.postId){ const {data}=await upFetch('/uploadposts/post-analytics?platform_post_id='+encodeURIComponent(it.postId)+'&platform='+encodeURIComponent(ydPlatApi(it.plat))); m=takParseMetrics(data); }
     }catch(e){}
     const views=m?parseInt(m.views!=null?m.views:m.impressions)||0:0;
-    if(views>=VIRAL_ESIK){
-      notifEkle(nid,'🚀','🎉 '+ytkFmt(views)+' izlenme: '+(it.title||'').slice(0,42),String(it.plat||'').toUpperCase()+' · '+(it.profile||''),'yayindurumu');
+    const esik=viralEsik(it.plat);
+    if(views>=esik){
+      notifEkle(nid,'🚀','🎉 '+ytkFmt(views)+' izlenme: '+(it.title||'').slice(0,42),String(it.plat||'').toUpperCase()+' · '+(it.profile||'')+' · eşik '+ytkFmt(esik),'yayindurumu');
     }
   }
 }
