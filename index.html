@@ -256,6 +256,8 @@ tbody td{line-height:1.5}
 .utab:hover{color:var(--tx);border-color:var(--acc)}
 .utab.on{background:var(--acc);color:#012;border-color:var(--acc)}
 .utab .ui{font-size:13px}
+.utab-cnt{background:var(--acc);color:#012;font-size:10px;font-weight:800;border-radius:9px;padding:0 6px;margin-left:3px;line-height:16px;display:inline-block}
+.utab.on .utab-cnt{background:#012;color:var(--acc)}
 .pfav{width:15px;height:15px;border-radius:3px;vertical-align:-2px;object-fit:contain;background:rgba(255,255,255,.05);display:inline-block}
 /* ═══ Trend Radar ═══ */
 .rd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px}
@@ -323,8 +325,7 @@ tbody td{line-height:1.5}
     <div class="ns">Ana</div>
     <div class="ni active" onclick="go('dashboard',this)"><span class="ic">▦</span>Dashboard</div>
     <div class="ni" onclick="go('video',this)"><span class="ic">▶</span>Video Gönder & Ara</div>
-    <div class="ni" onclick="go('trendonay',this)"><span class="ic">🔥</span>Trend Onay<span class="ni-badge acc" id="badge-tr"></span></div>
-    <div class="ni" onclick="go('radar',this)"><span class="ic">📡</span>Trend Radar</div>
+    <div class="ni" onclick="go('radar',this)"><span class="ic">📡</span>Trend Radar &amp; Onay<span class="ni-badge acc" id="badge-tr"></span></div>
     <div class="ni" onclick="go('opusclip',this)"><span class="ic">◈</span>OpusClip Galeri</div>
     <div class="ns">Kaynaklar</div>
     <div class="ni" onclick="go('drive',this)"><span class="ic">◉</span>Google Drive &amp; Sheets</div>
@@ -626,7 +627,8 @@ tbody td{line-height:1.5}
 
 <!-- TREND ONAY -->
 <div id="page-trendonay" class="page">
-  <div class="ph"><div class="pt">Trend Onay</div><div class="ps">Kworb Trending TR'nin bulduğu yeni videolar — onaylayıp kategori/açıklama belirle ya da reddet</div></div>
+  <div class="ph"><div class="pt">Trend Radar &amp; Onay</div><div class="ps">Onay Kuyruğu — Kworb Trending TR + YouTube trend akışının bulduğu videolar; onaylayıp kategori/açıklama belirle ya da reddet</div></div>
+  <div class="utab-bar" data-group="trend" data-utab="trendonay"></div>
   <div class="card" style="margin-bottom:12px">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn bp" onclick="trFetchPending()" id="tr-fetch-btn">🔥 Bekleyenleri Getir</button>
@@ -1230,7 +1232,8 @@ tbody td{line-height:1.5}
 
 <!-- TREND RADAR (günlük keşif: trend + yükselen + potansiyel + kanallar) -->
 <div id="page-radar" class="page">
-  <div class="ph"><div class="pt">Trend Radar</div><div class="ps">Günlük keşif — YouTube'da trend olan, hızla yükselen ve patlama potansiyeli taşıyan video &amp; kanallar</div></div>
+  <div class="ph"><div class="pt">Trend Radar &amp; Onay</div><div class="ps">Keşif Radarı — YouTube'da trend olan, hızla yükselen ve patlama potansiyeli taşıyan video &amp; kanallar (canlı)</div></div>
+  <div class="utab-bar" data-group="trend" data-utab="radar"></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veri önce <b>n8n günlük radar</b>'dan (<code>/webhook/trend-radar</code>, her sabah hesaplanır) alınır; yoksa <b>YouTube API</b> ile canlı hesaplanır (Ayarlar → YouTube API Key). <b>Hız</b> = izlenme/saat. <b>▲ artış</b> = son ziyaretten bu yana kazanılan izlenme. <b>💎 Potansiyel</b> = abone sayısına göre izlenmesi patlamış taze video (küçük kanal, büyük ivme).</span></div>
 
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
@@ -1618,6 +1621,10 @@ const UTAB_GROUPS = {
     { id:'drive',  icon:'◉', label:'Google Drive' },
     { id:'sheets', icon:'▤', label:'Google Sheets' }
   ],
+  trend: [
+    { id:'radar',     icon:'📡', label:'Keşif Radarı' },
+    { id:'trendonay', icon:'🔥', label:'Onay Kuyruğu' }
+  ],
   takip: [
     { id:'kuyruk',    icon:'≡', label:'İşlem Kuyruğu' },
     { id:'urltakip',  icon:'⊙', label:'URL Takip' },
@@ -1629,7 +1636,7 @@ const UTAB_GROUPS = {
     { id:'gecmis',      icon:'🕘', label:'Gönderim Geçmişi' }
   ]
 };
-const UTAB_ANCHOR = { uretim:'video', kaynak:'drive', takip:'kuyruk', durum:'yayindurumu' }; // kenar çubuğundaki hub öğesinin id'si
+const UTAB_ANCHOR = { uretim:'video', kaynak:'drive', trend:'radar', takip:'kuyruk', durum:'yayindurumu' }; // kenar çubuğundaki hub öğesinin id'si
 function renderUretimTabs(){
   document.querySelectorAll('.utab-bar').forEach(bar=>{
     const group  = bar.getAttribute('data-group') || 'uretim';
@@ -1638,6 +1645,15 @@ function renderUretimTabs(){
     bar.innerHTML = (UTAB_GROUPS[group]||[]).map(t=>
       `<div class="utab${t.id===active?' on':''}" onclick="goUretim('${t.id}','${anchor}')"><span class="ui">${t.icon}</span>${t.label}</div>`
     ).join('');
+  });
+}
+// Onay Kuyruğu sekmesine bekleyen sayısını işle (Radar sekmesindeyken de görünür)
+function trTabCount(n){
+  document.querySelectorAll('.utab-bar[data-group="trend"] .utab').forEach(el=>{
+    if(!(el.getAttribute('onclick')||'').includes("'trendonay'")) return;
+    let b=el.querySelector('.utab-cnt');
+    if(n>0){ if(!b){ b=document.createElement('span'); b.className='utab-cnt'; el.appendChild(b); } b.textContent=n>99?'99+':n; }
+    else if(b) b.remove();
   });
 }
 function goUretim(id, anchor){
@@ -1678,14 +1694,26 @@ async function faf(url, body) {
   });
 }
 
+// n8n GET — hata türünü AYIRT eder:
+//   null        → gerçek bağlantı/HTTP hatası (ağ, CORS, 404, geçersiz JSON)
+//   {_bos:true} → HTTP 200 ama boş gövde: akış çalıştı, Respond node'una ulaşmadı
 async function n8nGet(path) {
   const base = getN8N();
   if (!base) return null;
   try {
     const r = await fetch(base+path,{method:'GET',mode:'cors'});
-    if (!r.ok) { addLog('warn','webhook','GET '+path+': HTTP '+r.status); return null; }
-    return await r.json();
-  } catch(e) { addLog('warn','webhook','GET '+path+': '+e.message); return null; }
+    if (!r.ok) {
+      addLog('err','webhook','GET '+path+': HTTP '+r.status+(r.status===404?' — webhook kayıtlı değil (workflow Active mi? path doğru mu?)':''));
+      return null;
+    }
+    const txt = (await r.text()).trim();
+    if (!txt) {
+      addLog('err','webhook','GET '+path+': n8n BOŞ yanıt döndü (HTTP 200, 0 bayt) — akış "Respond to Webhook" node\'una ulaşmadı. n8n → Executions listesinde son çalıştırmanın hatasına bak.');
+      return {_bos:true};
+    }
+    try { return JSON.parse(txt); }
+    catch(e){ addLog('err','webhook','GET '+path+': geçersiz JSON — '+txt.slice(0,100)); return null; }
+  } catch(e) { addLog('err','webhook','GET '+path+': ağ/CORS hatası — '+e.message); return null; }
 }
 
 async function sheetsGet(sheetId, range) {
@@ -2786,7 +2814,7 @@ async function loadPlatforms() {
   // 2) n8n webhook (var ve CORS izinli)
   if (!raw) {
     const d = await n8nGet('/webhook/uploadpost-profiller');
-    if (d) { raw = d; kaynak = 'n8n proxy'; }
+    if (d && !d._bos) { raw = d; kaynak = 'n8n proxy'; }
   }
   // 3) Doğrudan API (S.cfg.blot varsa)
   if (!raw && S.cfg.blot) {
@@ -4041,8 +4069,10 @@ async function trFetchPending() {
   showRes('tr-status','⏳ Bekleyenler yükleniyor...','info');
   try {
     const data = await n8nGet('/webhook/kworb-bekleyenler');
-    if (!data) { showRes('tr-status','✕ Bekleyenler alınamadı — n8n aktif mi / CORS?','err'); return; }
-    TR.pending = Array.isArray(data.pending) ? data.pending.slice().reverse() : [];  // en yeni önce
+    if (!data) { showRes('tr-status','✕ n8n\'e ulaşılamadı — URL yanlış, CORS engeli ya da webhook kayıtlı değil (ayrıntı: Loglar)','err'); return; }
+    if (data._bos) { showRes('tr-status','✕ n8n boş yanıt döndü (HTTP 200, 0 bayt) — akış tamamlanmıyor. n8n → Executions listesinde son çalıştırmanın hatasına bak.','err'); return; }
+    TR.pending = Array.isArray(data.pending) ? data.pending.slice().reverse() : [];
+    try{ trTabCount(TR.pending.length); }catch(e){}  // en yeni önce
     trRenderPending();
     showRes('tr-status', TR.pending.length ? ('✓ '+TR.pending.length+' bekleyen video') : 'Bekleyen trend video yok', TR.pending.length?'ok':'info');
     addLog('ok','webhook','Trend onay: '+TR.pending.length+' bekleyen');
@@ -4772,7 +4802,7 @@ document.addEventListener('DOMContentLoaded', function() {
     try { renderUretimTabs(); } catch(e){}
     setTimeout(()=>{ try{ svcCheck(); }catch(e){} try{ refreshBadges(); }catch(e){} }, 800);
     // Tüm global fonksiyonları window'a bağla
-    const globals = [go,showTab,goUretim,renderUretimTabs,refreshDash,sendSingle,sendBulkURLs,sendSearch,
+    const globals = [go,showTab,goUretim,renderUretimTabs,trTabCount,refreshDash,sendSingle,sendBulkURLs,sendSearch,
       loadDriveSheet,sendDriveURLs,clearSentURLs,
       scanSheet,sendSheetURLs,filterTbl,exportCSV,loadReports,loadPlatforms,
       saveSettings,updateWHs,copyText,renderLogs,
@@ -5534,7 +5564,7 @@ function svcSet(id, cls, title){ const d=document.getElementById(id); if(d){ d.c
 async function svcCheck() {
   const base=getN8N();
   if(!base) svcSet('svc-n8n','warn','n8n URL girilmemiş (Ayarlar)');
-  else { try { const r=await fetch(base+'/webhook/kworb-bekleyenler',{method:'GET',mode:'cors'}); svcSet('svc-n8n',r.ok?'ok':'err',r.ok?'n8n bağlı ✓':('n8n HTTP '+r.status+' — workflow Active mi?')); } catch(e){ svcSet('svc-n8n','err','n8n erişilemiyor / CORS — workflow Active mi?'); } }
+  else { try { const r=await fetch(base+'/webhook/kworb-bekleyenler',{method:'GET',mode:'cors'}); if(!r.ok){ svcSet('svc-n8n','err','n8n HTTP '+r.status+' — workflow Active mi?'); } else { const t=(await r.text()).trim(); svcSet('svc-n8n', t?'ok':'warn', t?'n8n bağlı ✓':'n8n boş yanıt — akış Respond aşamasına ulaşmıyor (n8n Executions listesini kontrol et)'); } } catch(e){ svcSet('svc-n8n','err','n8n erişilemiyor / CORS — workflow Active mi?'); } }
   if(!S.cfg.blot) svcSet('svc-up','warn','Upload-Post API Key yok');
   else { try { const r=await fetch('https://api.upload-post.com/api/uploadposts/users',{headers:{'Authorization':'Apikey '+S.cfg.blot}}); svcSet('svc-up',r.ok?'ok':'err',r.ok?'Upload-Post ✓':'Upload-Post HTTP '+r.status); } catch(e){ svcSet('svc-up','err','Upload-Post erişilemiyor'); } }
   if(!S.cfg.opus) svcSet('svc-opc','warn','OpusClip API Key yok');
@@ -5548,7 +5578,7 @@ async function refreshBadges() {
   const errs=(S.logs||[]).filter(l=>l.sev==='err').length;
   const bl=document.getElementById('badge-log'); if(bl){ bl.textContent=errs>99?'99+':errs; bl.classList.toggle('on',errs>0); }
   const base=getN8N();
-  if(base){ try { const d=await n8nGet('/webhook/kworb-bekleyenler'); const n=(d&&d.count!=null)?d.count:((d&&d.pending)?d.pending.length:0); const bt=document.getElementById('badge-tr'); if(bt){ bt.textContent=n>99?'99+':n; bt.classList.toggle('on',n>0); } } catch(e){} }
+  if(base){ try { const d=await n8nGet('/webhook/kworb-bekleyenler'); if(d&&d._bos) return; const n=(d&&d.count!=null)?d.count:((d&&d.pending)?d.pending.length:0); const bt=document.getElementById('badge-tr'); if(bt){ bt.textContent=n>99?'99+':n; bt.classList.toggle('on',n>0); } try{ trTabCount(n); }catch(e){} } catch(e){} }
 }
 // #8 GÖNDERİM GEÇMİŞİ
 function initGecmis() {
@@ -5596,7 +5626,7 @@ async function loadProfileLoad() {
   let shorts=(S.sheetData&&S.sheetData.shorts)||[];
   if(!shorts.length){
     const n8n=getN8N();
-    if(n8n){ const d=await n8nGet('/webhook/panel-data'); if(d){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } }
+    if(n8n){ const d=await n8nGet('/webhook/panel-data'); if(d&&!d._bos){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } }
     if(!shorts.length){ const sid=S.cfg.sheet||''; if(sid||S.cfg.shkey){ try{ shorts=parseSheet(await sheetsGet(sid,'Sheet1!A:Z')); }catch(e){} } }
   }
   const byP={};
@@ -5640,7 +5670,7 @@ window.loadProfileLoad=loadProfileLoad;
 async function seedProfileLoad() {
   const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
   let shorts=(S.sheetData&&S.sheetData.shorts)||[];
-  if(!shorts.length){ const n8n=getN8N(); if(n8n){ const d=await n8nGet('/webhook/panel-data'); if(d){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } } }
+  if(!shorts.length){ const n8n=getN8N(); if(n8n){ const d=await n8nGet('/webhook/panel-data'); if(d&&!d._bos){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } } }
   if(!shorts.length) return toast('Short verisi yok — önce Dashboard\'ı yenile','warn');
   const load={};
   shorts.forEach(r=>{ const p=String(r['profil']||r['Profil']||r['profile']||'').trim(); if(p) load[p]=(load[p]||0)+1; });
@@ -5669,7 +5699,7 @@ function ydShortsAll(){ return (S._panelCache && S._panelCache.shorts) || (S.she
 async function ydEnsureShorts(){
   if (ydShortsAll().length) return;
   const base = getN8N(); if (!base) return;
-  try { const d = await n8nGet('/webhook/panel-data'); if (d) S.sheetData = { shorts:d.shorts||[], urls:d.urls||[] }; } catch(e){}
+  try { const d = await n8nGet('/webhook/panel-data'); if (d && !d._bos) S.sheetData = { shorts:d.shorts||[], urls:d.urls||[] }; } catch(e){}
 }
 function ydRowUrl(r){ return r['short-url'] || r['shortUrl'] || r['uriForExport'] || ''; }
 
@@ -5926,7 +5956,7 @@ async function phFetchAccounts(){
   if (S.uploadPostAccounts) return S.uploadPostAccounts;
   if (S._panelCache && S._panelCache.accounts && Object.keys(S._panelCache.accounts).length) return S._panelCache.accounts;
   const base = getN8N();
-  if (base){ try { const d = await n8nGet('/webhook/uploadpost-profiller'); if (d){ S.uploadPostAccounts=d; return d; } } catch(e){} }
+  if (base){ try { const d = await n8nGet('/webhook/uploadpost-profiller'); if (d && !d._bos && d.profiles){ S.uploadPostAccounts=d; return d; } } catch(e){} }
   if (S.cfg.blot){ try { const { data } = await upFetch('/uploadposts/users'); S.uploadPostAccounts=data; return data; } catch(e){} }
   return null;
 }
@@ -5992,10 +6022,10 @@ async function loadActionCenter(){
   } catch(e){ return null; } })();
   const pStuck = (async()=>{ try {
     let urls = (S._panelCache&&S._panelCache.urls)||(S.sheetData&&S.sheetData.urls)||[];
-    if (!urls.length){ const base=getN8N(); if(base){ const d=await n8nGet('/webhook/panel-data'); if(d) urls=d.urls||[]; } }
+    if (!urls.length){ const base=getN8N(); if(base){ const d=await n8nGet('/webhook/panel-data'); if(d&&!d._bos) urls=d.urls||[]; } }
     return urls.length ? urls.filter(acIsStuck).length : null;
   } catch(e){ return null; } })();
-  const pTrend = (async()=>{ try { const base=getN8N(); if(!base) return null; const d=await n8nGet('/webhook/kworb-bekleyenler'); return d?(d.count!=null?d.count:(d.pending?d.pending.length:0)):null; } catch(e){ return null; } })();
+  const pTrend = (async()=>{ try { const base=getN8N(); if(!base) return null; const d=await n8nGet('/webhook/kworb-bekleyenler'); return (d&&!d._bos)?(d.count!=null?d.count:(d.pending?d.pending.length:0)):null; } catch(e){ return null; } })();
 
   const [fail, health, stuck, trend] = await Promise.all([pFail,pHealth,pStuck,pTrend]);
   const tiles = [
@@ -6060,7 +6090,7 @@ async function loadRadar(force){
     const base=getN8N();
     if(base){
       const d=await n8nGet('/webhook/trend-radar');
-      if(d && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],gtrend:d.gtrend||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:''); }
+      if(d && !d._bos && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],gtrend:d.gtrend||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:''); }
     }
     // 2) canlı hesap (YouTube API)
     if(!data){
