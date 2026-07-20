@@ -1237,11 +1237,11 @@ tbody td{line-height:1.5}
   </div>
   <div class="card" style="border-color:rgba(251,191,36,.3)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
-      <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için ayrı arama + Türkçe filtresi + outlier. YouTube genel trend listesini kaldırdığı için kategori boşluğunu bu doldurur (~800 API birimi, isteğe bağlı)</span></span>
-      <button class="btn bg bsm" onclick="rdKategoriTara()">🎯 Kategorileri Tara</button>
+      <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için günün <b>en iyi 5</b> videosu — ayrı arama + Türkçe filtresi + outlier. Sonuç gün boyu saklanır. YouTube genel trend listesini kaldırdığı için kategori boşluğunu bu doldurur (~800 API birimi, isteğe bağlı)</span></span>
+      <button class="btn bg bsm" onclick="rdKategoriTara(true)" title="Her kategori için günün en iyi 5 videosu. Sonuç gün boyu saklanır; tekrar basınca yeniden taranır.">🎯 Günün En İyi 5'i</button>
     </div>
     <div id="rd-kat-status" style="font-size:12px;color:var(--mt);margin-bottom:8px"></div>
-    <div id="rd-kat"><div class="rd-empty">Kategori bazlı avlanmak için butona bas</div></div>
+    <div id="rd-kat"><div class="rd-empty">Her kategori için günün en iyi 5 videosunu görmek için butona bas</div></div>
   </div>
   <div class="card" style="border-color:rgba(167,139,250,.35)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--acc3)">💥 Outlier <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— videonun izlenmesi / kanalın son 20 video medyanı. Kanal büyüklüğünden bağımsız "bu kanal için anormal" performans = algoritmanın ittiğinin en erken sinyali (2x kayda değer · 3–5x güçlü · 10x+ patlama)</span></span><span id="rd-outlier-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
@@ -1770,6 +1770,23 @@ async function n8nGetCached(path, ttl){
 // Kullanıcı "Yenile"ye bastığında taze veri gelsin
 function n8nCacheClear(path){ if (path) delete N8N_CACHE.data[path]; else N8N_CACHE.data = {}; }
 
+// YouTube URL'sinden kanal adini coz (short aciklamasina #KanalAdi etiketi icin).
+// Kalici onbellek: ayni video icin bir daha API cagrilmaz.
+const YT_CH_CACHE = (()=>{ try{ return JSON.parse(localStorage.getItem('op_yt_ch')||'{}'); }catch(e){ return {}; } })();
+async function ytKanalAdi(url){
+  try{
+    const id = vpExtractVideoId(url);
+    if(!id) return '';
+    if(YT_CH_CACHE[id]) return YT_CH_CACHE[id];
+    const key = S.cfg.ytApiKey || S.cfg.shkey || '';
+    if(!key) return '';
+    const d = await ytkFetch('https://www.googleapis.com/youtube/v3/videos?part=snippet&id='+id+'&key='+key);
+    const ch = (((d.items||[])[0]||{}).snippet||{}).channelTitle || '';
+    if(ch){ YT_CH_CACHE[id]=ch; try{ localStorage.setItem('op_yt_ch',JSON.stringify(YT_CH_CACHE)); }catch(e){} }
+    return ch;
+  }catch(e){ return ''; }
+}
+
 async function sheetsGet(sheetId, range) {
   if (S._panelCache) {
     const rl = range.toLowerCase();
@@ -1890,7 +1907,7 @@ async function sendSingle() {
   const base = getN8N();
   if (!base) return showRes('sv-res','Ayarlar\'dan n8n URL girin','warn');
   const svAciklama = (document.getElementById('sv-aciklama')||{}).value||'';
-  const payload = {'Youtube linki': url, kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, dil:getSelLang('sv-cats'), platformlar:getSelPlatforms('sv-cats'), aciklama_notu:svAciklama};
+  const payload = {'Youtube linki': url, channelTitle: await ytKanalAdi(url), kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, dil:getSelLang('sv-cats'), platformlar:getSelPlatforms('sv-cats'), aciklama_notu:svAciklama};
   let path;
   if (direkt) {
     path = '/webhook/video-direkt';
@@ -1936,7 +1953,7 @@ async function sendBulkURLs() {
     setEl('bv-st',(i+1)+'/'+urls.length+' ['+selCats.join(',')+']: '+u.slice(0,40));
     setStyle('bv-bar','width',((i+1)/urls.length*100)+'%');
     const bvAciklama = (document.getElementById('bv-aciklama')||{}).value||'';
-    await faf(base+mcPath(selCats),{'Youtube linki':u, kaynak:'toplu', ...mcFields(selCats), dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama});
+    await faf(base+mcPath(selCats),{'Youtube linki':u, channelTitle: await ytKanalAdi(u), kaynak:'toplu', ...mcFields(selCats), dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama});
     sent++;
     recordSend(u, selCats.join(','));
     if (i<urls.length-1) await sleep(delay);
@@ -1976,7 +1993,7 @@ async function searchYARVideos() {
     const sr = await ytkFetch(url);
     const ids = (sr.items||[]).map(i => i.id && i.id.videoId).filter(Boolean);
     if (!ids.length) { YAR.videos = []; YAR.selected.clear(); renderYARVideos(); return showRes('ya-res','Video bulunamadı','warn'); }
-    const dr = await ytkFetch('https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=' + ids.join(',') + '&key=' + apiKey);
+    const dr = await ytkFetch('https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics,topicDetails&id=' + ids.join(',') + '&key=' + apiKey);
     const items = dr.items || [];
     // Süre filtresi + izlenmeye göre sırala, ilk 10'u al
     YAR.videos = items
@@ -2386,7 +2403,7 @@ async function sendDriveURLs() {
     const path=CAT_WH[kat]||'/webhook/video-gonder';
     const drNotCol = (document.getElementById('dr-not-col')||{}).value||'Aciklama Notu';
     const drAciklama = (r[drNotCol]||'').trim();
-    await faf(base+path,{'Youtube linki':url,kaynak:'drive',kategori:kat,dil:getSelLang('dr-cats'),platformlar:getSelPlatforms('dr-cats'),aciklama_notu:drAciklama});
+    await faf(base+path,{'Youtube linki':url,channelTitle:await ytKanalAdi(url),kaynak:'drive',kategori:kat,dil:getSelLang('dr-cats'),platformlar:getSelPlatforms('dr-cats'),aciklama_notu:drAciklama});
     recordSend(url, kat);
     addLog('ok','drive','Drive ['+kat+']: '+url.slice(0,60));
   }
@@ -2444,7 +2461,7 @@ async function sendSheetURLs() {
     setStyle('sh-pbar','width',((i+1)/S.sheetURLs.length*100)+'%');
     const shNotCol = (document.getElementById('sh-not-col')||{}).value||'Aciklama Notu';
     const shAciklama = ((row[shNotCol]||'').trim());
-    await faf(base+path,{'Youtube linki':url,kaynak:'sheets',kategori:kat,dil:getSelLang('sh-cats'),platformlar:getSelPlatforms('sh-cats'),aciklama_notu:shAciklama});
+    await faf(base+path,{'Youtube linki':url,channelTitle:await ytKanalAdi(url),kaynak:'sheets',kategori:kat,dil:getSelLang('sh-cats'),platformlar:getSelPlatforms('sh-cats'),aciklama_notu:shAciklama});
     recordSend(url, kat);
     if(i<S.sheetURLs.length-1) await sleep(mode==='time'?delay:3*60*1000);
   }
@@ -3684,7 +3701,7 @@ async function ytkLoadMore(first) {
     const ids = (pd.items||[]).map(i => i.contentDetails && i.contentDetails.videoId).filter(Boolean);
     if (ids.length) {
       // Video detayları: izlenme, beğeni, yorum, tarih, süre
-      const vd = await ytkFetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${ids.join(',')}&key=${apiKey}`);
+      const vd = await ytkFetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics,topicDetails&id=${ids.join(',')}&key=${apiKey}`);
       const have = new Set(YTK.videos.map(v => v.id));
       YTK.videos = YTK.videos.concat((vd.items||[]).filter(v => !have.has(v.id)));
     }
@@ -4247,7 +4264,7 @@ async function trApprove(videoId) {
   // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
   // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
   if (actions) actions.innerHTML = '<span style="color:var(--mt);font-size:12px">⏳ ['+kats.join(', ')+'] gönderiliyor...</span>';
-  const payload = {'Youtube linki': v.youtubeLink, kaynak:'kworb-onay', ...mcFields(kats), dil, platformlar:plats, aciklama_notu:aciklama};
+  const payload = {'Youtube linki': v.youtubeLink, channelTitle: v.channelTitle||'', kaynak:'kworb-onay', ...mcFields(kats), dil, platformlar:plats, aciklama_notu:aciklama};
   const res = await faf(base + mcPath(kats), payload);
   if (res && res.ok === true) {
     recordSend(v.youtubeLink, kats.join(','));
@@ -4290,7 +4307,7 @@ async function trBulkApprove() {
   const tasks=vids.map(v=>({ label:(v.title||v.videoId).slice(0,42), badge:kats.join(','), send: async()=>{
     // Çoklu kategoride bile TEK gönderim — OpusClip video başına bir kez çalışır,
     // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
-    const r=await faf(base+mcPath(kats),{'Youtube linki':v.youtubeLink, kaynak:'kworb-onay', ...mcFields(kats), dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
+    const r=await faf(base+mcPath(kats),{'Youtube linki':v.youtubeLink, channelTitle:v.channelTitle||'', kaynak:'kworb-onay', ...mcFields(kats), dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
     if(r&&r.ok===true){ recordSend(v.youtubeLink,kats.join(',')); await faf(base+'/webhook/kworb-pending-sil',{videoId:v.videoId,durum:'onaylandı'}); TR.pending=TR.pending.filter(x=>x.videoId!==v.videoId); TR.selected.delete(v.videoId); return true; }
     return false;
   }}));
@@ -6191,7 +6208,7 @@ window.n8nCacheClear=n8nCacheClear; window.loadActionCenter=loadActionCenter; wi
 // Veri: 1) n8n /webhook/trend-radar (günlük cron)  2) YouTube API canlı hesap
 // Hız (vph) = izlenme/saat · ▲ = son ziyaretten beri artış (yerel snapshot)
 // ═══════════════════════════════════════════════════════════
-const RD = { data:null, kat:null, src:'', selected:new Set(), loading:false };
+const RD = { data:null, kat:null, katSecim:{}, src:'', selected:new Set(), loading:false };
 
 function initRadar(){
   const chips=document.getElementById('rd-cats');
@@ -6200,6 +6217,8 @@ function initRadar(){
     chips.dataset.ready='1';
     try{ renderLangToggle('rd-cats'); updateLangVisibility('rd-cats'); }catch(e){}
   }
+  try{ const c=rdKatOnbellekOku(); if(c){ RD.kat=c.veri; rdRenderKat();
+    const s=document.getElementById('rd-kat-status'); if(s) s.textContent='✓ bugünün taraması ('+c.gun+')'; } }catch(e){}
   if(RD.data){ renderRadar(); return; }
   const cache=rdCacheGet();
   if(cache){ RD.data=cache.data; RD.src=cache.src+' (önbellek)'; renderRadar(); return; }
@@ -6284,6 +6303,74 @@ function rdApplyOutlier(list, medCache){
   });
 }
 
+// ── #2 KATEGORİ TAHMİNİ + ÖĞRENME ───────────────────────────
+// Transkript ALINAMIYOR: YouTube captions.download OAuth (video sahibi) ister,
+// API anahtarı 401 döner; timedtext ucu da kapatıldı. Onun yerine daha güvenilir
+// ve ücretsiz sinyaller: Google'ın kendi topicCategories'i + categoryId + tags
+// + başlık/açıklama + SENİN geçmiş seçimlerin (kanal hafızası).
+const YT_CAT_MAP = { '1':'film','30':'film','31':'film','24':'eglence','23':'komedi','20':'oyun',
+  '17':'spor','18':'spor','28':'bilim','27':'bilim','26':'bilim','22':'vlog','19':'vlog','15':'vlog','25':'genel','29':'genel' };
+const TOPIC_MAP = [
+  [/game|gaming|video game|esport/i,'oyun'],
+  [/sport|football|soccer|basketball|athletic/i,'spor'],
+  [/film|movie|cinema|television|drama/i,'film'],
+  [/humou?r|comedy/i,'komedi'],
+  [/science|technolog|knowledge|education|health|medicine|engineering/i,'bilim'],
+  [/lifestyle|vehicle|food|pet|tourism|hobby|fashion/i,'vlog'],
+  [/entertainment|music|performing arts/i,'eglence']
+];
+const KEYWORD_MAP = {
+  oyun:   /\b(oyun|gameplay|minecraft|roblox|valorant|fortnite|lol|pubg|bölüm sonu|oynuyoruz|steam|fps|mmorpg)\b/i,
+  spor:   /\b(maç|gol|futbol|basketbol|transfer|şampiyon|lig|derbi|analiz|taktik|kadro|hakem)\b/i,
+  bilim:  /\b(bilim|uzay|fizik|kimya|biyoloji|teknoloji|yapay zeka|nasa|deney|araştırma|belgesel|tarih)\b/i,
+  komedi: /\b(komedi|skeç|espri|güldür|komik|stand.?up|parodi|troll)\b/i,
+  film:   /\b(film|dizi|fragman|sezon|bölüm|sinema|netflix|senaryo|oyuncu)\b/i,
+  vlog:   /\b(vlog|günlük|gezi|seyahat|yemek|tarif|rutin|alışveriş|evim)\b/i,
+  eglence:/\b(eğlence|challenge|akım|trend|reaksiyon|şaka|yarışma)\b/i
+};
+function katOgrenmeYukle(){ try{ return JSON.parse(localStorage.getItem('op_kat_ogrenme')||'{}'); }catch(e){ return {}; } }
+function katOgrenmeKaydet(m){ try{ localStorage.setItem('op_kat_ogrenme',JSON.stringify(m)); }catch(e){} }
+// Kullanıcı bir videoyu X kategorisinde yayınlayınca o kanalı hatırla
+function katOgren(channelId, channel, kategori){
+  if(!kategori) return;
+  const m=katOgrenmeYukle();
+  const k=channelId||('ad:'+String(channel||'').toLowerCase());
+  if(!k||k==='ad:') return;
+  if(!m[k]) m[k]={ad:channel||'',say:{}};
+  m[k].ad=channel||m[k].ad;
+  m[k].say[kategori]=(m[k].say[kategori]||0)+1;
+  katOgrenmeKaydet(m);
+}
+// Video için kategori tahmini → {kategori, guven, secenekler[], neden}
+function katTahmin(v){
+  const puan={}; const ekle=(k,p)=>{ if(k) puan[k]=(puan[k]||0)+p; };
+  // 1) ÖĞRENİLMİŞ kanal hafızası — en güçlü sinyal
+  const m=katOgrenmeYukle();
+  const kayit=m[v.channelId]||m['ad:'+String(v.channel||'').toLowerCase()];
+  let ogrenilen='';
+  if(kayit&&kayit.say){
+    const sirali=Object.entries(kayit.say).sort((a,b)=>b[1]-a[1]);
+    if(sirali.length){ ogrenilen=sirali[0][0]; ekle(ogrenilen, 6+Math.min(4,sirali[0][1])); }
+  }
+  // 2) Google'ın anlamsal konu etiketleri
+  (v.topics||[]).forEach(t=>{ for(const [re,k] of TOPIC_MAP){ if(re.test(t)){ ekle(k,3); break; } } });
+  // 3) YouTube kategori kimliği
+  if(v.catId && YT_CAT_MAP[v.catId]) ekle(YT_CAT_MAP[v.catId],3);
+  // 4) Başlık + etiketler + açıklama anahtar kelimeleri
+  const metin=[v.title||'',(v.tags||[]).join(' '),(v.desc||'').slice(0,300)].join(' ');
+  Object.keys(KEYWORD_MAP).forEach(k=>{ if(KEYWORD_MAP[k].test(metin)) ekle(k,2); });
+
+  const sirali=Object.entries(puan).sort((a,b)=>b[1]-a[1]);
+  if(!sirali.length) return { kategori:'genel', guven:0, secenekler:[], neden:'sinyal yok' };
+  const [enIyi,enIyiP]=sirali[0];
+  const ikinciP=sirali[1]?sirali[1][1]:0;
+  // Güven: lider ile ikinci arasındaki fark + mutlak puan
+  const guven=Math.min(100, Math.round((enIyiP/(enIyiP+ikinciP||1))*60 + Math.min(40,enIyiP*5)));
+  const neden = ogrenilen===enIyi ? 'senin geçmiş seçimin' : (v.topics&&v.topics.length ? 'konu etiketi + üstveri' : 'üstveri');
+  return { kategori:enIyi, guven, secenekler:sirali.slice(0,3).map(x=>x[0]), neden };
+}
+window.katOgren=katOgren; window.katTahmin=katTahmin;
+
 // ── #3 Kategori bazlı av ────────────────────────────────────
 // YouTube kategori ID + Türkçe tohum sorgu. videoCategoryId TEK BAŞINA sonuç
 // vermiyor (q zorunlu); relevanceLanguage de filtre değil ipucu — bu yüzden
@@ -6308,7 +6395,23 @@ function rdTurkceMi(v){
   if(/[çğışöüÇĞİŞÖÜ]/.test(t)) return true;
   return /\b(ve|bir|bu|için|ile|nasıl|çok|daha|son|yeni|büyük)\b/i.test(t);
 }
-async function rdKategoriTara(){
+function rdKatGunKey(){ return new Date().toISOString().slice(0,10); }
+function rdKatOnbellekOku(){
+  try{ const c=JSON.parse(localStorage.getItem('op_radar_kat')||'null');
+    if(c && c.gun===rdKatGunKey()) return c; }catch(e){}
+  return null;
+}
+async function rdKategoriTara(zorla){
+  if(!zorla){
+    const c=rdKatOnbellekOku();
+    if(c){ RD.kat=c.veri; rdRenderKat();
+      const s=document.getElementById('rd-kat-status');
+      if(s) s.textContent='✓ bugünün taraması (önbellek · '+c.gun+') — yeniden taramak için butona bas';
+      return; }
+  }
+  return rdKategoriTaraCalistir();
+}
+async function rdKategoriTaraCalistir(){
   const key=S.cfg.ytApiKey||S.cfg.shkey||'';
   const st=document.getElementById('rd-kat-status'), el=document.getElementById('rd-kat');
   if(!key){ if(st) st.textContent='YouTube API Key gerekli (Ayarlar)'; return; }
@@ -6334,7 +6437,7 @@ async function rdKategoriTara(){
   if(st) st.textContent='⏳ video detayları…';
   const det={};
   for(let a=0;a<ids.length;a+=50){
-    const d=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics&id='+ids.slice(a,a+50).join(',')+'&key='+key);
+    const d=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics,topicDetails&id='+ids.slice(a,a+50).join(',')+'&key='+key);
     (d.items||[]).forEach(v=>{ det[v.id]=v; });
   }
   // kanal detay + medyan (outlier)
@@ -6353,17 +6456,22 @@ async function rdKategoriTara(){
       const sn=v.snippet||{}, stx=v.statistics||{};
       const views=parseInt(stx.viewCount||0);
       const ageH=Math.max(1,(now-Date.parse(sn.publishedAt||0))/3.6e6);
-      return { id:v.id, url:'https://www.youtube.com/watch?v='+v.id, title:sn.title||'', channel:sn.channelTitle||'',
+      const o={ id:v.id, url:'https://www.youtube.com/watch?v='+v.id, title:sn.title||'', channel:sn.channelTitle||'',
         channelId:sn.channelId||'', thumb:((sn.thumbnails||{}).medium||{}).url||'', views,
         subs:subsBy[sn.channelId]||0, ageH:Math.round(ageH), durSec:ytkParseDur((v.contentDetails||{}).duration),
+        tags:(sn.tags||[]).slice(0,20), desc:(sn.description||'').slice(0,400),
+        topics:((v.topicDetails||{}).topicCategories||[]).map(t=>String(t).split('/').pop().replace(/_/g,' ')),
         vph:Math.round(views/ageH), ratio:0, delta:0, deltaH:0, outlier:0, chMed:0, ivme:0, kategori:k };
+      const _t=katTahmin(o); o.katTahmin=_t.kategori; o.katGuven=_t.guven; o.katSecenek=_t.secenekler; o.katNeden=_t.neden;
+      return o;
     }).filter(x=>x.views>=1000);
     rdApplyOutlier(list, medCache);
-    sonuc[k]=list.sort((a,b)=>(b.outlier||1)*b.vph-(a.outlier||1)*a.vph).slice(0,4);
+    sonuc[k]=list.sort((a,b)=>(b.outlier||1)*b.vph-(a.outlier||1)*a.vph).slice(0,5);
   });
   RD.kat=sonuc;
+  try{ localStorage.setItem('op_radar_kat',JSON.stringify({gun:rdKatGunKey(),veri:sonuc})); }catch(e){}
   const toplam=Object.values(sonuc).reduce((s,a)=>s+a.length,0);
-  if(st) st.textContent='✓ '+toplam+' video · '+kats.length+' kategori (Türkçe filtresi uygulandı)';
+  if(st) st.textContent='✓ '+toplam+' video · '+kats.length+' kategori · her kategoride en iyi 5 (Türkçe filtresi)';
   rdRenderKat();
   addLog('ok','sistem','Kategori avı: '+toplam+' video');
 }
@@ -6382,6 +6490,7 @@ function rdRenderKat(){
           +'<div class="rd-body"><div class="rd-title">'+rdEsc(x.title)+'</div>'
           +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span>'+rdAge(x.ageH)+'</span></div>'
           +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
+          +(x.katTahmin?rdKatSatiri(x):'')
           +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+rdEsc(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
           +'</div></div>';
       }).join('')+'</div></div>';
@@ -6393,7 +6502,7 @@ function rdRenderKat(){
 async function rdClientCompute(key, st){
   const YT='https://www.googleapis.com/youtube/v3/';
   if(st) st.textContent='⏳ 1/4 trend listesi…';
-  const trendRaw=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics&chart=mostPopular&regionCode=TR&maxResults=50&key='+key);
+  const trendRaw=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics,topicDetails&chart=mostPopular&regionCode=TR&maxResults=50&key='+key);
   if(st) st.textContent='⏳ 2/4 taze videolar…';
   const after=new Date(Date.now()-48*3600*1000).toISOString();
   const sr=await ytkFetch(YT+'search?part=snippet&type=video&order=viewCount&publishedAfter='+encodeURIComponent(after)+'&regionCode=TR&maxResults=50&key='+key);
@@ -6401,7 +6510,7 @@ async function rdClientCompute(key, st){
   let freshRaw={items:[]};
   if(freshIds.length){
     if(st) st.textContent='⏳ 3/4 video detayları…';
-    freshRaw=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics&id='+freshIds.join(',')+'&key='+key);
+    freshRaw=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics,topicDetails&id='+freshIds.join(',')+'&key='+key);
   }
   const chIds=[...new Set([...(trendRaw.items||[]),...(freshRaw.items||[])].map(v=>(v.snippet||{}).channelId).filter(Boolean))].slice(0,50);
   if(st) st.textContent='⏳ 4/4 kanal detayları…';
@@ -6423,7 +6532,10 @@ async function rdClientCompute(key, st){
     const it={ id:v.id, url:'https://www.youtube.com/watch?v='+v.id, title:sn.title||'', channel:sn.channelTitle||'', channelId:sn.channelId||'',
       thumb:((sn.thumbnails||{}).medium||{}).url||((sn.thumbnails||{}).default||{}).url||'',
       views, subs, ageH:Math.round(ageH), durSec:ytkParseDur((v.contentDetails||{}).duration), catId:sn.categoryId||'',
+      tags:(sn.tags||[]).slice(0,20), desc:(sn.description||'').slice(0,400),
+      topics:((v.topicDetails||{}).topicCategories||[]).map(t=>String(t).split('/').pop().replace(/_/g,' ')),
       vph:Math.round(views/ageH), ratio:subs>0?+(views/subs).toFixed(1):0, delta:0, deltaH:0, outlier:0, chMed:0, ivme:0 };
+    const _t=katTahmin(it); it.katTahmin=_t.kategori; it.katGuven=_t.guven; it.katSecenek=_t.secenekler; it.katNeden=_t.neden;
     if(useSnap&&snap.v[v.id]!=null){
       const dd=views-snap.v[v.id];
       if(dd>0){
@@ -6500,6 +6612,7 @@ function renderRadar(){
         +'<div class="rd-title">'+rdEsc(x.title)+'</div>'
         +(x.keyword?'<div style="font-size:10.5px;color:var(--acc);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Google Trends sorgusu">🔍 '+rdEsc(x.keyword)+'</div>':'')
         +(x.outlier>=2&&x.chMed?'<div style="font-size:10.5px;color:var(--acc3);margin-top:2px" title="Kanalın son 20 video medyanı">💥 '+x.outlier+'x · kanal medyanı '+ytkFmt(x.chMed)+'</div>':'')
+        +(x.katTahmin?rdKatSatiri(x):'')
         +(x.ivme>0?'<div style="font-size:10.5px;margin-top:2px;color:'+(x.ivme>=1.2?'var(--ok)':(x.ivme<0.8?'var(--mt)':'var(--wn)'))+'" title="Son '+x.deltaH+' saatteki hız ÷ ömür boyu ortalama hız. >1 hızlanıyor, <1 yavaşlıyor">'+(x.ivme>=1.2?'📈 hızlanıyor':(x.ivme<0.8?'📉 yavaşlıyor':'➡ sabit'))+' ×'+x.ivme+'</div>':'')
         +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span style="flex-shrink:0">'+rdAge(x.ageH)+'</span></div>'
         +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
@@ -6528,6 +6641,31 @@ function renderRadar(){
   rdUpdateSelCount();
 }
 
+// Kategori tahmini satiri: guven >=55 tek rozet, altinda secenek cipleri
+function rdKatSatiri(x){
+  const lbl=k=>((getCats()[k]||{}).label||k);
+  const sec=RD.katSecim&&RD.katSecim[x.id];
+  if(sec) return '<div style="font-size:10.5px;margin-top:3px;color:var(--ok)" title="Senin seçimin — gönderimde bu kullanılacak">✓ '+rdEsc(lbl(sec))+'</div>';
+  if(x.katGuven>=55)
+    return '<div style="font-size:10.5px;margin-top:3px;color:var(--acc3)" title="'+rdEsc(x.katNeden)+' · güven %'+x.katGuven+'">🏷 '+rdEsc(lbl(x.katTahmin))+' <span style="color:var(--mt)">%'+x.katGuven+'</span></div>';
+  const secenekler=(x.katSecenek&&x.katSecenek.length?x.katSecenek:[x.katTahmin]).slice(0,3);
+  return '<div style="margin-top:3px" title="Emin değilim — birini seç, bundan sonra bu kanalda hatırlarım">'
+    +'<div style="font-size:10px;color:var(--wn);margin-bottom:2px">🤔 emin değilim — seç:</div>'
+    +'<div style="display:flex;gap:3px;flex-wrap:wrap">'
+    +secenekler.map(k=>{ const Q=String.fromCharCode(39);
+        return '<span onclick="event.stopPropagation();rdKatSec('+Q+x.id+Q+','+Q+k+Q+')" style="cursor:pointer;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--sur);border:1px solid var(--brd);color:var(--tx)">'+rdEsc(lbl(k))+'</span>'; }).join('')
+    +'</div></div>';
+}
+function rdKatSec(id,kategori){
+  if(!RD.katSecim) RD.katSecim={};
+  RD.katSecim[id]=kategori;
+  // Kanal hafizasina yaz — sonraki benzer videolarda ayni kategori onerilir
+  const hepsi=[...Object.values(RD.data||{}).flat(), ...(RD.kat?Object.values(RD.kat).flat():[])];
+  const v=hepsi.find(z=>z&&z.id===id);
+  if(v) katOgren(v.channelId, v.channel, kategori);
+  toast('🏷 '+((getCats()[kategori]||{}).label||kategori)+' seçildi — bu kanalda hatırlanacak','ok');
+  renderRadar(); if(RD.kat) rdRenderKat();
+}
 function rdToggle(id){
   if(RD.selected.has(id)) RD.selected.delete(id); else RD.selected.add(id);
   renderRadar();
@@ -6555,19 +6693,22 @@ async function rdSendSelected(){
     if(choice==='skip') sel=sel.filter(x=>!findDupeSend(x.url));
   }
   if(!sel.length) return showRes('rd-res','Gönderilecek yeni video kalmadı','warn');
-  const cats=getSelCatList('rd-cats');
+  const genelCats=getSelCatList('rd-cats');
   let sent=0;
   for(const x of sel){
+    // Video basina kategori: senin secimin > yuksek guvenli tahmin > global secim
+    const secilen=(RD.katSecim&&RD.katSecim[x.id]) || (x.katGuven>=55?x.katTahmin:'') || '';
+    const cats=secilen?[secilen]:genelCats;
     showRes('rd-res','⏳ '+(sent+1)+'/'+sel.length+' gönderiliyor: '+(x.title||'').slice(0,40)+'…','info');
     const res=await faf(base+mcPath(cats), Object.assign({'Youtube linki':x.url, kaynak:'trend-radar', dil:getSelLang('rd-cats'), platformlar:getSelPlatforms('rd-cats'), title:x.title, channelTitle:x.channel, durationSec:x.durSec||0}, mcFields(cats)));
-    if(res&&res.ok===true){ sent++; recordSend(x.url,cats.join(',')); RD.selected.delete(x.id); }
+    if(res&&res.ok===true){ sent++; recordSend(x.url,cats.join(',')); katOgren(x.channelId,x.channel,cats[0]); RD.selected.delete(x.id); }
     await sleep(600);
   }
   showRes('rd-res',(sent===sel.length?'✓ ':'')+sent+'/'+sel.length+' video işleme alındı ['+cats.join(', ')+']', sent?'ok':'err');
   if(sent) toast('✓ '+sent+' video işleme alındı — Trend Radar','ok');
   renderRadar();
 }
-window.initRadar=initRadar; window.loadRadar=loadRadar; window.rdKategoriTara=rdKategoriTara; window.rdRenderKat=rdRenderKat; window.rdToggle=rdToggle; window.rdSendSelected=rdSendSelected; window.rdOpenChannel=rdOpenChannel;
+window.initRadar=initRadar; window.loadRadar=loadRadar; window.rdKatSec=rdKatSec; window.rdKatSatiri=rdKatSatiri; window.rdKategoriTara=rdKategoriTara; window.rdRenderKat=rdRenderKat; window.rdToggle=rdToggle; window.rdSendSelected=rdSendSelected; window.rdOpenChannel=rdOpenChannel;
 
 // #14 HIZLI GÖNDER — açılır menüde çoklu kategori + Genel için TR/EN dil seçici
 // #11 KOMUT PALETİ
