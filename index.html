@@ -1235,6 +1235,18 @@ tbody td{line-height:1.5}
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— müzik ve 5 dk altı hariç</span></span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-trend" class="rd-grid"><div class="rd-empty">↻ Bugünü Getir'e bas</div></div>
   </div>
+  <div class="card" style="border-color:rgba(251,191,36,.3)">
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
+      <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için ayrı arama + Türkçe filtresi + outlier. YouTube genel trend listesini kaldırdığı için kategori boşluğunu bu doldurur (~800 API birimi, isteğe bağlı)</span></span>
+      <button class="btn bg bsm" onclick="rdKategoriTara()">🎯 Kategorileri Tara</button>
+    </div>
+    <div id="rd-kat-status" style="font-size:12px;color:var(--mt);margin-bottom:8px"></div>
+    <div id="rd-kat"><div class="rd-empty">Kategori bazlı avlanmak için butona bas</div></div>
+  </div>
+  <div class="card" style="border-color:rgba(167,139,250,.35)">
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--acc3)">💥 Outlier <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— videonun izlenmesi / kanalın son 20 video medyanı. Kanal büyüklüğünden bağımsız "bu kanal için anormal" performans = algoritmanın ittiğinin en erken sinyali (2x kayda değer · 3–5x güçlü · 10x+ patlama)</span></span><span id="rd-outlier-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div id="rd-outlier" class="rd-grid"><div class="rd-empty">—</div></div>
+  </div>
   <div class="card">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🚀 Hızlı Yükselenler <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— son 48 saatte yayınlandı, izlenme hızı en yüksek</span></span><span id="rd-rising-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-rising" class="rd-grid"><div class="rd-empty">—</div></div>
@@ -6179,7 +6191,7 @@ window.n8nCacheClear=n8nCacheClear; window.loadActionCenter=loadActionCenter; wi
 // Veri: 1) n8n /webhook/trend-radar (günlük cron)  2) YouTube API canlı hesap
 // Hız (vph) = izlenme/saat · ▲ = son ziyaretten beri artış (yerel snapshot)
 // ═══════════════════════════════════════════════════════════
-const RD = { data:null, src:'', selected:new Set(), loading:false };
+const RD = { data:null, kat:null, src:'', selected:new Set(), loading:false };
 
 function initRadar(){
   const chips=document.getElementById('rd-cats');
@@ -6194,7 +6206,7 @@ function initRadar(){
   loadRadar(false);
 }
 function rdCacheGet(){
-  try{ const c=JSON.parse(localStorage.getItem('op_radar_cache')||'null'); if(c && c.v===3 && Date.now()-c.ts<3*3600*1000) return c; }catch(e){}
+  try{ const c=JSON.parse(localStorage.getItem('op_radar_cache')||'null'); if(c && c.v===4 && Date.now()-c.ts<3*3600*1000) return c; }catch(e){}
   return null;
 }
 
@@ -6210,7 +6222,7 @@ async function loadRadar(force){
     const base=getN8N();
     if(base){
       const d=await n8nGetCached('/webhook/trend-radar');
-      if(d && !d._bos && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],gtrend:d.gtrend||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:''); }
+      if(d && !d._bos && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],outlier:d.outlier||[],gtrend:d.gtrend||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:''); }
     }
     // 2) canlı hesap (YouTube API)
     if(!data){
@@ -6220,7 +6232,7 @@ async function loadRadar(force){
       src='YouTube API (canlı)';
     }
     RD.data=data; RD.src=src;
-    try{ localStorage.setItem('op_radar_cache',JSON.stringify({v:3,ts:Date.now(),src,data})); }catch(e){}
+    try{ localStorage.setItem('op_radar_cache',JSON.stringify({v:4,ts:Date.now(),src,data})); }catch(e){}
     renderRadar();
     const rEl=document.getElementById('rd-res'); if(rEl) rEl.style.display='none';
     addLog('ok','sistem','Trend Radar güncellendi ('+src+'): '+data.trend.length+' trend, '+data.rising.length+' yükselen, '+data.potential.length+' potansiyel');
@@ -6232,6 +6244,152 @@ async function loadRadar(force){
 }
 
 // YouTube API'den canlı hesap (mostPopular + son 48 saat + kanal aboneleri)
+// ── Outlier: kanal medyanı (24 sa önbellek) ──────────────────
+// Her kanalın son 20 videosunun izlenme MEDYANI. Ortalama yerine medyan:
+// tek bir viral video ortalamayı bozar, medyan kanalın gerçek normalini verir.
+function rdMedCacheGet(){ try{ return JSON.parse(localStorage.getItem('op_radar_chmed')||'{}'); }catch(e){ return {}; } }
+function rdMedian(nums){
+  const a=nums.filter(n=>n>0).sort((x,y)=>x-y);
+  if(a.length<5) return 0;                       // 5'ten az veri = güvenilmez
+  const m=a.length>>1;
+  return a.length%2 ? a[m] : Math.round((a[m-1]+a[m])/2);
+}
+async function rdChannelMedians(key, uploadsBy, chIds, st){
+  const YT='https://www.googleapis.com/youtube/v3/';
+  const cache=rdMedCacheGet(), now=Date.now(), TTL=24*3600*1000;
+  const need=chIds.filter(id=>uploadsBy[id] && !(cache[id] && now-cache[id].t<TTL)).slice(0,25);
+  let done=0;
+  for(const id of need){
+    try{
+      const pl=await ytkFetch(YT+'playlistItems?part=contentDetails&playlistId='+uploadsBy[id]+'&maxResults=20&key='+key);
+      const vids=(pl.items||[]).map(x=>x.contentDetails&&x.contentDetails.videoId).filter(Boolean);
+      if(!vids.length){ cache[id]={t:now,v:{}}; continue; }
+      const stt=await ytkFetch(YT+'videos?part=statistics&id='+vids.join(',')+'&key='+key);
+      const v={}; (stt.items||[]).forEach(x=>{ v[x.id]=parseInt((x.statistics||{}).viewCount||0); });
+      cache[id]={t:now,v};
+    }catch(e){ cache[id]={t:now,v:{}}; console.warn('[RD] medyan '+id+':',e.message); }
+    done++; if(st) st.textContent='⏳ kanal medyanları… '+done+'/'+need.length;
+  }
+  try{ localStorage.setItem('op_radar_chmed',JSON.stringify(cache)); }catch(e){}
+  return cache;
+}
+// Adayları outlier skoruyla zenginleştir (kendi videosunu medyandan çıkarır)
+function rdApplyOutlier(list, medCache){
+  list.forEach(x=>{
+    const ch=medCache[x.channelId];
+    if(!ch||!ch.v) return;
+    const vals=Object.keys(ch.v).filter(vid=>vid!==x.id).map(vid=>ch.v[vid]);
+    const med=rdMedian(vals);
+    if(med>0){ x.chMed=med; x.outlier=+(x.views/med).toFixed(1); }
+  });
+}
+
+// ── #3 Kategori bazlı av ────────────────────────────────────
+// YouTube kategori ID + Türkçe tohum sorgu. videoCategoryId TEK BAŞINA sonuç
+// vermiyor (q zorunlu); relevanceLanguage de filtre değil ipucu — bu yüzden
+// aşağıda ayrıca Türkçe içerik filtresi uygulanır.
+const RD_KAT_SORGU = {
+  genel:   { cid:'',   q:'belgesel' },
+  film:    { cid:'1',  q:'dizi bölüm' },
+  eglence: { cid:'24', q:'eğlenceli video' },
+  bilim:   { cid:'28', q:'bilim' },
+  vlog:    { cid:'22', q:'günlük vlog' },
+  komedi:  { cid:'23', q:'türkçe komedi' },
+  oyun:    { cid:'20', q:'oyun oynuyoruz' },
+  spor:    { cid:'17', q:'maç analiz' }
+};
+// Türkçe içerik mi? defaultAudioLanguage güvenilir; yoksa Türkçe karakter + sık sözcük
+function rdTurkceMi(v){
+  const sn=v.snippet||{};
+  const dl=String(sn.defaultAudioLanguage||sn.defaultLanguage||'').toLowerCase();
+  if(dl.startsWith('tr')) return true;
+  if(dl && !dl.startsWith('tr')) return false;           // açıkça başka dil
+  const t=(sn.title||'')+' '+(sn.description||'').slice(0,200);
+  if(/[çğışöüÇĞİŞÖÜ]/.test(t)) return true;
+  return /\b(ve|bir|bu|için|ile|nasıl|çok|daha|son|yeni|büyük)\b/i.test(t);
+}
+async function rdKategoriTara(){
+  const key=S.cfg.ytApiKey||S.cfg.shkey||'';
+  const st=document.getElementById('rd-kat-status'), el=document.getElementById('rd-kat');
+  if(!key){ if(st) st.textContent='YouTube API Key gerekli (Ayarlar)'; return; }
+  const YT='https://www.googleapis.com/youtube/v3/';
+  const after=new Date(Date.now()-7*24*3600*1000).toISOString();
+  const kats=Object.keys(RD_KAT_SORGU);
+  const bulunan={}; const idSet=new Set();
+  let i=0;
+  for(const k of kats){
+    i++; if(st) st.textContent='⏳ '+i+'/'+kats.length+' — '+k+' aranıyor…';
+    const c=RD_KAT_SORGU[k];
+    try{
+      let u=YT+'search?part=snippet&type=video&order=viewCount&regionCode=TR&relevanceLanguage=tr&videoDuration=long'
+           +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(c.q)+'&maxResults=10&key='+key;
+      if(c.cid) u+='&videoCategoryId='+c.cid;
+      const s=await ytkFetch(u);
+      bulunan[k]=(s.items||[]).map(x=>x.id&&x.id.videoId).filter(Boolean);
+      bulunan[k].forEach(id=>idSet.add(id));
+    }catch(e){ bulunan[k]=[]; console.warn('[RD-KAT] '+k+':',e.message); }
+  }
+  const ids=[...idSet];
+  if(!ids.length){ if(st) st.textContent='Sonuç yok'; el.innerHTML='<div class="rd-empty">Bu taramada sonuç çıkmadı</div>'; return; }
+  if(st) st.textContent='⏳ video detayları…';
+  const det={};
+  for(let a=0;a<ids.length;a+=50){
+    const d=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics&id='+ids.slice(a,a+50).join(',')+'&key='+key);
+    (d.items||[]).forEach(v=>{ det[v.id]=v; });
+  }
+  // kanal detay + medyan (outlier)
+  const chIds=[...new Set(Object.values(det).map(v=>(v.snippet||{}).channelId).filter(Boolean))].slice(0,50);
+  const subsBy={}, uploadsBy={};
+  if(chIds.length){
+    const ch=await ytkFetch(YT+'channels?part=statistics,contentDetails&id='+chIds.join(',')+'&maxResults=50&key='+key);
+    (ch.items||[]).forEach(c=>{ subsBy[c.id]=parseInt((c.statistics||{}).subscriberCount||0);
+      const up=((c.contentDetails||{}).relatedPlaylists||{}).uploads; if(up) uploadsBy[c.id]=up; });
+  }
+  const medCache=await rdChannelMedians(key, uploadsBy, chIds, st);
+  const now=Date.now();
+  const sonuc={};
+  kats.forEach(k=>{
+    const list=(bulunan[k]||[]).map(id=>det[id]).filter(Boolean).filter(rdTurkceMi).map(v=>{
+      const sn=v.snippet||{}, stx=v.statistics||{};
+      const views=parseInt(stx.viewCount||0);
+      const ageH=Math.max(1,(now-Date.parse(sn.publishedAt||0))/3.6e6);
+      return { id:v.id, url:'https://www.youtube.com/watch?v='+v.id, title:sn.title||'', channel:sn.channelTitle||'',
+        channelId:sn.channelId||'', thumb:((sn.thumbnails||{}).medium||{}).url||'', views,
+        subs:subsBy[sn.channelId]||0, ageH:Math.round(ageH), durSec:ytkParseDur((v.contentDetails||{}).duration),
+        vph:Math.round(views/ageH), ratio:0, delta:0, deltaH:0, outlier:0, chMed:0, ivme:0, kategori:k };
+    }).filter(x=>x.views>=1000);
+    rdApplyOutlier(list, medCache);
+    sonuc[k]=list.sort((a,b)=>(b.outlier||1)*b.vph-(a.outlier||1)*a.vph).slice(0,4);
+  });
+  RD.kat=sonuc;
+  const toplam=Object.values(sonuc).reduce((s,a)=>s+a.length,0);
+  if(st) st.textContent='✓ '+toplam+' video · '+kats.length+' kategori (Türkçe filtresi uygulandı)';
+  rdRenderKat();
+  addLog('ok','sistem','Kategori avı: '+toplam+' video');
+}
+function rdRenderKat(){
+  const el=document.getElementById('rd-kat'); if(!el||!RD.kat) return;
+  const html=Object.keys(RD.kat).map(k=>{
+    const list=RD.kat[k]; if(!list.length) return '';
+    const lbl=(getCats()[k]||{}).label||k;
+    return '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:var(--gld);margin-bottom:6px">'+rdEsc(lbl)+'</div>'
+      +'<div class="rd-grid">'+list.map(x=>{
+        const sel=RD.selected.has(x.id)?' sel':'';
+        return '<div class="rd-card'+sel+'" onclick="rdToggle(\''+x.id+'\')">'
+          +'<span class="rd-sel-tick">✓</span>'
+          +(x.outlier>=2?'<span class="rd-badge-ratio" style="background:rgba(167,139,250,.95);color:#150c2e">💥 '+x.outlier+'x</span>':'')
+          +'<img class="rd-thumb" src="'+rdEsc(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
+          +'<div class="rd-body"><div class="rd-title">'+rdEsc(x.title)+'</div>'
+          +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span>'+rdAge(x.ageH)+'</span></div>'
+          +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
+          +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+rdEsc(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
+          +'</div></div>';
+      }).join('')+'</div></div>';
+  }).join('');
+  el.innerHTML=html||'<div class="rd-empty">Türkçe filtresinden geçen video kalmadı</div>';
+  rdUpdateSelCount();
+}
+
 async function rdClientCompute(key, st){
   const YT='https://www.googleapis.com/youtube/v3/';
   if(st) st.textContent='⏳ 1/4 trend listesi…';
@@ -6247,8 +6405,12 @@ async function rdClientCompute(key, st){
   }
   const chIds=[...new Set([...(trendRaw.items||[]),...(freshRaw.items||[])].map(v=>(v.snippet||{}).channelId).filter(Boolean))].slice(0,50);
   if(st) st.textContent='⏳ 4/4 kanal detayları…';
-  const chRaw=chIds.length?await ytkFetch(YT+'channels?part=snippet,statistics&id='+chIds.join(',')+'&maxResults=50&key='+key):{items:[]};
-  const subsBy={}; (chRaw.items||[]).forEach(c=>{ subsBy[c.id]=parseInt((c.statistics||{}).subscriberCount||0); });
+  const chRaw=chIds.length?await ytkFetch(YT+'channels?part=snippet,statistics,contentDetails&id='+chIds.join(',')+'&maxResults=50&key='+key):{items:[]};
+  const subsBy={}, uploadsBy={};
+  (chRaw.items||[]).forEach(c=>{
+    subsBy[c.id]=parseInt((c.statistics||{}).subscriberCount||0);
+    const up=((c.contentDetails||{}).relatedPlaylists||{}).uploads; if(up) uploadsBy[c.id]=up;
+  });
   // yerel snapshot → ▲ artış rozetleri
   let snap=null; try{ snap=JSON.parse(localStorage.getItem('op_radar_snap')||'null'); }catch(e){}
   const snapAgeH=snap?(Date.now()-snap.ts)/3.6e6:0;
@@ -6261,15 +6423,36 @@ async function rdClientCompute(key, st){
     const it={ id:v.id, url:'https://www.youtube.com/watch?v='+v.id, title:sn.title||'', channel:sn.channelTitle||'', channelId:sn.channelId||'',
       thumb:((sn.thumbnails||{}).medium||{}).url||((sn.thumbnails||{}).default||{}).url||'',
       views, subs, ageH:Math.round(ageH), durSec:ytkParseDur((v.contentDetails||{}).duration), catId:sn.categoryId||'',
-      vph:Math.round(views/ageH), ratio:subs>0?+(views/subs).toFixed(1):0, delta:0, deltaH:0 };
-    if(useSnap&&snap.v[v.id]!=null){ const dd=views-snap.v[v.id]; if(dd>0){ it.delta=dd; it.deltaH=Math.round(snapAgeH); } }
+      vph:Math.round(views/ageH), ratio:subs>0?+(views/subs).toFixed(1):0, delta:0, deltaH:0, outlier:0, chMed:0, ivme:0 };
+    if(useSnap&&snap.v[v.id]!=null){
+      const dd=views-snap.v[v.id];
+      if(dd>0){
+        it.delta=dd; it.deltaH=Math.round(snapAgeH);
+        // İVME = son penceredeki hız ÷ ömür boyu ortalama hız
+        //  >1 hızlanıyor (hâlâ tırmanıyor) · <1 yavaşlıyor (zirve geçilmiş)
+        const sonHiz=dd/snapAgeH, omurHiz=views/ageH;
+        if(omurHiz>0) it.ivme=+(sonHiz/omurHiz).toFixed(2);
+      }
+    }
     return it;
   };
   // Trend: müzik (categoryId 10) ve 5 dk altı videolar hariç
   const trend=(trendRaw.items||[]).map(norm).filter(x=>x.catId!=='10'&&x.durSec>=300).slice(0,12);
   const freshAll=(freshRaw.items||[]).map(norm).filter(x=>x.views>=1000);
-  const rising=[...freshAll].sort((a,b)=>b.vph-a.vph).slice(0,12);
+  // İvme bilinen videolarda hızı ivmeyle ağırlıklandır → hızlanan üste çıkar
+  const risingSkor=x=>x.vph*(x.ivme>0?Math.min(3,x.ivme):1);
+  const rising=[...freshAll].sort((a,b)=>risingSkor(b)-risingSkor(a)).slice(0,12);
   const potential=freshAll.filter(x=>x.subs>0&&x.subs<=250000&&x.ratio>=1.5&&x.ageH<=72).sort((a,b)=>(b.ratio*b.vph)-(a.ratio*a.vph)).slice(0,8);
+  // 💥 OUTLIER — en umutlu adayların kanal medyanını çek, skoru hesapla
+  const aday=[...freshAll].sort((a,b)=>b.vph-a.vph).slice(0,30);
+  const adayCh=[...new Set(aday.map(x=>x.channelId).filter(Boolean))];
+  let outlier=[];
+  try{
+    const medCache=await rdChannelMedians(key, uploadsBy, adayCh, st);
+    rdApplyOutlier(aday, medCache);
+    rdApplyOutlier(trend, medCache);
+    outlier=aday.filter(x=>x.outlier>=2 && x.views>=1000).sort((a,b)=>b.outlier-a.outlier).slice(0,12);
+  }catch(e){ console.warn('[RD] outlier:', e.message); }
   const byCh={};
   [...trend,...rising].forEach(x=>{ if(!x.channelId) return; if(!byCh[x.channelId]) byCh[x.channelId]={channelId:x.channelId,channel:x.channel,subs:x.subs,count:0,sumVph:0,best:x}; const c=byCh[x.channelId]; c.count++; c.sumVph+=x.vph; if(x.vph>c.best.vph) c.best=x; });
   const channels=Object.values(byCh).sort((a,b)=>(b.count*b.sumVph)-(a.count*a.sumVph)).slice(0,8)
@@ -6279,7 +6462,7 @@ async function rdClientCompute(key, st){
     try{ localStorage.setItem('op_radar_snap',JSON.stringify({ts:Date.now(),v})); }catch(e){}
   }
   // gtrend (Erken Sinyal) tarayıcıdan hesaplanamaz — Google Trends CORS engelli, n8n gerekli
-  return {trend,rising,potential,gtrend:[],channels};
+  return {trend,rising,potential,outlier,gtrend:[],channels};
 }
 
 function rdEsc(s){ return String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
@@ -6289,11 +6472,13 @@ function renderRadar(){
   const d=RD.data; if(!d) return;
   const st=document.getElementById('rd-status');
   if(st) st.textContent='Kaynak: '+RD.src;
-  [['rd-trend',d.trend],['rd-rising',d.rising],['rd-potential',d.potential],['rd-gtrend',d.gtrend]].forEach(([elId,list])=>{
+  [['rd-trend',d.trend],['rd-outlier',d.outlier],['rd-rising',d.rising],['rd-potential',d.potential],['rd-gtrend',d.gtrend]].forEach(([elId,list])=>{
     const el=document.getElementById(elId); if(!el) return;
     setEl(elId+'-n',(list||[]).length+' video');
     if(!(list||[]).length){
-      el.innerHTML='<div class="rd-empty">'+(elId==='rd-gtrend'
+      el.innerHTML='<div class="rd-empty">'+(elId==='rd-outlier'
+        ? 'Bu taramada 2x üstü outlier çıkmadı — normal, her gün patlama olmaz.'
+        : elId==='rd-gtrend'
         ? 'Veri yok — bu bölüm <b>n8n günlük radar</b>dan gelir (Google Trends tarayıcıdan çekilemez). Workflow\'u aktif et, yarın sabah dolar.'
         : 'Bugün bu bölümde sonuç yok')+'</div>';
       return;
@@ -6303,6 +6488,8 @@ function renderRadar(){
       const sel=RD.selected.has(x.id)?' sel':'';
       const badge=(elId==='rd-potential')
         ? '<span class="rd-badge-ratio">×'+x.ratio+' abone</span>'
+        : (elId==='rd-outlier')
+        ? '<span class="rd-badge-ratio" style="background:rgba(167,139,250,.95);color:#150c2e">💥 '+x.outlier+'x</span>'
         : (elId==='rd-gtrend')
         ? '<span class="rd-badge-ratio" style="background:rgba(0,229,255,.95);color:#012">♥ %'+x.ratio+'</span>'
         : (x.delta>0?'<span class="rd-badge-delta">▲ +'+ytkFmt(x.delta)+' / '+x.deltaH+'sa</span>':'');
@@ -6312,6 +6499,8 @@ function renderRadar(){
         +'<div class="rd-body">'
         +'<div class="rd-title">'+rdEsc(x.title)+'</div>'
         +(x.keyword?'<div style="font-size:10.5px;color:var(--acc);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Google Trends sorgusu">🔍 '+rdEsc(x.keyword)+'</div>':'')
+        +(x.outlier>=2&&x.chMed?'<div style="font-size:10.5px;color:var(--acc3);margin-top:2px" title="Kanalın son 20 video medyanı">💥 '+x.outlier+'x · kanal medyanı '+ytkFmt(x.chMed)+'</div>':'')
+        +(x.ivme>0?'<div style="font-size:10.5px;margin-top:2px;color:'+(x.ivme>=1.2?'var(--ok)':(x.ivme<0.8?'var(--mt)':'var(--wn)'))+'" title="Son '+x.deltaH+' saatteki hız ÷ ömür boyu ortalama hız. >1 hızlanıyor, <1 yavaşlıyor">'+(x.ivme>=1.2?'📈 hızlanıyor':(x.ivme<0.8?'📉 yavaşlıyor':'➡ sabit'))+' ×'+x.ivme+'</div>':'')
         +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span style="flex-shrink:0">'+rdAge(x.ageH)+'</span></div>'
         +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
         +'<div class="prog"><div class="pf" style="background:var(--acc);width:'+Math.max(3,Math.round((x.vph||0)/maxVph*100))+'%"></div></div>'
@@ -6342,6 +6531,7 @@ function renderRadar(){
 function rdToggle(id){
   if(RD.selected.has(id)) RD.selected.delete(id); else RD.selected.add(id);
   renderRadar();
+  if(RD.kat) rdRenderKat();
 }
 function rdUpdateSelCount(){ setEl('rd-selcount',RD.selected.size); }
 function rdOpenChannel(name){
@@ -6351,7 +6541,8 @@ function rdOpenChannel(name){
 
 async function rdSendSelected(){
   const d=RD.data; if(!d) return;
-  const all=[...(d.trend||[]),...(d.rising||[]),...(d.potential||[]),...(d.gtrend||[])];
+  const katAll=RD.kat?Object.values(RD.kat).flat():[];
+  const all=[...(d.trend||[]),...(d.outlier||[]),...(d.rising||[]),...(d.potential||[]),...(d.gtrend||[]),...katAll];
   const seen=new Set();
   let sel=all.filter(x=>{ if(!RD.selected.has(x.id)||seen.has(x.id)) return false; seen.add(x.id); return true; });
   if(!sel.length) return showRes('rd-res','Video seçin (kartlara tıkla)','warn');
@@ -6376,7 +6567,7 @@ async function rdSendSelected(){
   if(sent) toast('✓ '+sent+' video işleme alındı — Trend Radar','ok');
   renderRadar();
 }
-window.initRadar=initRadar; window.loadRadar=loadRadar; window.rdToggle=rdToggle; window.rdSendSelected=rdSendSelected; window.rdOpenChannel=rdOpenChannel;
+window.initRadar=initRadar; window.loadRadar=loadRadar; window.rdKategoriTara=rdKategoriTara; window.rdRenderKat=rdRenderKat; window.rdToggle=rdToggle; window.rdSendSelected=rdSendSelected; window.rdOpenChannel=rdOpenChannel;
 
 // #14 HIZLI GÖNDER — açılır menüde çoklu kategori + Genel için TR/EN dil seçici
 // #11 KOMUT PALETİ
