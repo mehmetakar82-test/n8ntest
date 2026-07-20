@@ -289,6 +289,33 @@ tbody td{line-height:1.5}
 #hover-prev{position:fixed;z-index:10500;display:none;pointer-events:none;background:var(--sur2);border:1px solid var(--acc);border-radius:8px;padding:5px;box-shadow:0 8px 28px rgba(0,0,0,.55);max-width:340px}
 #hover-prev img{max-width:min(300px,76vw);max-height:52vh;width:auto;height:auto;border-radius:5px;display:block;margin:0 auto}
 #hover-prev .hp-t{font-size:13px;color:var(--tx);padding:5px 4px 2px;line-height:1.3;max-width:320px}
+/* ═══ Global geri bildirim: üst etkinlik çubuğu + buton durumu ═══ */
+#act-bar{position:fixed;top:0;left:0;height:3px;width:0;z-index:12000;background:linear-gradient(90deg,var(--acc),var(--acc3));box-shadow:0 0 8px var(--acc);opacity:0;transition:width .2s ease,opacity .3s ease;pointer-events:none}
+#act-bar.on{opacity:1}
+#act-bar.err{background:linear-gradient(90deg,var(--er),#ff8a8a);box-shadow:0 0 8px var(--er)}
+.btn{position:relative}
+.btn.fb-busy{color:transparent!important}
+.btn.fb-busy::after{content:'';position:absolute;top:50%;left:50%;width:13px;height:13px;margin:-7px 0 0 -7px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:fbspin .6s linear infinite}
+.bg.fb-busy::after,.btn.fb-busy.bg::after{border:2px solid var(--brd);border-top-color:var(--acc)}
+@keyframes fbspin{to{transform:rotate(360deg)}}
+.btn.fb-ok{box-shadow:0 0 0 2px var(--ok) inset!important;transition:box-shadow .2s}
+.btn.fb-err{box-shadow:0 0 0 2px var(--er) inset!important;transition:box-shadow .2s}
+.btn.fb-press{transform:scale(.95)!important}
+/* ═══ Bildirim merkezi ═══ */
+#bell-btn{position:relative;background:transparent;border:1px solid var(--brd);color:var(--tx);cursor:pointer;padding:5px 8px;border-radius:4px;font-size:14px;line-height:1;flex-shrink:0}
+#bell-btn:hover{border-color:var(--acc)}
+#bell-cnt{position:absolute;top:-6px;right:-6px;min-width:16px;height:16px;padding:0 4px;background:var(--er);color:#fff;font-size:9px;font-weight:800;border-radius:8px;display:none;align-items:center;justify-content:center;line-height:1}
+#bell-cnt.on{display:flex}
+#notif-panel{position:fixed;left:8px;top:56px;width:340px;max-width:calc(100vw - 16px);max-height:74vh;overflow-y:auto;z-index:11500;background:var(--sur2);border:1px solid var(--acc);border-radius:10px;box-shadow:0 16px 48px rgba(0,0,0,.6);display:none}
+#notif-panel.on{display:block}
+.nf-head{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;border-bottom:1px solid var(--brd);position:sticky;top:0;background:var(--sur2)}
+.nf-row{display:flex;gap:10px;padding:10px 13px;border-bottom:1px solid var(--brd);cursor:pointer;transition:background .12s}
+.nf-row:hover{background:rgba(0,229,255,.05)}
+.nf-row.unseen{background:rgba(0,229,255,.06)}
+.nf-row .nf-ic{font-size:16px;flex-shrink:0;line-height:1.3}
+.nf-row .nf-tx{font-size:12.5px;color:var(--tx);line-height:1.35}
+.nf-row .nf-sub{font-size:10.5px;color:var(--mt);margin-top:2px}
+.nf-row .nf-t{font-size:9.5px;color:var(--mt);opacity:.7;margin-top:2px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -296,8 +323,16 @@ tbody td{line-height:1.5}
 <div class="app">
 
 <!-- YENİ: Toast, Gönderim Kuyruğu, Komut Paleti, Hover Önizleme -->
+<div id="act-bar"></div>
 <div id="toast-wrap"></div>
 <div id="hover-prev"><img src="" alt=""><div class="hp-t"></div></div>
+<div id="notif-panel">
+  <div class="nf-head">
+    <b style="font-size:13px">🔔 Bildirimler</b>
+    <span><span onclick="notifTumunuOku()" style="cursor:pointer;color:var(--acc);font-size:11px;margin-right:10px">tümünü okundu</span><span onclick="notifTemizle()" style="cursor:pointer;color:var(--mt);font-size:11px;margin-right:10px">temizle</span><span onclick="notifPanelKapat()" style="cursor:pointer;color:var(--mt);font-size:14px">✕</span></span>
+  </div>
+  <div id="notif-list"><div style="padding:22px;text-align:center;color:var(--mt);font-size:12px">Henüz bildirim yok</div></div>
+</div>
 <div id="sq-panel">
   <div id="sq-head"><b>▶ Gönderim Kuyruğu</b><span class="sq-x" onclick="sqHide()" title="Kapat">✕</span></div>
   <div id="sq-body"></div>
@@ -311,9 +346,12 @@ tbody td{line-height:1.5}
       <div class="sb-badge">◆ v9.5</div>
       <div class="sb-name">OPUS<br>PRO</div>
     </div>
-    <button id="theme-toggle" onclick="toggleTheme()" title="Tema değiştir (light/dark)"
-            style="background:transparent;border:1px solid var(--brd);color:var(--tx);cursor:pointer;padding:5px 8px;border-radius:4px;font-size:14px;line-height:1;flex-shrink:0"
-            aria-label="Tema değiştir">🌙</button>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button id="bell-btn" onclick="notifPanelAc(event)" title="Bildirimler" aria-label="Bildirimler">🔔<span id="bell-cnt"></span></button>
+      <button id="theme-toggle" onclick="toggleTheme()" title="Tema değiştir (light/dark)"
+              style="background:transparent;border:1px solid var(--brd);color:var(--tx);cursor:pointer;padding:5px 8px;border-radius:4px;font-size:14px;line-height:1;flex-shrink:0"
+              aria-label="Tema değiştir">🌙</button>
+    </div>
   </div>
   <div class="svc-dots" id="svc-dots" onclick="svcCheck()" title="Servis durumu — yenilemek için tıkla" style="cursor:pointer;padding:0 4px 4px">
     <span class="svc-dot" title="n8n bağlantısı"><span class="d" id="svc-n8n"></span>n8n</span>
@@ -4906,6 +4944,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // YENİ: hızlı gönder, servis durumu, rozetler
     try { renderUretimTabs(); } catch(e){}
     setTimeout(()=>{ try{ svcCheck(); }catch(e){} try{ refreshBadges(); }catch(e){} }, 800);
+    try{ notifRender(); }catch(e){}                                   // kayıtlı bildirimleri hemen göster
+    setTimeout(()=>{ try{ notifCheck(true); }catch(e){} }, 1600);     // ilk tam tarama
+    setInterval(()=>{ try{ notifCheck(false); }catch(e){} }, 5*60*1000);  // ucuz periyodik kontrol
     // Tüm global fonksiyonları window'a bağla
     const globals = [go,showTab,goUretim,renderUretimTabs,trTabCount,refreshDash,sendSingle,sendBulkURLs,sendSearch,
       loadDriveSheet,sendDriveURLs,clearSentURLs,
@@ -5606,6 +5647,124 @@ function toast(msg, type, ms) {
   const t = ms==null ? (type==='err'?7000:4000) : ms;
   if (t>0) setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, t);
 }
+// ═══ GLOBAL GERİ BİLDİRİM: üst çubuk + buton durumu + sessiz hata yakalama ═══
+const FB = { inflight:0, err:false, activeBtn:null, btnTimer:null };
+function fbBarStart(){ const b=document.getElementById('act-bar'); if(!b) return; b.classList.remove('err'); b.classList.add('on'); b.style.width='72%'; }
+function fbBarEnd(hata){ const b=document.getElementById('act-bar'); if(!b) return; if(hata) b.classList.add('err'); b.style.width='100%'; setTimeout(()=>{ b.classList.remove('on'); b.style.width='0'; },300); }
+function fbBtnFlash(btn, ok){ if(!btn) return; btn.classList.remove('fb-busy'); btn.classList.add(ok?'fb-ok':'fb-err'); setTimeout(()=>btn.classList.remove('fb-ok','fb-err'),1200); }
+function fbSettle(){ clearTimeout(FB.btnTimer); const btn=FB.activeBtn, hadErr=FB.err; fbBarEnd(hadErr); if(btn) fbBtnFlash(btn,!hadErr); FB.activeBtn=null; FB.err=false; }
+if(!window.__fbWrapped){
+  window.__fbWrapped=true;
+  const _fetch=window.fetch.bind(window);
+  window.fetch=function(...a){
+    if(FB.inflight===0) fbBarStart();
+    FB.inflight++;
+    let p; try{ p=_fetch(...a); }catch(e){ FB.err=true; FB.inflight--; if(FB.inflight<=0){FB.inflight=0;fbSettle();} throw e; }
+    return p.then(r=>{ if(!r.ok) FB.err=true; return r; })
+            .catch(e=>{ FB.err=true; throw e; })
+            .finally(()=>{ FB.inflight--; if(FB.inflight<=0){ FB.inflight=0; fbSettle(); } });
+  };
+}
+document.addEventListener('click', e=>{
+  const btn=e.target.closest('.btn'); if(!btn||btn.disabled) return;
+  btn.classList.add('fb-press'); setTimeout(()=>btn.classList.remove('fb-press'),120);
+  FB.activeBtn=btn; FB.err=false; clearTimeout(FB.btnTimer);
+  FB.btnTimer=setTimeout(()=>{
+    if(FB.inflight>0) btn.classList.add('fb-busy');
+    else if(FB.activeBtn===btn){ fbBtnFlash(btn,true); FB.activeBtn=null; }   // yerel aksiyon: kısa onay
+  },180);
+}, true);
+window.addEventListener('unhandledrejection', e=>{
+  const m=String((e.reason&&e.reason.message)||e.reason||''); if(!m||/ResizeObserver/.test(m)) return;
+  try{ addLog('err','sistem','Yakalanmamış hata: '+m.slice(0,120)); }catch(_){}
+  try{ toast('⚠ Beklenmeyen hata: '+m.slice(0,80),'err'); }catch(_){}
+});
+window.addEventListener('error', e=>{ if(e.message){ try{ addLog('err','sistem','JS hatası: '+String(e.message).slice(0,120)); }catch(_){} } });
+
+// ═══ BİLDİRİM MERKEZİ ═══════════════════════════════════════
+const VIRAL_ESIK = 10000;   // 1 günde bu izlenmeyi geçen short "viral" bildirilir
+const NOTIF = {
+  items: (()=>{ try{ return JSON.parse(localStorage.getItem('op_notif')||'[]'); }catch(e){ return []; } })(),
+  seen:  new Set((()=>{ try{ return JSON.parse(localStorage.getItem('op_notif_seen')||'[]'); }catch(e){ return []; } })()),
+  checking:false, lastViral:0
+};
+function notifKaydet(){ try{ localStorage.setItem('op_notif',JSON.stringify(NOTIF.items.slice(0,60))); localStorage.setItem('op_notif_seen',JSON.stringify([...NOTIF.seen].slice(-200))); }catch(e){} }
+function notifEkle(id,icon,text,sub,page){
+  const v=NOTIF.items.find(x=>x.id===id);
+  if(v){ v.icon=icon; v.text=text; v.sub=sub; v.page=page; }
+  else { NOTIF.items.unshift({id,icon,text,sub,page,t:Date.now()}); }
+}
+function notifSil(id){ NOTIF.items=NOTIF.items.filter(x=>x.id!==id); }
+function notifSay(){ return NOTIF.items.filter(x=>!NOTIF.seen.has(x.id)).length; }
+function notifRozet(){ const b=document.getElementById('bell-cnt'); if(!b) return; const n=notifSay(); if(n>0){ b.textContent=n>99?'99+':n; b.classList.add('on'); } else { b.textContent=''; b.classList.remove('on'); } }
+function notifZaman(t){ const d=(Date.now()-t)/1000; if(d<60) return 'az önce'; if(d<3600) return Math.floor(d/60)+' dk önce'; if(d<86400) return Math.floor(d/3600)+' sa önce'; return Math.floor(d/86400)+' gün önce'; }
+function notifRender(){
+  const el=document.getElementById('notif-list'); if(!el){ notifRozet(); return; }
+  const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  if(!NOTIF.items.length){ el.innerHTML='<div style="padding:22px;text-align:center;color:var(--mt);font-size:12px">Henüz bildirim yok — her şey yolunda ✓</div>'; notifRozet(); return; }
+  el.innerHTML=NOTIF.items.slice(0,40).map(x=>`<div class="nf-row${NOTIF.seen.has(x.id)?'':' unseen'}" onclick="notifTikla('${esc(x.id)}')">
+    <span class="nf-ic">${x.icon||'🔔'}</span>
+    <div style="flex:1;min-width:0"><div class="nf-tx">${esc(x.text)}</div>${x.sub?`<div class="nf-sub">${esc(x.sub)}</div>`:''}<div class="nf-t">${notifZaman(x.t)}</div></div>
+  </div>`).join('');
+  notifRozet();
+}
+function notifPanelAc(e){ if(e) e.stopPropagation(); const p=document.getElementById('notif-panel'); if(!p) return; if(p.classList.toggle('on')){ notifRender(); notifCheck(true); } }
+function notifPanelKapat(){ const p=document.getElementById('notif-panel'); if(p) p.classList.remove('on'); }
+function notifTikla(id){ NOTIF.seen.add(id); const it=NOTIF.items.find(x=>x.id===id); notifKaydet(); notifRender(); notifPanelKapat();
+  if(it&&it.page){ const ni=[...document.querySelectorAll('.ni')].find(n=>(n.getAttribute('onclick')||'').includes("'"+it.page+"'")); if(ni) ni.click(); else if(typeof goUretim==='function'){ try{ goUretim(it.page); }catch(e){} } } }
+function notifTumunuOku(){ NOTIF.items.forEach(x=>NOTIF.seen.add(x.id)); notifKaydet(); notifRender(); }
+function notifTemizle(){ NOTIF.items=[]; notifKaydet(); notifRender(); }
+document.addEventListener('click', e=>{ const p=document.getElementById('notif-panel'); if(p&&p.classList.contains('on')&&!p.contains(e.target)&&!e.target.closest('#bell-btn')) notifPanelKapat(); });
+
+// Bildirim kaynaklarını tara. derin=true → başarısız/sağlık/viral (pahalı) da taranır.
+async function notifCheck(derin){
+  if(NOTIF.checking) return; NOTIF.checking=true;
+  try{
+    // Ucuz kaynaklar (her zaman)
+    const errs=(S.logs||[]).filter(l=>l.sev==='err' && Date.parse(l.t)>=Date.now()-3600000);
+    if(errs.length>=3) notifEkle('sys-err','⚠',errs.length+' sistem hatası (son 1 saat)','Loglar sayfasında ayrıntılar','loglar'); else notifSil('sys-err');
+    if(getN8N()){ try{ const d=await n8nGetCached('/webhook/kworb-bekleyenler'); const n=(d&&!d._bos)?(d.count!=null?d.count:(d.pending?d.pending.length:0)):0;
+      if(n>0) notifEkle('trend-pending','🔥',n+' trend videosu onay bekliyor','Onaylayıp kategori belirle','radar'); else notifSil('trend-pending'); }catch(e){} }
+    try{ let urls=(S._panelCache&&S._panelCache.urls)||(S.sheetData&&S.sheetData.urls)||[];
+      if(!urls.length&&getN8N()){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos) urls=d.urls||[]; }
+      const st=urls.filter(acIsStuck).length;
+      if(st>0) notifEkle('stuck','⏳',st+' video takılı kalmış (>6 saat)','OpusClip\'ten short dönmedi','urltakip'); else notifSil('stuck'); }catch(e){}
+    // Derin kaynaklar (panel açılınca / ilk yükleme)
+    if(derin && (S.cfg.blot||getN8N())){
+      try{
+        const items=await ydFetchItems();
+        const fail=items.filter(i=>i.status==='failed').length;
+        if(fail>0) notifEkle('fails','❌',fail+' başarısız gönderim','Yayın Durumu\'nda tek tık yeniden gönder','yayindurumu'); else notifSil('fails');
+        try{ const raw=await phFetchAccounts();
+          const sp=new Set(((S.sheetData&&S.sheetData.shorts)||(S._panelCache&&S._panelCache.shorts)||[]).map(r=>String(r.profil||'').trim()).filter(Boolean));
+          const bad=Object.values(phCompute(raw,sp)).filter(h=>h.status!=='live').length;
+          if(bad>0) notifEkle('health','🔴',bad+' profilde bağlantı sorunu','Süresi dolmuş veya hesapsız profil','platformlar'); else notifSil('health');
+        }catch(e){}
+        if(Date.now()-NOTIF.lastViral>3*3600000){ NOTIF.lastViral=Date.now(); await notifViralTara(items); }
+      }catch(e){}
+    }
+  }catch(e){ console.warn('[NOTIF]',e.message); }
+  notifKaydet(); notifRender(); NOTIF.checking=false;
+}
+// Son 48 saatte yayınlanan postların canlı izlenmesini çek; eşik üstünü bir kez bildir
+async function notifViralTara(items){
+  const adaylar=items.filter(i=>i.status==='published' && (i.reqId||i.postId) && (Date.parse(i.time)||0)>=Date.now()-48*3600000).slice(0,15);
+  for(const it of adaylar){
+    const nid='viral-'+(it.postId||it.reqId);
+    if(NOTIF.seen.has(nid)||NOTIF.items.find(x=>x.id===nid)) continue;
+    let m=null;
+    try{
+      if(it.reqId){ const {data}=await upFetch('/uploadposts/post-analytics/'+encodeURIComponent(it.reqId)); m=takParseMetrics(data); }
+      if(!m&&it.postId){ const {data}=await upFetch('/uploadposts/post-analytics?platform_post_id='+encodeURIComponent(it.postId)+'&platform='+encodeURIComponent(ydPlatApi(it.plat))); m=takParseMetrics(data); }
+    }catch(e){}
+    const views=m?parseInt(m.views!=null?m.views:m.impressions)||0:0;
+    if(views>=VIRAL_ESIK){
+      notifEkle(nid,'🚀','🎉 '+ytkFmt(views)+' izlenme: '+(it.title||'').slice(0,42),String(it.plat||'').toUpperCase()+' · '+(it.profile||''),'yayindurumu');
+    }
+  }
+}
+window.notifPanelAc=notifPanelAc; window.notifPanelKapat=notifPanelKapat; window.notifTikla=notifTikla; window.notifTumunuOku=notifTumunuOku; window.notifTemizle=notifTemizle; window.notifCheck=notifCheck;
+
 // #9 HOVER VİDEO ÖNİZLEME
 function hoverPrev(e, url, title) {
   const box=document.getElementById('hover-prev'); if(!box||!url) return;
