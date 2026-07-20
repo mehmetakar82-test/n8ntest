@@ -1088,8 +1088,9 @@ tbody td{line-height:1.5}
   <!-- PROFİL TABLOSU -->
   <div class="card">
     <div class="ct">📁 Upload-Post Profilleri <span id="rap-prof-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
-    <div class="tw"><table><thead><tr><th>Profil</th><th>Platformlar</th><th>Yayınlanan</th><th>Başarısız</th><th>Planlı/Kuyruk</th><th>Son Yayın</th><th>Takipçi</th><th>İzlenme</th></tr></thead>
-    <tbody id="rap-prof-tbody"><tr><td colspan="8" style="color:var(--mt);text-align:center;padding:14px">—</td></tr></tbody></table></div>
+    <div class="tw"><table><thead><tr><th>Profil</th><th>Kategori</th><th>Platformlar</th><th>Yayınlanan</th><th>Başarısız</th><th>Planlı/Kuyruk</th><th>Son Yayın</th><th>Takipçi</th><th>İzlenme</th></tr></thead>
+    <tbody id="rap-prof-tbody"><tr><td colspan="9" style="color:var(--mt);text-align:center;padding:14px">—</td></tr></tbody></table></div>
+    <div id="rap-kat-uyum" style="margin-top:12px"></div>
   </div>
 
   <!-- CANLI SOSYAL METRİKLER -->
@@ -1564,6 +1565,44 @@ const DEFAULT_CATS = {
   genel:   {label:'Genel 📌',   sel_ig:[],sel_yt:[],sel_tt:[]},
 };
 function getCats(){ return Object.keys(S.cats).length ? S.cats : DEFAULT_CATS; }
+
+// ── Kategori ↔ Upload-Post profil eşlemesi ──────────────────
+// n8n "Clips Parse Et" node'undaki KATEGORI_PROFIL_POOL ile BİREBİR aynı olmalı.
+// Short üretilirken kategori bu havuzdan en az yüklü profile yönlendirilir.
+const KATEGORI_PROFIL_POOL = {
+  genel:    ['General-1','genel-2-tr','genel-3-tr','genel-4-tr'],
+  genel_en: ['genel-1-en','genel-2-en'],
+  film:     ['General-2'],
+  eglence:  ['General-3','eglence-1-tr'],
+  bilim:    ['General-4'],
+  vlog:     ['General-5','vlog-1-tr'],
+  komedi:   ['General-6'],
+  oyun:     ['General-7'],
+  spor:     ['General-8'],
+};
+function profilKategori(username){
+  const u = String(username||'').trim();
+  for (const k in KATEGORI_PROFIL_POOL) if (KATEGORI_PROFIL_POOL[k].includes(u)) return k;
+  return '';
+}
+function katLabel(k){
+  if (!k) return '';
+  if (k === 'genel_en') return 'Genel (EN)';
+  const c = getCats()[k];
+  return c ? c.label : k;
+}
+// Canlı Upload-Post profilleriyle haritayı karşılaştır → sapmaları bul
+function katProfilUyum(profiles){
+  const live = new Set((profiles||[]).map(p=>String(p.username||'').trim()).filter(Boolean));
+  const mapped = new Set();
+  Object.values(KATEGORI_PROFIL_POOL).forEach(arr=>arr.forEach(u=>mapped.add(u)));
+  return {
+    live,
+    bagsiz: [...live].filter(u=>!mapped.has(u)),        // Upload-Post'ta var, kategoriye bağlı değil → içerik almaz
+    hayalet: [...mapped].filter(u=>!live.has(u)),       // Haritada var, Upload-Post'ta yok → gönderim başarısız olur
+    bosKategori: Object.keys(KATEGORI_PROFIL_POOL).filter(k=>!KATEGORI_PROFIL_POOL[k].some(u=>live.has(u)))
+  };
+}
 
 // ═══════════════════════════════════════════════════════════
 // NAV
@@ -2703,6 +2742,7 @@ function rapRenderProfiles(inP){
     const sum=f=>a?ytkFmt(Math.round(Object.values(a).reduce((s,m)=>s+(m&&typeof m==='object'?(parseFloat(f(m))||0):0),0))):'…';
     return `<tr>
       <td style="font-family:var(--fm);color:var(--tx)">${esc(u)}</td>
+      <td>${(()=>{ const k=profilKategori(u); return k?`<span class="badge bi" style="font-size:11px">${esc(katLabel(k))}</span>`:'<span class="badge be" style="font-size:11px" title="Hiçbir kategoriye bağlı değil — bu profile içerik gitmez">⚠ bağsız</span>'; })()}</td>
       <td>${platIcons(u)}</td>
       <td style="color:var(--ok);font-variant-numeric:tabular-nums">${b.p}</td>
       <td style="color:${b.f?'var(--er)':'var(--mt)'};font-variant-numeric:tabular-nums">${b.f}</td>
@@ -2711,7 +2751,37 @@ function rapRenderProfiles(inP){
       <td style="font-variant-numeric:tabular-nums">${sum(m=>m.followers)}</td>
       <td style="font-variant-numeric:tabular-nums">${sum(m=>m.views!=null?m.views:m.impressions)}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" style="color:var(--mt);text-align:center;padding:14px">Profil yok — Platformlar → Yenile</td></tr>';
+  }).join('') || '<tr><td colspan="9" style="color:var(--mt);text-align:center;padding:14px">Profil yok — Platformlar → Yenile</td></tr>';
+  rapRenderKatUyum(profs);
+}
+
+// Kategori ↔ profil eşleşmesi + sapma denetimi
+function rapRenderKatUyum(profs){
+  const el=document.getElementById('rap-kat-uyum'); if(!el) return;
+  const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  if(!(profs||[]).length){ el.innerHTML=''; return; }
+  const u=katProfilUyum(profs);
+  const satir=Object.keys(KATEGORI_PROFIL_POOL).map(k=>{
+    const chips=KATEGORI_PROFIL_POOL[k].map(pn=>{
+      const canli=u.live.has(pn);
+      return `<span class="badge ${canli?'bs2':'be'}" style="font-size:11px;font-family:var(--fm)" title="${canli?'Upload-Post baglantisi var':'Upload-Post listesinde YOK — bu profile gonderim basarisiz olur'}">${canli?'':'⚠ '}${esc(pn)}</span>`;
+    }).join(' ');
+    const bos=u.bosKategori.includes(k);
+    return `<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--brd)">
+      <span style="width:120px;flex-shrink:0;font-size:12px;color:${bos?'var(--er)':'var(--tx)'}">${esc(katLabel(k))}${bos?' ⚠':''}</span>
+      <span style="display:flex;gap:5px;flex-wrap:wrap">${chips}</span>
+    </div>`;
+  }).join('');
+  const sorun=[];
+  if(u.hayalet.length) sorun.push(`<div style="color:var(--er);font-size:12px;margin-top:8px">⚠ Haritada var ama Upload-Post'ta <b>yok</b> (gönderim başarısız olur): <b>${u.hayalet.map(esc).join(', ')}</b></div>`);
+  if(u.bagsiz.length)  sorun.push(`<div style="color:var(--wn);font-size:12px;margin-top:6px">⚠ Upload-Post'ta var ama <b>hiçbir kategoriye bağlı değil</b> (içerik almaz): <b>${u.bagsiz.map(esc).join(', ')}</b></div>`);
+  if(u.bosKategori.length) sorun.push(`<div style="color:var(--er);font-size:12px;margin-top:6px">⚠ Bu kategorilerin <b>canlı profili yok</b>: <b>${u.bosKategori.map(k=>esc(katLabel(k))).join(', ')}</b></div>`);
+  const ok = !sorun.length;
+  el.innerHTML=`<div style="border:1px solid ${ok?'rgba(52,211,153,.3)':'rgba(248,113,113,.35)'};border-radius:8px;padding:11px 13px;background:var(--sur2)">
+    <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:8px">🔗 Kategori ↔ Profil Eşleşmesi ${ok?'<span style="color:var(--ok);letter-spacing:0;text-transform:none">— tam uyumlu ✓</span>':'<span style="color:var(--er);letter-spacing:0;text-transform:none">— sapma var</span>'}</div>
+    ${satir}${sorun.join('')}
+    <div style="font-size:11px;color:var(--mt);margin-top:9px">Bu harita n8n <code>Clips Parse Et</code> node'undaki <code>KATEGORI_PROFIL_POOL</code> ile birebir aynı olmalıdır; short üretilirken kategori, havuzdaki <b>en az yüklü</b> profile yönlendirilir.</div>
+  </div>`;
 }
 
 function rapSpark(ts){
