@@ -1716,6 +1716,25 @@ async function n8nGet(path) {
   } catch(e) { addLog('err','webhook','GET '+path+': ağ/CORS hatası — '+e.message); return null; }
 }
 
+// ── n8n GET önbelleği + eşzamanlı istek birleştirme ──────────
+// Aynı veriyi birden çok bölüm istediğinde TEK istek atılır; kısa süreli
+// tekrarlar önbellekten döner. Google Sheets kota aşımını (429) önler.
+const N8N_CACHE = { data:{}, inflight:{} };
+const N8N_TTL = 90000; // 90 sn
+async function n8nGetCached(path, ttl){
+  const t = (ttl==null) ? N8N_TTL : ttl;
+  const hit = N8N_CACHE.data[path];
+  if (hit && Date.now()-hit.t < t) return hit.v;
+  if (N8N_CACHE.inflight[path]) return N8N_CACHE.inflight[path];
+  const pr = n8nGet(path)
+    .then(v => { if (v && !v._bos) N8N_CACHE.data[path] = { t:Date.now(), v }; delete N8N_CACHE.inflight[path]; return v; })
+    .catch(e => { delete N8N_CACHE.inflight[path]; throw e; });
+  N8N_CACHE.inflight[path] = pr;
+  return pr;
+}
+// Kullanıcı "Yenile"ye bastığında taze veri gelsin
+function n8nCacheClear(path){ if (path) delete N8N_CACHE.data[path]; else N8N_CACHE.data = {}; }
+
 async function sheetsGet(sheetId, range) {
   if (S._panelCache) {
     const rl = range.toLowerCase();
@@ -1758,6 +1777,7 @@ function parseSheet(values) {
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════
 async function refreshDash() {
+  n8nCacheClear();
   const lastEl = document.getElementById('dash-last');
   if (lastEl) lastEl.textContent = 'Guncelleniyor...';
   addLog('info','sistem','Dashboard yenileniyor');
@@ -1766,7 +1786,7 @@ async function refreshDash() {
   const n8n = getN8N();
 
   if (n8n) {
-    const d = await n8nGet('/webhook/panel-data');
+    const d = await n8nGetCached('/webhook/panel-data');
     if (d) {
       shorts = d.shorts||[]; urls = d.urls||[]; sched = d.scheduled||[];
       S._panelCache = d;
@@ -2561,6 +2581,7 @@ async function loadReports(){
   RAP.loading = true;
   const st = document.getElementById('rap-status');
   if (!S.cfg.blot && !getN8N()){ if(st) st.textContent='Upload-Post API Key veya n8n URL gerekli (Ayarlar)'; RAP.loading=false; return; }
+  n8nCacheClear();
   if (st) st.textContent = '⏳ veriler toplanıyor…';
   addLog('info','sistem','Rapor oluşturuluyor');
   // 1) Üretim verisi (cache → n8n panel-data → doğrudan Sheets)
@@ -2568,7 +2589,7 @@ async function loadReports(){
   let urls  =(S._panelCache&&S._panelCache.urls)||(S.sheetData&&S.sheetData.urls)||[];
   if (!shorts.length){
     const base=getN8N();
-    if (base){ const d=await n8nGet('/webhook/panel-data'); if(d){ shorts=d.shorts||[]; urls=d.urls||[]; S.sheetData={shorts,urls}; } }
+    if (base){ const d=await n8nGetCached('/webhook/panel-data'); if(d){ shorts=d.shorts||[]; urls=d.urls||[]; S.sheetData={shorts,urls}; } }
     if (!shorts.length && (S.cfg.sheet||S.cfg.shkey)){ try{ const sid=S.cfg.sheet||''; const [sv,uv]=await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid,'URL-Takip!A:Z')]); shorts=parseSheet(sv)||[]; urls=parseSheet(uv)||[]; }catch(e){} }
   }
   RAP.shorts=shorts; RAP.urls=urls;
@@ -2813,7 +2834,7 @@ async function loadPlatforms() {
   }
   // 2) n8n webhook (var ve CORS izinli)
   if (!raw) {
-    const d = await n8nGet('/webhook/uploadpost-profiller');
+    const d = await n8nGetCached('/webhook/uploadpost-profiller');
     if (d && !d._bos) { raw = d; kaynak = 'n8n proxy'; }
   }
   // 3) Doğrudan API (S.cfg.blot varsa)
@@ -4062,13 +4083,14 @@ function initTrendOnay() {
 }
 
 async function trFetchPending() {
+  n8nCacheClear('/webhook/kworb-bekleyenler');
   const base = getN8N();
   if (!base) return showRes('tr-status','Ayarlar\'dan n8n URL girin','warn');
   const btn = document.getElementById('tr-fetch-btn');
   if (btn) btn.disabled = true;
   showRes('tr-status','⏳ Bekleyenler yükleniyor...','info');
   try {
-    const data = await n8nGet('/webhook/kworb-bekleyenler');
+    const data = await n8nGetCached('/webhook/kworb-bekleyenler');
     if (!data) { showRes('tr-status','✕ n8n\'e ulaşılamadı — URL yanlış, CORS engeli ya da webhook kayıtlı değil (ayrıntı: Loglar)','err'); return; }
     if (data._bos) { showRes('tr-status','✕ n8n boş yanıt döndü (HTTP 200, 0 bayt) — akış tamamlanmıyor. n8n → Executions listesinde son çalıştırmanın hatasına bak.','err'); return; }
     TR.pending = Array.isArray(data.pending) ? data.pending.slice().reverse() : [];
@@ -4341,7 +4363,7 @@ function opcSyncProcessed(clipId, durum) {
 async function opcLoadProcessedRemote() {
   const base = getN8N(); if (!base) return;
   try {
-    const d = await n8nGet('/webhook/opus-islenen');
+    const d = await n8nGetCached('/webhook/opus-islenen');
     const ids = d && (d.ids || d.list || (Array.isArray(d)?d:[]));
     if (Array.isArray(ids) && ids.length) {
       ids.forEach(id => OPC.processed.add(String(id)));
@@ -5578,7 +5600,7 @@ async function refreshBadges() {
   const errs=(S.logs||[]).filter(l=>l.sev==='err').length;
   const bl=document.getElementById('badge-log'); if(bl){ bl.textContent=errs>99?'99+':errs; bl.classList.toggle('on',errs>0); }
   const base=getN8N();
-  if(base){ try { const d=await n8nGet('/webhook/kworb-bekleyenler'); if(d&&d._bos) return; const n=(d&&d.count!=null)?d.count:((d&&d.pending)?d.pending.length:0); const bt=document.getElementById('badge-tr'); if(bt){ bt.textContent=n>99?'99+':n; bt.classList.toggle('on',n>0); } try{ trTabCount(n); }catch(e){} } catch(e){} }
+  if(base){ try { const d=await n8nGetCached('/webhook/kworb-bekleyenler'); if(d&&d._bos) return; const n=(d&&d.count!=null)?d.count:((d&&d.pending)?d.pending.length:0); const bt=document.getElementById('badge-tr'); if(bt){ bt.textContent=n>99?'99+':n; bt.classList.toggle('on',n>0); } try{ trTabCount(n); }catch(e){} } catch(e){} }
 }
 // #8 GÖNDERİM GEÇMİŞİ
 function initGecmis() {
@@ -5621,12 +5643,13 @@ function gcClearAll() {
 async function loadProfileLoad() {
   const listEl=document.getElementById('pl-list'), st=document.getElementById('pl-status');
   if(!listEl) return;
+  n8nCacheClear('/webhook/panel-data');
   if(st) st.textContent='⏳ yükleniyor…';
   // 1) short-kaydetme profil dağılımı (dashboard yüklüyse cache, değilse çek)
   let shorts=(S.sheetData&&S.sheetData.shorts)||[];
   if(!shorts.length){
     const n8n=getN8N();
-    if(n8n){ const d=await n8nGet('/webhook/panel-data'); if(d&&!d._bos){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } }
+    if(n8n){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } }
     if(!shorts.length){ const sid=S.cfg.sheet||''; if(sid||S.cfg.shkey){ try{ shorts=parseSheet(await sheetsGet(sid,'Sheet1!A:Z')); }catch(e){} } }
   }
   const byP={};
@@ -5670,7 +5693,7 @@ window.loadProfileLoad=loadProfileLoad;
 async function seedProfileLoad() {
   const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
   let shorts=(S.sheetData&&S.sheetData.shorts)||[];
-  if(!shorts.length){ const n8n=getN8N(); if(n8n){ const d=await n8nGet('/webhook/panel-data'); if(d&&!d._bos){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } } }
+  if(!shorts.length){ const n8n=getN8N(); if(n8n){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } } }
   if(!shorts.length) return toast('Short verisi yok — önce Dashboard\'ı yenile','warn');
   const load={};
   shorts.forEach(r=>{ const p=String(r['profil']||r['Profil']||r['profile']||'').trim(); if(p) load[p]=(load[p]||0)+1; });
@@ -5699,7 +5722,7 @@ function ydShortsAll(){ return (S._panelCache && S._panelCache.shorts) || (S.she
 async function ydEnsureShorts(){
   if (ydShortsAll().length) return;
   const base = getN8N(); if (!base) return;
-  try { const d = await n8nGet('/webhook/panel-data'); if (d && !d._bos) S.sheetData = { shorts:d.shorts||[], urls:d.urls||[] }; } catch(e){}
+  try { const d = await n8nGetCached('/webhook/panel-data'); if (d && !d._bos) S.sheetData = { shorts:d.shorts||[], urls:d.urls||[] }; } catch(e){}
 }
 function ydRowUrl(r){ return r['short-url'] || r['shortUrl'] || r['uriForExport'] || ''; }
 
@@ -5999,7 +6022,7 @@ async function phFetchAccounts(){
   if (S.uploadPostAccounts) return S.uploadPostAccounts;
   if (S._panelCache && S._panelCache.accounts && Object.keys(S._panelCache.accounts).length) return S._panelCache.accounts;
   const base = getN8N();
-  if (base){ try { const d = await n8nGet('/webhook/uploadpost-profiller'); if (d && !d._bos && d.profiles){ S.uploadPostAccounts=d; return d; } } catch(e){} }
+  if (base){ try { const d = await n8nGetCached('/webhook/uploadpost-profiller'); if (d && !d._bos && d.profiles){ S.uploadPostAccounts=d; return d; } } catch(e){} }
   if (S.cfg.blot){ try { const { data } = await upFetch('/uploadposts/users'); S.uploadPostAccounts=data; return data; } catch(e){} }
   return null;
 }
@@ -6065,10 +6088,10 @@ async function loadActionCenter(){
   } catch(e){ return null; } })();
   const pStuck = (async()=>{ try {
     let urls = (S._panelCache&&S._panelCache.urls)||(S.sheetData&&S.sheetData.urls)||[];
-    if (!urls.length){ const base=getN8N(); if(base){ const d=await n8nGet('/webhook/panel-data'); if(d&&!d._bos) urls=d.urls||[]; } }
+    if (!urls.length){ const base=getN8N(); if(base){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos) urls=d.urls||[]; } }
     return urls.length ? urls.filter(acIsStuck).length : null;
   } catch(e){ return null; } })();
-  const pTrend = (async()=>{ try { const base=getN8N(); if(!base) return null; const d=await n8nGet('/webhook/kworb-bekleyenler'); return (d&&!d._bos)?(d.count!=null?d.count:(d.pending?d.pending.length:0)):null; } catch(e){ return null; } })();
+  const pTrend = (async()=>{ try { const base=getN8N(); if(!base) return null; const d=await n8nGetCached('/webhook/kworb-bekleyenler'); return (d&&!d._bos)?(d.count!=null?d.count:(d.pending?d.pending.length:0)):null; } catch(e){ return null; } })();
 
   const [fail, health, stuck, trend] = await Promise.all([pFail,pHealth,pStuck,pTrend]);
   const tiles = [
@@ -6096,7 +6119,7 @@ async function loadActionCenter(){
   const totalAct=vals.reduce((s,v)=>s+(typeof v==='number'?v:0),0);
   if (stEl) stEl.textContent = known===0 ? 'veri yok — Ayarlar (API key / n8n)' : (totalAct>0 ? (totalAct+' aksiyon bekliyor') : 'tümü temiz ✓');
 }
-window.loadActionCenter=loadActionCenter; window.acTileClick=acTileClick;
+window.n8nCacheClear=n8nCacheClear; window.loadActionCenter=loadActionCenter; window.acTileClick=acTileClick;
 
 // ═══════════════════════════════════════════════════════════
 // TREND RADAR — günlük keşif: trend + hızlı yükselen + potansiyel + kanallar
@@ -6125,6 +6148,7 @@ function rdCacheGet(){
 async function loadRadar(force){
   if(RD.loading) return;
   RD.loading=true;
+  if(force) n8nCacheClear('/webhook/trend-radar');
   const st=document.getElementById('rd-status');
   if(st) st.textContent='⏳ veriler toplanıyor…';
   try{
@@ -6132,7 +6156,7 @@ async function loadRadar(force){
     // 1) n8n günlük radar (her sabah hesaplanmış)
     const base=getN8N();
     if(base){
-      const d=await n8nGet('/webhook/trend-radar');
+      const d=await n8nGetCached('/webhook/trend-radar');
       if(d && !d._bos && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],gtrend:d.gtrend||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:''); }
     }
     // 2) canlı hesap (YouTube API)
