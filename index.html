@@ -1272,7 +1272,7 @@ tbody td{line-height:1.5}
 <div id="page-yayindurumu" class="page">
   <div class="ph"><div class="pt">Yayın Durumu</div><div class="ps">Başladı ≠ bitti — her gönderimin platform bazlı gerçek sonucu (yayınlandı / başarısız) + permalink + hedefli yeniden gönder</div></div>
   <div class="utab-bar" data-group="durum" data-utab="yayindurumu"></div>
-  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veri kaynağı <b>Upload-Post</b> <b>/uploadposts/history</b>'dir (yayınlanan = permalink, başarısız = hata sebebi). Kuyruğa atılan (add_to_queue) postlar ancak Upload-Post işledikten <b>sonra</b> burada görünür. <b>Yeniden Gönder</b>, başarısız gönderimi aynı profil/platforma tekrar iletir; kaynak videoyu short-kaydetme (<code>short-url</code>) sayfasından bulur, bulamazsa video URL'si ister.</span></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veri kaynağı <b>Upload-Post</b> <b>/uploadposts/history</b>'dir (yayınlanan = permalink, başarısız = hata sebebi). Kuyruğa atılan (add_to_queue) postlar ancak Upload-Post işledikten <b>sonra</b> burada görünür. <b>Yeniden Gönder</b> önce <b>Upload-Post yerel yeniden denemesini</b> kullanır (<code>/posts/retry</code>): yalnız <b>başarısız platform</b> tekrarlanır, orijinal medya yeniden kullanılır — kaynak video gerekmez. Kayıtta <code>request_id</code> yoksa kaynak mp4'ü short-kaydetme'den bulur, o da yoksa URL ister.</span></div>
 
   <!-- Özet kutuları -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
@@ -1287,10 +1287,10 @@ tbody td{line-height:1.5}
     <button class="btn bp bsm" onclick="loadYayinDurumu()">↻ Yenile</button>
     <span id="yd-status" style="font-size:13px;color:var(--mt);font-family:var(--fm)"></span>
     <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
-      <span class="badge bgr" id="yd-f-all"    onclick="ydFilter('all')"    style="cursor:pointer">Tümü</span>
-      <span class="badge bi"  id="yd-f-failed" onclick="ydFilter('failed')" style="cursor:pointer">❌ Başarısız</span>
-      <span class="badge bi"  id="yd-f-published" onclick="ydFilter('published')" style="cursor:pointer">✅ Yayınlandı</span>
-      <span class="badge bi"  id="yd-f-scheduled" onclick="ydFilter('scheduled')" style="cursor:pointer">⏰ Planlı</span>
+      <span class="badge bi"  id="yd-f-all"    onclick="ydFilter('all')"    style="cursor:pointer;opacity:.45">Tümü</span>
+      <span class="badge bgr" id="yd-f-failed" onclick="ydFilter('failed')" style="cursor:pointer">❌ Başarısız</span>
+      <span class="badge bi"  id="yd-f-published" onclick="ydFilter('published')" style="cursor:pointer;opacity:.45">✅ Yayınlandı</span>
+      <span class="badge bi"  id="yd-f-scheduled" onclick="ydFilter('scheduled')" style="cursor:pointer;opacity:.45">⏰ Planlı</span>
     </div>
   </div>
 
@@ -5688,7 +5688,7 @@ window.seedProfileLoad=seedProfileLoad;
 //  #1  Upload-Post /history → her gönderimin platform bazlı GERÇEK sonucu
 //  #2  Başarısızı aynı profil/platforma yeniden gönder (kaynak mp4 = short-kaydetme 'short-url')
 // ═══════════════════════════════════════════════════════════
-const YD = { items: [], filter: 'all', retry: null };
+const YD = { items: [], filter: 'failed', retry: null };
 const YD_PLATMAP   = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb', x:'x', twitter:'x', threads:'ig', linkedin:'fb' };
 const YD_PLAT_LABEL= { ig:PFAV('instagram.com')+' Instagram', yt:PFAV('youtube.com')+' YouTube', tt:PFAV('tiktok.com')+' TikTok', fb:PFAV('facebook.com')+' Facebook', x:PFAV('x.com')+' X' };
 function ydPlatApi(p){ return ({ig:'instagram',yt:'youtube',tt:'tiktok',fb:'facebook',x:'x'})[p] || p; }
@@ -5759,6 +5759,8 @@ async function ydFetchItems(){
         thumb:   h.thumbnail || h.preview_url || '',
         permalink: h.post_url || h.url || '',
         error:   h.error_message || h.error || '',
+        reqId:   h.request_id || '',
+        jobId:   h.job_id || '',
         time:    h.upload_timestamp || h.uploaded_at || h.created_at || h.timestamp || h.date || ''
       });
     });
@@ -5847,8 +5849,10 @@ function renderYayinDurumu(){
     let right = '';
     if ((it.status==='published') && it.permalink) right = `<a href="${esc(it.permalink)}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ Aç</a>`;
     else if (it.status==='failed'){
-      const known = it._video ? ' title="Kaynak video bulundu — tek tık"' : ' title="Kaynak bilinmiyor — mp4 sorulacak"';
-      right = `<button class="btn bp bsm" onclick="ydRetry(${realIdx})"${known}>↻ Yeniden Gönder${it._video?'':' *'}</button>`;
+      const native = !!(it.reqId || it.jobId);
+      const known = native ? ' title="Upload-Post yerel yeniden deneme — tek tık, yalnız başarısız platform"'
+                   : (it._video ? ' title="Kaynak video bulundu — tek tık"' : ' title="Kaynak bilinmiyor — mp4 sorulacak"');
+      right = `<button class="btn bp bsm" onclick="ydRetry(${realIdx})"${known}>↻ Yeniden Gönder${(native||it._video)?'':' *'}</button>`;
     }
     return `<div style="display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--brd);border-left:3px solid ${stColor};border-radius:6px;margin-bottom:6px;background:var(--sur)">
       ${thumb}
@@ -5864,8 +5868,47 @@ function renderYayinDurumu(){
 }
 
 // ── Retry ──────────────────────────────────────────────────
+// Upload-Post yerel yeniden deneme: yalnız başarısız platformlar, orijinal medya
+// yeniden kullanılır — kaynak mp4 aramaya gerek yok (tek tık).
+async function ydNativeRetry(it, idx){
+  const body = it.reqId ? { request_id: it.reqId } : { job_id: it.jobId };
+  toast('↻ Upload-Post üzerinden yeniden deneniyor…','info');
+  addLog('info','uploadpost','Native retry: '+(it.reqId||it.jobId)+' ['+it.plat+'] '+it.title);
+  try {
+    let ok=false, msg='';
+    if (S.cfg.blot){
+      const r = await fetch('https://api.upload-post.com/api/uploadposts/posts/retry', {
+        method:'POST', headers:{ 'Authorization':'Apikey '+S.cfg.blot, 'Content-Type':'application/json' },
+        body: JSON.stringify(body)
+      });
+      const j = await r.json().catch(()=>({}));
+      ok = r.ok && j.success !== false;
+      msg = j.message || j.error || ('HTTP '+r.status);
+    } else {
+      const res = await faf(getN8N()+'/webhook/yeniden-gonder', Object.assign({native:true}, body));
+      ok = res && res.ok === true;
+      msg = ok ? '' : 'n8n Active mi / yeniden-gonder webhook var mı?';
+    }
+    if (ok){
+      toast('✓ Yeniden kuyruğa alındı — '+(it.profile||'')+' ['+it.plat+']','ok');
+      addLog('ok','uploadpost','Native retry OK: '+(it.reqId||it.jobId));
+      it.status='retried'; it.error=(it.error?it.error+' · ':'')+'↻ Upload-Post yeniden denedi';
+      ydUpdateCounts(); renderYayinDurumu();
+    } else {
+      toast('✕ Yeniden denenemedi: '+msg,'err');
+      addLog('err','uploadpost','Native retry hata: '+msg);
+    }
+  } catch(e){
+    toast('✕ Hata: '+e.message,'err');
+    addLog('err','uploadpost','Native retry hata: '+e.message);
+  }
+}
+
 async function ydRetry(idx){
   const it = YD.items[idx]; if (!it) return;
+  // 1) Upload-Post yerel retry (request_id/job_id varsa) — tek tık, kaynak gerekmez
+  if (it.reqId || it.jobId) return ydNativeRetry(it, idx);
+  // 2) Yedek: kaynak mp4 ile yeniden gönder
   if (it._video){
     await ydDoRetry({ profil: it._profil||it.profile, platform: ydPlatApi(it.plat), video: it._video, title: it.title, description: it._caption||it.caption }, idx);
   } else {
