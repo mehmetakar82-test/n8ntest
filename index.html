@@ -266,6 +266,7 @@ tbody td{line-height:1.5}
 .rd-card:hover{border-color:var(--acc);transform:translateY(-2px)}
 .rd-card.sel{border-color:var(--acc);box-shadow:0 0 0 2px rgba(0,229,255,.3)}
 .rd-card .rd-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000}
+.rd-dur{position:absolute;right:6px;top:calc(56.25% - 22px);background:rgba(0,0,0,.85);color:#fff;font-size:10.5px;font-weight:700;padding:2px 6px;border-radius:4px;z-index:3;font-variant-numeric:tabular-nums}
 .rd-card .rd-body{padding:9px 10px 10px}
 .rd-card .rd-title{font-size:12.5px;font-weight:600;color:var(--tx);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px}
 .rd-card .rd-meta{font-size:11px;color:var(--mt);margin-top:4px;display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums}
@@ -1275,7 +1276,7 @@ tbody td{line-height:1.5}
   </div>
   <div class="card" style="border-color:rgba(251,191,36,.3)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
-      <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için günün <b>en iyi 5</b> videosu — ayrı arama + Türkçe filtresi + outlier. Sonuç gün boyu saklanır. YouTube genel trend listesini kaldırdığı için kategori boşluğunu bu doldurur (~800 API birimi, isteğe bağlı)</span></span>
+      <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için günün <b>en iyi 5</b> videosu — kategori başına 2 sorgu x 2 süre bandı (son 14 gün), dil filtresi, <b>4-60 dk</b> ve <b>100K+ abone</b> şartı, outlier sıralaması. Genel için TR ve EN ayrı. Sonuç gün boyu saklanır (~3600 API birimi). YouTube genel trend listesini kaldırdığı için kategori boşluğunu bu doldurur (~800 API birimi, isteğe bağlı)</span></span>
       <button class="btn bg bsm" onclick="rdKategoriTara(true)" title="Her kategori için günün en iyi 5 videosu. Sonuç gün boyu saklanır; tekrar basınca yeniden taranır.">🎯 Günün En İyi 5'i</button>
     </div>
     <div id="rd-kat-status" style="font-size:12px;color:var(--mt);margin-bottom:8px"></div>
@@ -6619,16 +6620,30 @@ window.katOgren=katOgren; window.katTahmin=katTahmin;
 // YouTube kategori ID + Türkçe tohum sorgu. videoCategoryId TEK BAŞINA sonuç
 // vermiyor (q zorunlu); relevanceLanguage de filtre değil ipucu — bu yüzden
 // aşağıda ayrıca Türkçe içerik filtresi uygulanır.
+// Kategori başına ÇOKLU tohum sorgu + iki süre bandı (medium 4-20dk, long 20dk+).
+// Ölçüm: tek sorgu + yalnız 'long' + 7 gün ile bilim/oyun filtrelerden sonra BOŞ
+// kalıyordu; 2 sorgu x 2 band x 14 gün ile bilim 19, oyun 24 videoya çıktı.
 const RD_KAT_SORGU = {
-  genel:   { cid:'',   q:'belgesel' },
-  film:    { cid:'1',  q:'dizi bölüm' },
-  eglence: { cid:'24', q:'eğlenceli video' },
-  bilim:   { cid:'28', q:'bilim' },
-  vlog:    { cid:'22', q:'günlük vlog' },
-  komedi:  { cid:'23', q:'türkçe komedi' },
-  oyun:    { cid:'20', q:'oyun oynuyoruz' },
-  spor:    { cid:'17', q:'maç analiz' }
+  genel:    { cid:'',   q:['belgesel','ilginç bilgiler'],       dil:'tr' },
+  genel_en: { cid:'',   q:['documentary','interesting facts'],  dil:'en', bolge:'US' },
+  film:     { cid:'1',  q:['dizi bölüm','film analiz'],         dil:'tr' },
+  eglence:  { cid:'24', q:['eğlenceli video','kamera şakası'],  dil:'tr' },
+  bilim:    { cid:'28', q:['bilim','teknoloji'],                dil:'tr' },
+  vlog:     { cid:'22', q:['günlük vlog','gezi'],               dil:'tr' },
+  komedi:   { cid:'23', q:['türkçe komedi','skeç'],             dil:'tr' },
+  oyun:     { cid:'20', q:['oyun','minecraft'],                 dil:'tr' },
+  spor:     { cid:'17', q:['maç analiz','futbol yorum'],        dil:'tr' }
 };
+// Ingilizce icerik mi? (genel_en icin - Turkce filtresinin aynasi)
+function rdIngilizceMi(v){
+  const sn=v.snippet||{};
+  const dl=String(sn.defaultAudioLanguage||sn.defaultLanguage||'').toLowerCase();
+  if(dl.startsWith('en')) return true;
+  if(dl && !dl.startsWith('en')) return false;
+  const t=(sn.title||'');
+  if(/[çğışöüÇĞİŞÖÜ]/.test(t)) return false;
+  return /\b(the|and|of|to|in|for|how|why|what|this|with|you)\b/i.test(t);
+}
 // Türkçe içerik mi? defaultAudioLanguage güvenilir; yoksa Türkçe karakter + sık sözcük
 function rdTurkceMi(v){
   const sn=v.snippet||{};
@@ -6660,23 +6675,32 @@ async function rdKategoriTaraCalistir(){
   const st=document.getElementById('rd-kat-status'), el=document.getElementById('rd-kat');
   if(!key){ if(st) st.textContent='YouTube API Key gerekli (Ayarlar)'; return; }
   const YT='https://www.googleapis.com/youtube/v3/';
-  const after=new Date(Date.now()-7*24*3600*1000).toISOString();
+  const after=new Date(Date.now()-14*24*3600*1000).toISOString();   // 14 gün: niş kategorilerde aday yetsin
   const kats=Object.keys(RD_KAT_SORGU);
   const bulunan={}; const idSet=new Set();
   let i=0;
   for(const k of kats){
     i++; if(st) st.textContent='⏳ '+i+'/'+kats.length+' — '+k+' aranıyor…';
     const c=RD_KAT_SORGU[k];
-    try{
-      let u=YT+'search?part=snippet&type=video&order=viewCount&regionCode=TR&relevanceLanguage=tr&videoDuration=long'
-           +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(c.q)+'&maxResults=10&key='+key;
-      if(c.cid) u+='&videoCategoryId='+c.cid;
-      const s=await ytkFetch(u);
-      bulunan[k]=(s.items||[]).map(x=>x.id&&x.id.videoId).filter(Boolean);
-      bulunan[k].forEach(id=>idSet.add(id));
-    }catch(e){ bulunan[k]=[]; console.warn('[RD-KAT] '+k+':',e.message); }
+    const bolge=c.bolge||'TR', dil=c.dil||'tr';
+    const sorgular=Array.isArray(c.q)?c.q:[c.q];
+    const bulun=new Set();
+    for(const q of sorgular){
+      for(const band of ['medium','long']){          // 4-20dk + 20dk+ → aday havuzu genişler
+        try{
+          let u=YT+'search?part=snippet&type=video&order=viewCount&regionCode='+bolge
+               +'&relevanceLanguage='+dil+'&videoDuration='+band
+               +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(q)+'&maxResults=25&key='+key;
+          if(c.cid) u+='&videoCategoryId='+c.cid;
+          const s=await ytkFetch(u);
+          (s.items||[]).forEach(x=>{ const id=x.id&&x.id.videoId; if(id) bulun.add(id); });
+        }catch(e){ console.warn('[RD-KAT] '+k+' q='+q+' '+band+':',e.message); }
+      }
+    }
+    bulunan[k]=[...bulun];
+    bulunan[k].forEach(id=>idSet.add(id));
   }
-  const ids=[...idSet];
+  const ids=[...idSet];   // tüm kategorilerin adayları (parça parça detay çekilir)
   if(!ids.length){ if(st) st.textContent='Sonuç yok'; el.innerHTML='<div class="rd-empty">Bu taramada sonuç çıkmadı</div>'; return; }
   if(st) st.textContent='⏳ video detayları…';
   const det={};
@@ -6685,18 +6709,21 @@ async function rdKategoriTaraCalistir(){
     (d.items||[]).forEach(v=>{ det[v.id]=v; });
   }
   // kanal detay + medyan (outlier)
-  const chIds=[...new Set(Object.values(det).map(v=>(v.snippet||{}).channelId).filter(Boolean))].slice(0,50);
+  const chIds=[...new Set(Object.values(det).map(v=>(v.snippet||{}).channelId).filter(Boolean))];
   const subsBy={}, uploadsBy={};
-  if(chIds.length){
-    const ch=await ytkFetch(YT+'channels?part=statistics,contentDetails&id='+chIds.join(',')+'&maxResults=50&key='+key);
-    (ch.items||[]).forEach(c=>{ subsBy[c.id]=parseInt((c.statistics||{}).subscriberCount||0);
-      const up=((c.contentDetails||{}).relatedPlaylists||{}).uploads; if(up) uploadsBy[c.id]=up; });
+  for(let a=0;a<chIds.length;a+=50){
+    try{
+      const ch=await ytkFetch(YT+'channels?part=statistics,contentDetails&id='+chIds.slice(a,a+50).join(',')+'&maxResults=50&key='+key);
+      (ch.items||[]).forEach(c=>{ subsBy[c.id]=parseInt((c.statistics||{}).subscriberCount||0);
+        const up=((c.contentDetails||{}).relatedPlaylists||{}).uploads; if(up) uploadsBy[c.id]=up; });
+    }catch(e){ console.warn('[RD-KAT] kanal:',e.message); }
   }
   const medCache=await rdChannelMedians(key, uploadsBy, chIds, st);
   const now=Date.now();
   const sonuc={};
   kats.forEach(k=>{
-    const list=(bulunan[k]||[]).map(id=>det[id]).filter(Boolean).filter(rdTurkceMi).map(v=>{
+    const dilFiltre=(RD_KAT_SORGU[k]&&RD_KAT_SORGU[k].dil==='en')?rdIngilizceMi:rdTurkceMi;
+    const list=(bulunan[k]||[]).map(id=>det[id]).filter(Boolean).filter(dilFiltre).map(v=>{
       const sn=v.snippet||{}, stx=v.statistics||{};
       const views=parseInt(stx.viewCount||0);
       const ageH=Math.max(1,(now-Date.parse(sn.publishedAt||0))/3.6e6);
@@ -6708,7 +6735,7 @@ async function rdKategoriTaraCalistir(){
         vph:Math.round(views/ageH), ratio:0, delta:0, deltaH:0, outlier:0, chMed:0, ivme:0, kategori:k };
       const _t=katTahmin(o); o.katTahmin=_t.kategori; o.katGuven=_t.guven; o.katSecenek=_t.secenekler; o.katNeden=_t.neden;
       return o;
-    }).filter(x=>x.views>=1000);
+    }).filter(x=>x.views>=1000 && rdKesifOk(x));   // ≤1sa + 100K+ abone
     rdApplyOutlier(list, medCache);
     sonuc[k]=list.sort((a,b)=>(b.outlier||1)*b.vph-(a.outlier||1)*a.vph).slice(0,5);
   });
@@ -6730,7 +6757,7 @@ function rdRenderKat(){
         return '<div class="rd-card'+sel+'" onclick="rdToggle(\''+x.id+'\')">'
           +'<span class="rd-sel-tick">✓</span>'
           +(x.outlier>=2?'<span class="rd-badge-ratio" style="background:rgba(167,139,250,.95);color:#150c2e">💥 '+x.outlier+'x</span>':'')
-          +'<img class="rd-thumb" src="'+rdEsc(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
+          +(x.durSec?'<span class="rd-dur">'+rdSure(x.durSec)+'</span>':'')+'<img class="rd-thumb" src="'+rdEsc(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
           +'<div class="rd-body"><div class="rd-title">'+rdEsc(x.title)+'</div>'
           +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span>'+rdAge(x.ageH)+'</span></div>'
           +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
@@ -6756,9 +6783,13 @@ async function rdClientCompute(key, st){
     if(st) st.textContent='⏳ 3/4 video detayları…';
     freshRaw=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics,topicDetails&id='+freshIds.join(',')+'&key='+key);
   }
-  const chIds=[...new Set([...(trendRaw.items||[]),...(freshRaw.items||[])].map(v=>(v.snippet||{}).channelId).filter(Boolean))].slice(0,50);
+  const chIds=[...new Set([...(trendRaw.items||[]),...(freshRaw.items||[])].map(v=>(v.snippet||{}).channelId).filter(Boolean))];
   if(st) st.textContent='⏳ 4/4 kanal detayları…';
-  const chRaw=chIds.length?await ytkFetch(YT+'channels?part=snippet,statistics,contentDetails&id='+chIds.join(',')+'&maxResults=50&key='+key):{items:[]};
+  const chItems=[];
+  for(let a=0;a<chIds.length;a+=50){
+    try{ const r=await ytkFetch(YT+'channels?part=snippet,statistics,contentDetails&id='+chIds.slice(a,a+50).join(',')+'&maxResults=50&key='+key); (r.items||[]).forEach(c=>chItems.push(c)); }catch(e){ console.warn('[RD] kanal:',e.message); }
+  }
+  const chRaw={items:chItems};
   const subsBy={}, uploadsBy={};
   (chRaw.items||[]).forEach(c=>{
     subsBy[c.id]=parseInt((c.statistics||{}).subscriberCount||0);
@@ -6793,11 +6824,11 @@ async function rdClientCompute(key, st){
     return it;
   };
   // Trend: müzik (categoryId 10) ve 5 dk altı videolar hariç
-  const trend=(trendRaw.items||[]).map(norm).filter(x=>x.catId!=='10'&&x.durSec>=300).slice(0,12);
-  const freshAll=(freshRaw.items||[]).map(norm).filter(x=>x.views>=1000);
+  const trend=(trendRaw.items||[]).map(norm).filter(x=>x.catId!=='10'&&x.durSec>=300&&rdKesifOk(x)).slice(0,12);
+  const freshAll=(freshRaw.items||[]).map(norm).filter(x=>x.views>=1000&&rdSureOk(x));   // ≤1sa her yerde
   // İvme bilinen videolarda hızı ivmeyle ağırlıklandır → hızlanan üste çıkar
   const risingSkor=x=>x.vph*(x.ivme>0?Math.min(3,x.ivme):1);
-  const rising=[...freshAll].sort((a,b)=>risingSkor(b)-risingSkor(a)).slice(0,12);
+  const rising=[...freshAll].filter(rdKesifOk).sort((a,b)=>risingSkor(b)-risingSkor(a)).slice(0,12);
   const potential=freshAll.filter(x=>x.subs>0&&x.subs<=250000&&x.ratio>=1.5&&x.ageH<=72).sort((a,b)=>(b.ratio*b.vph)-(a.ratio*a.vph)).slice(0,8);
   // 💥 OUTLIER — en umutlu adayların kanal medyanını çek, skoru hesapla
   const aday=[...freshAll].sort((a,b)=>b.vph-a.vph).slice(0,30);
@@ -6821,6 +6852,18 @@ async function rdClientCompute(key, st){
   return {trend,rising,potential,outlier,gtrend:[],channels};
 }
 
+// Filtre eşikleri — keşif bölümlerinde 100K+ abone, her yerde ≤1 saat.
+// Potansiyel ve Outlier MUAF: bu ikisi zaten küçük kanaldan patlayan videoyu bulur.
+const RD_SURE_MAX = 3600;      // 1 saat
+const RD_ABONE_MIN = 100000;   // 100 bin abone
+const rdSureOk  = x => x.durSec>0 && x.durSec<=RD_SURE_MAX;
+const rdKesifOk = x => rdSureOk(x) && (x.subs||0)>=RD_ABONE_MIN;
+function rdSure(sec){
+  const s=parseInt(sec)||0; if(!s) return '';
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sn=s%60;
+  return h>0 ? (h+':'+String(m).padStart(2,'0')+':'+String(sn).padStart(2,'0'))
+             : (m+':'+String(sn).padStart(2,'0'));
+}
 function rdEsc(s){ return String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c])); }
 function rdAge(h){ return h<24?(h+' sa'):(Math.round(h/24)+' gün'); }
 
@@ -6851,7 +6894,7 @@ function renderRadar(){
         : (x.delta>0?'<span class="rd-badge-delta">▲ +'+ytkFmt(x.delta)+' / '+x.deltaH+'sa</span>':'');
       return '<div class="rd-card'+sel+'" onclick="rdToggle(\''+x.id+'\')">'
         +'<span class="rd-sel-tick">✓</span>'+badge
-        +'<img class="rd-thumb" src="'+rdEsc(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
+        +(x.durSec?'<span class="rd-dur">'+rdSure(x.durSec)+'</span>':'')+'<img class="rd-thumb" src="'+rdEsc(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
         +'<div class="rd-body">'
         +'<div class="rd-title">'+rdEsc(x.title)+'</div>'
         +(x.keyword?'<div style="font-size:10.5px;color:var(--acc);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Google Trends sorgusu">🔍 '+rdEsc(x.keyword)+'</div>':'')
