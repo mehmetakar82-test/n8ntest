@@ -1808,8 +1808,13 @@ async function faf(url, body) {
 async function n8nGet(path) {
   const base = getN8N();
   if (!base) return null;
+  // Zaman asimi: yaniti gelmeyen akis tarayiciyi dakikalarca asili birakiyordu.
+  // AbortController ile 25 sn'de kesip NET sebep bildiriyoruz.
+  const ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  const sure = setTimeout(()=>{ try{ ctl && ctl.abort(); }catch(e){} }, 25000);
   try {
-    const r = await fetch(base+path,{method:'GET',mode:'cors'});
+    const r = await fetch(base+path,{method:'GET',mode:'cors',signal:ctl?ctl.signal:undefined});
+    clearTimeout(sure);
     if (!r.ok) {
       addLog('err','webhook','GET '+path+': HTTP '+r.status+(r.status===404?' — webhook kayıtlı değil (workflow Active mi? path doğru mu?)':''));
       return null;
@@ -1821,7 +1826,15 @@ async function n8nGet(path) {
     }
     try { return JSON.parse(txt); }
     catch(e){ addLog('err','webhook','GET '+path+': geçersiz JSON — '+txt.slice(0,100)); return null; }
-  } catch(e) { addLog('err','webhook','GET '+path+': ağ/CORS hatası — '+e.message); return null; }
+  } catch(e) {
+    clearTimeout(sure);
+    if (e && e.name === 'AbortError') {
+      addLog('err','webhook','GET '+path+': n8n 25 sn içinde yanıt vermedi — akış tamamlanmıyor olabilir (n8n → Executions listesine bak). Panel bekletilmedi.');
+    } else {
+      addLog('err','webhook','GET '+path+': n8n\'e ulaşılamadı — '+e.message+' (URL doğru mu, workflow Active mi?)');
+    }
+    return null;
+  }
 }
 
 // ── n8n GET önbelleği + eşzamanlı istek birleştirme ──────────
