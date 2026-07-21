@@ -1274,6 +1274,17 @@ tbody td{line-height:1.5}
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— müzik ve 5 dk altı hariç</span></span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-trend" class="rd-grid"><div class="rd-empty">↻ Bugünü Getir'e bas</div></div>
   </div>
+  <div class="card" style="border-color:rgba(52,211,153,.3)">
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
+      <span style="color:var(--ok)">🇹🇷 Haftanın En Çok İzlenenleri <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— son 7 günde yayınlanmış, Türkiye'de en çok izlenen videolar (Türkçe içerik filtresi, 4-60 dk, 100K+ abone). Gün boyu saklanır.</span></span>
+      <span style="display:flex;gap:8px;align-items:center">
+        <span id="rd-hafta-status" style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt);font-size:11px"></span>
+        <span id="rd-hafta-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span>
+        <button class="btn bg bsm" onclick="rdHaftaTara(true)" title="Yeniden tara (~800 API birimi)">↻</button>
+      </span>
+    </div>
+    <div id="rd-hafta" class="rd-grid"><div class="rd-empty">Radar yüklenince otomatik gelir</div></div>
+  </div>
   <div class="card" style="border-color:rgba(251,191,36,.3)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
       <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için günün <b>en iyi 5</b> videosu — kategori başına 2 sorgu x 2 süre bandı (son 14 gün), dil filtresi, <b>4-60 dk</b> ve <b>100K+ abone</b> şartı, outlier sıralaması. Genel için TR ve EN ayrı. Sonuç gün boyu saklanır (~3600 API birimi). YouTube genel trend listesini kaldırdığı için kategori boşluğunu bu doldurur (~800 API birimi, isteğe bağlı)</span></span>
@@ -6453,7 +6464,7 @@ window.n8nCacheClear=n8nCacheClear; window.loadActionCenter=loadActionCenter; wi
 // Veri: 1) n8n /webhook/trend-radar (günlük cron)  2) YouTube API canlı hesap
 // Hız (vph) = izlenme/saat · ▲ = son ziyaretten beri artış (yerel snapshot)
 // ═══════════════════════════════════════════════════════════
-const RD = { data:null, kat:null, katSecim:{}, src:'', selected:new Set(), loading:false };
+const RD = { data:null, kat:null, hafta:null, katSecim:{}, src:'', selected:new Set(), loading:false };
 
 function initRadar(){
   const chips=document.getElementById('rd-cats');
@@ -6462,6 +6473,7 @@ function initRadar(){
     chips.dataset.ready='1';
     try{ renderLangToggle('rd-cats'); updateLangVisibility('rd-cats'); }catch(e){}
   }
+  try{ rdHaftaTara(false); }catch(e){}
   try{ const c=rdKatOnbellekOku(); if(c){ RD.kat=c.veri; rdRenderKat();
     const s=document.getElementById('rd-kat-status'); if(s) s.textContent='✓ bugünün taraması ('+c.gun+')'; } }catch(e){}
   if(RD.data){ renderRadar(); return; }
@@ -6615,6 +6627,77 @@ function katTahmin(v){
   return { kategori:enIyi, guven, secenekler:sirali.slice(0,3).map(x=>x[0]), neden };
 }
 window.katOgren=katOgren; window.katTahmin=katTahmin;
+
+// ── Haftanın en çok izlenenleri (son 7 gün, Türkiye) ────────────
+// Ölçüm notu: YouTube araması q ZORUNLU (q'suz 0 sonuç döner) ve regionCode=TR
+// Türkçe içeriği GARANTİ ETMİYOR (İspanyolca/Bengalce sızıyor). Stopword
+// tohumları en isabetli sonucu veriyor; ardından Türkçe içerik filtresi.
+// Ölçülen: 8 arama → 191 aday → 161 Türkçe → 131 uygun / 93 farklı kanal.
+const RD_HAFTA_SORGU = ['bir','ve','bu','için'];
+function rdHaftaGun(){ return new Date().toISOString().slice(0,10); }
+function rdHaftaOnbellek(){
+  try{ const c=JSON.parse(localStorage.getItem('op_radar_hafta')||'null');
+    if(c && c.gun===rdHaftaGun()) return c; }catch(e){}
+  return null;
+}
+async function rdHaftaTara(zorla){
+  const el=document.getElementById('rd-hafta'), st=document.getElementById('rd-hafta-status');
+  if(!el) return;
+  if(!zorla){
+    const c=rdHaftaOnbellek();
+    if(c){ RD.hafta=c.veri; if(st) st.textContent='bugünün listesi (önbellek)'; renderRadar(); return; }
+  }
+  const key=S.cfg.ytApiKey||S.cfg.shkey||'';
+  if(!key){ el.innerHTML='<div class="rd-empty">YouTube API Key gerekli (Ayarlar)</div>'; return; }
+  const YT='https://www.googleapis.com/youtube/v3/';
+  const after=new Date(Date.now()-7*24*3600*1000).toISOString();
+  const idSet=new Set();
+  let n=0;
+  for(const q of RD_HAFTA_SORGU){
+    for(const band of ['medium','long']){
+      n++; if(st) st.textContent='⏳ taranıyor '+n+'/'+(RD_HAFTA_SORGU.length*2);
+      try{
+        const s=await ytkFetch(YT+'search?part=snippet&type=video&order=viewCount&regionCode=TR&relevanceLanguage=tr&videoDuration='+band
+          +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(q)+'&maxResults=25&key='+key);
+        (s.items||[]).forEach(x=>{ const id=x.id&&x.id.videoId; if(id) idSet.add(id); });
+      }catch(e){ console.warn('[RD-HAFTA]',q,band,e.message); }
+    }
+  }
+  const ids=[...idSet];
+  if(!ids.length){ el.innerHTML='<div class="rd-empty">Sonuç yok</div>'; if(st) st.textContent=''; return; }
+  const det={};
+  for(let a=0;a<ids.length;a+=50){
+    try{ const d=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics,topicDetails&id='+ids.slice(a,a+50).join(',')+'&key='+key);
+      (d.items||[]).forEach(v=>{ det[v.id]=v; }); }catch(e){ console.warn('[RD-HAFTA] detay:',e.message); }
+  }
+  const chIds=[...new Set(Object.values(det).map(v=>(v.snippet||{}).channelId).filter(Boolean))];
+  const subsBy={};
+  for(let a=0;a<chIds.length;a+=50){
+    try{ const ch=await ytkFetch(YT+'channels?part=statistics&id='+chIds.slice(a,a+50).join(',')+'&maxResults=50&key='+key);
+      (ch.items||[]).forEach(c=>{ subsBy[c.id]=parseInt((c.statistics||{}).subscriberCount||0); }); }catch(e){}
+  }
+  const now=Date.now();
+  const list=Object.values(det).filter(rdTurkceMi).map(v=>{
+    const sn=v.snippet||{}, stx=v.statistics||{};
+    const views=parseInt(stx.viewCount||0);
+    const ageH=Math.max(1,(now-Date.parse(sn.publishedAt||0))/3.6e6);
+    const o={ id:v.id, url:'https://www.youtube.com/watch?v='+v.id, title:sn.title||'', channel:sn.channelTitle||'',
+      channelId:sn.channelId||'', thumb:((sn.thumbnails||{}).medium||{}).url||'', views,
+      subs:subsBy[sn.channelId]||0, ageH:Math.round(ageH), durSec:ytkParseDur((v.contentDetails||{}).duration),
+      catId:sn.categoryId||'', tags:(sn.tags||[]).slice(0,20), desc:(sn.description||'').slice(0,400),
+      topics:((v.topicDetails||{}).topicCategories||[]).map(t=>String(t).split('/').pop().replace(/_/g,' ')),
+      vph:Math.round(views/ageH), ratio:0, delta:0, deltaH:0, outlier:0, chMed:0, ivme:0 };
+    const t=katTahmin(o); o.katTahmin=t.kategori; o.katGuven=t.guven; o.katSecenek=t.secenekler; o.katNeden=t.neden;
+    return o;
+  }).filter(x=>x.views>=1000 && rdKesifOk(x))
+    .sort((a,b)=>b.views-a.views).slice(0,12);
+  RD.hafta=list;
+  try{ localStorage.setItem('op_radar_hafta',JSON.stringify({gun:rdHaftaGun(),veri:list})); }catch(e){}
+  if(st) st.textContent='son 7 gün';
+  renderRadar();
+  addLog('ok','sistem','Haftanın en çok izlenenleri: '+list.length+' video');
+}
+window.rdHaftaTara=rdHaftaTara;
 
 // ── #3 Kategori bazlı av ────────────────────────────────────
 // YouTube kategori ID + Türkçe tohum sorgu. videoCategoryId TEK BAŞINA sonuç
@@ -6871,11 +6954,13 @@ function renderRadar(){
   const d=RD.data; if(!d) return;
   const st=document.getElementById('rd-status');
   if(st) st.textContent='Kaynak: '+RD.src;
-  [['rd-trend',d.trend],['rd-outlier',d.outlier],['rd-rising',d.rising],['rd-potential',d.potential],['rd-gtrend',d.gtrend]].forEach(([elId,list])=>{
+  [['rd-trend',d.trend],['rd-hafta',RD.hafta],['rd-outlier',d.outlier],['rd-rising',d.rising],['rd-potential',d.potential],['rd-gtrend',d.gtrend]].forEach(([elId,list])=>{
     const el=document.getElementById(elId); if(!el) return;
     setEl(elId+'-n',(list||[]).length+' video');
     if(!(list||[]).length){
-      el.innerHTML='<div class="rd-empty">'+(elId==='rd-outlier'
+      el.innerHTML='<div class="rd-empty">'+(elId==='rd-hafta'
+        ? 'Haftalık liste henüz taranmadı — sağdaki ↻ tuşuna bas'
+        : elId==='rd-outlier'
         ? 'Bu taramada 2x üstü outlier çıkmadı — normal, her gün patlama olmaz.'
         : elId==='rd-gtrend'
         ? 'Veri yok — bu bölüm <b>n8n günlük radar</b>dan gelir (Google Trends tarayıcıdan çekilemez). Workflow\'u aktif et, yarın sabah dolar.'
@@ -6966,7 +7051,7 @@ function rdOpenChannel(name){
 
 async function rdSendSelected(){
   const d=RD.data; if(!d) return;
-  const katAll=RD.kat?Object.values(RD.kat).flat():[];
+  const katAll=(RD.kat?Object.values(RD.kat).flat():[]).concat(RD.hafta||[]);
   const all=[...(d.trend||[]),...(d.outlier||[]),...(d.rising||[]),...(d.potential||[]),...(d.gtrend||[]),...katAll];
   const seen=new Set();
   let sel=all.filter(x=>{ if(!RD.selected.has(x.id)||seen.has(x.id)) return false; seen.add(x.id); return true; });
