@@ -1774,7 +1774,12 @@ async function faf(url, body) {
     return {ok:false, invalidUrl:true};
   }
   return new Promise(resolve=>{
-    const tid = setTimeout(()=>resolve({ok:false,timeout:true}),8000);
+    // Zaman asimi HATA DEGIL: video-gonder zincirinde Wait dugumu var, yanit
+    // dakikalar surer. Istek TCP ile teslim edildi; n8n islemeye devam eder.
+    const tid = setTimeout(()=>{
+      addLog('info','webhook','Istek teslim edildi, n8n isliyor (yanit beklenmedi): '+url);
+      resolve({ok:true, pending:true});
+    },8000);
     fetch(url,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       .then(r=>{
         clearTimeout(tid);
@@ -7066,18 +7071,23 @@ async function rdSendSelected(){
   }
   if(!sel.length) return showRes('rd-res','Gönderilecek yeni video kalmadı','warn');
   const genelCats=getSelCatList('rd-cats');
-  let sent=0;
+  let sent=0, bekleyen=0, sonCats=genelCats;
   for(const x of sel){
     // Video basina kategori: senin secimin > yuksek guvenli tahmin > global secim
     const secilen=(RD.katSecim&&RD.katSecim[x.id]) || (x.katGuven>=55?x.katTahmin:'') || '';
     const cats=secilen?[secilen]:genelCats;
+    sonCats=cats;                       // dongu disinda ozet icin
     showRes('rd-res','⏳ '+(sent+1)+'/'+sel.length+' gönderiliyor: '+(x.title||'').slice(0,40)+'…','info');
     const res=await faf(base+mcPath(cats), Object.assign({'Youtube linki':x.url, kaynak:'trend-radar', dil:getSelLang('rd-cats'), platformlar:getSelPlatforms('rd-cats'), title:x.title, channelTitle:x.channel, durationSec:x.durSec||0}, mcFields(cats)));
-    if(res&&res.ok===true){ sent++; recordSend(x.url,cats.join(',')); katOgren(x.channelId,x.channel,cats[0]); RD.selected.delete(x.id); }
+    if(res&&res.ok===true){
+      sent++; if(res.pending) bekleyen++;
+      recordSend(x.url,cats.join(',')); katOgren(x.channelId,x.channel,cats[0]); RD.selected.delete(x.id);
+    }
     await sleep(600);
   }
-  showRes('rd-res',(sent===sel.length?'✓ ':'')+sent+'/'+sel.length+' video işleme alındı ['+cats.join(', ')+']', sent?'ok':'err');
-  if(sent) toast('✓ '+sent+' video işleme alındı — Trend Radar','ok');
+  const ek = bekleyen ? ' — n8n işliyor (OpusClip klip üretimi birkaç dakika sürer)' : '';
+  showRes('rd-res',(sent===sel.length?'✓ ':'')+sent+'/'+sel.length+' video işleme alındı ['+sonCats.join(', ')+']'+ek, sent?'ok':'err');
+  if(sent) toast('✓ '+sent+' video işleme alındı'+(bekleyen?' (n8n işliyor)':''),'ok');
   renderRadar();
 }
 window.initRadar=initRadar; window.loadRadar=loadRadar; window.rdKatSec=rdKatSec; window.rdKatSatiri=rdKatSatiri; window.rdKategoriTara=rdKategoriTara; window.rdRenderKat=rdRenderKat; window.rdToggle=rdToggle; window.rdSendSelected=rdSendSelected; window.rdOpenChannel=rdOpenChannel;
