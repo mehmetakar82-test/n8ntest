@@ -271,6 +271,13 @@ tbody td{line-height:1.5}
 .rd-card .rd-title{font-size:12.5px;font-weight:600;color:var(--tx);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:34px}
 .rd-card .rd-meta{font-size:11px;color:var(--mt);margin-top:4px;display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums}
 .rd-card .rd-sel-tick{position:absolute;top:6px;left:6px;width:22px;height:22px;border-radius:50%;background:var(--acc);color:#012;display:none;align-items:center;justify-content:center;font-weight:800;font-size:13px;z-index:2;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+/* İşleme alınmış video: yeşil tik + hafif perde (tekrar göndermeyi önler) */
+.rd-card.done{border-color:rgba(52,211,153,.55)}
+.rd-card.done .rd-thumb{opacity:.45;filter:saturate(.6)}
+.rd-card .rd-done-tick{position:absolute;top:6px;left:6px;width:24px;height:24px;border-radius:50%;background:var(--ok);color:#012;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;z-index:4;box-shadow:0 2px 8px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.85);animation:rdPop .22s cubic-bezier(.2,.9,.3,1.35) both;line-height:1}
+.rd-card.done.sel .rd-done-tick{left:auto;right:6px;bottom:auto;top:34px}
+@keyframes rdPop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.rd-done-lbl{font-size:10.5px;color:var(--ok);margin-top:3px;display:flex;align-items:center;gap:4px}
 .rd-card.sel .rd-sel-tick{display:flex}
 .rd-badge-delta{position:absolute;top:6px;right:6px;background:rgba(16,185,129,.92);color:#012;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;z-index:2;font-variant-numeric:tabular-nums}
 .rd-badge-ratio{position:absolute;top:6px;right:6px;background:rgba(251,191,36,.94);color:#221a00;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:5px;z-index:2;font-variant-numeric:tabular-nums}
@@ -6842,11 +6849,12 @@ function rdRenderKat(){
     return '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:var(--gld);margin-bottom:6px">'+rdEsc(lbl)+'</div>'
       +'<div class="rd-grid">'+list.map(x=>{
         const sel=RD.selected.has(x.id)?' sel':'';
-        return '<div class="rd-card'+sel+'" onclick="rdToggle(\''+x.id+'\')">'
-          +'<span class="rd-sel-tick">✓</span>'
+        const _dn=rdDone(x);
+        return '<div class="rd-card'+sel+(_dn?' done':'')+'" onclick="rdToggle(\''+x.id+'\')">'
+          +'<span class="rd-sel-tick">✓</span>'+rdDoneTik(_dn)
           +(x.outlier>=2?'<span class="rd-badge-ratio" style="background:rgba(167,139,250,.95);color:#150c2e">💥 '+x.outlier+'x</span>':'')
           +(x.durSec?'<span class="rd-dur">'+rdSure(x.durSec)+'</span>':'')+'<img class="rd-thumb" src="'+rdEsc(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
-          +'<div class="rd-body"><div class="rd-title">'+rdEsc(x.title)+'</div>'
+          +'<div class="rd-body"><div class="rd-title">'+rdEsc(x.title)+'</div>'+rdDoneLbl(_dn)
           +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span>'+rdAge(x.ageH)+'</span></div>'
           +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
           +(x.katTahmin?rdKatSatiri(x):'')
@@ -6946,6 +6954,21 @@ const RD_SURE_MAX = 3600;      // 1 saat
 const RD_ABONE_MIN = 100000;   // 100 bin abone
 const rdSureOk  = x => x.durSec>0 && x.durSec<=RD_SURE_MAX;
 const rdKesifOk = x => rdSureOk(x) && (x.subs||0)>=RD_ABONE_MIN;
+// Video daha once isleme alindi mi? (S.sentLog -> findDupeSend)
+// Doner: {url,t,kategori} veya null. Kart yesil tik + perde ile isaretlenir.
+function rdDone(x){
+  try{ return (x && x.url) ? findDupeSend(x.url) : null; }catch(e){ return null; }
+}
+function rdDoneTik(rec){
+  if(!rec) return '';
+  const t = 'İşleme alındı: ' + (rec.t || '') + (rec.kategori ? ' · ' + rec.kategori : '');
+  return '<span class="rd-done-tick" title="' + rdEsc(t) + '">✓</span>';
+}
+function rdDoneLbl(rec){
+  if(!rec) return '';
+  return '<div class="rd-done-lbl" title="' + rdEsc('İşleme alındı: ' + (rec.t || '')) + '">✓ işleme alındı'
+    + (rec.kategori ? ' <span style="color:var(--mt)">· ' + rdEsc(rec.kategori) + '</span>' : '') + '</div>';
+}
 function rdSure(sec){
   const s=parseInt(sec)||0; if(!s) return '';
   const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sn=s%60;
@@ -6982,11 +7005,12 @@ function renderRadar(){
         : (elId==='rd-gtrend')
         ? '<span class="rd-badge-ratio" style="background:rgba(0,229,255,.95);color:#012">♥ %'+x.ratio+'</span>'
         : (x.delta>0?'<span class="rd-badge-delta">▲ +'+ytkFmt(x.delta)+' / '+x.deltaH+'sa</span>':'');
-      return '<div class="rd-card'+sel+'" onclick="rdToggle(\''+x.id+'\')">'
-        +'<span class="rd-sel-tick">✓</span>'+badge
+      const _dn=rdDone(x);
+      return '<div class="rd-card'+sel+(_dn?' done':'')+'" onclick="rdToggle(\''+x.id+'\')">'
+        +'<span class="rd-sel-tick">✓</span>'+rdDoneTik(_dn)+badge
         +(x.durSec?'<span class="rd-dur">'+rdSure(x.durSec)+'</span>':'')+'<img class="rd-thumb" src="'+rdEsc(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
         +'<div class="rd-body">'
-        +'<div class="rd-title">'+rdEsc(x.title)+'</div>'
+        +'<div class="rd-title">'+rdEsc(x.title)+'</div>'+rdDoneLbl(_dn)
         +(x.keyword?'<div style="font-size:10.5px;color:var(--acc);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Google Trends sorgusu">🔍 '+rdEsc(x.keyword)+'</div>':'')
         +(x.outlier>=2&&x.chMed?'<div style="font-size:10.5px;color:var(--acc3);margin-top:2px" title="Kanalın son 20 video medyanı">💥 '+x.outlier+'x · kanal medyanı '+ytkFmt(x.chMed)+'</div>':'')
         +(x.katTahmin?rdKatSatiri(x):'')
