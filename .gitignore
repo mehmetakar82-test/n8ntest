@@ -1,4 +1,6 @@
 # n8n workflow JSON — credential icerdigi icin push edilmez
+# (n8n'den yeni export alindiginda dosya adi degisebiliyor: OPUSPRO* ile hepsi kapsanir)
+OPUSPRO*.json
 OPUSPRO_v13_UploadPost.json
 OPUSPRO_v14_Kworb.json
 *.n8n.json

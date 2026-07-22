@@ -6022,11 +6022,13 @@ function stokSeritCiz(){
   gruplar.forEach(g=>{
     g.dusuk.forEach(x=>{
       const krit = x.n === 0;
-      const ipucu = g.label+' kategorisi · '+x.p+' — kuyrukta '+x.n+' zamanlanmış short (eşik '+esik+
-                   '). Kategoride toplam '+g.profiller.length+' profil, '+g.toplam+' zamanlanmış.';
+      // Hapta profil adı YAZILMAZ, yalnız kategori — aynı kategoriden birden çok
+      // profil düşükse haplar birbirinin aynısı görünür; hangisi olduğu ipucunda.
+      const ipucu = x.p+' — kuyrukta '+x.n+' zamanlanmış short (eşik '+esik+')'
+                  + '\nKategori: '+g.label
+                  + '\nBu kategoride '+g.profiller.length+' profil var, toplam '+g.toplam+' zamanlanmış.';
       haplar.push('<span class="gpill'+(krit?' krit':'')+'" title="'+esc(ipucu)+'">'
-        + '<span class="gp-kat">'+esc(g.label)+'</span>'
-        + '<span>'+esc(x.p)+'</span>'
+        + '<span>'+esc(g.label)+'</span>'
         + '<span class="gp-n">'+x.n+'</span></span>');
     });
   });
