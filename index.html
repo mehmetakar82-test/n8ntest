@@ -7281,12 +7281,30 @@ async function rdClientCompute(key, st){
   const trendRaw=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics,topicDetails&chart=mostPopular&regionCode=TR&maxResults=50&key='+key);
   if(st) st.textContent='⏳ 2/4 taze videolar…';
   const after=new Date(Date.now()-48*3600*1000).toISOString();
-  const sr=await ytkFetch(YT+'search?part=snippet&type=video&order=viewCount&publishedAfter='+encodeURIComponent(after)+'&regionCode=TR&maxResults=50&key='+key);
-  const freshIds=(sr.items||[]).map(i=>i.id&&i.id.videoId).filter(Boolean);
+  // ÖNEMLİ: YouTube search endpoint'i q PARAMETRESİ YOKSA 0 SONUÇ döndürür —
+  // order/publishedAfter/regionCode hiçbiri tek başına yetmiyor (23.07.2026 ölçümü:
+  // q'suz 4 varyantın dördü de 0; q eklenince 50). Bu yüzden "Hızlı Yükselenler"
+  // ve "Potansiyel" bölümleri hep boş kalıyordu.
+  // Çözüm: haftalık taramadaki ile aynı stopword tohumları, birleştirilerek.
+  // Ölçüm: 4 tohum → 191 eşsiz video, hepsi TR ve yüksek izlenmeli.
+  const freshIdSet=new Set();
+  for(const q of RD_HAFTA_SORGU){
+    try{
+      const s=await ytkFetch(YT+'search?part=snippet&type=video&order=viewCount&regionCode=TR&relevanceLanguage=tr'
+        +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(q)+'&maxResults=50&key='+key);
+      (s.items||[]).forEach(i=>{ const id=i.id&&i.id.videoId; if(id) freshIdSet.add(id); });
+    }catch(e){ console.warn('[RD] taze arama "'+q+'":',e.message); }
+  }
+  const freshIds=[...freshIdSet];
   let freshRaw={items:[]};
   if(freshIds.length){
     if(st) st.textContent='⏳ 3/4 video detayları…';
-    freshRaw=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics,topicDetails&id='+freshIds.join(',')+'&key='+key);
+    const fItems=[];
+    for(let a=0;a<freshIds.length;a+=50){
+      try{ const r=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics,topicDetails&id='+freshIds.slice(a,a+50).join(',')+'&key='+key);
+        (r.items||[]).forEach(v=>fItems.push(v)); }catch(e){ console.warn('[RD] taze detay:',e.message); }
+    }
+    freshRaw={items:fItems};
   }
   const chIds=[...new Set([...(trendRaw.items||[]),...(freshRaw.items||[])].map(v=>(v.snippet||{}).channelId).filter(Boolean))];
   if(st) st.textContent='⏳ 4/4 kanal detayları…';
