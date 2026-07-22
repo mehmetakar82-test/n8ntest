@@ -260,36 +260,34 @@ tbody td{line-height:1.5}
 .utab.on .utab-cnt{background:#012;color:var(--acc)}
 .pfav{width:15px;height:15px;border-radius:3px;vertical-align:-2px;object-fit:contain;background:rgba(255,255,255,.05);display:inline-block}
 /* ═══ Trend Radar ═══ */
-/* ── STOK ŞERİDİ: altın hap rozetler ───────────────────────── */
-.stok-serit{margin:0 0 14px}
-.stok-kutu{border:1px solid rgba(201,162,39,.34);border-radius:14px;padding:11px 13px;
-  background:linear-gradient(180deg,rgba(72,56,16,.20),rgba(28,22,6,.24))}
-.stok-bas{display:flex;align-items:center;gap:8px;font-family:var(--fh);font-size:11.5px;
-  letter-spacing:.9px;text-transform:uppercase;color:#f0d98f;margin-bottom:9px}
-.stok-bas .stok-esik{margin-left:auto;letter-spacing:0;text-transform:none;
-  font-family:var(--fm);font-size:11px;color:var(--mt)}
-.gp-wrap{display:flex;flex-wrap:wrap;gap:9px}
-.gpill{position:relative;display:inline-flex;align-items:center;gap:9px;padding:8px 15px;
-  border-radius:999px;border:2px solid transparent;cursor:default;
-  font-family:var(--fm);font-size:11.5px;font-weight:600;line-height:1.15;
+/* ── STOK UYARISI: kategori chip'i üzerinde altın vurgu ────── */
+/* Kuyruğu azalan kategorinin chip'i altın çerçeve + kalan sayı rozeti alır;
+   tamamen bitmişse dolu altın olur. Ayrı bir şerit yerine seçicinin kendisinde
+   duruyor — kategori seçerken hangisinin içeriğe ihtiyacı olduğu görünsün. */
+.cat-chip.stok-az{
+  border-color:transparent!important;color:#f5e2a8!important;
   background:linear-gradient(180deg,#1b1508 0%,#0d0a04 100%) padding-box,
-             linear-gradient(160deg,#fdf4d0 0%,#e0bd5c 22%,#9c7418 48%,#7a5a0e 64%,#f2dfa0 100%) border-box;
-  color:#f5e2a8;
-  box-shadow:0 2px 12px rgba(196,152,42,.20), inset 0 1px 0 rgba(255,240,190,.13);}
-.gpill::after{content:'';position:absolute;left:9px;right:9px;top:2px;height:42%;
-  border-radius:999px;pointer-events:none;
-  background:linear-gradient(180deg,rgba(255,255,255,.17),rgba(255,255,255,0))}
-.gpill .gp-kat{opacity:.72;font-size:10.5px}
-.gpill .gp-n{font-size:13.5px;font-weight:800;letter-spacing:.3px}
-.gpill.krit{color:#3a2a02;text-shadow:0 1px 0 rgba(255,255,255,.32);
+             linear-gradient(160deg,#fdf4d0 0%,#e0bd5c 22%,#9c7418 48%,#7a5a0e 64%,#f2dfa0 100%) border-box!important;
+  border:1.5px solid transparent!important;
+  box-shadow:0 1px 9px rgba(196,152,42,.20), inset 0 1px 0 rgba(255,240,190,.13);}
+.cat-chip.stok-krit{
+  border-color:transparent!important;color:#3a2a02!important;
+  text-shadow:0 1px 0 rgba(255,255,255,.30);
   background:linear-gradient(180deg,#fdf4cf 0%,#e8c86a 44%,#c9a53c 64%,#f4e6b0 100%) padding-box,
-             linear-gradient(160deg,#fffbe8 0%,#d4ab3e 40%,#8a6612 70%,#fbf1c8 100%) border-box;
-  box-shadow:0 2px 16px rgba(212,171,62,.40), inset 0 1px 0 rgba(255,255,255,.45);}
-.gpill.krit .gp-kat{opacity:.62}
-.stok-ok{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ok);
-  border:1px solid rgba(52,211,153,.28);border-radius:12px;padding:9px 12px;
-  background:rgba(52,211,153,.06)}
-@media (max-width:640px){ .gpill{padding:7px 12px;font-size:11px} .gpill .gp-n{font-size:12.5px} }
+             linear-gradient(160deg,#fffbe8 0%,#d4ab3e 40%,#8a6612 70%,#fbf1c8 100%) border-box!important;
+  border:1.5px solid transparent!important;
+  box-shadow:0 1px 12px rgba(212,171,62,.38), inset 0 1px 0 rgba(255,255,255,.42);}
+/* Altın stil, .cat-chip.sel'in üç seçim işaretini de (kenarlık/yazı/arkaplan)
+   ezdiği için seçili altın chip'e ayrı bir camgöbeği halka veriyoruz.
+   outline yerine box-shadow: outline'ı focus stilleri devralıp siliyor. */
+.cat-chip.stok-az.sel,.cat-chip.stok-krit.sel{
+  box-shadow:0 0 0 2px var(--acc), 0 2px 12px rgba(0,229,255,.32)!important}
+.cat-chip .cs-n{
+  display:inline-flex;align-items:center;justify-content:center;
+  margin-left:6px;padding:0 5px;min-width:17px;height:16px;border-radius:8px;
+  font-family:var(--fm);font-size:10px;font-weight:800;line-height:1;vertical-align:middle;
+  background:rgba(0,0,0,.34);color:#f7e7ae}
+.cat-chip.stok-krit .cs-n{background:rgba(58,42,2,.26);color:#3a2a02}
 /* ── PLATFORMLAR: profil bazlı kümeleme + sorun vurgusu ───── */
 .pl-prof{border:1px solid var(--brd);border-radius:12px;padding:12px 13px;background:var(--sur)}
 .pl-prof.bozuk{border-color:rgba(248,113,113,.55);background:linear-gradient(180deg,rgba(248,113,113,.10),rgba(248,113,113,.03))}
@@ -523,7 +521,6 @@ tbody td{line-height:1.5}
 <div id="page-video" class="page">
   <div class="ph"><div class="pt">Video Gönder</div><div class="ps">YouTube linkini doğrudan sisteme gönder</div></div>
   <div class="utab-bar" data-utab="video"></div>
-  <div class="stok-serit"></div>
   <div style="max-width:880px">
     <div>
       <div class="card">
@@ -685,7 +682,6 @@ tbody td{line-height:1.5}
 <div id="page-parcala" class="page">
   <div class="ph"><div class="pt">Video Parçala</div><div class="ps">Uzun bir YouTube videosunu sabit uzunlukta parçalara böl, her parçayı ayrı short olarak yayınla</div></div>
   <div class="utab-bar" data-utab="parcala"></div>
-  <div class="stok-serit"></div>
   <div class="alert ai"><span>ℹ</span><span>OpusClip her parça için ayrı bir proje oluşturur ve o zaman penceresine odaklanır (AI en iyi anı seçer, milisaniye hassasiyetinde birebir kesim garanti edilmez). Kredi/kota parça sayısı kadar tüketilir.</span></div>
   <div class="g2">
     <div>
@@ -722,7 +718,6 @@ tbody td{line-height:1.5}
 <div id="page-trendonay" class="page">
   <div class="ph"><div class="pt">Trend Radar &amp; Onay</div><div class="ps">Onay Kuyruğu — Kworb Trending TR + YouTube trend akışının bulduğu videolar; onaylayıp kategori/açıklama belirle ya da reddet</div></div>
   <div class="utab-bar" data-group="trend" data-utab="trendonay"></div>
-  <div class="stok-serit"></div>
   <div class="card" style="margin-bottom:12px">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn bp" onclick="trFetchPending()" id="tr-fetch-btn">🔥 Bekleyenleri Getir</button>
@@ -856,7 +851,6 @@ tbody td{line-height:1.5}
 <!-- OPUS CLIP DİREKT -->
 <div id="page-opusclip" class="page">
   <div class="ph"><div class="pt">OpusClip Galeri</div><div class="ps">Opus Pro projelerini görsel olarak göster, seç ve işleme al</div></div>
-  <div class="stok-serit"></div>
 
   <!-- ÜST BAR: Proje getir + Proje ID ile ara -->
   <div class="card" style="margin-bottom:12px">
@@ -1331,7 +1325,6 @@ tbody td{line-height:1.5}
 <div id="page-radar" class="page">
   <div class="ph"><div class="pt">Trend Radar &amp; Onay</div><div class="ps">Keşif Radarı — YouTube'da trend olan, hızla yükselen ve patlama potansiyeli taşıyan video &amp; kanallar (canlı)</div></div>
   <div class="utab-bar" data-group="trend" data-utab="radar"></div>
-  <div class="stok-serit"></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veri önce <b>n8n günlük radar</b>'dan (<code>/webhook/trend-radar</code>, her sabah hesaplanır) alınır; yoksa <b>YouTube API</b> ile canlı hesaplanır (Ayarlar → YouTube API Key). <b>Hız</b> = izlenme/saat. <b>▲ artış</b> = son ziyaretten bu yana kazanılan izlenme. <b>💎 Potansiyel</b> = abone sayısına göre izlenmesi patlamış taze video (küçük kanal, büyük ivme).</span></div>
 
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
@@ -1757,7 +1750,7 @@ function go(id, el) {
   el.classList.add('active');
   // Video gönderimi olan sayfalarda stok şeridini tazele
   if (['video','parcala','trendonay','radar','opusclip'].indexOf(id) >= 0){
-    try{ stokSeritCiz(); stokTazele(); }catch(e){}
+    try{ stokChipIsaretle(); stokTazele(); }catch(e){}
   }
   const h = {
     dashboard: ()=>{ refreshDash(); loadActionCenter(); },
@@ -2387,6 +2380,8 @@ function renderCatChips(id) {
   renderLangToggle(id);
   updateLangVisibility(id);
   renderPlatToggle(id);
+  // chip'ler yeniden cizildi -> stok isaretlerini geri koy (veri yoksa sessiz gecer)
+  try{ stokChipIsaretle(); }catch(e){}
 }
 
 function catChipSingle(el, containerId) {
@@ -6006,43 +6001,50 @@ function stokDusukler(upBy){
   });
   return out.sort((a,b)=>a.enAz-b.enAz);
 }
-function stokSeritCiz(){
-  const els = document.querySelectorAll('.stok-serit');
-  if (!els.length) return;
+// Kategori chip'lerini stok durumuna gore isaretle.
+// 'genel' ve 'genel_en' AYRI havuzlar: kategori chip'i 'genel'i gosterir,
+// Genel secilince cikan TR/EN dil chip'leri kendi havuzlarini gosterir.
+function stokChipIsaretle(){
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const temizle = c => {
+    c.classList.remove('stok-az','stok-krit');
+    const b = c.querySelector('.cs-n'); if (b) b.remove();
+    if (c.dataset.stokTip){ c.removeAttribute('title'); delete c.dataset.stokTip; }
+  };
+  const tumChipler = document.querySelectorAll('.cat-chip[data-cat],.cat-chip[data-lang]');
+  if (!STOK.data){ tumChipler.forEach(temizle); return; }
   const esik = stokEsik();
-  if (!STOK.data){ els.forEach(el=>{ el.innerHTML=''; }); return; }
-  const gruplar = stokDusukler(STOK.data);
-  if (!gruplar.length){
-    const ok = '<div class="stok-ok"><span>✓</span><span>Tüm kategorilerde <b>'+esik+'+</b> zamanlanmış short var — stok yeterli</span></div>';
-    els.forEach(el=>{ el.innerHTML = ok; });
-    return;
-  }
-  const haplar = [];
-  gruplar.forEach(g=>{
-    g.dusuk.forEach(x=>{
-      const krit = x.n === 0;
-      // Hapta profil adı YAZILMAZ, yalnız kategori — aynı kategoriden birden çok
-      // profil düşükse haplar birbirinin aynısı görünür; hangisi olduğu ipucunda.
-      const ipucu = x.p+' — kuyrukta '+x.n+' zamanlanmış short (eşik '+esik+')'
-                  + '\nKategori: '+g.label
-                  + '\nBu kategoride '+g.profiller.length+' profil var, toplam '+g.toplam+' zamanlanmış.';
-      haplar.push('<span class="gpill'+(krit?' krit':'')+'" title="'+esc(ipucu)+'">'
-        + '<span>'+esc(g.label)+'</span>'
-        + '<span class="gp-n">'+x.n+'</span></span>');
-    });
-  });
-  const n = haplar.length;
-  const html = '<div class="stok-kutu">'
-    + '<div class="stok-bas"><span>⚠</span><span>Stok azalıyor — '+n+' profil</span>'
-    + '<span class="stok-esik">eşik '+esik+' · Ayarlar\'dan değiştirilir</span></div>'
-    + '<div class="gp-wrap">'+haplar.join('')+'</div></div>';
-  els.forEach(el=>{ el.innerHTML = html; });
+  // havuz anahtari -> {enAz, dusuk[]}
+  const durum = {};
+  stokDusukler(STOK.data).forEach(g => { durum[g.kat] = g; });
+
+  const isle = (chip, havuz) => {
+    temizle(chip);
+    const g = durum[havuz];
+    if (!g) return;
+    const krit = g.enAz === 0;
+    chip.classList.add(krit ? 'stok-krit' : 'stok-az');
+    const rozet = document.createElement('span');
+    rozet.className = 'cs-n';
+    rozet.textContent = g.enAz;
+    chip.appendChild(rozet);
+    chip.title = (krit ? 'Kuyruk bitti — bu kategoriye içerik gönder' : 'Kuyruk azalıyor')
+      + ' (eşik ' + esik + ')\n'
+      + g.dusuk.map(x=>'• '+x.p+': '+x.n+' zamanlanmış').join('\n')
+      + '\nBu kategoride ' + g.profiller.length + ' profil var, toplam ' + g.toplam + ' zamanlanmış.';
+    chip.dataset.stokTip = '1';
+  };
+
+  document.querySelectorAll('.cat-chip[data-cat]').forEach(c => isle(c, c.dataset.cat));
+  // dil chip'leri: TR -> genel havuzu, EN -> genel_en havuzu
+  document.querySelectorAll('.cat-chip[data-lang]').forEach(c =>
+    isle(c, c.dataset.lang === 'en' ? 'genel_en' : 'genel'));
 }
+window.stokChipIsaretle = stokChipIsaretle;
 // Şeridi tazele (sayfa açılışında ve veri yenilendiğinde)
 async function stokTazele(zorla){
   await stokVeri(zorla);
-  stokSeritCiz();
+  stokChipIsaretle();
 }
 window.stokTazele = stokTazele;
 
@@ -6123,7 +6125,7 @@ async function notifCheck(derin){
                 katLabel(g.kat)+' · '+x.p+(krit?' — zamanlanmış short kalmadı':' — '+x.n+' zamanlanmış short kaldı'),
                 'Eşik '+esik+' · bu profile yeni short gönder', 'video');
             }));
-            stokSeritCiz();
+            stokChipIsaretle();
           }
         }catch(e){ console.warn('[Stok/NOTIF]', e.message); }
         if(Date.now()-NOTIF.lastViral>3*3600000){ NOTIF.lastViral=Date.now(); await notifViralTara(items); }
@@ -6288,7 +6290,7 @@ async function loadProfileLoad() {
   // 2) Upload-Post'ta zamanlanmış (varsa) — profile_username başına
   // Zamanlanmış sayıları stok katmanıyla ORTAK (tek kaynak, 5 dk önbellek)
   const upBy=(await stokVeri(true))||{};
-  stokSeritCiz();
+  stokChipIsaretle();
   // render
   const profs=[...new Set([...Object.keys(byP),...Object.keys(upBy)])];
   if(!profs.length){ listEl.innerHTML='<div style="color:var(--mt);font-size:13px;text-align:center;padding:14px">Veri yok — Ayarlar\'da Sheet ID / n8n URL girili mi? (short-kaydetme sayfası \'profil\' kolonu okunur)</div>'; if(st) st.textContent=''; return; }
