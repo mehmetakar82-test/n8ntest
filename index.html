@@ -1316,6 +1316,10 @@ tbody td{line-height:1.5}
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--acc)">🎯 Erken Sinyal <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— Google Trends'te yükselen aramalar × YouTube: 15 dk+, beğeni/izlenme ≥ %5 (trend olmadan yakala)</span></span><span id="rd-gtrend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-gtrend" class="rd-grid"><div class="rd-empty">—</div></div>
   </div>
+  <div class="card" style="border-color:rgba(52,211,153,.3)">
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--ok)">🔎 Keşif <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— Wikipedia gündemi × YouTube araması × kanal RSS: kanalın kendi medyanını 2.5 kat aşan videolar <b style="color:var(--ok)">(sıfır API kotası)</b></span></span><span id="rd-kesif-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div id="rd-kesif" class="rd-grid"><div class="rd-empty">—</div></div>
+  </div>
   <div class="card">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>📺 Yükselen Kanallar <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— bugün birden çok sıcak videosu olan kanallar</span></span><span id="rd-channels-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-channels" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"><div class="rd-empty">—</div></div>
@@ -6523,7 +6527,7 @@ async function loadRadar(force){
     const base=getN8N();
     if(base){
       const d=await n8nGetCached('/webhook/trend-radar');
-      if(d && !d._bos && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],outlier:d.outlier||[],gtrend:d.gtrend||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:''); }
+      if(d && !d._bos && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],outlier:d.outlier||[],gtrend:d.gtrend||[],kesif:d.kesif||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:''); }
     }
     // 2) canlı hesap (YouTube API)
     if(!data){
@@ -6958,7 +6962,9 @@ async function rdClientCompute(key, st){
     try{ localStorage.setItem('op_radar_snap',JSON.stringify({ts:Date.now(),v})); }catch(e){}
   }
   // gtrend (Erken Sinyal) tarayıcıdan hesaplanamaz — Google Trends CORS engelli, n8n gerekli
-  return {trend,rising,potential,outlier,gtrend:[],channels};
+  // kesif de gtrend gibi n8n'e bagli: Wikipedia ve YouTube HTML'i CORS yuzunden
+  // tarayicidan cekilemez, sunucu tarafi (n8n) gerekir.
+  return {trend,rising,potential,outlier,gtrend:[],kesif:[],channels};
 }
 
 // Filtre eşikleri — keşif bölümlerinde 100K+ abone, her yerde ≤1 saat.
@@ -6995,7 +7001,7 @@ function renderRadar(){
   const d=RD.data; if(!d) return;
   const st=document.getElementById('rd-status');
   if(st) st.textContent='Kaynak: '+RD.src;
-  [['rd-trend',d.trend],['rd-hafta',RD.hafta],['rd-outlier',d.outlier],['rd-rising',d.rising],['rd-potential',d.potential],['rd-gtrend',d.gtrend]].forEach(([elId,list])=>{
+  [['rd-trend',d.trend],['rd-hafta',RD.hafta],['rd-outlier',d.outlier],['rd-rising',d.rising],['rd-potential',d.potential],['rd-gtrend',d.gtrend],['rd-kesif',d.kesif]].forEach(([elId,list])=>{
     const el=document.getElementById(elId); if(!el) return;
     setEl(elId+'-n',(list||[]).length+' video');
     if(!(list||[]).length){
@@ -7005,6 +7011,8 @@ function renderRadar(){
         ? 'Bu taramada 2x üstü outlier çıkmadı — normal, her gün patlama olmaz.'
         : elId==='rd-gtrend'
         ? 'Veri yok — bu bölüm <b>n8n günlük radar</b>dan gelir (Google Trends tarayıcıdan çekilemez). Workflow\'u aktif et, yarın sabah dolar.'
+        : elId==='rd-kesif'
+        ? 'Veri yok — bu bölüm <b>n8n günlük radar</b>dan gelir (Wikipedia + YouTube sayfası tarayıcıdan çekilemez). Workflow\'u aktif et, yarın sabah dolar.'
         : 'Bugün bu bölümde sonuç yok')+'</div>';
       return;
     }
@@ -7017,6 +7025,8 @@ function renderRadar(){
         ? '<span class="rd-badge-ratio" style="background:rgba(167,139,250,.95);color:#150c2e">💥 '+x.outlier+'x</span>'
         : (elId==='rd-gtrend')
         ? '<span class="rd-badge-ratio" style="background:rgba(0,229,255,.95);color:#012">♥ %'+x.ratio+'</span>'
+        : (elId==='rd-kesif')
+        ? '<span class="rd-badge-ratio" style="background:rgba(52,211,153,.95);color:#052e21" title="Kanalin kendi medyanina gore kac kat">🔎 '+(x.outlier||0)+'x</span>'
         : (x.delta>0?'<span class="rd-badge-delta">▲ +'+ytkFmt(x.delta)+' / '+x.deltaH+'sa</span>':'');
       const _dn=rdDone(x);
       return '<div class="rd-card'+sel+(_dn?' done':'')+'" onclick="rdToggle(\''+x.id+'\')">'
@@ -7024,7 +7034,7 @@ function renderRadar(){
         +(x.durSec?'<span class="rd-dur">'+rdSure(x.durSec)+'</span>':'')+'<img class="rd-thumb" src="'+rdEsc(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
         +'<div class="rd-body">'
         +'<div class="rd-title">'+rdEsc(x.title)+'</div>'+rdDoneLbl(_dn)
-        +(x.keyword?'<div style="font-size:10.5px;color:var(--acc);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Google Trends sorgusu">🔍 '+rdEsc(x.keyword)+'</div>':'')
+        +(x.keyword?'<div style="font-size:10.5px;color:var(--acc);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Bu videoyu bulduran arama kelimesi (Google Trends veya Wikipedia gündemi)">🔍 '+rdEsc(x.keyword)+'</div>':'')
         +(x.outlier>=2&&x.chMed?'<div style="font-size:10.5px;color:var(--acc3);margin-top:2px" title="Kanalın son 20 video medyanı">💥 '+x.outlier+'x · kanal medyanı '+ytkFmt(x.chMed)+'</div>':'')
         +(x.katTahmin?rdKatSatiri(x):'')
         +(x.ivme>0?'<div style="font-size:10.5px;margin-top:2px;color:'+(x.ivme>=1.2?'var(--ok)':(x.ivme<0.8?'var(--mt)':'var(--wn)'))+'" title="Son '+x.deltaH+' saatteki hız ÷ ömür boyu ortalama hız. >1 hızlanıyor, <1 yavaşlıyor">'+(x.ivme>=1.2?'📈 hızlanıyor':(x.ivme<0.8?'📉 yavaşlıyor':'➡ sabit'))+' ×'+x.ivme+'</div>':'')
@@ -7094,7 +7104,7 @@ function rdOpenChannel(name){
 async function rdSendSelected(){
   const d=RD.data; if(!d) return;
   const katAll=(RD.kat?Object.values(RD.kat).flat():[]).concat(RD.hafta||[]);
-  const all=[...(d.trend||[]),...(d.outlier||[]),...(d.rising||[]),...(d.potential||[]),...(d.gtrend||[]),...katAll];
+  const all=[...(d.trend||[]),...(d.outlier||[]),...(d.rising||[]),...(d.potential||[]),...(d.gtrend||[]),...(d.kesif||[]),...katAll];
   const seen=new Set();
   let sel=all.filter(x=>{ if(!RD.selected.has(x.id)||seen.has(x.id)) return false; seen.add(x.id); return true; });
   if(!sel.length) return showRes('rd-res','Video seçin (kartlara tıkla)','warn');
