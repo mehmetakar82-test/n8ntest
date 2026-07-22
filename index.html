@@ -1182,7 +1182,7 @@ tbody td{line-height:1.5}
   <!-- PROFİL TABLOSU -->
   <div class="card">
     <div class="ct">📁 Upload-Post Profilleri <span id="rap-prof-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
-    <div class="tw"><table><thead><tr><th>Profil</th><th>Kategori</th><th>Platformlar</th><th>Yayınlanan</th><th>Başarısız</th><th>Planlı/Kuyruk</th><th>Son Yayın</th><th>Takipçi</th><th>İzlenme</th></tr></thead>
+    <div class="tw"><table><thead><tr><th>Profil</th><th>Kategori</th><th>Platformlar</th><th title="Seçili rapor dönemi içinde">Yayınlanan <span style="color:var(--mt);font-weight:400">(dönem)</span></th><th title="Seçili rapor dönemi içinde">Başarısız</th><th>Planlı/Kuyruk</th><th title="Çekilen tüm geçmişteki en son yayın — rapor döneminden bağımsız">Son Yayın <span style="color:var(--mt);font-weight:400">(tüm)</span></th><th>Takipçi</th><th>İzlenme</th></tr></thead>
     <tbody id="rap-prof-tbody"><tr><td colspan="9" style="color:var(--mt);text-align:center;padding:14px">—</td></tr></tbody></table></div>
     <div id="rap-kat-uyum" style="margin-top:12px"></div>
   </div>
@@ -2823,7 +2823,11 @@ async function loadReports(){
   const profs = (raw && Array.isArray(raw.profiles)) ? raw.profiles : [];
   // 3) Yayın geçmişi (sayfalı) + planlı + kuyruk
   const hist=[], plan=[]; const seenJobs=new Set();
-  const pHist=(async()=>{ for(let pg=1;pg<=3;pg++){ try{ const {data}=await upFetch('/uploadposts/history?limit=100&page='+pg); const h=Array.isArray(data)?data:(data.history||data.data||[]); h.forEach(x=>hist.push(x)); if(h.length<100) break; }catch(e){ break; } } })();
+  // Gecmis penceresi: 3 sayfa (300 kayit) cok profilli hesapta birkac gunu ancak
+  // kapsiyordu; seyrek yayinlayan profiller pencere disina dusup SIFIR gorunuyordu.
+  const HIST_MAX_SAYFA = 10;   // 10 x 100 = 1000 kayit
+  RAP.histKirpik = false;
+  const pHist=(async()=>{ for(let pg=1;pg<=HIST_MAX_SAYFA;pg++){ try{ const {data}=await upFetch('/uploadposts/history?limit=100&page='+pg); const h=Array.isArray(data)?data:(data.history||data.data||[]); h.forEach(x=>hist.push(x)); if(h.length<100) break; if(pg===HIST_MAX_SAYFA) RAP.histKirpik=true; }catch(e){ break; } } })();
   const pPlan=(async()=>{
     try{ const {data}=await upFetch('/uploadposts/schedule'); const s=Array.isArray(data)?data:(data.scheduled_posts||data.scheduled||[]); s.forEach(x=>{ if(x.job_id) seenJobs.add(x.job_id); plan.push({profile:x.profile_username||'', time:x.scheduled_date||'', queue:false}); }); }catch(e){}
     await Promise.all(profs.map(p=>upFetch('/uploadposts/queue/preview?profile_username='+encodeURIComponent(p.username)+'&count=50').then(({data})=>{
@@ -2913,12 +2917,21 @@ function rapRenderProfiles(inP){
   const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   const profs=(RAP.profRaw&&RAP.profRaw.profiles)||[];
   const by={};
-  const ens=u=>{ if(!by[u]) by[u]={p:0,f:0,plan:0,last:0}; return by[u]; };
-  inP.forEach(h=>{ const b=ens(h.profile_username||h.user||'?'); b[rapOk(h)?'p':'f']++; const t=Date.parse(rapHistTime(h))||0; if(t>b.last) b.last=t; });
+  // p/f = SECILI DONEM;  last + hicYayin = cekilen TUM gecmis (donem disi dahil)
+  const ens=u=>{ if(!by[u]) by[u]={p:0,f:0,plan:0,last:0,tumP:0,tumF:0}; return by[u]; };
+  inP.forEach(h=>{ const b=ens(h.profile_username||h.user||'?'); b[rapOk(h)?'p':'f']++; });
+  // 'Son Yayin' donemle filtrelenmemeli — yoksa donem disinda yayinlayan profil
+  // "hic yayinlamamis" gibi gorunuyordu (asil sikayet buydu).
+  (RAP.hist||[]).forEach(h=>{ const b=ens(h.profile_username||h.user||'?');
+    b[rapOk(h)?'tumP':'tumF']++;
+    const t=Date.parse(rapHistTime(h))||0; if(t>b.last) b.last=t; });
   RAP.plan.forEach(x=>{ ens(x.profile||'?').plan++; });
   profs.forEach(p=>ens(p.username));
   const rows=Object.keys(by).sort((a,b)=>(by[b].p+by[b].f+by[b].plan)-(by[a].p+by[a].f+by[a].plan));
-  setEl('rap-prof-n', '— '+rows.length+' profil');
+  const akmayan = rows.filter(u=>by[u].plan>0 && by[u].tumP===0 && by[u].tumF===0);
+  setEl('rap-prof-n', '— '+rows.length+' profil'
+    + (akmayan.length ? ' · ⚠ '+akmayan.length+' profilin kuyruğu akmıyor' : '')
+    + (RAP.histKirpik ? ' · geçmiş penceresi kırpıldı (ilk 1000 kayıt)' : ''));
   const PI={instagram:PFAV('instagram.com'),youtube:PFAV('youtube.com'),tiktok:PFAV('tiktok.com'),facebook:PFAV('facebook.com'),x:PFAV('x.com'),twitter:PFAV('x.com'),threads:PFAV('threads.net'),linkedin:PFAV('linkedin.com'),pinterest:PFAV('pinterest.com')};
   const platIcons=u=>{ const pr=profs.find(x=>x.username===u); if(!pr) return '—'; const sa=pr.social_accounts||pr.socialAccounts||{};
     const ic=Object.keys(sa).filter(k=>{ const v=sa[k]; const a=Array.isArray(v)?v[0]:v; return a&&(a.username||a.id||a.display_name||a.name); }).map(k=>PI[k]||'▪');
@@ -2933,7 +2946,13 @@ function rapRenderProfiles(inP){
       <td style="color:var(--ok);font-variant-numeric:tabular-nums">${b.p}</td>
       <td style="color:${b.f?'var(--er)':'var(--mt)'};font-variant-numeric:tabular-nums">${b.f}</td>
       <td style="color:#00b8d4;font-variant-numeric:tabular-nums">${b.plan}</td>
-      <td style="color:var(--mt)">${b.last?new Date(b.last).toLocaleDateString('tr'):'—'}</td>
+      <td style="color:${(b.plan>0&&b.tumP===0&&b.tumF===0)?'var(--er)':'var(--mt)'}">${(()=>{
+        if (b.last) return new Date(b.last).toLocaleDateString('tr');
+        // Kuyrukta is var + cekilen gecmiste HIC kayit yok = kuyruk akmiyor.
+        // Tipik sebep: Upload-Post'ta o profil icin Posting Times / Active Days bos.
+        if (b.plan>0) return `<span title="Kuyrukta ${b.plan} iş bekliyor ama bu profilin çekilen geçmişinde hiç yayın yok.\n\nEn olası sebep: Upload-Post → bu profil → Configuration → Posting Times / Active Days boş. Kuyruk dolar ama hiçbir zaman akmaz.\n\n(Not: geçmiş penceresi son ${(RAP.hist||[]).length} kayıtla sınırlı${RAP.histKirpik?' ve KIRPILMIŞ':''} — çok eski yayınlar görünmeyebilir.)" style="color:var(--er);font-weight:700;cursor:help">⚠ hiç akmamış</span>`;
+        return '—';
+      })()}</td>
       <td style="font-variant-numeric:tabular-nums">${sum(m=>m.followers)}</td>
       <td style="font-variant-numeric:tabular-nums">${sum(m=>m.views!=null?m.views:m.impressions)}</td>
     </tr>`;
