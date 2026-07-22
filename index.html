@@ -319,6 +319,11 @@ tbody td{line-height:1.5}
 .pl-tip b{display:block;color:#fff;font-size:12px;margin-bottom:4px}
 .pl-tip .pl-tip-api{display:block;margin-top:7px;padding-top:7px;border-top:1px solid rgba(248,113,113,.28);
   color:#f3a5a5;font-family:var(--fm);font-size:10.5px;word-break:break-all}
+/* OpusClip proje kartında takım rozeti (2+ takım varsa görünür) */
+.opc-takim{position:absolute;top:7px;left:7px;z-index:3;padding:2px 7px;border-radius:999px;
+  font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:.2px;
+  background:rgba(0,229,255,.92);color:#012;box-shadow:0 1px 6px rgba(0,0,0,.4)}
+.opc-takim.t1{background:rgba(167,139,250,.94);color:#150c2e}
 .rd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px}
 .rd-empty{grid-column:1/-1;color:var(--mt);font-size:12px;text-align:center;padding:18px}
 .rd-card{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .12s;position:relative}
@@ -1508,7 +1513,13 @@ tbody td{line-height:1.5}
         <div class="fg"><label>Sheet ID (Short Kaydet)</label><input id="cfg-sheet" type="text" placeholder="1eAm6yyasd_..."/></div>
         <div class="fg"><label>Sheet ID (URL-Takip)</label><input id="cfg-sheet2" type="text" placeholder="aynı veya farklı"/></div>
         <div class="fg"><label>Upload-Post API Key</label><input id="cfg-blot" type="text" placeholder="blt_..."/></div>
-        <div class="fg"><label>OpusClip API Key</label><input id="cfg-opus" type="text" placeholder="sk-..."/><div style="font-size:11px;color:var(--mt);margin-top:3px">opus.pro → Settings → API → API Key</div></div>
+        <div class="fg"><label>OpusClip API Key <span style="color:var(--mt)">(1. takım)</span></label><input id="cfg-opus" type="text" placeholder="sk-..."/><div style="font-size:11px;color:var(--mt);margin-top:3px">opus.pro → Settings → API → API Key</div></div>
+        <div class="fg"><label>OpusClip API Key <span style="color:var(--mt)">(2. takım — isteğe bağlı)</span></label><input id="cfg-opus2" type="text" placeholder="sk-... (boş bırakılabilir)"/><div style="font-size:11px;color:var(--mt);margin-top:3px">Her takımın <b>kendi</b> API anahtarı vardır — tek anahtar iki takımı birden göremez (ölçüldü). İkinci takıma geçip Settings → API'den anahtarını al. Girilirse galeride her iki takımın projeleri birlikte listelenir.</div></div>
+        <div class="fg"><label>Takım adları <span style="color:var(--mt)">(görünen ad, isteğe bağlı)</span></label>
+          <div style="display:flex;gap:8px">
+            <input id="cfg-opus-ad" type="text" placeholder="1. Takım" style="flex:1"/>
+            <input id="cfg-opus2-ad" type="text" placeholder="2. Takım" style="flex:1"/>
+          </div></div>
         <div class="fg"><label>Cobalt API Key</label><input id="cfg-cobalt" type="text" placeholder="..."/><div style="font-size:11px;color:var(--mt);margin-top:3px">cobalt.tools → API Key (Direkt Yayınla için gerekli)</div></div>
         <div style="display:flex;gap:10px">
           <div class="fg" style="flex:1"><label>Toplu Gönderim Uyarı Sınırı</label><input id="cfg-batchmax" type="number" min="1" value="15" placeholder="15"/><div style="font-size:11px;color:var(--mt);margin-top:3px">Bu sayıyı aşınca onay ister</div></div>
@@ -3514,6 +3525,9 @@ function saveSettings() {
     sheet2:(document.getElementById('cfg-sheet2')||{}).value||'',
     blot:  (document.getElementById('cfg-blot')||{}).value||'',
     opus:  (document.getElementById('cfg-opus')||{}).value||'',
+    opus2: (document.getElementById('cfg-opus2')||{}).value||'',
+    opusAd:  (document.getElementById('cfg-opus-ad')||{}).value||'',
+    opus2Ad: (document.getElementById('cfg-opus2-ad')||{}).value||'',
     cobalt:(document.getElementById('cfg-cobalt')||{}).value||'',
     batchMax:(document.getElementById('cfg-batchmax')||{}).value||'15',
     batchDelay:(document.getElementById('cfg-batchdelay')||{}).value||'8',
@@ -3553,6 +3567,7 @@ function loadSettings() {
   const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
   set('cfg-n8n',c.n8n); set('cfg-shkey',c.shkey); set('cfg-sheet',c.sheet);
   set('cfg-sheet2',c.sheet2); set('cfg-blot',c.blot); set('cfg-opus',c.opus); set('cfg-cobalt',c.cobalt);
+  set('cfg-opus2',c.opus2); set('cfg-opus-ad',c.opusAd); set('cfg-opus2-ad',c.opus2Ad);
   set('cfg-batchmax',c.batchMax||'15'); set('cfg-batchdelay',c.batchDelay||'8');
   const ytkEl=document.getElementById('ytk-apikey');if(ytkEl&&c.ytApiKey)ytkEl.value=c.ytApiKey;
   const ytkSh=document.getElementById('ytk-sheetid');if(ytkSh&&(c.sheet2||c.sheet))ytkSh.value=c.sheet2||c.sheet;
@@ -4722,6 +4737,8 @@ const OPC = {
   selectedClips: new Set(),
   currentProjectId: null,
   orgId: '',
+  takimlar: [],          // opusTakimlar() sonucu (proje→anahtar eşlemesi için)
+  takimOzet: [], takimHata: [],
   // projectId -> o projeye ait tüm clip id listesi (proje açıldığında cache'lenir)
   projClips: JSON.parse(localStorage.getItem('op_opc_projclips')||'{}'),
   // işlenmiş (gönderilmiş) clip id'leri — sınırsız, kalıcı (geçmiş 50 ile sınırlı olduğu için ayrı tutulur)
@@ -4784,6 +4801,18 @@ function opcUnmarkSelectedDone() {
 }
 
 function getOpusKey() { return S.cfg.opus || ''; }
+// ── OpusClip takımları ──────────────────────────────────────
+// ÖLÇÜM (23.07.2026): x-opus-org-id başlığı API tarafından YOK SAYILIYOR
+// (uydurma org id ile bile aynı projeler dönüyor) → takım = anahtar.
+// Bu yüzden her takımın kendi anahtarı ayrı ayrı sorgulanır.
+function opusTakimlar() {
+  const t = [];
+  const k1 = (S.cfg.opus || '').trim();
+  const k2 = (S.cfg.opus2 || '').trim();
+  if (k1) t.push({ key: k1, ad: (S.cfg.opusAd || '').trim() || '1. Takım', ix: 0 });
+  if (k2 && k2 !== k1) t.push({ key: k2, ad: (S.cfg.opus2Ad || '').trim() || '2. Takım', ix: 1 });
+  return t;
+}
 
 function initOpusClip() {
   renderOPCHist();
@@ -4805,8 +4834,8 @@ function extractClipId(raw) {
   return s;
 }
 
-async function opcApiFetch(url) {
-  const key = getOpusKey();
+async function opcApiFetch(url, anahtar) {
+  const key = anahtar || getOpusKey();
   if (!key) throw new Error('OpusClip API Key gerekli — Ayarlar sayfasından girin');
   const hdrs = { 'Authorization': 'Bearer ' + key };
   if (OPC.orgId) hdrs['x-opus-org-id'] = OPC.orgId;
@@ -4828,15 +4857,31 @@ async function opcFetchProjects() {
   try {
     if (st) st.innerHTML = '⏳ Projeler yükleniyor...';
     if (btn) btn.disabled = true;
-    const data = await opcApiFetch('https://api.opus.pro/api/clip-projects?pageSize=100');
-    console.log('[OPC] raw clip-projects response:', JSON.stringify(data).substring(0,500));
-    const projects = Array.isArray(data) ? data : (data.list || data.data || data.projects || data.items || []);
-    if (projects.length) {
-      console.log('[OPC] first project keys:', Object.keys(projects[0]).join(', '));
-      console.log('[OPC] first project:', JSON.stringify(projects[0]).substring(0,500));
-      const org = projects[0].orgId || projects[0].org_id || '';
-      if (org) OPC.orgId = org;
+    // Her takım AYRI anahtarla sorgulanır (tek anahtar iki takımı göremez).
+    // Bir takım hata verirse diğeri yine de listelensin.
+    const takimlar = opusTakimlar();
+    if (!takimlar.length) throw new Error('OpusClip API Key gerekli — Ayarlar sayfasından girin');
+    OPC.takimlar = takimlar;
+    let projects = [];
+    const takimOzet = [], takimHata = [];
+    for (const t of takimlar) {
+      try {
+        const data = await opcApiFetch('https://api.opus.pro/api/clip-projects?pageSize=100', t.key);
+        const liste = Array.isArray(data) ? data : (data.list || data.data || data.projects || data.items || []);
+        liste.forEach(p => { p._takimIx = t.ix; p._takimAd = t.ad; });
+        projects = projects.concat(liste);
+        takimOzet.push(t.ad + ': ' + liste.length);
+        console.log('[OPC] ' + t.ad + ' → ' + liste.length + ' proje');
+      } catch(e) {
+        takimHata.push(t.ad + ' (' + e.message + ')');
+        console.warn('[OPC] ' + t.ad + ' alınamadı:', e.message);
+      }
     }
+    // İki takımın projeleri tarih sırasına göre harmanlanır (en yeni üstte)
+    projects.sort((a,b) => String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+    OPC.takimOzet = takimOzet;
+    OPC.takimHata = takimHata;
+    if (takimHata.length && !projects.length) throw new Error(takimHata.join(' · '));
     OPC.projects = projects;
     if (!projects.length) {
       if (grid) grid.innerHTML = '';
@@ -4846,8 +4891,10 @@ async function opcFetchProjects() {
     }
     if (empty) empty.style.display = 'none';
     opcRenderProjects(projects);
-    if (st) st.innerHTML = `✓ ${projects.length} proje yüklendi`;
-    addLog('ok', 'sistem', `OpusClip: ${projects.length} proje yüklendi`);
+    const ozet = (OPC.takimOzet && OPC.takimOzet.length > 1) ? ' (' + OPC.takimOzet.join(' · ') + ')' : '';
+    const hata = (OPC.takimHata && OPC.takimHata.length) ? ` <span style="color:var(--er)">· ${OPC.takimHata.join(' · ')}</span>` : '';
+    if (st) st.innerHTML = `✓ ${projects.length} proje yüklendi${ozet}${hata}`;
+    addLog('ok', 'sistem', `OpusClip: ${projects.length} proje yüklendi${ozet}`);
   } catch(e) {
     if (st) st.innerHTML = '<span style="color:var(--er)">✕ ' + e.message + '</span>';
     addLog('err', 'sistem', 'OpusClip proje yükleme hatası: ' + e.message);
@@ -4882,6 +4929,9 @@ function opcRenderProjects(projects) {
     const projScrim = allDone
       ? `<div class="opc-scrim on done" title="Tüm clipler işlendi"><div class="opc-check done">✓</div></div>`
       : '';
+    // Birden çok takım varsa hangi takımdan geldiği kartta görünsün
+    const takimRozet = (p._takimAd && OPC.takimlar && OPC.takimlar.length > 1)
+      ? `<span class="opc-takim t${p._takimIx||0}" title="OpusClip takımı">${p._takimAd}</span>` : '';
     const thumbHtml = thumb
       ? `<img src="${thumb}" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       : '';
@@ -4889,6 +4939,7 @@ function opcRenderProjects(projects) {
       <div class="opc-thumb" style="border-radius:6px 6px 0 0">
       ${thumbHtml}
       <div style="display:${thumb?'none':'flex'};align-items:center;justify-content:center;height:140px;background:linear-gradient(135deg,#0a1628,#162a4a);color:var(--acc);font-size:36px">◈</div>
+      ${takimRozet}
       ${projScrim}
       </div>
       <div style="padding:10px 12px">
@@ -4929,7 +4980,11 @@ async function opcOpenProject(projectId) {
 
   try {
     if (st) st.innerHTML = '⏳ Clipler yükleniyor...';
-    const data = await opcApiFetch('https://api.opus.pro/api/exportable-clips?q=findByProjectId&projectId=' + projectId);
+    // Clipler, projenin AİT OLDUĞU takımın anahtarıyla çekilmeli
+    // (not: aşağıda ayrı bir `proj` değişkeni var — adı çakışmasın diye _tp)
+    const _tp = (OPC.projects || []).find(p => (p.projectId || p.id) === projectId);
+    const tkm = (OPC.takimlar || []).find(t => t.ix === (_tp ? _tp._takimIx : 0));
+    const data = await opcApiFetch('https://api.opus.pro/api/exportable-clips?q=findByProjectId&projectId=' + projectId, tkm && tkm.key);
     const clips = Array.isArray(data) ? data : (data.list || data.data || data.clips || data.items || []);
     OPC.clips = clips;
 
