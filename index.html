@@ -260,6 +260,67 @@ tbody td{line-height:1.5}
 .utab.on .utab-cnt{background:#012;color:var(--acc)}
 .pfav{width:15px;height:15px;border-radius:3px;vertical-align:-2px;object-fit:contain;background:rgba(255,255,255,.05);display:inline-block}
 /* ═══ Trend Radar ═══ */
+/* ── STOK ŞERİDİ: altın hap rozetler ───────────────────────── */
+.stok-serit{margin:0 0 14px}
+.stok-kutu{border:1px solid rgba(201,162,39,.34);border-radius:14px;padding:11px 13px;
+  background:linear-gradient(180deg,rgba(72,56,16,.20),rgba(28,22,6,.24))}
+.stok-bas{display:flex;align-items:center;gap:8px;font-family:var(--fh);font-size:11.5px;
+  letter-spacing:.9px;text-transform:uppercase;color:#f0d98f;margin-bottom:9px}
+.stok-bas .stok-esik{margin-left:auto;letter-spacing:0;text-transform:none;
+  font-family:var(--fm);font-size:11px;color:var(--mt)}
+.gp-wrap{display:flex;flex-wrap:wrap;gap:9px}
+.gpill{position:relative;display:inline-flex;align-items:center;gap:9px;padding:8px 15px;
+  border-radius:999px;border:2px solid transparent;cursor:default;
+  font-family:var(--fm);font-size:11.5px;font-weight:600;line-height:1.15;
+  background:linear-gradient(180deg,#1b1508 0%,#0d0a04 100%) padding-box,
+             linear-gradient(160deg,#fdf4d0 0%,#e0bd5c 22%,#9c7418 48%,#7a5a0e 64%,#f2dfa0 100%) border-box;
+  color:#f5e2a8;
+  box-shadow:0 2px 12px rgba(196,152,42,.20), inset 0 1px 0 rgba(255,240,190,.13);}
+.gpill::after{content:'';position:absolute;left:9px;right:9px;top:2px;height:42%;
+  border-radius:999px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(255,255,255,.17),rgba(255,255,255,0))}
+.gpill .gp-kat{opacity:.72;font-size:10.5px}
+.gpill .gp-n{font-size:13.5px;font-weight:800;letter-spacing:.3px}
+.gpill.krit{color:#3a2a02;text-shadow:0 1px 0 rgba(255,255,255,.32);
+  background:linear-gradient(180deg,#fdf4cf 0%,#e8c86a 44%,#c9a53c 64%,#f4e6b0 100%) padding-box,
+             linear-gradient(160deg,#fffbe8 0%,#d4ab3e 40%,#8a6612 70%,#fbf1c8 100%) border-box;
+  box-shadow:0 2px 16px rgba(212,171,62,.40), inset 0 1px 0 rgba(255,255,255,.45);}
+.gpill.krit .gp-kat{opacity:.62}
+.stok-ok{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ok);
+  border:1px solid rgba(52,211,153,.28);border-radius:12px;padding:9px 12px;
+  background:rgba(52,211,153,.06)}
+@media (max-width:640px){ .gpill{padding:7px 12px;font-size:11px} .gpill .gp-n{font-size:12.5px} }
+/* ── PLATFORMLAR: profil bazlı kümeleme + sorun vurgusu ───── */
+.pl-prof{border:1px solid var(--brd);border-radius:12px;padding:12px 13px;background:var(--sur)}
+.pl-prof.bozuk{border-color:rgba(248,113,113,.55);background:linear-gradient(180deg,rgba(248,113,113,.10),rgba(248,113,113,.03))}
+.pl-prof-bas{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.pl-prof-ad{font-family:var(--fm);font-size:13px;font-weight:700;color:var(--tx);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-prof.bozuk .pl-prof-ad{color:#fca5a5}
+.pl-nokta{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.pl-prof-alt{font-size:11px;color:var(--mt);margin-bottom:10px}
+.pl-prof.bozuk .pl-prof-alt{color:#f8a5a5}
+.pl-hesap{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;
+  border:1px solid var(--brd);background:var(--bg);margin-top:6px;cursor:pointer;
+  transition:border-color .13s,background .13s}
+.pl-hesap:hover{border-color:var(--acc)}
+.pl-hesap.bozuk{border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.11)}
+.pl-hesap.bozuk:hover{border-color:#f87171;background:rgba(248,113,113,.18)}
+.pl-hesap.bozuk .pl-h-ad,.pl-hesap.bozuk .pl-h-alt{color:#fca5a5}
+.pl-h-ikon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;
+  justify-content:center;font-size:13px;flex-shrink:0}
+.pl-h-ad{font-size:12px;font-weight:600;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-h-alt{font-size:10.5px;color:var(--mt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-h-uyari{margin-left:auto;flex-shrink:0;font-size:11px;color:#f87171;font-weight:700}
+/* fare ipucu — kart taşmasına takılmaması için fixed konumlanır (JS ile) */
+.pl-tip{position:fixed;z-index:9998;max-width:340px;background:#1c0e0e;
+  border:1px solid rgba(248,113,113,.55);border-radius:10px;padding:11px 13px;
+  font-size:11.5px;line-height:1.55;color:#fecaca;pointer-events:none;
+  box-shadow:0 10px 30px rgba(0,0,0,.6);opacity:0;transition:opacity .12s}
+.pl-tip.acik{opacity:1}
+.pl-tip b{display:block;color:#fff;font-size:12px;margin-bottom:4px}
+.pl-tip .pl-tip-api{display:block;margin-top:7px;padding-top:7px;border-top:1px solid rgba(248,113,113,.28);
+  color:#f3a5a5;font-family:var(--fm);font-size:10.5px;word-break:break-all}
 .rd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px}
 .rd-empty{grid-column:1/-1;color:var(--mt);font-size:12px;text-align:center;padding:18px}
 .rd-card{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .12s;position:relative}
@@ -462,6 +523,7 @@ tbody td{line-height:1.5}
 <div id="page-video" class="page">
   <div class="ph"><div class="pt">Video Gönder</div><div class="ps">YouTube linkini doğrudan sisteme gönder</div></div>
   <div class="utab-bar" data-utab="video"></div>
+  <div class="stok-serit"></div>
   <div style="max-width:880px">
     <div>
       <div class="card">
@@ -623,6 +685,7 @@ tbody td{line-height:1.5}
 <div id="page-parcala" class="page">
   <div class="ph"><div class="pt">Video Parçala</div><div class="ps">Uzun bir YouTube videosunu sabit uzunlukta parçalara böl, her parçayı ayrı short olarak yayınla</div></div>
   <div class="utab-bar" data-utab="parcala"></div>
+  <div class="stok-serit"></div>
   <div class="alert ai"><span>ℹ</span><span>OpusClip her parça için ayrı bir proje oluşturur ve o zaman penceresine odaklanır (AI en iyi anı seçer, milisaniye hassasiyetinde birebir kesim garanti edilmez). Kredi/kota parça sayısı kadar tüketilir.</span></div>
   <div class="g2">
     <div>
@@ -659,6 +722,7 @@ tbody td{line-height:1.5}
 <div id="page-trendonay" class="page">
   <div class="ph"><div class="pt">Trend Radar &amp; Onay</div><div class="ps">Onay Kuyruğu — Kworb Trending TR + YouTube trend akışının bulduğu videolar; onaylayıp kategori/açıklama belirle ya da reddet</div></div>
   <div class="utab-bar" data-group="trend" data-utab="trendonay"></div>
+  <div class="stok-serit"></div>
   <div class="card" style="margin-bottom:12px">
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <button class="btn bp" onclick="trFetchPending()" id="tr-fetch-btn">🔥 Bekleyenleri Getir</button>
@@ -792,6 +856,7 @@ tbody td{line-height:1.5}
 <!-- OPUS CLIP DİREKT -->
 <div id="page-opusclip" class="page">
   <div class="ph"><div class="pt">OpusClip Galeri</div><div class="ps">Opus Pro projelerini görsel olarak göster, seç ve işleme al</div></div>
+  <div class="stok-serit"></div>
 
   <!-- ÜST BAR: Proje getir + Proje ID ile ara -->
   <div class="card" style="margin-bottom:12px">
@@ -1139,11 +1204,12 @@ tbody td{line-height:1.5}
 
 <!-- PLATFORMLAR -->
 <div id="page-platformlar" class="page">
-  <div class="ph"><div class="pt">Platformlar</div><div class="ps">Upload-Post hesapları — tümü kart olarak görünür, birine tıkla → detay modal</div></div>
+  <div class="ph"><div class="pt">Platformlar</div><div class="ps">Sosyal hesaplar <b>Upload-Post profiline göre</b> kümelenir — sorunlu olanlar kırmızı, üzerine gel sorunu göster, tıkla detay aç</div></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den (api.upload-post.com/api/uploadposts/users) gelir. Ayarlar → <b>Upload-Post API Key</b> gerekli. n8n bağlıysa proxy üzerinden gelir (CORS sorunu olmaz), değilse doğrudan API'ye istek atılır.</span></div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms()">↻ Yenile</button>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
+    <span id="plat-ozet" style="font-size:12px;color:var(--tx);align-self:center"></span>
     <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
   <div id="pl-grid" class="g3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
@@ -1265,6 +1331,7 @@ tbody td{line-height:1.5}
 <div id="page-radar" class="page">
   <div class="ph"><div class="pt">Trend Radar &amp; Onay</div><div class="ps">Keşif Radarı — YouTube'da trend olan, hızla yükselen ve patlama potansiyeli taşıyan video &amp; kanallar (canlı)</div></div>
   <div class="utab-bar" data-group="trend" data-utab="radar"></div>
+  <div class="stok-serit"></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veri önce <b>n8n günlük radar</b>'dan (<code>/webhook/trend-radar</code>, her sabah hesaplanır) alınır; yoksa <b>YouTube API</b> ile canlı hesaplanır (Ayarlar → YouTube API Key). <b>Hız</b> = izlenme/saat. <b>▲ artış</b> = son ziyaretten bu yana kazanılan izlenme. <b>💎 Potansiyel</b> = abone sayısına göre izlenmesi patlamış taze video (küçük kanal, büyük ivme).</span></div>
 
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
@@ -1483,6 +1550,12 @@ tbody td{line-height:1.5}
         <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
       </div>
       <div class="card">
+        <div class="ct">📦 Stok Uyarı Eşiği</div>
+        <div style="font-size:11px;color:var(--mt);margin:-4px 0 10px">Bir profilin Upload-Post kuyruğunda kalan <b>zamanlanmış short</b> sayısı bu değerin altına inince 🔔 <b>bildirim</b> gelir ve video gönderme sayfalarında <b>altın şerit</b> görünür. Kategori bazlı bakılır: örn. <code>genel</code> havuzundaki 4 profilden herhangi biri eşiğin altındaysa uyarır.</div>
+        <div class="fg"><label>Zamanlanmış short alt sınırı</label><input id="cfg-stok-esik" type="number" min="0" step="5" value="50" placeholder="50"/></div>
+        <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
+      </div>
+      <div class="card">
         <div class="ct">Otomasyon Toggle</div>
         <div class="trow"><div><div class="tn">Drive Kontrol</div><div class="td">Her 30 dk</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
         <div class="trow"><div><div class="tn">YouTube Arama</div><div class="td">Webhook tetikli</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
@@ -1682,6 +1755,10 @@ function go(id, el) {
   if (!page) { console.error('Page not found: page-'+id); return; }
   page.classList.add('active');
   el.classList.add('active');
+  // Video gönderimi olan sayfalarda stok şeridini tazele
+  if (['video','parcala','trendonay','radar','opusclip'].indexOf(id) >= 0){
+    try{ stokSeritCiz(); stokTazele(); }catch(e){}
+  }
   const h = {
     dashboard: ()=>{ refreshDash(); loadActionCenter(); },
     loglar:     ()=>{ renderLogs(); refreshBadges(); },
@@ -3060,19 +3137,153 @@ function normalizePlatforms(d) {
   return out;
 }
 
+
+// ── Sosyal hesabın sorunu ne? → {kisa, detay, api} veya null ──
+// Upload-Post alan adları sürüme göre değişebildiği için geniş bir küme taranır;
+// ham durum metni de ipucunun altında aynen gösterilir (tahmin edilmez).
+function platHamDurum(a){
+  const ham=[];
+  ['status','connection_status','state','error','error_message','message','last_error','detail','reason']
+    .forEach(k=>{ const v=a&&a[k]; if(v&&typeof v==='string'&&v.trim()) ham.push(k+': '+v.trim()); });
+  return ham.join(' · ');
+}
+function platHesapSorun(a){
+  if (!a || typeof a!=='object')
+    return {kisa:'Hesap verisi yok', detay:'Upload-Post bu hesap için hiç veri döndürmedi.', api:''};
+  const api = platHamDurum(a);
+  const S_ = s => ({kisa:s.k, detay:s.d, api});
+  if (a.expired===true || a.is_expired===true || a.token_expired===true)
+    return S_({k:'Yetki süresi dolmuş', d:'Erişim jetonu geçersiz. Upload-Post panelinde bu profili aç → hesabı yeniden bağla. Yeniden bağlanana kadar bu hesaba gönderim başarısız olur.'});
+  if (a.needs_reconnect===true || a.reconnect_required===true)
+    return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post bu hesap için yeniden yetkilendirme istiyor.'});
+  const s = String(a.status||a.connection_status||a.state||'').toLowerCase();
+  if (/expir/.test(s))      return S_({k:'Yetki süresi dolmuş', d:'Erişim jetonu geçersiz — Upload-Post\'ta hesabı yeniden bağla.'});
+  if (/reconnect/.test(s))  return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post yeniden yetkilendirme istiyor.'});
+  if (/revoked/.test(s))    return S_({k:'Yetki iptal edilmiş', d:'Sosyal medya tarafında uygulama erişimi kaldırılmış. Hesap ayarlarından izni geri ver, sonra Upload-Post\'ta yeniden bağla.'});
+  if (/disconnect/.test(s)) return S_({k:'Bağlantı kopmuş', d:'Hesap Upload-Post ile bağlı görünmüyor.'});
+  if (/invalid/.test(s))    return S_({k:'Geçersiz hesap', d:'Upload-Post hesabı geçersiz olarak işaretlemiş.'});
+  if (!phAcctConnected(a))
+    return S_({k:'Kimlik bilgisi eksik', d:'Hesabın kullanıcı adı / ID bilgisi gelmedi. Gönderim sırasında hedef bulunamayabilir.'});
+  return null;
+}
+// ── Profil düzeyinde sorun ──
+function platProfilSorun(g){
+  if (g.eksik)
+    return {kisa:'Upload-Post\'ta profil yok', api:'',
+      detay:'Bu profil kategori haritasında (KATEGORI_PROFIL_POOL) tanımlı ama Upload-Post\'ta bulunamadı. Bu profile yönlenen short\'lar gönderilemez.'};
+  if (!g.hesaplar.length)
+    return {kisa:'Bağlı sosyal hesap yok', api:'',
+      detay:'Profil var ama hiçbir sosyal medya hesabı bağlanmamış. Upload-Post → profili aç → hesap ekle.'};
+  const bozuk = g.hesaplar.filter(h=>platHesapSorun(h.a));
+  if (bozuk.length)
+    return {kisa:bozuk.length+' hesapta sorun', api:'',
+      detay:bozuk.map(h=>PLAT_MAP[h.p.key].label+': '+platHesapSorun(h.a).kisa).join('\n')};
+  if (!profilKategori(g.profil))
+    return {kisa:'Kategoriye bağlı değil', api:'',
+      detay:'Bu profil hiçbir kategori havuzunda yok, bu yüzden otomatik üretilen short\'lardan pay almaz. Kategori haritasına eklenmeli.'};
+  return null;
+}
+// ── Hesapları Upload-Post profiline göre kümele ──
+function platProfilGrupla(byPlat){
+  const g = {};
+  const al = ad => { const k=String(ad||'').trim()||'(profil bilgisi yok)';
+                     if(!g[k]) g[k]={profil:k, hesaplar:[], eksik:false}; return g[k]; };
+  PLAT_LIST.forEach(p=>{
+    (byPlat[p.key]||[]).forEach((a,idx)=>{ al(a._profile).hesaplar.push({a,p,idx}); });
+  });
+  // Upload-Post'ta olup hiç hesabı olmayan profiller
+  try{
+    const profs=(S.uploadPostAccounts&&S.uploadPostAccounts.profiles)||[];
+    profs.forEach(pr=>{ if(pr&&pr.username) al(pr.username); });
+  }catch(e){}
+  // Haritada olup Upload-Post'ta hiç olmayan profiller
+  try{
+    const varOlan=new Set(Object.keys(g));
+    Object.values(KATEGORI_PROFIL_POOL).forEach(arr=>arr.forEach(u=>{
+      if(!varOlan.has(u)){ const x=al(u); x.eksik=true; }
+    }));
+  }catch(e){}
+  return Object.values(g).sort((a,b)=>{
+    const sa=platProfilSorun(a)?0:1, sb=platProfilSorun(b)?0:1;   // sorunlular üstte
+    return sa-sb || a.profil.localeCompare(b.profil,'tr');
+  });
+}
+// ── Fare ipucu (kart taşmasına takılmasın diye body'ye fixed eklenir) ──
+let _plTip=null;
+function platTipAc(el, ev){
+  const kisa=el.getAttribute('data-h-kisa'), detay=el.getAttribute('data-h-detay')||'';
+  const api=el.getAttribute('data-h-api')||'';
+  if(!kisa) return;
+  const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  if(!_plTip){ _plTip=document.createElement('div'); _plTip.className='pl-tip'; document.body.appendChild(_plTip); }
+  _plTip.innerHTML='<b>⚠ '+esc(kisa)+'</b>'+esc(detay).replace(/\n/g,'<br>')
+    +(api?'<span class="pl-tip-api">Upload-Post yanıtı → '+esc(api)+'</span>':'');
+  _plTip.classList.add('acik');
+  platTipTasi(ev);
+}
+function platTipTasi(ev){
+  if(!_plTip||!_plTip.classList.contains('acik')) return;
+  const m=12, r=_plTip.getBoundingClientRect();
+  let x=ev.clientX+m, y=ev.clientY+m;
+  if(x+r.width>innerWidth-8)  x=ev.clientX-r.width-m;
+  if(y+r.height>innerHeight-8) y=ev.clientY-r.height-m;
+  _plTip.style.left=Math.max(8,x)+'px'; _plTip.style.top=Math.max(8,y)+'px';
+}
+function platTipKapat(){ if(_plTip) _plTip.classList.remove('acik'); }
+window.platTipAc=platTipAc; window.platTipTasi=platTipTasi; window.platTipKapat=platTipKapat;
+
+// Hesaplar UPLOAD-POST PROFILINE gore kumelenir (eskiden platforma goreydi).
+// Sorunlu profil/hesap kirmizi; fareyle uzerine gelince sorunun ne oldugu cikar.
 function renderPlatformsGrid(byPlat) {
   const grid = document.getElementById('pl-grid'); if (!grid) return;
-  grid.innerHTML = PLAT_LIST.filter(p => byPlat[p.key] && byPlat[p.key].length)
-    .map(p => {
-      const accs = byPlat[p.key];
-      return `<div class="card" style="border-top:3px solid ${p.color}">
-        <div class="ct" style="color:${p.color};display:flex;justify-content:space-between;align-items:center">
-          <span>${p.icon} ${p.label}</span>
-          <span style="font-size:12px;color:var(--mt);font-weight:400">${accs.length} hesap</span>
-        </div>
-        <div>${accs.map((a,i)=>platAccCard(a,p,i)).join('')}</div>
-      </div>`;
-    }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mt);font-size:13px">Bu profilde bağlı sosyal hesap yok</div>';
+  const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const gruplar = platProfilGrupla(byPlat);
+  if (!gruplar.length){
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mt);font-size:13px">Hiç profil bulunamadı</div>';
+    setEl('plat-ozet','');
+    return;
+  }
+  const hataAttr = (s) => s
+    ? ' data-h-kisa="'+esc(s.kisa)+'" data-h-detay="'+esc(s.detay)+'" data-h-api="'+esc(s.api||'')+'"'
+      + ' onmouseenter="platTipAc(this,event)" onmousemove="platTipTasi(event)" onmouseleave="platTipKapat()"'
+    : '';
+  let bozukProfil = 0, bozukHesap = 0, toplamHesap = 0;
+  grid.innerHTML = gruplar.map(g => {
+    const ps = platProfilSorun(g);
+    if (ps) bozukProfil++;
+    const kat = profilKategori(g.profil);
+    const hesapHtml = g.hesaplar.map(h => {
+      const hs = platHesapSorun(h.a);
+      if (hs) bozukHesap++;
+      toplamHesap++;
+      const ad = platAccName(h.a, h.p);
+      const kul = cleanHandle(h.a.username || h.a.handle);
+      return '<div class="pl-hesap'+(hs?' bozuk':'')+'"'+hataAttr(hs)
+        + ' onclick="platOpenModal(\''+h.p.key+'\','+h.idx+')">'
+        + '<div class="pl-h-ikon" style="background:'+h.p.color+'22;color:'+h.p.color+'">'+h.p.icon+'</div>'
+        + '<div style="min-width:0;flex:1">'
+        +   '<div class="pl-h-ad">'+esc(ad)+'</div>'
+        +   '<div class="pl-h-alt">'+esc(h.p.label)+(kul?' · @'+esc(kul):'')+'</div>'
+        + '</div>'
+        + (hs ? '<span class="pl-h-uyari">⚠</span>' : '')
+        + '</div>';
+    }).join('');
+    const nokta = ps ? 'var(--er)' : 'var(--ok)';
+    const altSatir = g.eksik
+      ? 'Upload-Post\'ta bulunamadı'
+      : (g.hesaplar.length + ' sosyal hesap' + (kat ? ' · ' + esc(katLabel(kat)) : ' · kategorisiz'));
+    return '<div class="pl-prof'+(ps?' bozuk':'')+'">'
+      + '<div class="pl-prof-bas"'+hataAttr(ps)+'>'
+      +   '<span class="pl-nokta" style="background:'+nokta+'"></span>'
+      +   '<span class="pl-prof-ad">'+esc(g.profil)+'</span>'
+      +   (ps ? '<span style="margin-left:auto;flex-shrink:0;font-size:10.5px;color:#fca5a5;font-weight:700">⚠ '+esc(ps.kisa)+'</span>' : '')
+      + '</div>'
+      + '<div class="pl-prof-alt">'+altSatir+'</div>'
+      + (hesapHtml || '<div style="font-size:11.5px;color:var(--mt);padding:6px 2px">— bağlı hesap yok —</div>')
+      + '</div>';
+  }).join('');
+  setEl('plat-ozet', gruplar.length+' profil · '+toplamHesap+' hesap'
+    + (bozukProfil||bozukHesap ? ' · ⚠ '+bozukProfil+' profil / '+bozukHesap+' hesap sorunlu' : ' · tümü sağlıklı ✓'));
 }
 
 function platAccName(a, p) {
@@ -3319,6 +3530,7 @@ function saveSettings() {
       fb: Math.max(0,parseInt((document.getElementById('cfg-viral-fb')||{}).value||10000)||10000),
       x:  Math.max(0,parseInt((document.getElementById('cfg-viral-x') ||{}).value||10000)||10000),
     },
+    stokEsik: Math.max(0,parseInt((document.getElementById('cfg-stok-esik')||{}).value||50)||50),
   };
   S.limits={
     ig:    parseInt((document.getElementById('cfg-ig-lim')||{}).value||10),
@@ -3353,6 +3565,7 @@ function loadSettings() {
   set('cfg-start',S.limits.start); set('cfg-end',S.limits.end);
   const ve=c.viralEsik||{};
   ['ig','yt','tt','fb','x'].forEach(k=>{ const el=document.getElementById('cfg-viral-'+k); if(el) el.value=(ve[k]!=null?ve[k]:10000); });
+  const se=document.getElementById('cfg-stok-esik'); if(se) se.value=(c.stokEsik!=null?c.stokEsik:50);
   if(c.n8n) updateWHs();
 }
 
@@ -5742,6 +5955,95 @@ window.addEventListener('unhandledrejection', e=>{
 });
 window.addEventListener('error', e=>{ if(e.message){ try{ addLog('err','sistem','JS hatası: '+String(e.message).slice(0,120)); }catch(_){} } });
 
+
+// ═══ STOK UYARISI — zamanlanmış short azaldığında ═══════════
+// Upload-Post'ta bir profilin kuyruğunda kalan zamanlanmış short sayısı
+// eşiğin altına inince altın şerit + bildirim. Kategori bazlı bakılır:
+// örn. "genel" havuzunda 4 profil var, HERHANGİ biri eşiğin altındaysa uyarır.
+const STOK_ESIK_VARSAYILAN = 50;
+const STOK = { data:null, t:0, yukleniyor:false };
+function stokEsik(){
+  const n = parseInt((S.cfg||{}).stokEsik);
+  return (isNaN(n) || n < 0) ? STOK_ESIK_VARSAYILAN : n;
+}
+// profile_username -> zamanlanmış adet. Önce Upload-Post, olmazsa n8n panel-data.
+async function stokVeri(zorla){
+  if (!zorla && STOK.data && Date.now()-STOK.t < 5*60000) return STOK.data;
+  if (STOK.yukleniyor) return STOK.data;
+  STOK.yukleniyor = true;
+  const say = arr => {
+    const by = {};
+    (arr||[]).forEach(s=>{ const p=String(s.profile_username||s.profile||s.user||'').trim(); if(p) by[p]=(by[p]||0)+1; });
+    return by;
+  };
+  try{
+    let by = null;
+    if (S.cfg.blot){
+      try{
+        const {data} = await upFetch('/uploadposts/schedule');
+        const arr = Array.isArray(data)?data:(data.scheduled_posts||data.scheduled||data.jobs||data.data||data.results||data.posts||data.schedules||[]);
+        by = say(arr);
+      }catch(e){ console.warn('[Stok] Upload-Post alınamadı:', e.message); }
+    }
+    if ((!by || !Object.keys(by).length) && getN8N()){
+      try{ const d = await n8nGetCached('/webhook/panel-data'); if (d && !d._bos) by = say(d.scheduled||[]); }
+      catch(e){ console.warn('[Stok] panel-data alınamadı:', e.message); }
+    }
+    if (by && Object.keys(by).length){ STOK.data = by; STOK.t = Date.now(); }
+  }catch(e){ console.warn('[Stok]', e.message); }
+  STOK.yukleniyor = false;
+  return STOK.data;
+}
+// Eşiğin altındaki profilleri KATEGORİ bazında grupla
+function stokDusukler(upBy){
+  const esik = stokEsik(), out = [];
+  if (!upBy) return out;
+  Object.keys(KATEGORI_PROFIL_POOL).forEach(k=>{
+    const profiller = KATEGORI_PROFIL_POOL[k].map(p=>({ p, n: parseInt(upBy[p]||0) }));
+    const dusuk = profiller.filter(x=>x.n < esik).sort((a,b)=>a.n-b.n);
+    if (dusuk.length) out.push({ kat:k, label:katLabel(k), profiller, dusuk,
+      toplam: profiller.reduce((s,x)=>s+x.n,0), enAz: dusuk[0].n });
+  });
+  return out.sort((a,b)=>a.enAz-b.enAz);
+}
+function stokSeritCiz(){
+  const els = document.querySelectorAll('.stok-serit');
+  if (!els.length) return;
+  const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const esik = stokEsik();
+  if (!STOK.data){ els.forEach(el=>{ el.innerHTML=''; }); return; }
+  const gruplar = stokDusukler(STOK.data);
+  if (!gruplar.length){
+    const ok = '<div class="stok-ok"><span>✓</span><span>Tüm kategorilerde <b>'+esik+'+</b> zamanlanmış short var — stok yeterli</span></div>';
+    els.forEach(el=>{ el.innerHTML = ok; });
+    return;
+  }
+  const haplar = [];
+  gruplar.forEach(g=>{
+    g.dusuk.forEach(x=>{
+      const krit = x.n === 0;
+      const ipucu = g.label+' kategorisi · '+x.p+' — kuyrukta '+x.n+' zamanlanmış short (eşik '+esik+
+                   '). Kategoride toplam '+g.profiller.length+' profil, '+g.toplam+' zamanlanmış.';
+      haplar.push('<span class="gpill'+(krit?' krit':'')+'" title="'+esc(ipucu)+'">'
+        + '<span class="gp-kat">'+esc(g.label)+'</span>'
+        + '<span>'+esc(x.p)+'</span>'
+        + '<span class="gp-n">'+x.n+'</span></span>');
+    });
+  });
+  const n = haplar.length;
+  const html = '<div class="stok-kutu">'
+    + '<div class="stok-bas"><span>⚠</span><span>Stok azalıyor — '+n+' profil</span>'
+    + '<span class="stok-esik">eşik '+esik+' · Ayarlar\'dan değiştirilir</span></div>'
+    + '<div class="gp-wrap">'+haplar.join('')+'</div></div>';
+  els.forEach(el=>{ el.innerHTML = html; });
+}
+// Şeridi tazele (sayfa açılışında ve veri yenilendiğinde)
+async function stokTazele(zorla){
+  await stokVeri(zorla);
+  stokSeritCiz();
+}
+window.stokTazele = stokTazele;
+
 // ═══ BİLDİRİM MERKEZİ ═══════════════════════════════════════
 const VIRAL_ESIK = 10000;   // varsayılan — platform başına Ayarlar'dan geçilir
 function viralEsik(plat){
@@ -5806,6 +6108,22 @@ async function notifCheck(derin){
           const bad=Object.values(phCompute(raw,sp)).filter(h=>h.status!=='live').length;
           if(bad>0) notifEkle('health','🔴',bad+' profilde bağlantı sorunu','Süresi dolmuş veya hesapsız profil','platformlar'); else notifSil('health');
         }catch(e){}
+        // Stok: eşiğin altına inen her profil için ayrı bildirim.
+        // id'ye seviye eklenir (az/krit) → 0'a düşünce yeniden uyarır, yoksa susar.
+        try{
+          const upBy=await stokVeri();
+          if(upBy){
+            const esik=stokEsik(), gruplar=stokDusukler(upBy);
+            NOTIF.items=NOTIF.items.filter(x=>!String(x.id).startsWith('stok-'));
+            gruplar.forEach(g=>g.dusuk.forEach(x=>{
+              const krit=x.n===0;
+              notifEkle('stok-'+x.p+'-'+(krit?'krit':'az'), krit?'🛑':'🟡',
+                katLabel(g.kat)+' · '+x.p+(krit?' — zamanlanmış short kalmadı':' — '+x.n+' zamanlanmış short kaldı'),
+                'Eşik '+esik+' · bu profile yeni short gönder', 'video');
+            }));
+            stokSeritCiz();
+          }
+        }catch(e){ console.warn('[Stok/NOTIF]', e.message); }
         if(Date.now()-NOTIF.lastViral>3*3600000){ NOTIF.lastViral=Date.now(); await notifViralTara(items); }
       }catch(e){}
     }
@@ -5966,13 +6284,9 @@ async function loadProfileLoad() {
   const isPending=r=>{ const s=String(r['platform-status']||r['durum']||'').toLowerCase(); return s.includes('bekli')||s==='' ; };
   shorts.forEach(r=>{ const p=pickProfil(r); if(!p) return; if(!byP[p]) byP[p]={total:0,pending:0}; byP[p].total++; if(isPending(r)) byP[p].pending++; });
   // 2) Upload-Post'ta zamanlanmış (varsa) — profile_username başına
-  const upBy={};
-  try{
-    const {data}=await upFetch('/uploadposts/schedule');
-    console.log('[ProfilYuk] schedule raw:', JSON.stringify(data).slice(0,500));
-    const arr=Array.isArray(data)?data:(data.scheduled_posts||data.scheduled||data.jobs||data.data||data.results||data.posts||data.schedules||[]);
-    (arr||[]).forEach(s=>{ const p=String(s.profile_username||s.profile||s.user||'').trim(); if(p) upBy[p]=(upBy[p]||0)+1; });
-  }catch(e){ console.warn('[ProfilYuk] schedule alınamadı:', e.message); }
+  // Zamanlanmış sayıları stok katmanıyla ORTAK (tek kaynak, 5 dk önbellek)
+  const upBy=(await stokVeri(true))||{};
+  stokSeritCiz();
   // render
   const profs=[...new Set([...Object.keys(byP),...Object.keys(upBy)])];
   if(!profs.length){ listEl.innerHTML='<div style="color:var(--mt);font-size:13px;text-align:center;padding:14px">Veri yok — Ayarlar\'da Sheet ID / n8n URL girili mi? (short-kaydetme sayfası \'profil\' kolonu okunur)</div>'; if(st) st.textContent=''; return; }
