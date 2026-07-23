@@ -5790,7 +5790,10 @@ const TPM_METRICS = [
 ];
 function takPostClose(){ const m=document.getElementById('tak-post-modal'); if(m) m.style.display='none'; }
 function takOpenPost(gi){
-  hideTakTip(); try{ closeDayModal(); }catch(e){}
+  // Gün modalını KAPATMA — post modalı (z=11000) onun üstüne (z=10000) biner.
+  // Böylece post detayını kapatınca gün listesine geri dönülür. Takvim
+  // hücresinden açılışta gün modalı zaten kapalı olduğu için etkilenmez.
+  hideTakTip();
   const it = TAK.items[gi]; if (!it) return;
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   const pm = PLAT_META[it.plat] || {};
