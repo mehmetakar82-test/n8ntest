@@ -4539,7 +4539,9 @@ function trRenderPending() {
   if (!TR.pending.length) { grid.innerHTML=''; if (empty) empty.style.display='block'; return; }
   if (empty) empty.style.display='none';
   // Çoklu seçim: kategori chip'leri (diğer sayfalardaki cat-chip deseniyle aynı)
-  const catChips = Object.entries(getCats()).map(([k,c])=>`<span class="cat-chip${k==='genel'?' sel':''}" data-cat="${k}" onclick="this.classList.toggle('sel')" style="font-size:11px;padding:2px 7px">${c.label}</span>`).join('');
+  // trChip(selKat): verilen kategori önceden seçili gelir → tahmin edilen kategoriyi işaretlemek için
+  const trChip = (selKat) => Object.entries(getCats()).map(([k,c])=>`<span class="cat-chip${k===selKat?' sel':''}" data-cat="${k}" onclick="this.classList.toggle('sel')" style="font-size:11px;padding:2px 7px">${c.label}</span>`).join('');
+  const catChips = trChip('genel');
   // bulk kategori chip'lerini doldur (bir kez)
   const bc = document.getElementById('tr-bulk-cats'); if (bc && !bc.children.length) bc.innerHTML = catChips;
   // filtre + sıralama
@@ -4557,6 +4559,17 @@ function trRenderPending() {
     const selChk = TR.selected.has(vid);
     const views = (parseInt(v.viewCount)||0).toLocaleString('tr');
     const channel = v.channelTitle || '';
+    // Kategori tahmini — Keşif radarındaki katTahmin ile aynı (başlık kelimeleri +
+    // öğrenilmiş kanal hafızası). Güven yeterliyse chip önceden seçili gelir.
+    const kt = katTahmin({ title:v.title, channel:channel });
+    const ktGuven = kt.guven || 0;
+    const ktLbl = (getCats()[kt.kategori]||{}).label || kt.kategori;
+    const ktSel = ktGuven>=40 ? kt.kategori : 'genel';
+    const ktHint = ktGuven>=40
+      ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--acc3)" title="${(kt.neden||'').replace(/"/g,'&quot;')} · güven %${ktGuven}">🏷 Önerilen: <b>${ktLbl}</b> <span style="color:var(--mt)">%${ktGuven} · seçili</span></div>`
+      : (ktGuven>0
+        ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--wn)" title="Zayıf sinyal — kontrol edip seç">🤔 belki <b>${ktLbl}</b> — emin değilim, kontrol et</div>`
+        : `<div style="font-size:10.5px;margin-bottom:5px;color:var(--mt)">kategori sinyali yok — elle seç</div>`);
     let pub = '';
     if (v.publishedAt) { const d = new Date(v.publishedAt); if (!isNaN(d)) pub = d.toLocaleDateString('tr',{day:'2-digit',month:'short',year:'numeric'}); }
     const platRow = ['ig','yt','tt','fb','x'].map(p=>`<label style="display:flex;align-items:center;gap:2px;cursor:pointer"><input type="checkbox" class="tr-plat" value="${p}" checked style="width:auto;margin:0;accent-color:var(--acc)"> ${TR_PLAT_LABEL[p]}</label>`).join('');
@@ -4574,8 +4587,9 @@ function trRenderPending() {
           <span>👁 ${views}${pub?` · 📅 ${pub}`:''}</span>
           <a href="${v.youtubeLink}" target="_blank" rel="noopener" style="color:var(--acc)">YouTube ↗</a>
         </div>
+        ${ktHint}
         <div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
-          <div class="tr-cats cat-chips" style="flex:1;display:flex;flex-wrap:wrap;gap:3px" title="Birden fazla kategori seçebilirsin — her kategori için ayrı gönderim yapılır">${catChips}</div>
+          <div class="tr-cats cat-chips" style="flex:1;display:flex;flex-wrap:wrap;gap:3px" title="Birden fazla kategori seçebilirsin — her kategori için ayrı gönderim yapılır">${trChip(ktSel)}</div>
           <select class="tr-dil" title="Dil (yalnız Genel için etkili)" style="width:60px;font-size:12px;flex-shrink:0"><option value="tr">TR</option><option value="en">EN</option></select>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--mt)">${platRow}</div>
@@ -4599,6 +4613,9 @@ async function trApprove(videoId) {
   // Çoklu kategori: seçilen HER kategori için ayrı gönderim yapılır
   const kats = [...card.querySelectorAll('.tr-cats .cat-chip.sel')].map(c=>c.dataset.cat);
   if (!kats.length) kats.push('genel');
+  // Öğrenme: kullanıcının seçtiği kategoriyi bu kanal için hatırla → sonraki
+  // videolarda katTahmin aynı kategoriyi önerir (Keşif radarıyla ortak hafıza).
+  try { katOgren(v.channelId, v.channelTitle, kats[0]); } catch(e) {}
   const dil  = (card.querySelector('.tr-dil')||{}).value || 'tr';
   const plats = [...card.querySelectorAll('.tr-plat:checked')].map(c=>c.value);
   const aciklama = (card.querySelector('.tr-desc')||{}).value || '';
@@ -7288,12 +7305,17 @@ async function rdClientCompute(key, st){
   // Çözüm: haftalık taramadaki ile aynı stopword tohumları, birleştirilerek.
   // Ölçüm: 4 tohum → 191 eşsiz video, hepsi TR ve yüksek izlenmeli.
   const freshIdSet=new Set();
+  // 15 dk alt sınırı için medium(4-20dk)+long(>20dk) bantları — short'ları arama
+  // AŞAMASINDA eler. Bantsız aramada ≥15dk video sayısı çok düşük kalıyordu
+  // (ölçüm 23.07: bantsız 191→sadece 15 adet ≥15dk; bantlı 383→232 adet ≥15dk).
   for(const q of RD_HAFTA_SORGU){
-    try{
-      const s=await ytkFetch(YT+'search?part=snippet&type=video&order=viewCount&regionCode=TR&relevanceLanguage=tr'
-        +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(q)+'&maxResults=50&key='+key);
-      (s.items||[]).forEach(i=>{ const id=i.id&&i.id.videoId; if(id) freshIdSet.add(id); });
-    }catch(e){ console.warn('[RD] taze arama "'+q+'":',e.message); }
+    for(const band of ['medium','long']){
+      try{
+        const s=await ytkFetch(YT+'search?part=snippet&type=video&order=viewCount&regionCode=TR&relevanceLanguage=tr&videoDuration='+band
+          +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(q)+'&maxResults=50&key='+key);
+        (s.items||[]).forEach(i=>{ const id=i.id&&i.id.videoId; if(id) freshIdSet.add(id); });
+      }catch(e){ console.warn('[RD] taze arama "'+q+'/'+band+'":',e.message); }
+    }
   }
   const freshIds=[...freshIdSet];
   let freshRaw={items:[]};
@@ -7346,8 +7368,8 @@ async function rdClientCompute(key, st){
     }
     return it;
   };
-  // Trend: müzik (categoryId 10) ve 5 dk altı videolar hariç
-  const trend=(trendRaw.items||[]).map(norm).filter(x=>x.catId!=='10'&&x.durSec>=300&&rdKesifOk(x)).slice(0,12);
+  // Trend: müzik (categoryId 10) hariç + 15 dk altı hariç (rdKesifOk zaten uygular)
+  const trend=(trendRaw.items||[]).map(norm).filter(x=>x.catId!=='10'&&x.durSec>=RD_SURE_MIN&&rdKesifOk(x)).slice(0,12);
   const freshAll=(freshRaw.items||[]).map(norm).filter(x=>x.views>=1000&&rdSureOk(x));   // ≤1sa her yerde
   // İvme bilinen videolarda hızı ivmeyle ağırlıklandır → hızlanan üste çıkar
   const risingSkor=x=>x.vph*(x.ivme>0?Math.min(3,x.ivme):1);
@@ -7377,11 +7399,13 @@ async function rdClientCompute(key, st){
   return {trend,rising,potential,outlier,gtrend:[],kesif:[],channels};
 }
 
-// Filtre eşikleri — keşif bölümlerinde 100K+ abone, her yerde ≤1 saat.
-// Potansiyel ve Outlier MUAF: bu ikisi zaten küçük kanaldan patlayan videoyu bulur.
+// Filtre eşikleri — keşif bölümlerinde 100K+ abone, her yerde 15 dk – 1 saat.
+// Potansiyel ve Outlier abone sınırından MUAF ama SÜRE sınırından değil:
+// kullanıcı isteğiyle radardaki HER bölüm en az 15 dakikalık video gösterir.
+const RD_SURE_MIN = 900;       // 15 dakika — tüm radar bölümlerinde alt sınır
 const RD_SURE_MAX = 3600;      // 1 saat
 const RD_ABONE_MIN = 100000;   // 100 bin abone
-const rdSureOk  = x => x.durSec>0 && x.durSec<=RD_SURE_MAX;
+const rdSureOk  = x => x.durSec>=RD_SURE_MIN && x.durSec<=RD_SURE_MAX;
 const rdKesifOk = x => rdSureOk(x) && (x.subs||0)>=RD_ABONE_MIN;
 // Video daha once isleme alindi mi? (S.sentLog -> findDupeSend)
 // Doner: {url,t,kategori} veya null. Kart yesil tik + perde ile isaretlenir.
