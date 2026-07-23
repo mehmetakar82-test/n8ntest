@@ -6517,10 +6517,15 @@ async function loadProfileLoad() {
     const h=health[r.p]||null; const hm=h?(PH_META[h.status]||PH_META.live):null;
     const dot=hm?`<span title="${(hm.txt||'Bağlı').replace(/"/g,'')}" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${hm.dot};margin-right:5px;vertical-align:middle"></span>`:'';
     const warn=(hm&&hm.txt)?` <span style="color:${hm.dot};font-size:11px">${hm.txt}</span>`:'';
+    // Profilin ait olduğu kategori (KATEGORI_PROFIL_POOL'dan)
+    const _kat=profilKategori(r.p);
+    const katChip=_kat
+      ? ` <span style="font-size:10px;color:var(--acc3);background:rgba(167,139,250,.13);padding:1px 7px;border-radius:8px;vertical-align:middle;font-family:var(--ft)" title="Bu profil '${katLabel(_kat).replace(/'/g,'')}' kategorisinin havuzunda — bu kategorideki short'lar buraya dağıtılır">${katLabel(_kat)}</span>`
+      : ` <span style="font-size:10px;color:var(--wn);vertical-align:middle" title="Hiçbir kategori havuzunda değil — otomatik üretilen short'lardan pay almaz">⚠ kategorisiz</span>`;
     return `<div style="margin-bottom:8px">
     <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:3px">
-      <span style="color:var(--tx);font-family:var(--fm)">${dot}${r.p}${warn}</span>
-      <span style="color:var(--mt)"><b style="color:var(--acc)">${r.total}</b> short${r.pending&&r.pending!==r.total?` (${r.pending} bekliyor)`:''}${r.sched?` · ⏰ ${r.sched} zamanlı`:''}</span>
+      <span style="color:var(--tx);font-family:var(--fm)">${dot}${r.p}${katChip}${warn}</span>
+      <span style="color:var(--mt)"><b style="color:var(--acc)">${r.total}</b> short${r.sched?` · ⏰ ${r.sched} zamanlı`:''}</span>
     </div>
     <div class="prog"><div class="pf" style="background:var(--acc);width:${Math.round(Math.max(r.total,r.sched)/max*100)}%"></div></div>
   </div>`;}).join('');
