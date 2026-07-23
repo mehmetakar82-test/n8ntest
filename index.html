@@ -1207,6 +1207,7 @@ tbody td{line-height:1.5}
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den (api.upload-post.com/api/uploadposts/users) gelir. Ayarlar → <b>Upload-Post API Key</b> gerekli. n8n bağlıysa proxy üzerinden gelir (CORS sorunu olmaz), değilse doğrudan API'ye istek atılır.</span></div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms()">↻ Yenile</button>
+    <button class="btn bg bsm" id="plat-temizle-btn" onclick="upTemizleBasliklar()" title="Upload-Post kuyruğunda BEKLEYEN zamanlanmış gönderilerin açıklamalarından 'İstediğin Başlık' / 'Your Title Here' yer tutucularını toplu kaldırır">🧹 Açıklamaları Temizle</button>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-ozet" style="font-size:12px;color:var(--tx);align-self:center"></span>
     <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
@@ -3389,15 +3390,20 @@ function platCloseModal() { const m = document.getElementById('plat-modal'); if 
 
 // ── Upload-Post analytics + sayfalar/board'lar için ortak fetch ──
 // n8n proxy yoksa doğrudan API'ye gider (S.cfg.blot ile)
-async function upFetch(path) {
+// opts: { method, body } — GET dışı (PATCH/DELETE/POST) çağrılar için.
+// Yazma çağrıları YALNIZ doğrudan API ile (n8n proxy sadece GET destekler).
+async function upFetch(path, opts) {
+  opts = opts || {};
   if (S.cfg.blot) {
-    const r = await fetch('https://api.upload-post.com/api' + path, {
-      headers: { 'Authorization': 'Apikey ' + S.cfg.blot }
-    });
+    const init = { headers: { 'Authorization': 'Apikey ' + S.cfg.blot } };
+    if (opts.method) init.method = opts.method;
+    if (opts.body != null) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
+    const r = await fetch('https://api.upload-post.com/api' + path, init);
     const j = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error('HTTP ' + r.status + ': ' + (j.message||j.error||'?'));
     return { data: j, src: 'doğrudan API' };
   }
+  if (opts.method && opts.method !== 'GET') throw new Error('Yazma işlemi için Upload-Post API Key gerekli (Ayarlar)');
   const base = getN8N();
   if (base) {
     const r = await fetch(base + '/webhook/uploadpost-proxy?path=' + encodeURIComponent(path));
@@ -3406,6 +3412,82 @@ async function upFetch(path) {
   }
   throw new Error('Upload-Post API Key yok (Ayarlar → Upload-Post API Key)');
 }
+
+// ── Zamanlanmış açıklamalardan yer tutucu başlıkları toplu temizle ──
+// Kaynak düzeltmesi (Code in JavaScript3'te SABIT_BASLIK boşaltıldı) YALNIZ yeni
+// short'ları etkiler; Upload-Post kuyruğunda BEKLEYEN eski gönderiler hâlâ
+// "İstediğin Başlık" / "Your Title Here" içerebilir. Bu araç onları
+// PATCH /uploadposts/schedule/{job_id} ile toplu düzeltir.
+const UP_YER_TUTUCU = /İstediğin Başlık|İstediğiniz Başlık|Your Title Here/gi;
+function upBaslikTemizle(s) {
+  if (s == null) return s;
+  return String(s).replace(UP_YER_TUTUCU, '')
+    .replace(/[ \t]{2,}/g, ' ')          // çift boşlukları tekle
+    .replace(/ +([.,!?;:])/g, '$1')       // noktalama öncesi boşluğu kaldır
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+async function upTemizleBasliklar() {
+  const btn = document.getElementById('plat-temizle-btn');
+  if (!S.cfg.blot) { toast('Upload-Post API Key gerekli (Ayarlar → Upload-Post API Key)','warn'); return; }
+  if (btn) btn.disabled = true;
+  toast('⏳ Zamanlanmış gönderiler taranıyor…','info');
+  let sched = [];
+  try {
+    const { data } = await upFetch('/uploadposts/schedule');
+    sched = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||data.jobs||data.data||data.results||data.posts||[]);
+  } catch(e) { toast('✕ Zamanlanmış liste alınamadı: '+e.message,'err'); if(btn) btn.disabled=false; return; }
+
+  // Yer tutucu içeren gönderileri bul (title + caption alanlarında)
+  const hedefler = [];
+  (sched||[]).forEach(p => {
+    const jid = p.job_id || p.jobId || p.id;
+    if (!jid) return;
+    const body = {};
+    ['title','caption'].forEach(alan => {
+      const eski = p[alan];
+      if (eski && UP_YER_TUTUCU.test(eski)) {
+        UP_YER_TUTUCU.lastIndex = 0;               // global regex — test sonrası sıfırla
+        const yeni = upBaslikTemizle(eski);
+        if (yeni !== eski) body[alan] = yeni;
+      }
+      UP_YER_TUTUCU.lastIndex = 0;
+    });
+    if (Object.keys(body).length) {
+      const eskiOrnek = (p.title || p.caption || '').slice(0,60);
+      const yeniOrnek = (body.title!=null?body.title:(body.caption!=null?body.caption:'')).slice(0,60);
+      hedefler.push({ jid, body, eskiOrnek, yeniOrnek, profil: p.profile_username||p.profile||'' });
+    }
+  });
+
+  if (!hedefler.length) {
+    toast('✓ Temizlenecek gönderi yok — zamanlanmışların hepsi temiz','ok');
+    if (btn) btn.disabled = false; return;
+  }
+  const ornek = hedefler[0];
+  if (!confirm(hedefler.length + ' zamanlanmış gönderinin açıklamasından yer tutucu başlık kaldırılacak.\n\n'
+      + 'Örnek (' + (ornek.profil||'profil') + '):\n'
+      + 'ÖNCE:  ' + ornek.eskiOrnek + '\n'
+      + 'SONRA: ' + ornek.yeniOrnek + '\n\n'
+      + 'Bu işlem Upload-Post\'taki zamanlanmış gönderileri kalıcı olarak günceller. Devam edilsin mi?')) {
+    if (btn) btn.disabled = false; return;
+  }
+
+  let ok=0, fail=0; const hatalar=[];
+  for (let i=0; i<hedefler.length; i++) {
+    const h = hedefler[i];
+    if (btn) btn.textContent = '⏳ Temizleniyor '+(i+1)+'/'+hedefler.length;
+    try {
+      await upFetch('/uploadposts/schedule/'+encodeURIComponent(h.jid), { method:'PATCH', body:h.body });
+      ok++;
+    } catch(e) { fail++; if(hatalar.length<3) hatalar.push(e.message); console.warn('[Temizle]', h.jid, e.message); }
+    await new Promise(r=>setTimeout(r, 400));   // hız sınırı koruması
+  }
+  if (btn) { btn.disabled=false; btn.textContent='🧹 Açıklamaları Temizle'; }
+  addLog(fail?'warn':'ok','uploadpost', 'Yer tutucu temizliği: '+ok+' güncellendi, '+fail+' başarısız');
+  toast('✓ '+ok+' gönderi temizlendi' + (fail? (' · '+fail+' başarısız ('+hatalar[0]+')') : ''), fail?'warn':'ok', fail?9000:5000);
+}
+window.upTemizleBasliklar = upTemizleBasliklar;
 
 // Analytics endpoint: /analytics/{profile}?platforms=instagram,youtube,...
 async function platLoadAnalytics(profileUsername, platformKey, containerId) {
