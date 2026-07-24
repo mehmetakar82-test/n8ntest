@@ -603,6 +603,8 @@ html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
     <div class="sc c3"><div class="sl">Zamanlanmış</div><div class="sv" id="d-sched">—</div><div class="ss">Upload-Post scheduled</div></div>
     <div class="sc c4"><div class="sl">İşlemde</div><div class="sv" id="d-proc">—</div><div class="ss">Aktif kuyruk</div></div>
   </div>
+  <!-- Sayılar birbirini tutmuyorsa sessiz kalma: nereye bakılacağını söyle -->
+  <div id="dash-tutarsiz" class="alert aw" style="display:none;margin-bottom:14px;font-size:12px"></div>
   <!-- YENİ: Profil başına short dağılımı -->
   <div class="card" style="margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -615,6 +617,7 @@ html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
       </div>
     </div>
     <div style="font-size:11px;color:var(--mt);margin:4px 0 10px">Aynı kategorideki profiller <b>short bazında orantılı</b> ilerler (en az short almış profile öncelik). Mevcut dengesizliği kapatmak için <b>⚖ Dengele</b>'ye bas: Sheet sayıları n8n'e yük olarak yazılır, sonraki short'lar geride kalanlara gider.</div>
+    <div id="pl-profilsiz" class="alert aw" style="display:none;margin:0 0 10px;font-size:12px"></div>
     <div id="pl-list"><div style="color:var(--mt);font-size:13px;text-align:center;padding:12px">Yenile'ye tıklayın</div></div>
   </div>
   <div class="card">
@@ -2220,6 +2223,12 @@ async function refreshDash() {
   setEl('d-url',   urls.length ? urls.length.toLocaleString('tr') : (S.sentURLs.size || 0));
   setEl('d-short', shorts.length.toLocaleString('tr'));
   setEl('d-proc',  procCount.toLocaleString('tr'));
+  // ZAMANLANMIŞ: n8n'in panel-data'sındaki 'scheduled' yalnızca GEÇİCİ değer.
+  // O dizi n8n'deki 'Panel Upload-Post Zamanlanmış' düğümünden gelir ve düğüm
+  // neverError:true ile kurulu — çağrı başarısız olursa sessizce boş döner ve
+  // kutu 0 gösterir. Oysa panel Upload-Post'u ZATEN kendi çekiyor (stokVeri).
+  // Kesin sayı, aşağıdaki loadProfileLoad sonunda bu kutunun üzerine yazılır;
+  // böylece "0 zamanlanmış" ile "1772 zamanlı" aynı ekranda çelişemez.
   setEl('d-sched', Array.isArray(sched) ? sched.length.toLocaleString('tr') : 0);
 
 
@@ -2244,6 +2253,22 @@ async function refreshDash() {
                                 alt:'Google Sheets API Key / Sheet ID girilmemiş.'}))
         + '</td></tr>';
     }
+  }
+
+  // ── TUTARLILIK KONTROLÜ ─────────────────────────────────────────────
+  // "1 işlenen URL" ile "2.130 üretilen short" aynı anda doğru olamaz: her
+  // short bir URL'den üretilir. Böyle bir durumda URL-Takip tarafı eksik
+  // okunuyor demektir — sayıya bakıp yanlış sonuç çıkarmak yerine uyar.
+  const tut = document.getElementById('dash-tutarsiz');
+  if (tut) {
+    const mesaj = [];
+    if (shorts.length > 50 && urls.length < shorts.length/20)
+      mesaj.push(`<b>İşlenen URL (${urls.length}) ile Üretilen Short (${shorts.length.toLocaleString('tr')}) bağdaşmıyor.</b> `
+        + `Her short bir URL'den üretildiğine göre <b>URL-Takip</b> sayfası eksik okunuyor. `
+        + `n8n'deki <code>Panel Veri Birleştir</code> düğümü yalnızca <code>youtube-url</code> kolonu DOLU olan satırları sayar — `
+        + `sayfadaki başlık hücresinin tam olarak <code>youtube-url</code> yazdığını doğrula.`);
+    tut.innerHTML = mesaj.length ? ('<span>⚠</span><div>'+mesaj.join('<br><br>')+'</div>') : '';
+    tut.style.display = mesaj.length ? 'flex' : 'none';
   }
 
   if (lastEl) dmgYaz('dash-last');
@@ -7079,6 +7104,26 @@ async function loadProfileLoad() {
   const badN=Object.values(health).filter(h=>h.status!=='live').length;
   if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}${badN?` · ⚠ ${badN} sağlık sorunu`:''}`;
   dmgYaz('pl-dmg');
+
+  // ── Dashboard kutularını AYNI kaynakla hizala ────────────────────────
+  // ZAMANLANMIŞ kutusu n8n panel-data'sındaki 'scheduled' dizisini gösteriyordu;
+  // o düğüm sessizce boş dönebildiği için kutu 0 derken hemen altında
+  // "1772 zamanlı" yazabiliyordu. Artık ikisi de Upload-Post'tan gelen
+  // aynı sayı (stokVeri). Upload-Post okunamadıysa kutuya dokunulmuyor.
+  if (Object.keys(upBy).length) setEl('d-sched', tSched.toLocaleString('tr'));
+
+  // ÜRETİLEN SHORT ile buradaki toplam neden farklı olabilir: 'profil' kolonu
+  // boş olan short satırları hiçbir profile sayılamaz. Farkı gizlemek yerine yaz.
+  const tumShort = ((S.sheetData&&S.sheetData.shorts)||[]).length;
+  const profilsiz = Math.max(0, tumShort - tShort);
+  const uyari = document.getElementById('pl-profilsiz');
+  if (uyari) {
+    uyari.innerHTML = profilsiz
+      ? `⚠ ${profilsiz.toLocaleString('tr')} short kaydında <b>profil</b> kolonu boş — bu satırlar yukarıdaki dağılıma girmiyor, `
+        + `bu yüzden <b>Üretilen Short (${tumShort.toLocaleString('tr')})</b> ile buradaki <b>${tShort.toLocaleString('tr')}</b> farklı.`
+      : '';
+    uyari.style.display = profilsiz ? 'flex' : 'none';
+  }
 }
 window.loadProfileLoad=loadProfileLoad;
 // Mevcut Sheet short sayılarını n8n staticData.profilLoad'a "yük" olarak yaz →
