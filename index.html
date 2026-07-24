@@ -44,7 +44,11 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 .dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--ok);margin-right:4px;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 /* MAIN */
-.main{flex:1;padding:24px 28px;overflow-y:auto;overflow-x:hidden}
+/* overflow-x:hidden idi; CSS'te 'visible' + 'hidden' eşleşince diğer eksen de
+   'auto'ya döner → .main sahte bir kaydırma kabı oluyor ve içindeki
+   position:sticky hiç yapışmıyordu. 'clip' yatay taşmayı yine keser ama
+   kaydırma kabı YARATMAZ; böylece sticky viewport'a göre çalışır. */
+.main{flex:1;padding:24px 28px;overflow-x:clip;min-width:0}
 .main > .page{max-width:1400px;margin:0 auto}
 .page{display:none;animation:fi .18s ease}
 .page.active{display:block}
@@ -388,6 +392,87 @@ tbody td{line-height:1.5}
 .nf-row .nf-tx{font-size:12.5px;color:var(--tx);line-height:1.35}
 .nf-row .nf-sub{font-size:10.5px;color:var(--mt);margin-top:2px}
 .nf-row .nf-t{font-size:9.5px;color:var(--mt);opacity:.7;margin-top:2px}
+/* ═══════════════════════════════════════════════════════════════════
+   UX PAKETİ — kenarlık kontrastı · durum kutuları · ⓘ ipucu · onay kuyruğu
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── P9: kenarlık kontrastı ──────────────────────────────────────────
+   Eski --brd (#243247) yüzey üzerinde 1.47:1 idi; WCAG 1.4.11 arayüz
+   bileşenleri için 3:1 ister. Saç teli ayraçları ağırlaştırmamak adına
+   ikiye ayrıldı: --brd biraz güçlendi (ayraçlar), --brd-str 3:1'i
+   karşılıyor ve yalnız gerçek bileşen sınırlarında kullanılıyor. */
+:root{--brd:#2e4059;--brd-str:#4a628a}
+html.light-theme{--brd:#c2cbd9;--brd-str:#808fa8}
+input,select,textarea{border-color:var(--brd-str)}
+.bg{border-color:var(--brd-str)}
+.tg{background:var(--brd-str)}
+.card,.acc-card,.rd-card,.pl-prof,.pl-hesap,.rd-ch-card,.sc{border-color:var(--brd-str)}
+
+/* ── P8: tutarlı durum kutuları (yükleniyor / kurulum / boş / hata) ──
+   Panelde aynı durum üç ayrı dille anlatılıyordu ("↻ ...'e bas",
+   "API Key gerekli", "—"). Hepsi tek bileşene indi. */
+.durum{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:7px;text-align:center;padding:22px 16px;color:var(--mt);font-size:13px;line-height:1.5}
+.rd-grid > .durum,.durum.tam{grid-column:1/-1}
+.durum .du-ic{font-size:26px;line-height:1;opacity:.85}
+.durum .du-bas{font-size:13.5px;color:var(--tx);font-weight:600}
+.durum .du-alt{font-size:12px;color:var(--mt);max-width:430px}
+.durum .du-eylem{margin-top:3px;display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
+.durum.kurulum{color:var(--wn)}
+.durum.kurulum .du-bas{color:var(--wn)}
+.durum.hata .du-bas{color:var(--er)}
+
+/* İskelet yükleyici — "—" yerine içeriğin şeklini gösterir, sıçrama olmaz */
+.isk{background:linear-gradient(90deg,var(--sur2) 25%,var(--brd) 37%,var(--sur2) 63%);
+  background-size:400% 100%;animation:iskKay 1.3s ease-in-out infinite;border-radius:5px}
+@keyframes iskKay{0%{background-position:100% 50%}100%{background-position:0 50%}}
+.isk-kart{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;overflow:hidden}
+.isk-kart .isk-gorsel{width:100%;aspect-ratio:16/9}
+.isk-kart .isk-govde{padding:9px 10px 11px;display:flex;flex-direction:column;gap:6px}
+.isk-sat{height:10px}
+
+/* Tazelik damgası — "3 dk önce güncellendi" */
+.dmg{font-size:11.5px;color:var(--mt);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dmg.bayat{color:var(--wn)}
+
+/* ── P2: ⓘ ipucu — uzun açıklamalar baloncuğa taşındı ───────────────
+   Radar sayfasının %78'i açıklama metniydi (bir başlık 376 karakter).
+   Başlıkta tek satır kalır, ayrıntı tıklayınca baloncukta açılır. */
+.ipuc{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;
+  margin-left:5px;border-radius:50%;border:1px solid var(--brd-str);background:transparent;
+  color:var(--mt);font-family:var(--ft);font-size:10.5px;font-weight:700;line-height:1;
+  cursor:help;flex-shrink:0;vertical-align:middle;letter-spacing:0;text-transform:none;
+  padding:0;transition:color .13s,border-color .13s}
+.ipuc:hover,.ipuc:focus-visible{color:var(--acc);border-color:var(--acc)}
+.ipuc.acik{color:#012;background:var(--acc);border-color:var(--acc)}
+#ipuc-pop{position:fixed;z-index:11800;max-width:390px;background:var(--sur2);
+  border:1px solid var(--acc);border-radius:10px;padding:11px 13px;font-family:var(--ft);
+  font-size:12px;line-height:1.6;color:var(--tx);text-transform:none;letter-spacing:0;
+  font-weight:400;box-shadow:0 12px 34px rgba(0,0,0,.55);display:none}
+#ipuc-pop.acik{display:block}
+#ipuc-pop b{color:var(--acc)}
+#ipuc-pop code{font-size:11px}
+
+/* ── P6: onay kuyruğu — sabit araç çubuğu ───────────────────────────
+   "Seçilenleri Onayla" sayfa akışındaydı, aşağı kaydırınca kayboluyordu. */
+#tr-toolbar{position:sticky;top:0;z-index:30;
+  box-shadow:0 6px 18px rgba(0,0,0,.34);background:var(--sur)}
+html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
+
+/* ── P4: klavye imleci ──────────────────────────────────────────── */
+.card.tr-imlec{box-shadow:0 0 0 2px var(--acc),0 6px 22px rgba(0,229,255,.22);
+  border-color:var(--acc)!important}
+#tr-kisayol{font-size:11px;color:var(--mt);display:flex;gap:9px;flex-wrap:wrap;align-items:center;
+  padding-top:8px;margin-top:8px;border-top:1px solid var(--brd)}
+#tr-kisayol kbd{font-family:var(--fm);font-size:10.5px;background:var(--sur2);color:var(--tx);
+  border:1px solid var(--brd-str);border-bottom-width:2px;border-radius:4px;padding:1px 5px;line-height:1.5}
+
+/* ── P5: toast içinde "Geri Al" ─────────────────────────────────── */
+.toast .geri{flex-shrink:0;cursor:pointer;color:var(--acc);font-weight:700;font-size:12px;
+  border:1px solid var(--acc);border-radius:5px;padding:2px 8px;background:transparent;
+  font-family:var(--ft);white-space:nowrap}
+.toast .geri:hover{background:var(--acc);color:#012}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -465,6 +550,7 @@ tbody td{line-height:1.5}
       <div class="ct" style="margin:0">🚨 Aksiyon Merkezi</div>
       <div style="display:flex;gap:8px;align-items:center">
         <span id="ac-status" style="font-size:12px;color:var(--mt)"></span>
+        <span id="ac-dmg" class="dmg"></span>
         <button class="btn bg bsm" onclick="loadActionCenter()">↻ Yenile</button>
       </div>
     </div>
@@ -481,9 +567,11 @@ tbody td{line-height:1.5}
       3. Ayarlar'dan n8n URL giriliyse bu sorun olmaz (n8n proxy kullanılır)
     </div>
   </div>
-  <div class="alert ai" style="margin-bottom:10px">
-    <span>ℹ</span>
-    <span>Veriler <b>Google Sheets API</b> üzerinden çekilir. Ayarlar → <b>Google Sheets API Key</b> ve <b>Sheet ID</b> girin. Daha sonra <b>Yenile</b>'ye tıklayın.</span>
+  <!-- Yapılandırma tamamsa gizlenir (dashKurulumIpucu) — kalıcı olarak yer kaplamasın -->
+  <div id="dash-kurulum" class="alert aw" style="display:none;margin-bottom:10px">
+    <span>⚠</span>
+    <span>Veriler <b>Google Sheets API</b> ya da <b>n8n</b> üzerinden çekilir. Ayarlar → <b>Google Sheets API Key</b> + <b>Sheet ID</b> (ya da <b>n8n URL</b>) girin.
+      <span onclick="gitAyarlar()" style="color:var(--acc);cursor:pointer;text-decoration:underline">Ayarlar'a git</span></span>
   </div>
   <div style="display:flex;gap:8px;margin-bottom:14px">
     <button class="btn bp bsm" onclick="refreshDash()">↻ Yenile</button>
@@ -501,6 +589,7 @@ tbody td{line-height:1.5}
       <div class="ct" style="margin:0">📊 Profil Başına Short</div>
       <div style="display:flex;gap:8px;align-items:center">
         <span id="pl-status" style="font-size:12px;color:var(--mt)"></span>
+        <span id="pl-dmg" class="dmg"></span>
         <button class="btn bg bsm" onclick="seedProfileLoad()" title="Mevcut Sheet short sayılarını n8n'e 'yük' olarak yaz — geride kalan profiller öncelik alıp dengelenir">⚖ Dengele</button>
         <button class="btn bg bsm" onclick="loadProfileLoad()">↻ Yenile</button>
       </div>
@@ -739,14 +828,22 @@ tbody td{line-height:1.5}
         <option value="date">Yayın tarihi (yeni→eski)</option>
         <option value="dur">Süre (uzun→kısa)</option>
       </select>
-      <button class="btn bg bsm" onclick="trSelectAll()">Tümünü Seç</button>
-      <button class="btn bg bsm" onclick="trClearSel()">Kaldır</button>
+      <button class="btn bg bsm" id="tr-selall" onclick="trSelectAll()">Tümünü Seç</button>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--brd)">
       <span style="font-size:12px;color:var(--mt)">Seçili: <b id="tr-selcount">0</b> →</span>
       <div id="tr-bulk-cats" class="cat-chips" style="display:inline-flex;flex-wrap:wrap;gap:4px" title="Birden fazla kategori seçebilirsin — her video her kategori için ayrı gönderilir"></div>
       <button class="btn bp bsm" onclick="trBulkApprove()">✓ Seçilenleri Onayla</button>
       <button class="btn bg bsm" onclick="trBulkReject()">✗ Seçilenleri Reddet</button>
+    </div>
+    <div id="tr-kisayol">
+      <span>⌨</span>
+      <span><kbd>J</kbd><kbd>K</kbd> gez</span>
+      <span><kbd>A</kbd> seç</span>
+      <span><kbd>Enter</kbd> onayla</span>
+      <span><kbd>X</kbd> reddet</span>
+      <span><kbd>Shift</kbd>+tık aralık seçer</span>
+      <span><kbd>?</kbd> yardım</span>
     </div>
   </div>
   <div id="tr-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px"></div>
@@ -1331,7 +1428,7 @@ tbody td{line-height:1.5}
 <div id="page-radar" class="page">
   <div class="ph"><div class="pt">Trend Radar &amp; Onay</div><div class="ps">Keşif Radarı — YouTube'da trend olan, hızla yükselen ve patlama potansiyeli taşıyan video &amp; kanallar (canlı)</div></div>
   <div class="utab-bar" data-group="trend" data-utab="radar"></div>
-  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veri önce <b>n8n günlük radar</b>'dan (<code>/webhook/trend-radar</code>, her sabah hesaplanır) alınır; yoksa <b>YouTube API</b> ile canlı hesaplanır (Ayarlar → YouTube API Key). <b>Hız</b> = izlenme/saat. <b>▲ artış</b> = son ziyaretten bu yana kazanılan izlenme. <b>💎 Potansiyel</b> = abone sayısına göre izlenmesi patlamış taze video (küçük kanal, büyük ivme).</span></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veri önce <b>n8n günlük radar</b>'dan, yoksa <b>YouTube API</b> ile canlı hesaplanır.<button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Veri kaynağı: önce &lt;b&gt;n8n günlük radar&lt;/b&gt; (&lt;code&gt;/webhook/trend-radar&lt;/code&gt;, her sabah hesaplanır); yoksa &lt;b&gt;YouTube API&lt;/b&gt; ile canlı hesaplanır (Ayarlar → YouTube API Key).&lt;br&gt;&lt;br&gt;&lt;b&gt;Hız&lt;/b&gt; = izlenme/saat.&lt;br&gt;&lt;b&gt;▲ artış&lt;/b&gt; = son ziyaretten bu yana kazanılan izlenme.&lt;br&gt;&lt;b&gt;💎 Potansiyel&lt;/b&gt; = abone sayısına göre izlenmesi patlamış taze video (küçük kanal, büyük ivme).">ⓘ</button></span></div>
 
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
     <button class="btn bp bsm" onclick="loadRadar(true)">↻ Bugünü Getir</button>
@@ -1345,50 +1442,50 @@ tbody td{line-height:1.5}
 
   <div class="card">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— müzik ve 5 dk altı hariç</span></span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
-    <div id="rd-trend" class="rd-grid"><div class="rd-empty">↻ Bugünü Getir'e bas</div></div>
+    <div id="rd-trend" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card" style="border-color:rgba(52,211,153,.3)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
-      <span style="color:var(--ok)">🇹🇷 Haftanın En Çok İzlenenleri <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— son 7 günde yayınlanmış, Türkiye'de en çok izlenen videolar (Türkçe içerik filtresi, 4-60 dk, 100K+ abone). Gün boyu saklanır.</span></span>
+      <span style="color:var(--ok)">🇹🇷 Haftanın En Çok İzlenenleri <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— son 7 gün, Türkiye</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Son &lt;b&gt;7 günde yayınlanmış&lt;/b&gt;, Türkiye'de en çok izlenen videolar.&lt;br&gt;&lt;br&gt;Filtreler: Türkçe içerik, &lt;b&gt;4–60 dk&lt;/b&gt; süre, &lt;b&gt;100K+ abone&lt;/b&gt;.&lt;br&gt;&lt;br&gt;Sonuç gün boyu saklanır — ↻ ile yeniden taranır (~800 API birimi).">ⓘ</button></span>
       <span style="display:flex;gap:8px;align-items:center">
         <span id="rd-hafta-status" style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt);font-size:11px"></span>
         <span id="rd-hafta-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span>
         <button class="btn bg bsm" onclick="rdHaftaTara(true)" title="Yeniden tara (~800 API birimi)">↻</button>
       </span>
     </div>
-    <div id="rd-hafta" class="rd-grid"><div class="rd-empty">Radar yüklenince otomatik gelir</div></div>
+    <div id="rd-hafta" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card" style="border-color:rgba(251,191,36,.3)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
-      <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için günün <b>en iyi 5</b> videosu — kategori başına 2 sorgu x 2 süre bandı (son 14 gün), dil filtresi, <b>4-60 dk</b> ve <b>100K+ abone</b> şartı, outlier sıralaması. Genel için TR ve EN ayrı. Sonuç gün boyu saklanır (~3600 API birimi). YouTube genel trend listesini kaldırdığı için kategori boşluğunu bu doldurur (~800 API birimi, isteğe bağlı)</span></span>
+      <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için günün <b>en iyi 5</b>'i</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Her kategori için günün &lt;b&gt;en iyi 5&lt;/b&gt; videosu.&lt;br&gt;&lt;br&gt;&lt;b&gt;Nasıl:&lt;/b&gt; kategori başına 2 sorgu × 2 süre bandı (son 14 gün), dil filtresi, &lt;b&gt;4–60 dk&lt;/b&gt; ve &lt;b&gt;100K+ abone&lt;/b&gt; şartı, outlier'a göre sıralama. Genel kategorisi için TR ve EN ayrı taranır.&lt;br&gt;&lt;br&gt;&lt;b&gt;Neden:&lt;/b&gt; YouTube genel trend listesini kaldırdı; bu tarama o boşluğu dolduruyor.&lt;br&gt;&lt;br&gt;&lt;b&gt;Maliyet:&lt;/b&gt; ~3600 API birimi. Sonuç gün boyu saklanır, butona tekrar basınca yeniden taranır.">ⓘ</button></span>
       <button class="btn bg bsm" onclick="rdKategoriTara(true)" title="Her kategori için günün en iyi 5 videosu. Sonuç gün boyu saklanır; tekrar basınca yeniden taranır.">🎯 Günün En İyi 5'i</button>
     </div>
     <div id="rd-kat-status" style="font-size:12px;color:var(--mt);margin-bottom:8px"></div>
-    <div id="rd-kat"><div class="rd-empty">Her kategori için günün en iyi 5 videosunu görmek için butona bas</div></div>
+    <div id="rd-kat"><div class="rd-empty">Bu tarama isteğe bağlı — <b>🎯 Günün En İyi 5'i</b> butonuna bas</div></div>
   </div>
   <div class="card" style="border-color:rgba(167,139,250,.35)">
-    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--acc3)">💥 Outlier <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— videonun izlenmesi / kanalın son 20 video medyanı. Kanal büyüklüğünden bağımsız "bu kanal için anormal" performans = algoritmanın ittiğinin en erken sinyali (2x kayda değer · 3–5x güçlü · 10x+ patlama)</span></span><span id="rd-outlier-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
-    <div id="rd-outlier" class="rd-grid"><div class="rd-empty">—</div></div>
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--acc3)">💥 Outlier <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— kanal medyanının kaç katı</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="&lt;b&gt;Outlier = videonun izlenmesi ÷ kanalın son 20 video medyanı&lt;/b&gt; (chMed).&lt;br&gt;&lt;br&gt;Kanal büyüklüğünden bağımsız olarak &amp;quot;bu kanal için anormal&amp;quot; performansı gösterir — algoritmanın bir videoyu ittiğinin en erken sinyalidir.&lt;br&gt;&lt;br&gt;&lt;b&gt;2x&lt;/b&gt; kayda değer · &lt;b&gt;3–5x&lt;/b&gt; güçlü · &lt;b&gt;10x+&lt;/b&gt; patlama">ⓘ</button></span><span id="rd-outlier-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div id="rd-outlier" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🚀 Hızlı Yükselenler <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— son 48 saatte yayınlandı, izlenme hızı en yüksek</span></span><span id="rd-rising-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
-    <div id="rd-rising" class="rd-grid"><div class="rd-empty">—</div></div>
+    <div id="rd-rising" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card" style="border-color:rgba(251,191,36,.3)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--gld)">💎 Potansiyel <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— küçük kanaldan patlayan taze video (izlenme ≥ abone)</span></span><span id="rd-potential-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
-    <div id="rd-potential" class="rd-grid"><div class="rd-empty">—</div></div>
+    <div id="rd-potential" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card" style="border-color:rgba(0,229,255,.3)">
-    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--acc)">🎯 Erken Sinyal <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— Google Trends'te yükselen aramalar × YouTube: 15 dk+, beğeni/izlenme ≥ %5 (trend olmadan yakala)</span></span><span id="rd-gtrend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
-    <div id="rd-gtrend" class="rd-grid"><div class="rd-empty">—</div></div>
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--acc)">🎯 Erken Sinyal <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— Google Trends × YouTube</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="&lt;b&gt;Google Trends&lt;/b&gt;'te yükselen aramaları YouTube'da arar — video henüz trend listesine girmeden yakalamak için.&lt;br&gt;&lt;br&gt;Filtreler: &lt;b&gt;15 dk+&lt;/b&gt; süre, beğeni/izlenme oranı &lt;b&gt;≥ %5&lt;/b&gt;.">ⓘ</button></span><span id="rd-gtrend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div id="rd-gtrend" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card" style="border-color:rgba(52,211,153,.3)">
-    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--ok)">🔎 Keşif <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— Wikipedia gündemi × YouTube araması × kanal RSS: kanalın kendi medyanını 2.5 kat aşan videolar <b style="color:var(--ok)">(sıfır API kotası)</b></span></span><span id="rd-kesif-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
-    <div id="rd-kesif" class="rd-grid"><div class="rd-empty">—</div></div>
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--ok)">🔎 Keşif <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— Wikipedia × RSS <b style="color:var(--ok)">(sıfır kota)</b></span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Üç ücretsiz kaynağı birleştirir: &lt;b&gt;Wikipedia gündemi&lt;/b&gt; × &lt;b&gt;YouTube araması&lt;/b&gt; × &lt;b&gt;kanal RSS&lt;/b&gt; akışları.&lt;br&gt;&lt;br&gt;Kanalın kendi medyanını &lt;b&gt;2.5 kat&lt;/b&gt; aşan videoları çıkarır.&lt;br&gt;&lt;br&gt;&lt;b style=&amp;quot;color:var(--ok)&amp;quot;&gt;Sıfır YouTube API kotası&lt;/b&gt; harcar — anahtar limiti dolsa bile çalışır.">ⓘ</button></span><span id="rd-kesif-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div id="rd-kesif" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>📺 Yükselen Kanallar <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— bugün birden çok sıcak videosu olan kanallar</span></span><span id="rd-channels-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
-    <div id="rd-channels" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"><div class="rd-empty">—</div></div>
+    <div id="rd-channels" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
 </div>
 
@@ -2003,7 +2100,17 @@ function parseSheet(values) {
 async function refreshDash() {
   n8nCacheClear();
   const lastEl = document.getElementById('dash-last');
-  if (lastEl) lastEl.textContent = 'Guncelleniyor...';
+  if (lastEl) { lastEl.classList.remove('dmg','bayat'); lastEl.textContent = '⏳ güncelleniyor…'; delete DMG['dash-last']; }
+  // P8: "—" yerine iskelet — verinin geleceği belli olur, düzen sıçraması olmaz
+  ['d-url','d-short','d-sched','d-proc'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el && !el.querySelector('.isk')) el.innerHTML = '<span class="isk" style="display:inline-block;width:62px;height:20px"></span>';
+  });
+  const tb0 = document.getElementById('dash-tbody');
+  if (tb0) tb0.innerHTML = '<tr><td colspan="5" style="padding:12px">'+iskeletHTML(3,'satir')+'</td></tr>';
+  // Kurulum ipucu yalnız gerçekten eksikken görünsün (kalıcı bant yerine)
+  const ipucu = document.getElementById('dash-kurulum');
+  if (ipucu) ipucu.style.display = (getN8N() || (S.cfg.shkey && S.cfg.sheet)) ? 'none' : 'flex';
   addLog('info','sistem','Dashboard yenileniyor');
 
   let shorts=[], urls=[], sched=[];
@@ -2051,11 +2158,19 @@ async function refreshDash() {
         '<td>'+(r['istek-tarihi']||'-').slice(0,16)+'</td>'+
         '</tr>').join('');
     } else {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">'+(S.cfg.shkey?'Veri bulunamadi':'Ayarlar\'dan API Key ve Sheet ID girin')+'</td></tr>';
+      // P8: yapılandırma eksikliği ile boş sonuç artık ayrı görünüyor
+      const yapilandirildi = !!(S.cfg.shkey || getN8N());
+      const bant = document.getElementById('dash-kurulum');
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:4px">' + (yapilandirildi
+        ? durumHTML('bos', {alt:'Sheet\'te henüz işlenmiş URL kaydı yok. Video gönderdikçe burada listelenir.',
+                            btn:{fn:"goUretim('video','uretim')", ad:'▶ Video Gönder'}, btnTip:'bg'})
+        : durumHTML('kurulum', {kompakt: !!(bant && bant.style.display !== 'none'),
+                                alt:'Google Sheets API Key / Sheet ID girilmemiş.'}))
+        + '</td></tr>';
     }
   }
 
-  if (lastEl) lastEl.textContent = 'Son: '+new Date().toLocaleTimeString('tr');
+  if (lastEl) dmgYaz('dash-last');
   addLog('ok','sistem','Dashboard guncellendi');
   try { loadProfileLoad(); } catch(e) {}   // profil başına short dağılımını da güncelle
 }
@@ -4581,7 +4696,9 @@ async function vpSend() {
 // ═══════════════════════════════════════════════════════════
 // TREND ONAY — Kworb'un bulduğu videoları panelden onaya alma
 // ═══════════════════════════════════════════════════════════
-const TR = { pending: [], selected: new Set() };
+// gorunen: ekrandaki (filtre+sıralama sonrası) videoId sırası — Shift+tık aralığı
+// ve J/K imleci bu sıraya göre çalışır. imlec: klavye imlecinin indeksi.
+const TR = { pending: [], selected: new Set(), gorunen: [], imlec: null, sonSecim: null };
 const TR_PLAT_LABEL = { ig:'IG', yt:'YT', tt:'TT', fb:'FB', x:'X' };
 function trDur(sec){ sec=parseInt(sec)||0; const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); }
 
@@ -4670,6 +4787,9 @@ function trRenderPending() {
   list.sort((a,b) => sort==='date' ? (new Date(b.publishedAt||0)-new Date(a.publishedAt||0))
                     : sort==='dur' ? ((parseInt(b.durationSec)||0)-(parseInt(a.durationSec)||0))
                     : ((parseInt(b.viewCount)||0)-(parseInt(a.viewCount)||0)));
+  // Ekrandaki sıra — Shift+tık aralığı ve J/K imleci buna göre çalışır
+  TR.gorunen = list.map(v=>v.videoId);
+  if (TR.imlec != null && TR.imlec >= TR.gorunen.length) TR.imlec = TR.gorunen.length ? TR.gorunen.length-1 : null;
   trUpdateSelCount();
   grid.innerHTML = list.map(v => {
     const vid = v.videoId;
@@ -4700,7 +4820,7 @@ function trRenderPending() {
         <img src="${v.thumbnail}" style="width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${v.thumbnail}','${(v.title||'').replace(/'/g,'’').replace(/"/g,'&quot;')}')" onmouseleave="hidePrev()">
         <span class="opc-dur">${trDur(v.durationSec)}</span>
         ${deltaBadge}
-        <label onclick="event.stopPropagation()" title="Toplu işlem için seç" style="position:absolute;top:6px;right:6px;z-index:5;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;cursor:pointer;display:flex"><input type="checkbox" class="tr-selbox" ${selChk?'checked':''} onchange="trToggleSel('${vid}')" style="width:16px;height:16px;margin:0;accent-color:var(--acc);cursor:pointer"></label>
+        <label onclick="event.stopPropagation()" title="Toplu işlem için seç — Shift+tık ile aralık seçilir" style="position:absolute;top:6px;right:6px;z-index:5;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;cursor:pointer;display:flex"><input type="checkbox" class="tr-selbox" ${selChk?'checked':''} onclick="trSecTikla(event,'${vid}')" style="width:16px;height:16px;margin:0;accent-color:var(--acc);cursor:pointer"></label>
         ${already?rdDoneTik(already):''}
       </div>
       <div style="padding:10px 12px">
@@ -4724,6 +4844,7 @@ function trRenderPending() {
       </div>
     </div>`;
   }).join('');
+  trImlecCiz(false);   // yeniden çizimde klavye imleci kaybolmasın
 }
 
 async function trApprove(videoId) {
@@ -4762,22 +4883,110 @@ async function trApprove(videoId) {
   }
 }
 
+// P5: reddetme artık GERİ ALINABİLİR. Arayüzden hemen çıkar, sunucuya
+// yazmayı 6 sn beklet — kullanıcı "Geri Al"a basarsa n8n'e hiç gidilmez,
+// dolayısıyla n8n tarafında geri alma ucu gerekmiyor. (Gmail deseni.)
 async function trReject(videoId) {
-  const v = TR.pending.find(x=>x.videoId===videoId);
+  const idx = TR.pending.findIndex(x=>x.videoId===videoId);
+  if (idx < 0) return;
+  const v = TR.pending[idx];
   const base = getN8N();
   if (!base) return showRes('tr-status','Ayarlar\'dan n8n URL girin','warn');
-  await faf(base + '/webhook/kworb-pending-sil', {videoId, durum:'reddedildi'});
-  TR.pending = TR.pending.filter(x=>x.videoId!==videoId);
+  TR.pending.splice(idx,1);
+  TR.selected.delete(videoId);
   trRenderPending();
-  showRes('tr-status','✗ Reddedildi (kuyruktan çıkarıldı)','info');
-  addLog('info','webhook','Trend reddedildi: '+((v&&v.title)||videoId).slice(0,40));
+  showRes('tr-status','✗ Reddedildi — geri almak için bildirime bak','info');
+  geriAlinabilir(
+    '✗ Reddedildi: ' + ((v&&v.title)||videoId).slice(0,36),
+    async () => {
+      await faf(base + '/webhook/kworb-pending-sil', {videoId, durum:'reddedildi'});
+      addLog('info','webhook','Trend reddedildi: '+((v&&v.title)||videoId).slice(0,40));
+    },
+    () => { TR.pending.splice(Math.min(idx,TR.pending.length), 0, v); trRenderPending(); }
+  );
 }
 
 // #4 TREND ONAY TOPLU İŞLEMLER
-function trUpdateSelCount(){ const el=document.getElementById('tr-selcount'); if(el) el.textContent=TR.selected.size; }
+function trUpdateSelCount(){
+  const el=document.getElementById('tr-selcount'); if(el) el.textContent=TR.selected.size;
+  // P6: "Tümünü Seç" hepsi seçiliyken "Seçimi Kaldır"a döner (tek buton, iki iş)
+  const btn=document.getElementById('tr-selall');
+  if(btn){ const hepsi=(TR.gorunen||[]).length>0 && (TR.gorunen||[]).every(id=>TR.selected.has(id));
+    btn.textContent = hepsi ? 'Seçimi Kaldır' : 'Tümünü Seç';
+    btn.setAttribute('onclick', hepsi ? 'trClearSel()' : 'trSelectAll()'); }
+}
 function trToggleSel(vid){ if(TR.selected.has(vid)) TR.selected.delete(vid); else TR.selected.add(vid); trUpdateSelCount(); }
+
+// P6: Shift+tık ile ARALIK seçimi. Önceden 12 video seçmek 12 tıklamaydı;
+// artık ilkine tık + sonuncusuna Shift+tık yetiyor.
+function trSecTikla(ev, vid){
+  ev.stopPropagation();
+  const sira = TR.gorunen || [];
+  const i = sira.indexOf(vid);
+  const kutu = ev.currentTarget;
+  if (ev.shiftKey && TR.sonSecim != null && TR.sonSecim >= 0 && i >= 0) {
+    const [a,b] = TR.sonSecim < i ? [TR.sonSecim,i] : [i,TR.sonSecim];
+    // Aralığın tamamı çapa öğenin YENİ durumuna eşitlenir (tabloların standart davranışı)
+    const hedef = kutu.checked;
+    for (let n=a; n<=b; n++){ if(hedef) TR.selected.add(sira[n]); else TR.selected.delete(sira[n]); }
+    trRenderPending();
+    toast((b-a+1)+' video '+(hedef?'seçildi':'seçimden çıkarıldı'),'info',2200);
+  } else {
+    trToggleSel(vid);
+  }
+  TR.sonSecim = i;
+}
 function trSelectAll(){ const q=((document.getElementById('tr-search')||{}).value||'').toLowerCase(); TR.pending.forEach(v=>{ if(!q || (v.title||'').toLowerCase().includes(q) || (v.channelTitle||'').toLowerCase().includes(q)) TR.selected.add(v.videoId); }); trRenderPending(); }
-function trClearSel(){ TR.selected.clear(); trRenderPending(); }
+function trClearSel(){ TR.selected.clear(); TR.sonSecim=null; trRenderPending(); }
+
+// ── P4: KLAVYE KISAYOLLARI ─────────────────────────────────────────
+// Onay kuyruğu panelin en çok tekrar eden işi ama tamamen fareye bağlıydı.
+// Reddit mod kuyruğu / Canvas / GitHub review ile aynı J-K deseni.
+function trImlecGit(delta){
+  const sira = TR.gorunen || []; if (!sira.length) return;
+  let i = TR.imlec == null ? -1 : TR.imlec;
+  i += delta;
+  if (i < 0) i = 0; if (i >= sira.length) i = sira.length-1;
+  TR.imlec = i;
+  trImlecCiz(true);
+}
+function trImlecCiz(kaydir){
+  document.querySelectorAll('#tr-grid .card.tr-imlec').forEach(e=>e.classList.remove('tr-imlec'));
+  const sira = TR.gorunen || [];
+  if (TR.imlec == null || !sira[TR.imlec]) return;
+  const kart = document.querySelector('#tr-grid [data-trvid="'+sira[TR.imlec]+'"]');
+  if (!kart) return;
+  kart.classList.add('tr-imlec');
+  if (kaydir) kart.scrollIntoView({block:'nearest', behavior:'smooth'});
+}
+function trKisayolYardim(){
+  const pop = document.getElementById('ipuc-pop') || (()=>{ const d=document.createElement('div'); d.id='ipuc-pop'; document.body.appendChild(d); return d; })();
+  pop.innerHTML = '<b>Onay kuyruğu kısayolları</b><br><br>'
+    + '<b>J</b> / <b>↓</b> — sonraki video<br><b>K</b> / <b>↑</b> — önceki video<br>'
+    + '<b>A</b> — imleçteki videoyu seç / bırak<br><b>Enter</b> — onayla ve gönder<br>'
+    + '<b>X</b> — reddet (6 sn geri alınabilir)<br><b>Shift</b>+tık — aralık seç<br>'
+    + '<b>Esc</b> — imleci bırak';
+  pop.classList.add('acik');
+  pop.style.left = Math.round(window.innerWidth/2 - 170)+'px';
+  pop.style.top  = '90px';
+}
+document.addEventListener('keydown', ev => {
+  const sayfa = document.getElementById('page-trendonay');
+  if (!sayfa || !sayfa.classList.contains('active')) return;
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  const t = ev.target;
+  if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+  const sira = TR.gorunen || [];
+  const akt = () => (TR.imlec != null ? sira[TR.imlec] : null);
+  const k = ev.key;
+  if (k === 'j' || k === 'J' || k === 'ArrowDown')      { ev.preventDefault(); trImlecGit(1); }
+  else if (k === 'k' || k === 'K' || k === 'ArrowUp')   { ev.preventDefault(); trImlecGit(-1); }
+  else if (k === 'a' || k === 'A') { const v=akt(); if(v){ ev.preventDefault(); trToggleSel(v); trRenderPending(); trImlecCiz(false); } }
+  else if (k === 'Enter')          { const v=akt(); if(v){ ev.preventDefault(); trApprove(v); } }
+  else if (k === 'x' || k === 'X') { const v=akt(); if(v){ ev.preventDefault(); trReject(v); } }
+  else if (k === '?')              { ev.preventDefault(); trKisayolYardim(); }
+  else if (k === 'Escape')         { TR.imlec = null; trImlecCiz(false); ipucKapat(); }
+});
 async function trBulkApprove() {
   if(!TR.selected.size) return toast('Önce video seç','warn');
   const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
@@ -4797,20 +5006,33 @@ async function trBulkApprove() {
   trRenderPending();
   if(!res.cancel) showRes('tr-status',`✓ ${res.ok} onaylandı${res.err?` · ✕ ${res.err}`:''} [${kats.join(', ')}]`, res.err?'warn':'ok');
 }
+// P5: toplu reddetme de confirm() yerine geri alınabilir. Engelleyici
+// diyalog yerine iş hemen yapılır, 8 sn boyunca tek tuşla dönülebilir.
 async function trBulkReject() {
   if(!TR.selected.size) return toast('Önce video seç','warn');
   const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
-  if(!confirm(`${TR.selected.size} video reddedilsin mi? (kuyruktan çıkar, bir daha gelmez)`)) return;
   const ids=[...TR.selected];
-  const tasks=ids.map(id=>{ const v=TR.pending.find(x=>x.videoId===id); return { label:'Reddet: '+((v&&v.title)||id).slice(0,36), badge:'red', send: async()=>{
-    const r=await faf(base+'/webhook/kworb-pending-sil',{videoId:id,durum:'reddedildi'});
-    if(r&&r.ok===true){ TR.pending=TR.pending.filter(x=>x.videoId!==id); TR.selected.delete(id); return true; } return false;
-  }}; });
-  const res=await sqRunBatch(tasks,{name:'Trend reddet'});
+  // Geri alma için konumlarıyla birlikte sakla (aynı sıraya dönsün)
+  const yedek=ids.map(id=>({id, idx:TR.pending.findIndex(x=>x.videoId===id), v:TR.pending.find(x=>x.videoId===id)}))
+                 .filter(x=>x.v).sort((a,b)=>a.idx-b.idx);
+  TR.pending=TR.pending.filter(x=>!TR.selected.has(x.videoId));
+  TR.selected.clear(); TR.sonSecim=null;
   trRenderPending();
-  if(!res.cancel) showRes('tr-status',`✗ ${res.ok} reddedildi${res.err?` · ✕ ${res.err}`:''}`,'info');
+  showRes('tr-status',`✗ ${yedek.length} video reddedildi — geri almak için bildirime bak`,'info');
+  geriAlinabilir(
+    `✗ ${yedek.length} video reddedildi`,
+    async () => {
+      const tasks=yedek.map(y=>({ label:'Reddet: '+((y.v&&y.v.title)||y.id).slice(0,36), badge:'red',
+        send: async()=>{ const r=await faf(base+'/webhook/kworb-pending-sil',{videoId:y.id,durum:'reddedildi'}); return !!(r&&r.ok===true); } }));
+      const res=await sqRunBatch(tasks,{name:'Trend reddet'});
+      if(!res.cancel) showRes('tr-status',`✗ ${res.ok} reddedildi${res.err?` · ✕ ${res.err}`:''}`,'info');
+    },
+    () => { yedek.forEach(y=>TR.pending.splice(Math.min(y.idx,TR.pending.length),0,y.v)); trRenderPending(); },
+    8000
+  );
 }
-[trToggleSel,trSelectAll,trClearSel,trBulkApprove,trBulkReject].forEach(fn=>{ if(typeof fn==='function') window[fn.name]=fn; });
+[trToggleSel,trSecTikla,trSelectAll,trClearSel,trBulkApprove,trBulkReject,
+ trImlecGit,trImlecCiz,trKisayolYardim].forEach(fn=>{ if(typeof fn==='function') window[fn.name]=fn; });
 
 // ═══════════════════════════════════════════════════════════
 // OTO YAKALA — panelden n8n staticData'sına ayar kaydetme
@@ -5429,6 +5651,16 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(()=>{ try{ svcCheck(); }catch(e){} try{ refreshBadges(); }catch(e){} }, 800);
     try{ notifRender(); }catch(e){}                                   // kayıtlı bildirimleri hemen göster
     setTimeout(()=>{ try{ notifCheck(true); }catch(e){} }, 1600);     // ilk tam tarama
+    // P1: Dashboard AÇILIŞTA yüklensin. go() diğer 18 sayfayı otomatik
+    // yüklüyordu ama Dashboard HTML'de zaten .active olduğu için go()
+    // hiç çalışmıyordu — açılış sayfası "Yenile'ye bas" ile ölü geliyordu.
+    setTimeout(()=>{
+      try { refreshDash(); }catch(e){ console.warn('[boot] refreshDash:', e.message); }
+      try { loadActionCenter(); }catch(e){ console.warn('[boot] loadActionCenter:', e.message); }
+      // loadProfileLoad'ı refreshDash zaten sonunda çağırıyor
+    }, 250);
+    setInterval(()=>{ try{ dmgCiz(); }catch(e){} }, 30000);           // tazelik damgalarını canlı tut
+    try{ alertSadelestir(); }catch(e){ console.warn('[boot] alertSadelestir:', e.message); }
     setInterval(()=>{ try{ notifCheck(false); }catch(e){} }, 5*60*1000);  // ucuz periyodik kontrol
     // Tüm global fonksiyonları window'a bağla
     const globals = [go,showTab,goUretim,renderUretimTabs,trTabCount,refreshDash,sendSingle,sendBulkURLs,sendSearch,
@@ -5455,7 +5687,10 @@ document.addEventListener('DOMContentLoaded', function() {
       initTrendOnay,trFetchPending,trApprove,trReject,
       parseDriveSheetID,addSearchHist,
       toggleAutoLog,addCustomCat,saveCats,genLimCode,
-      loadAllSheetData,loadSheetPage];
+      loadAllSheetData,loadSheetPage,
+      // UX paketi yardımcıları (onclick'lerden çağrılıyor)
+      durumHTML,iskeletHTML,durumYaz,iskeletYaz,gitAyarlar,dmgYaz,dmgCiz,
+      ipucAc,ipucKapat,geriAlinabilir,alertSadelestir];
     globals.forEach(fn => { if(typeof fn === 'function') window[fn.name] = fn; });
   }catch(e){console.error('Init hatasi:',e);}
 });
@@ -6133,6 +6368,169 @@ function toast(msg, type, ms) {
   const t = ms==null ? (type==='err'?7000:4000) : ms;
   if (t>0) setTimeout(()=>{ el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); }, t);
 }
+// ═══════════════════════════════════════════════════════════════════
+// UX PAKETİ — durum kutuları · tazelik damgası · ⓘ ipucu · geri alma
+// ═══════════════════════════════════════════════════════════════════
+
+// ── P8: TUTARLI DURUM KUTULARI ─────────────────────────────────────
+// Panelde aynı durum üç ayrı dille anlatılıyordu: "↻ Bugünü Getir'e bas",
+// "YouTube API Key gerekli (Ayarlar)", "—". Kullanıcı hangisinin eksik
+// yapılandırma hangisinin boş sonuç olduğunu ayırt edemiyordu.
+// durumHTML() dört durumu tek görsel dile indirger.
+//   tip: 'yukleniyor' | 'kurulum' | 'bos' | 'hata'
+function durumHTML(tip, o){
+  o = o || {};
+  const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const on = { yukleniyor:{ic:'',    bas:'Yükleniyor…',        alt:''},
+               kurulum:   {ic:'🔑',  bas:'Yapılandırma eksik',  alt:''},
+               bos:       {ic:'∅',   bas:'Sonuç yok',           alt:''},
+               hata:      {ic:'✕',   bas:'Alınamadı',           alt:''} }[tip] || {ic:'',bas:'',alt:''};
+  const ic  = o.ic  != null ? o.ic  : on.ic;
+  const bas = o.bas != null ? o.bas : on.bas;
+  const alt = o.alt != null ? o.alt : on.alt;
+  // kompakt: sayfa üstünde zaten aynı uyarı varsa kart içinde tek satır kalsın
+  // (aynı mesajın üç kez tekrarlanması gürültü yaratıyordu)
+  if (o.kompakt)
+    return `<div class="durum ${esc(tip)} kompakt" style="padding:12px 10px;flex-direction:row;gap:6px">`
+      + (ic ? `<span class="du-ic" style="font-size:14px">${esc(ic)}</span>` : '')
+      + `<span style="font-size:12.5px">${esc(alt || bas)}</span></div>`;
+  let eylem = '';
+  if (o.kurulumBtn !== false && tip === 'kurulum')
+    eylem += `<button class="btn bg bsm" onclick="gitAyarlar()">⊞ Ayarlar'a git</button>`;
+  if (o.btn) eylem += `<button class="btn ${o.btnTip||'bp'} bsm" onclick="${esc(o.btn.fn)}">${esc(o.btn.ad)}</button>`;
+  return `<div class="durum ${esc(tip)}">`
+    + (ic ? `<div class="du-ic">${esc(ic)}</div>` : '')
+    + (bas ? `<div class="du-bas">${esc(bas)}</div>` : '')
+    + (alt ? `<div class="du-alt">${esc(alt)}</div>` : '')
+    + (eylem ? `<div class="du-eylem">${eylem}</div>` : '')
+    + `</div>`;
+}
+// İskelet yükleyici — "—" yerine içeriğin şeklini gösterir (düzen sıçraması olmaz)
+function iskeletHTML(n, tur){
+  n = n || 4;
+  if (tur === 'satir')
+    return Array.from({length:n},()=>`<div class="isk isk-sat" style="margin-bottom:7px"></div>`).join('');
+  return Array.from({length:n},()=>
+    `<div class="isk-kart"><div class="isk isk-gorsel"></div><div class="isk-govde">`
+    + `<div class="isk isk-sat" style="width:92%"></div>`
+    + `<div class="isk isk-sat" style="width:64%"></div></div></div>`).join('');
+}
+function durumYaz(id, tip, o){ const el=document.getElementById(id); if(el) el.innerHTML=durumHTML(tip,o); }
+function iskeletYaz(id, n, tur){ const el=document.getElementById(id); if(el) el.innerHTML=iskeletHTML(n,tur); }
+function gitAyarlar(){
+  const ni=[...document.querySelectorAll('.ni')].find(n=>/Ayarlar/.test(n.textContent));
+  if(ni) go('ayarlar', ni);
+}
+
+// ── P1: TAZELİK DAMGASI ────────────────────────────────────────────
+// "Yenile" butonu varsa yanında verinin ne kadar eski olduğu yazmalı
+// (Cloudscape rehberi). 30 sn'de bir kendini tazeler; 30 dk'yı geçince
+// sarıya döner ki bayat veriye bakıldığı gözden kaçmasın.
+const DMG = {};
+function dmgYaz(id, ts){ DMG[id] = ts || Date.now(); dmgCiz(); }
+function dmgMetin(t){
+  const s = Math.round((Date.now()-t)/1000);
+  if (s < 45)    return 'az önce güncellendi';
+  if (s < 3600)  return Math.round(s/60)+' dk önce güncellendi';
+  if (s < 86400) return Math.round(s/3600)+' sa önce güncellendi';
+  return Math.round(s/86400)+' gün önce güncellendi';
+}
+function dmgCiz(){
+  Object.keys(DMG).forEach(id=>{
+    const el = document.getElementById(id); if(!el) return;
+    el.textContent = dmgMetin(DMG[id]);
+    el.classList.add('dmg');
+    el.classList.toggle('bayat', Date.now()-DMG[id] > 30*60*1000);
+  });
+}
+
+// ── P2: ⓘ İPUCU BALONCUĞU ──────────────────────────────────────────
+// Uzun açıklamalar başlıkta yer kaplamasın diye baloncuğa taşındı.
+// Konum fixed: kart taşmasına/overflow'a takılmaz (.pl-tip ile aynı yaklaşım).
+function ipucAc(ev, el){
+  ev.stopPropagation();
+  let pop = document.getElementById('ipuc-pop');
+  if (!pop){ pop = document.createElement('div'); pop.id='ipuc-pop'; document.body.appendChild(pop); }
+  if (el.classList.contains('acik')) return ipucKapat();
+  ipucKapat();
+  pop.innerHTML = el.dataset.ip || '';
+  pop.classList.add('acik');
+  el.classList.add('acik');
+  const r = el.getBoundingClientRect(), p = pop.getBoundingClientRect();
+  let l = r.left + r.width/2 - p.width/2;
+  l = Math.max(8, Math.min(l, window.innerWidth - p.width - 8));
+  let t = r.bottom + 8;
+  if (t + p.height > window.innerHeight - 8) t = Math.max(8, r.top - p.height - 8);
+  pop.style.left = l+'px'; pop.style.top = t+'px';
+}
+function ipucKapat(){
+  const pop = document.getElementById('ipuc-pop');
+  if (pop) pop.classList.remove('acik');
+  document.querySelectorAll('.ipuc.acik').forEach(e=>e.classList.remove('acik'));
+}
+document.addEventListener('click', e => { if(!e.target.closest('.ipuc,#ipuc-pop')) ipucKapat(); });
+window.addEventListener('scroll', ipucKapat, true);
+
+// P2 (devamı): uzun BİLGİ kutularını otomatik sadeleştir.
+// Panelde 15 sayfada 120+ karakterlik kalıcı ".alert ai" bandı vardı
+// (en uzunu 456 karakter). Hepsini elle kısaltmak yerine açılışta tek
+// geçişte "ilk cümle + ⓘ"ye indirgiyoruz; tam metin baloncukta duruyor.
+// Uyarı/hata kutularına (aw/ae) DOKUNULMAZ — onlar zaten aksiyon ister.
+// İçinde buton/link olan kutular da atlanır (etkileşim kaybolmasın).
+function alertSadelestir(){
+  document.querySelectorAll('.alert.ai').forEach(box => {
+    if (box.dataset.sade) return;
+    const govde = box.querySelector('span:last-child');
+    if (!govde || govde === box.firstElementChild) return;
+    if (govde.querySelector('button,a,[onclick],input,select')) return;
+    const tam = govde.innerHTML.trim();
+    const duz = (govde.innerText || '').trim().replace(/\s+/g, ' ');
+    if (duz.length < 150) return;
+    // İlk cümle: 40-130 aralığındaki ilk ". " / ": " / " — " sınırı
+    let kes = -1;
+    for (const m of duz.matchAll(/[.:]\s|\s—\s/g)) {
+      if (m.index >= 40) { kes = m.index + 1; break; }
+      if (m.index > 130) break;
+    }
+    if (kes < 0 || kes > 150) { kes = duz.lastIndexOf(' ', 110); if (kes < 40) kes = 110; }
+    const ozet = duz.slice(0, kes).trim().replace(/[,:;—]$/, '');
+    box.dataset.sade = '1';
+    govde.textContent = ozet + (kes < duz.length ? '' : '');
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'ipuc';
+    btn.setAttribute('aria-label', 'Ayrıntı'); btn.textContent = 'ⓘ';
+    btn.dataset.ip = tam;
+    btn.onclick = e => ipucAc(e, btn);
+    govde.appendChild(btn);
+  });
+}
+
+// ── P5: GERİ ALINABİLİR İŞLEM ──────────────────────────────────────
+// confirm() yerine: işlemi arayüzde hemen uygula, sunucu çağrısını
+// geri alma süresi dolana kadar beklet. Kullanıcı "Geri Al"a basarsa
+// sunucuya hiç gidilmez — n8n'de geri alma ucu gerekmiyor.
+function geriAlinabilir(mesaj, sunucuyaYaz, geriAl, ms){
+  ms = ms || 6000;
+  const wrap = document.getElementById('toast-wrap');
+  if (!wrap) { sunucuyaYaz(); return; }
+  const el = document.createElement('div');
+  el.className = 'toast info';
+  el.innerHTML = '<span class="tx"></span><button class="geri" type="button">↶ Geri Al</button>';
+  el.querySelector('.tx').textContent = mesaj;
+  let bitti = false;
+  const kapat = () => { el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(),300); };
+  const zaman = setTimeout(() => {
+    if (bitti) return; bitti = true; kapat();
+    try { sunucuyaYaz(); } catch(e){ console.error('[geriAlinabilir]', e); }
+  }, ms);
+  el.querySelector('.geri').onclick = () => {
+    if (bitti) return; bitti = true; clearTimeout(zaman); kapat();
+    try { geriAl(); } catch(e){ console.error('[geriAlinabilir/geriAl]', e); }
+    toast('Geri alındı','info',2500);
+  };
+  wrap.appendChild(el);
+}
+
 // ═══ GLOBAL GERİ BİLDİRİM: üst çubuk + buton durumu + sessiz hata yakalama ═══
 const FB = { inflight:0, err:false, activeBtn:null, btnTimer:null };
 function fbBarStart(){ const b=document.getElementById('act-bar'); if(!b) return; b.classList.remove('err'); b.classList.add('on'); b.style.width='72%'; }
@@ -6493,6 +6891,8 @@ async function loadProfileLoad() {
   if(!listEl) return;
   n8nCacheClear('/webhook/panel-data');
   if(st) st.textContent='⏳ yükleniyor…';
+  setEl('pl-dmg','');
+  listEl.innerHTML = iskeletHTML(4,'satir');   // P8: "Yenile'ye tıklayın" yerine iskelet
   // 1) short-kaydetme profil dağılımı (dashboard yüklüyse cache, değilse çek)
   let shorts=(S.sheetData&&S.sheetData.shorts)||[];
   if(!shorts.length){
@@ -6510,7 +6910,16 @@ async function loadProfileLoad() {
   stokChipIsaretle();
   // render
   const profs=[...new Set([...Object.keys(byP),...Object.keys(upBy)])];
-  if(!profs.length){ listEl.innerHTML='<div style="color:var(--mt);font-size:13px;text-align:center;padding:14px">Veri yok — Ayarlar\'da Sheet ID / n8n URL girili mi? (short-kaydetme sayfası \'profil\' kolonu okunur)</div>'; if(st) st.textContent=''; return; }
+  if(!profs.length){
+    // P8: yapılandırma eksik mi, gerçekten boş mu — ikisi ayrı mesaj
+    const yapilandirildi = !!(getN8N() || (S.cfg.shkey && S.cfg.sheet));
+    const bant = document.getElementById('dash-kurulum');
+    listEl.innerHTML = yapilandirildi
+      ? durumHTML('bos',{alt:'Hiçbir profile short atanmamış. short-kaydetme sayfasındaki \'profil\' kolonu okunur — üretim başlayınca dağılım burada görünür.'})
+      : durumHTML('kurulum',{kompakt: !!(bant && bant.style.display !== 'none'),
+                             alt:'Sheet ID / n8n URL girilmemiş — profil dağılımı okunamıyor.'});
+    if(st) st.textContent=''; setEl('pl-dmg',''); return;
+  }
   // #3 profil hesap sağlığı (Upload-Post /users) — her profile durum noktası
   let health={}; try { health=phCompute(await phFetchAccounts(), new Set(profs)); } catch(e){ console.warn('[ProfilSaglik]', e.message); }
   const rows=profs.map(p=>({p, total:(byP[p]&&byP[p].total)||0, pending:(byP[p]&&byP[p].pending)||0, sched:upBy[p]||0}));
@@ -6535,6 +6944,7 @@ async function loadProfileLoad() {
   const tShort=rows.reduce((s,r)=>s+r.total,0), tSched=rows.reduce((s,r)=>s+r.sched,0);
   const badN=Object.values(health).filter(h=>h.status!=='live').length;
   if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}${badN?` · ⚠ ${badN} sağlık sorunu`:''}`;
+  dmgYaz('pl-dmg');
 }
 window.loadProfileLoad=loadProfileLoad;
 // Mevcut Sheet short sayılarını n8n staticData.profilLoad'a "yük" olarak yaz →
@@ -6984,7 +7394,13 @@ function acTileClick(target){
 }
 async function loadActionCenter(){
   const listEl = document.getElementById('ac-list'); if (!listEl) return;
-  const stEl = document.getElementById('ac-status'); if (stEl) stEl.textContent='⏳';
+  const stEl = document.getElementById('ac-status');
+  if (stEl) { stEl.classList.remove('dmg','bayat'); stEl.textContent='⏳ kontrol ediliyor…'; delete DMG['ac-status']; }
+  // P8: dört kutunun iskeleti — "Yenile'ye bas" yerine yüklendiği görünür
+  listEl.innerHTML = Array.from({length:4},()=>
+    '<div style="border:1px solid var(--brd);border-radius:6px;padding:10px 12px;background:var(--sur)">'
+    + '<div class="isk isk-sat" style="width:34px;height:17px;margin-bottom:6px"></div>'
+    + '<div class="isk isk-sat" style="width:86%"></div></div>').join('');
   const pFail = (async()=>{ try { if(!S.cfg.blot && !getN8N()) return null; const items = await ydFetchItems(); return items.filter(i=>i.status==='failed').length; } catch(e){ return null; } })();
   const pHealth = (async()=>{ try {
     const shorts = (S.sheetData&&S.sheetData.shorts)||(S._panelCache&&S._panelCache.shorts)||[];
@@ -7024,7 +7440,19 @@ async function loadActionCenter(){
   const vals=[fail,health,stuck,trend];
   const known=vals.filter(v=>typeof v==='number').length;
   const totalAct=vals.reduce((s,v)=>s+(typeof v==='number'?v:0),0);
-  if (stEl) stEl.textContent = known===0 ? 'veri yok — Ayarlar (API key / n8n)' : (totalAct>0 ? (totalAct+' aksiyon bekliyor') : 'tümü temiz ✓');
+  if (known===0){
+    // Hiçbir kaynak cevap vermedi → dört boş kutu yerine tek net kurulum mesajı
+    // Sayfa üstündeki kurulum bandı görünüyorsa burada tek satır yeter
+    const bant = document.getElementById('dash-kurulum');
+    listEl.innerHTML = durumHTML('kurulum',{
+      kompakt: !!(bant && bant.style.display !== 'none'),
+      alt:'n8n ya da Upload-Post/Sheets anahtarı olmadan kontrol yapılamıyor.'});
+    if (stEl) stEl.textContent = 'yapılandırma eksik';
+    setEl('ac-dmg','');
+  } else {
+    if (stEl) stEl.textContent = totalAct>0 ? (totalAct+' aksiyon bekliyor') : 'tümü temiz ✓';
+    dmgYaz('ac-dmg');
+  }
 }
 window.n8nCacheClear=n8nCacheClear; window.loadActionCenter=loadActionCenter; window.acTileClick=acTileClick;
 
@@ -7076,7 +7504,14 @@ async function loadRadar(force){
     // 2) canlı hesap (YouTube API)
     if(!data){
       const key=S.cfg.ytApiKey||S.cfg.shkey||'';
-      if(!key){ if(st) st.textContent=''; showRes('rd-res','YouTube API Key gerekli (YouTube Ara sayfasındaki alan veya Ayarlar → Google API Key) — ya da n8n radar akışını kur','warn'); RD.loading=false; return; }
+      if(!key){
+        // P8: her bölüm tutarlı "kurulum" durumu göstersin — iskelet asılı kalmasın
+        if(st) st.textContent='';
+        ['rd-trend','rd-outlier','rd-rising','rd-potential','rd-gtrend','rd-kesif','rd-channels'].forEach(id=>
+          durumYaz(id,'kurulum',{kompakt:true,alt:'YouTube API Key ya da n8n radar akışı gerekli'}));
+        showRes('rd-res','YouTube API Key gerekli (YouTube Ara sayfasındaki alan veya Ayarlar → Google API Key) — ya da n8n radar akışını kur','warn');
+        RD.loading=false; return;
+      }
       data=await rdClientCompute(key, st);
       src='YouTube API (canlı)';
     }
@@ -7247,7 +7682,7 @@ async function rdHaftaTara(zorla){
     if(c){ RD.hafta=c.veri; if(st) st.textContent='bugünün listesi (önbellek)'; renderRadar(); return; }
   }
   const key=S.cfg.ytApiKey||S.cfg.shkey||'';
-  if(!key){ el.innerHTML='<div class="rd-empty">YouTube API Key gerekli (Ayarlar)</div>'; return; }
+  if(!key){ el.innerHTML=durumHTML('kurulum',{kompakt:true,alt:'YouTube API Key gerekli'}); return; }
   const YT='https://www.googleapis.com/youtube/v3/';
   const after=new Date(Date.now()-7*24*3600*1000).toISOString();
   const idSet=new Set();
