@@ -7067,7 +7067,11 @@ async function loadRadar(force){
     const base=getN8N();
     if(base){
       const d=await n8nGetCached('/webhook/trend-radar');
-      if(d && !d._bos && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],outlier:d.outlier||[],gtrend:d.gtrend||[],kesif:d.kesif||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:''); }
+      if(d && !d._bos && (d.trend||[]).length){ data={trend:d.trend||[],rising:d.rising||[],potential:d.potential||[],outlier:d.outlier||[],gtrend:d.gtrend||[],kesif:d.kesif||[],channels:d.channels||[]}; src='n8n günlük radar'+(d.tarih?' · '+d.tarih:'');
+        // n8n outlier/chMed vermiyor → panelde resmi API ile hesapla (anahtar varsa)
+        const _k=S.cfg.ytApiKey||S.cfg.shkey||'';
+        if(_k){ if(st) st.textContent='⏳ kanal medyanları (outlier)…'; try{ await rdEnrichN8N(data,_k); src+=' + outlier'; }catch(e){ console.warn('[RD] outlier zenginleştirme:',e.message); } }
+      }
     }
     // 2) canlı hesap (YouTube API)
     if(!data){
@@ -7127,6 +7131,32 @@ function rdApplyOutlier(list, medCache){
     const med=rdMedian(vals);
     if(med>0){ x.chMed=med; x.outlier=+(x.views/med).toFixed(1); }
   });
+}
+// n8n GÜNLÜK RADAR verisi outlier/chMed İÇERMEZ (ana Radar Hesapla üretmiyor).
+// Panelde resmi API ile kanal medyanlarını çekip chMed + outlier'ı hesaplar,
+// yoksa OUTLIER bölümünü de doldurur. Anahtar yoksa sessizce atlar (regresyon yok).
+async function rdEnrichN8N(data, key){
+  if(!key || !data) return;
+  const YT='https://www.googleapis.com/youtube/v3/';
+  const all=[...(data.trend||[]),...(data.rising||[]),...(data.potential||[])].filter(x=>x&&x.channelId&&x.id);
+  if(!all.length) return;
+  // Zaten chMed'i olanları geç; olmayan kanalların medyanını çek
+  const chIds=[...new Set(all.filter(x=>!(x.chMed>0)).map(x=>x.channelId))];
+  if(!chIds.length) return;
+  const uploadsBy={};
+  for(let a=0;a<chIds.length;a+=50){
+    try{
+      const r=await ytkFetch(YT+'channels?part=contentDetails&id='+chIds.slice(a,a+50).join(',')+'&key='+key);
+      (r.items||[]).forEach(c=>{ const up=((c.contentDetails||{}).relatedPlaylists||{}).uploads; if(up) uploadsBy[c.id]=up; });
+    }catch(e){ console.warn('[RD] kanal detay:',e.message); }
+  }
+  const medCache=await rdChannelMedians(key, uploadsBy, chIds);
+  rdApplyOutlier(all, medCache);
+  // n8n outlier bölümünü vermediyse, hesaplananlardan kur
+  if(!(data.outlier&&data.outlier.length)){
+    data.outlier=all.filter(x=>x.outlier>=2 && x.views>=1000)
+      .sort((a,b)=>b.outlier-a.outlier).slice(0,12);
+  }
 }
 
 // ── #2 KATEGORİ TAHMİNİ + ÖĞRENME ───────────────────────────
