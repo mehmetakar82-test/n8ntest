@@ -483,6 +483,16 @@ html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
   font-family:var(--ft);white-space:nowrap}
 .toast .geri:hover{background:var(--acc);color:#012}
 
+/* ── İşlenmiş video gizleme notu ──────────────────────────────────
+   Liste sessizce kısalmasın: kaç video gizlendiği ve nasıl geri
+   getirileceği her listenin altında yazar. */
+.isl-not{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:7px;
+  padding:9px 12px;margin-top:2px;font-size:11.5px;color:var(--mt);
+  border-top:1px dashed var(--brd-str)}
+.isl-not .isl-btn{background:transparent;border:1px solid var(--brd-str);color:var(--acc);
+  font-family:var(--ft);font-size:11px;font-weight:600;padding:2px 9px;border-radius:5px;cursor:pointer}
+.isl-not .isl-btn:hover{border-color:var(--acc);background:rgba(0,229,255,.08)}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1788,6 +1798,47 @@ function recordSend(url, kategori) {
   saveSent();
 }
 
+// ═══════════════════════════════════════════════════════════
+// İŞLENMİŞ VİDEOLARI LİSTELERDEN GİZLE
+// ═══════════════════════════════════════════════════════════
+// Panelden bir kez işleme alınan video, keşif/onay listelerinde tekrar
+// karşına çıkmasın. Önceden yeşil tik + perde ile İŞARETLENİYORDU ama yer
+// kaplamaya devam ediyordu; artık listeden tamamen düşüyor.
+// Kalıcı kayıp olmasın diye her listenin altında kaç tanesinin gizlendiği
+// yazıyor ve tek tıkla geri getiriliyor (oturum boyu, kaydedilmez).
+const ISL = { goster: false };
+function islenmisMi(url){ return !!findDupeSend(url); }
+// list  : videolar
+// urlAl : bir videodan YouTube URL'ini çıkaran fonksiyon
+// secim : (isteğe bağlı) Set — gizlenen video seçiliyse seçimden de düşer,
+//         yoksa görünmeyen bir video toplu gönderime dahil olurdu
+function islenmisAyikla(list, urlAl, secim, idAl){
+  list = list || [];
+  if (ISL.goster) return { liste: list, gizlenen: 0 };
+  const kalan = [];
+  let gizlenen = 0;
+  list.forEach(x => {
+    if (islenmisMi(urlAl(x))) {
+      gizlenen++;
+      if (secim && idAl) secim.delete(idAl(x));
+    } else kalan.push(x);
+  });
+  return { liste: kalan, gizlenen };
+}
+function islenmisNotu(gizlenen){
+  if (!gizlenen) return '';
+  return '<div class="isl-not"><span>✓ ' + gizlenen + ' video daha önce işleme alındığı için gizlendi</span>'
+    + '<button type="button" class="isl-btn" onclick="islenmisGoster(true)">yine de göster</button></div>';
+}
+function islenmisGoster(v){
+  ISL.goster = !!v;
+  toast(ISL.goster ? 'İşlenmiş videolar da listeleniyor' : 'İşlenmiş videolar gizlendi', 'info', 2500);
+  try { if (typeof TR!=='undefined' && TR.pending && TR.pending.length) trRenderPending(); } catch(e){}
+  try { if (typeof RD!=='undefined' && RD.data) renderRadar(); } catch(e){}
+  try { if (typeof YAR!=='undefined' && YAR.videos && YAR.videos.length) renderYARVideos(); } catch(e){}
+  try { if (typeof YTK!=='undefined' && YTK.videos && YTK.videos.length) renderYTKVideos(); } catch(e){}
+}
+
 // Tekrar gonderim tespit edilirse onay ister; onaylanirsa true doner, iptal edilirse false.
 function confirmDupeSend(url) {
   const d = findDupeSend(url);
@@ -2363,7 +2414,16 @@ function renderYARVideos() {
   const cnt = document.getElementById('ya-sel-count');
   if (cnt) cnt.textContent = `(${YAR.selected.size} seçili)`;
   if (!YAR.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Video yok</div>'; return; }
-  el.innerHTML = YAR.videos.map(raw => {
+  // Daha önce işleme alınmış videolar sonuçlarda çıkmasın
+  const _ay = islenmisAyikla(YAR.videos,
+    raw => 'https://www.youtube.com/watch?v=' + yarNormalizeVideo(raw).id,
+    YAR.selected, raw => yarNormalizeVideo(raw).id);
+  if (!_ay.liste.length) {
+    el.innerHTML = durumHTML('bos',{ic:'✓',bas:'Hepsi işleme alınmış',
+      alt:'Bulunan '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'}) + islenmisNotu(_ay.gizlenen);
+    return;
+  }
+  el.innerHTML = _ay.liste.map(raw => {
     const v = yarNormalizeVideo(raw);
     const sel = YAR.selected.has(v.id);
     const durS = ytkParseDur(v.duration);
@@ -2380,7 +2440,7 @@ function renderYARVideos() {
       </div>
       <a href="https://www.youtube.com/watch?v=${v.id}" target="_blank" onclick="event.stopPropagation()" style="align-self:center;color:var(--acc);font-size:12px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px;text-decoration:none;flex-shrink:0">↗ Aç</a>
     </div>`;
-  }).join('');
+  }).join('') + islenmisNotu(_ay.gizlenen);
 }
 
 // ── Modal aç/kapat + gecmisten yukle
@@ -2411,7 +2471,8 @@ function yarOpenHistory(idx) {
 }
 
 function yarToggle(id) { if (YAR.selected.has(id)) YAR.selected.delete(id); else YAR.selected.add(id); renderYARVideos(); }
-function yarSelectAll() { YAR.videos.forEach(v => YAR.selected.add(v.id)); renderYARVideos(); }
+// Gizlenen (daha önce işlenmiş) videolar toplu seçime dahil edilmez
+function yarSelectAll() { islenmisAyikla(YAR.videos, raw=>'https://www.youtube.com/watch?v='+yarNormalizeVideo(raw).id).liste.forEach(v => YAR.selected.add(yarNormalizeVideo(v).id)); renderYARVideos(); }
 function yarClearAll()  { YAR.selected.clear(); renderYARVideos(); }
 
 // Secilen videolari n8n'e TEK TEK gonderir (video-gonder[-kategori] webhook)
@@ -4307,11 +4368,19 @@ function renderYTKVideos() {
   if (selCount) selCount.textContent = `(${YTK.selected.size} seçili)`;
   const mw = document.getElementById('ytk-more-wrap');
   if (mw) mw.style.display = (YTK.uploadsId && YTK.nextPage) ? 'flex' : 'none';
-  const list = ytkFilteredVideos();
-  const vidCount = document.getElementById('ytk-vid-count');
-  if (vidCount) vidCount.textContent = YTK.videos.length ? `${list.length} gösteriliyor / ${YTK.videos.length} yüklü / kanalda ${ytkFmt(YTK.channelInfo ? YTK.channelInfo.videoCount : 0)}` : '';
+  let list = ytkFilteredVideos();
   if (!YTK.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Kanal seçin</div>'; return; }
   if (!list.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Süre filtresine uyan video yok — filtreyi "Tüm süreler" yapın veya daha fazla yükleyin</div>'; return; }
+  // Daha önce işleme alınmış videolar kanal listesinde çıkmasın
+  const _ay = islenmisAyikla(list, v => 'https://www.youtube.com/watch?v=' + v.id, YTK.selected, v => v.id);
+  list = _ay.liste;
+  const vidCount = document.getElementById('ytk-vid-count');
+  if (vidCount) vidCount.textContent = `${list.length} gösteriliyor${_ay.gizlenen?` · ${_ay.gizlenen} işlenmiş gizli`:''} / ${YTK.videos.length} yüklü / kanalda ${ytkFmt(YTK.channelInfo ? YTK.channelInfo.videoCount : 0)}`;
+  if (!list.length) {
+    el.innerHTML = durumHTML('bos',{ic:'✓',bas:'Hepsi işleme alınmış',
+      alt:'Bu kanaldan listelenen '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'}) + islenmisNotu(_ay.gizlenen);
+    return;
+  }
   el.innerHTML = list.map(v => {
     const sel = YTK.selected.has(v.id);
     const st = v.statistics || {};
@@ -4339,7 +4408,8 @@ function ytkToggle(id) {
   renderYTKVideos();
 }
 
-function ytkSelectAll() { ytkFilteredVideos().forEach(v => YTK.selected.add(v.id)); renderYTKVideos(); }
+// Gizlenen (daha önce işlenmiş) videolar toplu seçime dahil edilmez
+function ytkSelectAll() { islenmisAyikla(ytkFilteredVideos(), v=>'https://www.youtube.com/watch?v='+v.id).liste.forEach(v => YTK.selected.add(v.id)); renderYTKVideos(); }
 function ytkClearAll()  { YTK.selected.clear(); renderYTKVideos(); }
 
 // Seçilen videoları n8n'e TEK TEK gönderir (her video ayrı webhook çağrısı)
@@ -4812,6 +4882,9 @@ function trRenderPending() {
   list.sort((a,b) => sort==='date' ? (new Date(b.publishedAt||0)-new Date(a.publishedAt||0))
                     : sort==='dur' ? ((parseInt(b.durationSec)||0)-(parseInt(a.durationSec)||0))
                     : ((parseInt(b.viewCount)||0)-(parseInt(a.viewCount)||0)));
+  // Daha önce işleme alınmış videoları kuyruktan düşür (seçiliyse seçimden de)
+  const _ay = islenmisAyikla(list, v=>v.youtubeLink||'', TR.selected, v=>v.videoId);
+  list = _ay.liste;
   // Ekrandaki sıra — Shift+tık aralığı ve J/K imleci buna göre çalışır
   TR.gorunen = list.map(v=>v.videoId);
   if (TR.imlec != null && TR.imlec >= TR.gorunen.length) TR.imlec = TR.gorunen.length ? TR.gorunen.length-1 : null;
@@ -4868,7 +4941,13 @@ function trRenderPending() {
         </div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') + islenmisNotu(_ay.gizlenen);
+  // Filtre + gizleme sonrası hiç kart kalmadıysa boş durumu göster
+  if (!list.length && _ay.gizlenen) {
+    grid.innerHTML = durumHTML('bos',{ic:'✓',bas:'Hepsi işleme alınmış',
+      alt:'Kuyruktaki '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'})
+      + islenmisNotu(_ay.gizlenen);
+  }
   trImlecCiz(false);   // yeniden çizimde klavye imleci kaybolmasın
 }
 
@@ -4961,7 +5040,9 @@ function trSecTikla(ev, vid){
   }
   TR.sonSecim = i;
 }
-function trSelectAll(){ const q=((document.getElementById('tr-search')||{}).value||'').toLowerCase(); TR.pending.forEach(v=>{ if(!q || (v.title||'').toLowerCase().includes(q) || (v.channelTitle||'').toLowerCase().includes(q)) TR.selected.add(v.videoId); }); trRenderPending(); }
+// Yalnız EKRANDA GÖRÜNENLERİ seçer. TR.pending üzerinden gitseydi filtreye
+// takılan ya da işlenmiş olduğu için gizlenen videolar da toplu gönderime girerdi.
+function trSelectAll(){ (TR.gorunen||[]).forEach(id=>TR.selected.add(id)); trRenderPending(); }
 function trClearSel(){ TR.selected.clear(); TR.sonSecim=null; trRenderPending(); }
 
 // ── P4: KLAVYE KISAYOLLARI ─────────────────────────────────────────
@@ -5721,7 +5802,8 @@ document.addEventListener('DOMContentLoaded', function() {
       loadAllSheetData,loadSheetPage,
       // UX paketi yardımcıları (onclick'lerden çağrılıyor)
       durumHTML,iskeletHTML,durumYaz,iskeletYaz,gitAyarlar,dmgYaz,dmgCiz,
-      ipucAc,ipucKapat,geriAlinabilir,alertSadelestir,pzUygula,pzF,pzBol];
+      ipucAc,ipucKapat,geriAlinabilir,alertSadelestir,pzUygula,pzF,pzBol,
+      islenmisMi,islenmisAyikla,islenmisNotu,islenmisGoster];
     globals.forEach(fn => { if(typeof fn === 'function') window[fn.name] = fn; });
   }catch(e){console.error('Init hatasi:',e);}
 });
@@ -8085,8 +8167,17 @@ function renderRadar(){
   if(st) st.textContent='Kaynak: '+RD.src;
   [['rd-trend',d.trend],['rd-hafta',RD.hafta],['rd-outlier',d.outlier],['rd-rising',d.rising],['rd-potential',d.potential],['rd-gtrend',d.gtrend],['rd-kesif',d.kesif]].forEach(([elId,list])=>{
     const el=document.getElementById(elId); if(!el) return;
-    setEl(elId+'-n',(list||[]).length+' video');
+    // İşleme alınmış videoları bölümden düşür (seçiliyse seçimden de)
+    const _ay=islenmisAyikla(list, x=>x.url||'', RD.selected, x=>x.id);
+    list=_ay.liste;
+    setEl(elId+'-n',(list||[]).length+' video'+(_ay.gizlenen?' · '+_ay.gizlenen+' gizli':''));
     if(!(list||[]).length){
+      if(_ay.gizlenen){
+        el.innerHTML=durumHTML('bos',{ic:'✓',bas:'Hepsi işleme alınmış',
+          alt:'Bu bölümdeki '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'})
+          +islenmisNotu(_ay.gizlenen);
+        return;
+      }
       el.innerHTML='<div class="rd-empty">'+(elId==='rd-hafta'
         ? 'Haftalık liste henüz taranmadı — sağdaki ↻ tuşuna bas'
         : elId==='rd-outlier'
@@ -8125,7 +8216,7 @@ function renderRadar(){
         +'<div class="prog"><div class="pf" style="background:var(--acc);width:'+Math.max(3,Math.round((x.vph||0)/maxVph*100))+'%"></div></div>'
         +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+rdEsc(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
         +'</div></div>';
-    }).join('');
+    }).join('') + islenmisNotu(_ay.gizlenen);
   });
   const chEl=document.getElementById('rd-channels');
   if(chEl){
