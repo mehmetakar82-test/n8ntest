@@ -6933,7 +6933,10 @@ window.addEventListener('error', e=>{ if(e.message){ try{ addLog('err','sistem',
 // eşiğin altına inince altın şerit + bildirim. Kategori bazlı bakılır:
 // örn. "genel" havuzunda 4 profil var, HERHANGİ biri eşiğin altındaysa uyarır.
 const STOK_ESIK_VARSAYILAN = 50;
-const STOK = { data:null, t:0, yukleniyor:false };
+// son: profil başına EN GEÇ planlanmış tarih (ms) — "kuyruk ne zamana kadar
+// yetiyor" sorusunun cevabı. Upload-Post 1 yıla kadar planlamaya izin verir
+// (scheduled_date "within 1 year"), yani ufuk API sınırı değil KUYRUK DERİNLİĞİ.
+const STOK = { data:null, t:0, yukleniyor:false, son:null };
 function stokEsik(){
   const n = parseInt((S.cfg||{}).stokEsik);
   return (isNaN(n) || n < 0) ? STOK_ESIK_VARSAYILAN : n;
@@ -6943,9 +6946,16 @@ async function stokVeri(zorla){
   if (!zorla && STOK.data && Date.now()-STOK.t < 5*60000) return STOK.data;
   if (STOK.yukleniyor) return STOK.data;
   STOK.yukleniyor = true;
+  const son = {};
   const say = arr => {
     const by = {};
-    (arr||[]).forEach(s=>{ const p=String(s.profile_username||s.profile||s.user||'').trim(); if(p) by[p]=(by[p]||0)+1; });
+    (arr||[]).forEach(s=>{
+      const p=String(s.profile_username||s.profile||s.user||'').trim(); if(!p) return;
+      by[p]=(by[p]||0)+1;
+      // En geç planlanan tarih — kuyruğun o profilde nereye kadar uzandığı
+      const t = Date.parse(s.scheduled_date||s.scheduledDate||s.scheduled_at||s.date||'')||0;
+      if (t && t > (son[p]||0)) son[p] = t;
+    });
     return by;
   };
   try{
@@ -6961,7 +6971,7 @@ async function stokVeri(zorla){
       try{ const d = await n8nGetCached('/webhook/panel-data'); if (d && !d._bos) by = say(d.scheduled||[]); }
       catch(e){ console.warn('[Stok] panel-data alınamadı:', e.message); }
     }
-    if (by && Object.keys(by).length){ STOK.data = by; STOK.t = Date.now(); }
+    if (by && Object.keys(by).length){ STOK.data = by; STOK.t = Date.now(); STOK.son = son; }
   }catch(e){ console.warn('[Stok]', e.message); }
   STOK.yukleniyor = false;
   return STOK.data;
@@ -7249,6 +7259,25 @@ function gcClearAll() {
   S.sentLog={}; localStorage.setItem('op_sent_log','{}'); S.sentURLs=new Set(); localStorage.setItem('op_sent','[]');
   initGecmis(); toast('Geçmiş temizlendi','ok');
 }
+// ── KUYRUK ÖMRÜ ────────────────────────────────────────────────────────
+// "Kuyruk ne zamana kadar dolu?" — Upload-Post 1 yıla kadar planlamaya
+// izin veriyor (scheduled_date "within 1 year"), yani ufuk bir API sınırı
+// DEĞİL: kuyruğa ne kadar içerik koyduğunla belirleniyor. Bittiği tarihi
+// yazmazsak "21 Ağustos'tan sonra hiç yok" bir kısıt gibi okunuyor.
+function kuyrukOmru(profil){
+  const t = (STOK.son || {})[profil] || 0;
+  if (!t) return null;
+  const gun = Math.round((t - Date.now()) / 864e5);
+  return { t, gun, tarih: new Date(t).toLocaleDateString('tr',{day:'2-digit',month:'short'}) };
+}
+function kuyrukEtiketi(profil){
+  const k = kuyrukOmru(profil);
+  if (!k) return '';
+  // 7 günün altına inince sarı, 3 günün altına inince kırmızı
+  const renk = k.gun < 3 ? 'var(--er)' : k.gun < 7 ? 'var(--wn)' : 'var(--mt)';
+  return ` · <span style="color:${renk}" title="Bu profilin kuyruğundaki en geç planlanmış gönderim. Upload-Post 1 yıla kadar izin veriyor — bu tarih kuyruk derinliğin, API sınırı değil.">→ ${k.tarih} (${k.gun} gün)</span>`;
+}
+
 // PROFİL BAŞINA SHORT — hangi Upload-Post profiline kaç short atandı
 async function loadProfileLoad() {
   const listEl=document.getElementById('pl-list'), st=document.getElementById('pl-status');
@@ -7301,13 +7330,22 @@ async function loadProfileLoad() {
     return `<div style="margin-bottom:8px">
     <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:3px">
       <span style="color:var(--tx);font-family:var(--fm)">${dot}${r.p}${katChip}${warn}</span>
-      <span style="color:var(--mt)"><b style="color:var(--acc)">${r.total}</b> short${r.sched?` · ⏰ ${r.sched} zamanlı`:''}</span>
+      <span style="color:var(--mt)"><b style="color:var(--acc)">${r.total}</b> short${r.sched?` · ⏰ ${r.sched} zamanlı`:''}${kuyrukEtiketi(r.p)}</span>
     </div>
     <div class="prog"><div class="pf" style="background:var(--acc);width:${Math.round(Math.max(r.total,r.sched)/max*100)}%"></div></div>
   </div>`;}).join('');
   const tShort=rows.reduce((s,r)=>s+r.total,0), tSched=rows.reduce((s,r)=>s+r.sched,0);
   const badN=Object.values(health).filter(h=>h.status!=='live').length;
-  if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}${badN?` · ⚠ ${badN} sağlık sorunu`:''}`;
+  // Genel kuyruk ömrü: en erken biten profil kritik olandır
+  const omurler = rows.map(r=>kuyrukOmru(r.p)).filter(Boolean);
+  let omurMetni = '';
+  if (omurler.length){
+    const enErken = omurler.reduce((a,b)=>a.t<b.t?a:b);
+    const enGec   = omurler.reduce((a,b)=>a.t>b.t?a:b);
+    omurMetni = ` · kuyruk ${enErken.tarih}'e kadar (${enErken.gun} gün)`
+      + (enGec.t !== enErken.t ? ` · en uzun ${enGec.tarih}` : '');
+  }
+  if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}${omurMetni}${badN?` · ⚠ ${badN} sağlık sorunu`:''}`;
   dmgYaz('pl-dmg');
 
   // ── Dashboard kutularını AYNI kaynakla hizala ────────────────────────
