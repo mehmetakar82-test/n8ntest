@@ -7245,7 +7245,9 @@ window.seedProfileLoad=seedProfileLoad;
 //  #1  Upload-Post /history → her gönderimin platform bazlı GERÇEK sonucu
 //  #2  Başarısızı aynı profil/platforma yeniden gönder (kaynak mp4 = short-kaydetme 'short-url')
 // ═══════════════════════════════════════════════════════════
-const YD = { items: [], filter: 'failed', retry: null };
+// cozulen: yeniden gönderilip başarıyla yayınlanmış eski hata sayısı
+// cozulenGoster: true olursa onlar da listelenir (varsayılan gizli)
+const YD = { items: [], filter: 'failed', retry: null, cozulen: 0, cozulenGoster: false };
 const YD_PLATMAP   = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb', x:'x', twitter:'x', threads:'ig', linkedin:'fb' };
 
 // ── Ham Upload-Post/platform hata metnini SADE TÜRKÇE'ye çevir ──
@@ -7383,7 +7385,42 @@ async function ydFetchItems(){
     }
   });
   items.sort((a,b)=>{ const ta=Date.parse(a.time)||0, tb=Date.parse(b.time)||0; return tb-ta; });
+  YD.cozulen = ydCozulenleriIsaretle(items);
   return items;
+}
+
+// ── Yeniden gönderilip BAŞARIYLA yayınlanan gönderimler ────────────────
+// Upload-Post /history'de eski başarısız kayıt SİLİNMEZ; yeniden gönderim
+// AYRI bir kayıt olarak eklenir. Bu yüzden aynı short listede hem
+// "❌ Başarısız" hem "✅ Yayınlandı" olarak iki kez görünüyor, hata sayacı
+// ve kenar çubuğu rozeti de çözülmüş hataları saymaya devam ediyordu.
+// Aynı profil + platform + başlık için DAHA SONRA başarılı bir kayıt varsa
+// eski başarısız kaydı "çözülmüş" sayıp listeden düşürüyoruz.
+function ydAnahtar(it){
+  const t = String(it.title||'').trim().toLowerCase().replace(/\s+/g,' ');
+  // Başlık ayırt edici değilse eşleştirme yapma — gerçek bir hatayı
+  // yanlışlıkla gizlemektense göstermek yeğdir.
+  if (!t || t === '(başlıksız)' || t.length < 6) return '';
+  return (it.profile||'') + '|' + (it.plat||'') + '|' + t;
+}
+function ydCozulenleriIsaretle(items){
+  const basarili = {};
+  items.forEach(it => {
+    if (it.status !== 'published') return;
+    const k = ydAnahtar(it); if (!k) return;
+    const t = Date.parse(it.time) || 0;
+    if (!basarili[k] || t > basarili[k].t) basarili[k] = { t, permalink: it.permalink || '', time: it.time };
+  });
+  let n = 0;
+  items.forEach(it => {
+    delete it._cozuldu;
+    if (it.status !== 'failed') return;
+    const k = ydAnahtar(it); if (!k) return;
+    const b = basarili[k]; if (!b) return;
+    const tf = Date.parse(it.time) || 0;
+    if (b.t >= tf) { it._cozuldu = b; n++; }   // başarı hatadan SONRA gelmiş
+  });
+  return n;
 }
 
 async function loadYayinDurumu(){
@@ -7406,7 +7443,9 @@ async function loadYayinDurumu(){
 
 function ydUpdateCounts(){
   const pub  = YD.items.filter(i=>i.status==='published').length;
-  const fail = YD.items.filter(i=>i.status==='failed').length;
+  // Çözülmüş hatalar sayılmaz: yoksa rozet ve "başarı oranı" düzelmiş
+  // gönderimleri hâlâ hata sayıyordu.
+  const fail = YD.items.filter(i=>i.status==='failed' && !i._cozuldu).length;
   const sch  = YD.items.filter(i=>i.status==='scheduled').length;
   const total= pub+fail;
   setEl('yd-c-pub', pub);
@@ -7420,7 +7459,7 @@ function ydUpdateCounts(){
 // Başarısızların NEDEN dağılımı — tek bakışta "13 hatanın çoğu şu yüzden"
 function ydFailOzet(){
   const box=document.getElementById('yd-fail-ozet'); if(!box) return;
-  const fails=YD.items.filter(i=>i.status==='failed'&&i.error);
+  const fails=YD.items.filter(i=>i.status==='failed'&&i.error&&!i._cozuldu);
   if(!fails.length){ box.style.display='none'; return; }
   const grup={};
   fails.forEach(i=>{ const h=hataCevir(i.error); if(!grup[h.baslik]) grup[h.baslik]={n:0,ciddiyet:h.ciddiyet,cozum:h.cozum}; grup[h.baslik].n++; });
@@ -7453,16 +7492,40 @@ function renderYayinDurumu(){
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   let list = YD.items;
   if (YD.filter !== 'all') list = list.filter(i=>i.status===YD.filter);
-  if (!list.length){ el.innerHTML='<div style="color:var(--mt);text-align:center;padding:30px;font-size:14px">Bu filtrede kayıt yok</div>'; return; }
+  // Yeniden gönderilip yayınlanmış eski hatalar listeden düşer
+  let gizlenen = 0;
+  if (!YD.cozulenGoster){
+    const once = list.length;
+    list = list.filter(i => !i._cozuldu);
+    gizlenen = once - list.length;
+  }
+  const not = gizlenen
+    ? '<div class="isl-not"><span>✓ ' + gizlenen + ' başarısız gönderim yeniden gönderilip yayınlandığı için gizlendi</span>'
+      + '<button type="button" class="isl-btn" onclick="ydCozulenGoster(true)">yine de göster</button></div>'
+    : '';
+  if (!list.length){
+    el.innerHTML = (gizlenen
+      ? durumHTML('bos',{ic:'✓',bas:'Bekleyen hata yok',
+          alt:'Bu filtredeki '+gizlenen+' başarısız gönderimin tamamı yeniden gönderilip yayınlanmış.'})
+      : '<div style="color:var(--mt);text-align:center;padding:30px;font-size:14px">Bu filtrede kayıt yok</div>') + not;
+    return;
+  }
   el.innerHTML = list.map(it=>{
     const realIdx = YD.items.indexOf(it);
-    const stColor = it.status==='published'?'var(--ok)':it.status==='failed'?'var(--er)':it.status==='retried'?'var(--acc)':'var(--wn)';
-    const stLabel = it.status==='published'?'✅ Yayınlandı':it.status==='failed'?'❌ Başarısız':it.status==='retried'?'↻ Tekrar denendi':'⏰ Planlı';
+    // Çözülmüş hata görünür kılındıysa yeşil ve "sonradan yayınlandı" etiketiyle
+    const cz = it.status==='failed' && it._cozuldu;
+    const stColor = cz?'var(--ok)':it.status==='published'?'var(--ok)':it.status==='failed'?'var(--er)':it.status==='retried'?'var(--acc)':'var(--wn)';
+    const stLabel = cz?'✓ Sonradan yayınlandı':it.status==='published'?'✅ Yayınlandı':it.status==='failed'?'❌ Başarısız':it.status==='retried'?'↻ Tekrar denendi':'⏰ Planlı';
     const platLabel = YD_PLAT_LABEL[it.plat] || (it.plat==='sch'?'':it.plat);
     const t = it.time ? new Date(it.time).toLocaleString('tr',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
     const thumb = it.thumb ? `<img src="${esc(it.thumb)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0" onerror="this.style.display='none'"/>` : '';
     let right = '';
     if ((it.status==='published') && it.permalink) right = `<a href="${esc(it.permalink)}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ Aç</a>`;
+    else if (cz){
+      // Çözülmüş: "Yeniden Gönder" gösterme (tekrar yayınlar), başarılı postu aç
+      right = it._cozuldu.permalink
+        ? `<a href="${esc(it._cozuldu.permalink)}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ Yayını Aç</a>` : '';
+    }
     else if (it.status==='failed'){
       const native = !!(it.reqId || it.jobId);
       const known = native ? ' title="Upload-Post yerel yeniden deneme — tek tık, yalnız başarısız platform"'
@@ -7479,7 +7542,14 @@ function renderYayinDurumu(){
       <span style="font-size:12px;color:${stColor};font-weight:700;white-space:nowrap">${stLabel}</span>
       ${right}
     </div>`;
-  }).join('');
+  }).join('') + not;
+}
+
+// "yine de göster" — çözülmüş hataları da listele (oturumluk, kaydedilmez)
+function ydCozulenGoster(v){
+  YD.cozulenGoster = !!v;
+  toast(YD.cozulenGoster ? 'Çözülmüş hatalar da listeleniyor' : 'Çözülmüş hatalar gizlendi','info',2500);
+  renderYayinDurumu();
 }
 
 // ── Retry ──────────────────────────────────────────────────
@@ -7605,6 +7675,7 @@ async function ydDoRetry(payload, idx){
 }
 window.loadYayinDurumu=loadYayinDurumu;
 window.ydFilter=ydFilter; window.ydRetry=ydRetry; window.ydRetryClose=ydRetryClose; window.ydRetryConfirm=ydRetryConfirm; window.ydRetryPick=ydRetryPick;
+window.ydCozulenGoster=ydCozulenGoster; window.ydCozulenleriIsaretle=ydCozulenleriIsaretle; window.ydAnahtar=ydAnahtar;
 
 // ═══════════════════════════════════════════════════════════
 // #3 PROFİL HESAP SAĞLIĞI  +  #4 AKSİYON MERKEZİ
