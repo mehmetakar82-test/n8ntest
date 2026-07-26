@@ -3161,7 +3161,11 @@ function rapRenderProfiles(inP){
     + (RAP.histKirpik ? ' · geçmiş penceresi kırpıldı (ilk 1000 kayıt)' : ''));
   const PI={instagram:PFAV('instagram.com'),youtube:PFAV('youtube.com'),tiktok:PFAV('tiktok.com'),facebook:PFAV('facebook.com'),x:PFAV('x.com'),twitter:PFAV('x.com'),threads:PFAV('threads.net'),linkedin:PFAV('linkedin.com'),pinterest:PFAV('pinterest.com')};
   const platIcons=u=>{ const pr=profs.find(x=>x.username===u); if(!pr) return '—'; const sa=pr.social_accounts||pr.socialAccounts||{};
-    const ic=Object.keys(sa).filter(k=>{ const v=sa[k]; const a=Array.isArray(v)?v[0]:v; return a&&(a.username||a.id||a.display_name||a.name); }).map(k=>PI[k]||'▪');
+    // Sabit sıra: Instagram → YouTube → TikTok → X. Simge tek başına belirsiz
+    // olduğu için üzerine gelince platform adı yazsın.
+    const ic=rapPlatSirala(Object.keys(sa).filter(k=>{ const v=sa[k]; const a=Array.isArray(v)?v[0]:v; return a&&(a.username||a.id||a.display_name||a.name); }))
+      .map(k=>{ const ad=RAP_PLAT_AD[rapPlatAnahtar(k)]||k;
+        return '<span title="'+esc(ad)+'">'+(PI[k]||'▪')+'</span>'; });
     return ic.length?ic.join(' '):'—'; };
   tb.innerHTML=rows.map(u=>{
     const b=by[u], a=RAP.analytics[u];
@@ -3216,6 +3220,22 @@ function rapRenderKatUyum(profs){
   </div>`;
 }
 
+// ── Rapor sayfasında sosyal platform SIRASI ─────────────────────────
+// Hem "Platformlar" kolonu hem "Canlı Sosyal Metrikler" kartları
+// Object.keys() sırasını kullanıyordu; yani sıra Upload-Post'un yanıtına
+// göre profilden profile değişiyordu. Artık her yerde sabit:
+// Instagram → YouTube → TikTok → X, tanımsızlar arkada alfabetik.
+const RAP_PLAT_SIRA = ['instagram','youtube','tiktok','x','facebook','threads','linkedin','pinterest'];
+const rapPlatAnahtar = k => (String(k||'').toLowerCase()==='twitter' ? 'x' : String(k||'').toLowerCase());
+const RAP_PLAT_AD = {instagram:'Instagram',youtube:'YouTube',tiktok:'TikTok',x:'X',
+  facebook:'Facebook',threads:'Threads',linkedin:'LinkedIn',pinterest:'Pinterest'};
+function rapPlatSirala(liste){
+  return (liste||[]).slice().sort((a,b)=>{
+    const ia=RAP_PLAT_SIRA.indexOf(rapPlatAnahtar(a)), ib=RAP_PLAT_SIRA.indexOf(rapPlatAnahtar(b));
+    return (ia<0?99:ia)-(ib<0?99:ib) || String(a).localeCompare(String(b),'tr');
+  });
+}
+
 function rapSpark(ts){
   if(!Array.isArray(ts)||ts.length<2) return '';
   const vals=ts.map(x=>parseFloat(x.value)||0);
@@ -3233,7 +3253,8 @@ function rapRenderLiveCard(u, data, err){
   if (err || !data || !Object.keys(data).length){
     inner=`<div style="font-size:11px;color:var(--wn)">Metrik alınamadı${err?': '+esc(String(err).slice(0,70)):''}</div>`;
   } else {
-    inner=Object.keys(data).map(pk=>{
+    // Sabit sıra: Instagram → YouTube → TikTok → X (profilden profile değişmesin)
+    inner=rapPlatSirala(Object.keys(data)).map(pk=>{
       const m=data[pk]||{};
       if(typeof m!=='object') return '';
       const rows=[['Takipçi',m.followers],['İzlenme',m.views!=null?m.views:m.impressions],['Erişim',m.reach],['Beğeni',m.likes],['Yorum',m.comments],['Paylaşım',m.shares],['Kaydetme',m.saves]].filter(x=>x[1]!=null&&!isNaN(parseFloat(x[1])));
@@ -3255,7 +3276,8 @@ async function rapLoadAnalytics(profs){
   const valid=['instagram','tiktok','linkedin','x','youtube','threads','pinterest'];
   const targets=(profs||[]).map(p=>{
     const sa=p.social_accounts||p.socialAccounts||{};
-    const plats=[...new Set(Object.keys(sa).filter(k=>{ const v=sa[k]; const a=Array.isArray(v)?v[0]:v; return a&&(a.username||a.id||a.display_name||a.name); }).map(k=>k==='twitter'?'x':k).filter(k=>valid.includes(k)))];
+    // İstek sırası da aynı olsun ki Upload-Post yanıtı zaten sıralı gelsin
+    const plats=rapPlatSirala([...new Set(Object.keys(sa).filter(k=>{ const v=sa[k]; const a=Array.isArray(v)?v[0]:v; return a&&(a.username||a.id||a.display_name||a.name); }).map(k=>k==='twitter'?'x':k).filter(k=>valid.includes(k)))]);
     return { u:p.username, plats };
   }).filter(t=>t.u&&t.plats.length);
   if(!targets.length){ liveEl.innerHTML='<div style="color:var(--mt);font-size:12px;grid-column:1/-1;text-align:center;padding:10px">Bağlı sosyal hesap bulunamadı — Platformlar → Yenile ile profilleri doldur</div>'; if(stEl) stEl.textContent=''; return; }
