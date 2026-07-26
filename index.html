@@ -483,6 +483,25 @@ html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
   font-family:var(--ft);white-space:nowrap}
 .toast .geri:hover{background:var(--acc);color:#012}
 
+/* ── Sayfalama çubuğu ─────────────────────────────────────────────
+   Uzun listelerin altında/üstünde: aralık · sayfa numaraları · boyut. */
+.sayfa-cubuk{display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:9px 2px;font-size:12px;color:var(--mt)}
+.sayfa-cubuk .sayfa-bilgi{font-variant-numeric:tabular-nums;white-space:nowrap}
+.sayfa-cubuk .sayfa-bilgi b{color:var(--tx)}
+/* nav > ul/li: ekran okuyucu öğe sayısını seslendirsin diye liste yapısı
+   korunuyor, görsel olarak madde imi kaldırılıp yatay diziliyor. */
+.sayfa-cubuk .sayfa-nav ul{display:inline-flex;gap:4px;align-items:center;
+  flex-wrap:wrap;list-style:none;margin:0;padding:0}
+.sayfa-cubuk .sayfa-nav li{display:inline-flex}
+.sayfa-cubuk .sayfa-uc{color:var(--mt);padding:0 3px;user-select:none}
+.sayfa-cubuk .sayfa-boyut{display:inline-flex;gap:6px;align-items:center;margin-left:auto;white-space:nowrap}
+.sayfa-cubuk .btn:disabled{opacity:.3;cursor:not-allowed}
+.sayfa-cubuk .cat-chip{cursor:pointer;color:var(--mt)}
+.sayfa-cubuk .cat-chip.sel{color:var(--acc)}
+.sayfa-cubuk .btn:focus-visible,.sayfa-cubuk .cat-chip:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+td > .sayfa-cubuk{padding:4px 6px}
+
 /* ── İşlenmiş video gizleme notu ──────────────────────────────────
    Liste sessizce kısalmasın: kaç video gizlendiği ve nasıl geri
    getirileceği her listenin altında yazar. */
@@ -6768,6 +6787,86 @@ function alertSadelestir(){
   });
 }
 
+// ── SAYFALAMA ──────────────────────────────────────────────────────
+// Uzun listeler tek seferde basılıyordu (short listesi 2000+ satır,
+// yayın durumu 2500 kayda kadar). Hem yavaş hem de içinde gezinmek zor.
+// Tek bileşen: durum + dilim + çubuk. Sayfa boyutu liste bazında saklanır.
+const SAYFA = {};
+function sayfaDurum(id, varsayilan){
+  if (!SAYFA[id]){
+    let b = varsayilan || 20;
+    try { const k = parseInt(localStorage.getItem('op_sayfa_' + id)); if (k > 0) b = k; } catch(e) {}
+    SAYFA[id] = { no: 1, boyut: b };
+  }
+  return SAYFA[id];
+}
+// Aktif sayfanın dilimini döndürür; liste kısaldıysa sayfa numarasını düzeltir
+function sayfaDilim(id, liste, varsayilan){
+  const d = sayfaDurum(id, varsayilan);
+  const son = Math.max(1, Math.ceil(liste.length / d.boyut));
+  if (d.no > son) d.no = son;
+  if (d.no < 1) d.no = 1;
+  const bas = (d.no - 1) * d.boyut;
+  return liste.slice(bas, bas + d.boyut);
+}
+function sayfaGit(id, no, ciz){
+  const d = sayfaDurum(id); d.no = no;
+  if (typeof window[ciz] === 'function') window[ciz]();
+}
+function sayfaBoyut(id, n, ciz){
+  const d = sayfaDurum(id); d.boyut = n; d.no = 1;
+  try { localStorage.setItem('op_sayfa_' + id, n); } catch(e) {}
+  if (typeof window[ciz] === 'function') window[ciz]();
+}
+// ciz: yeniden çizecek global fonksiyonun ADI (string)
+function sayfaCubugu(id, toplam, ciz, varsayilan){
+  const d = sayfaDurum(id, varsayilan);
+  if (!toplam) return '';
+  const son = Math.max(1, Math.ceil(toplam / d.boyut));
+  // Sayfa numarasını BURADA kırp: çubuk, sayfaDilim'den ÖNCE çiziliyor.
+  // Kırpmazsak filtre daraldığında ya da elle büyük sayfaya gidildiğinde
+  // "791–36 / 36" gibi anlamsız aralıklar yazıyordu.
+  if (d.no > son) d.no = son;
+  if (d.no < 1) d.no = 1;
+  const bas = (d.no - 1) * d.boyut + 1;
+  const bit = Math.min(toplam, d.no * d.boyut);
+  // Erişilebilirlik (USWDS / W3C sayfalama deseni):
+  //  • <nav aria-label> + <ul>/<li> → ekran okuyucu "N öğeli gezinme" der
+  //  • aktif sayfada aria-current="page"
+  //  • her düğmede açıklayıcı aria-label ("Sayfa 3'e git")
+  //  • üç nokta aria-hidden + tıklanamaz (dekoratif)
+  //  • uçlarda Önceki/Sonraki disabled → odak sırasına da girmez
+  const btn = (etiket, hedef, pasif, ariaEtiket) =>
+    `<li><button type="button" class="btn bg bsm" ${pasif?'disabled':''}`
+    + ` aria-label="${ariaEtiket}" title="${ariaEtiket}"`
+    + ` onclick="sayfaGit('${id}',${hedef},'${ciz}')">${etiket}</button></li>`;
+  // Sayfa numaraları: ilk · … · aktifin ±1 komşusu · … · son  → en fazla 7 yuva
+  const nolar = [];
+  for (let i = 1; i <= son; i++){
+    if (i === 1 || i === son || Math.abs(i - d.no) <= 1) nolar.push(i);
+    else if (nolar[nolar.length-1] !== '…') nolar.push('…');
+  }
+  const numaraHtml = son > 1 ? nolar.map(n => n === '…'
+    ? '<li><span class="sayfa-uc" aria-hidden="true">…</span></li>'
+    : `<li><button type="button" class="btn ${n===d.no?'bp':'bg'} bsm" style="min-width:30px;padding:5px 8px"`
+      + `${n===d.no?' aria-current="page"':''} aria-label="Sayfa ${n}${n===d.no?' (şu anki sayfa)':''}"`
+      + ` onclick="sayfaGit('${id}',${n},'${ciz}')">${n}</button></li>`).join('') : '';
+  const boyutlar = [10,20,50,100].map(n =>
+    `<button type="button" class="cat-chip${n===d.boyut?' sel':''}" style="font-size:11px;padding:2px 8px;font-family:var(--ft);background:transparent"`
+    + `${n===d.boyut?' aria-current="true"':''} aria-label="Sayfa başına ${n} kayıt göster"`
+    + ` onclick="sayfaBoyut('${id}',${n},'${ciz}')">${n}</button>`).join('');
+  return `<div class="sayfa-cubuk">
+    <span class="sayfa-bilgi" aria-live="polite">${bas}–${bit} / <b>${toplam.toLocaleString('tr')}</b></span>
+    ${son > 1 ? `<nav class="sayfa-nav" aria-label="Sayfa gezinmesi"><ul>
+      ${btn('‹', d.no-1, d.no<=1, 'Önceki sayfaya git')}
+      ${numaraHtml}
+      ${btn('›', d.no+1, d.no>=son, 'Sonraki sayfaya git')}
+    </ul></nav>` : ''}
+    <span class="sayfa-boyut"><span style="color:var(--mt);font-size:11px">sayfa başına</span>
+      <span class="cat-chips" style="margin:0;display:inline-flex">${boyutlar}</span></span>
+  </div>`;
+}
+
 // ── P5: GERİ ALINABİLİR İŞLEM ──────────────────────────────────────
 // confirm() yerine: işlemi arayüzde hemen uygula, sunucu çağrısını
 // geri alma süresi dolana kadar beklet. Kullanıcı "Geri Al"a basarsa
@@ -7262,7 +7361,7 @@ window.seedProfileLoad=seedProfileLoad;
 // "son 2 gün"ü gösterip daha eski hataları hiç görmüyordu. Raporlar 10,
 // Takvim 3 sayfa çekiyordu; hataları bulmakla görevli sayfa en sığıydı.
 const YD = { items: [], filter: 'failed', retry: null, cozulen: 0, cozulenGoster: false,
-             sayfa: 5, kirpik: false, kapsam: '' };
+             derinlik: 5, kirpik: false, kapsam: '' };   // sayfalama: ortak SAYFA bileşeni
 const YD_PLATMAP   = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb', x:'x', twitter:'x', threads:'ig', linkedin:'fb' };
 
 // ── Ham Upload-Post/platform hata metnini SADE TÜRKÇE'ye çevir ──
@@ -7360,7 +7459,7 @@ async function ydFetchItems(){
   YD.kirpik = false;
   try {
     const hist = [];
-    for (let pg = 1; pg <= YD.sayfa; pg++) {
+    for (let pg = 1; pg <= YD.derinlik; pg++) {
       let data;
       try {
         ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page=' + pg));
@@ -7372,7 +7471,7 @@ async function ydFetchItems(){
       const h = Array.isArray(data) ? data : (data.history || data.data || data.results || data.posts || data.items || []);
       h.forEach(x => hist.push(x));
       if (h.length < 100) break;                       // son sayfaya gelindi
-      if (pg === YD.sayfa) YD.kirpik = true;           // daha eski kayıt var
+      if (pg === YD.derinlik) YD.kirpik = true;           // daha eski kayıt var
     }
     (hist||[]).forEach(h => {
       const ok = h.success !== false && !h.error_message;
@@ -7469,7 +7568,7 @@ async function loadYayinDurumu(){
     listEl.innerHTML = '<div style="color:var(--wn);text-align:center;padding:24px;font-size:14px">Ayarlar → <b>Upload-Post API Key</b> (veya n8n URL) gerekli</div>';
     return;
   }
-  listEl.innerHTML = '<div style="color:var(--mt);text-align:center;padding:24px;font-size:14px">⏳ Yükleniyor… ('+YD.sayfa+' sayfaya kadar)</div>';
+  listEl.innerHTML = '<div style="color:var(--mt);text-align:center;padding:24px;font-size:14px">⏳ Yükleniyor… ('+YD.derinlik+' sayfaya kadar)</div>';
   if (stEl) stEl.textContent = '';
   const items = await ydFetchItems();
   YD.items = items;
@@ -7480,7 +7579,7 @@ async function loadYayinDurumu(){
   const kEl = document.getElementById('yd-kirpik');
   if (kEl){
     kEl.innerHTML = YD.kirpik
-      ? '<span>⚠</span><div><b>Liste bu pencereyle sınırlı.</b> Upload-Post geçmişinin son <b>'+(YD.sayfa*100)+' kaydı</b> çekildi ve pencere doldu — '
+      ? '<span>⚠</span><div><b>Liste bu pencereyle sınırlı.</b> Upload-Post geçmişinin son <b>'+(YD.derinlik*100)+' kaydı</b> çekildi ve pencere doldu — '
         + 'daha eski gönderimler <b>var</b> ama listede yok. Daha geriye gitmek için yukarıdaki <b>derinlik</b> seçeneğini büyüt.</div>'
       : '';
     kEl.style.display = YD.kirpik ? 'flex' : 'none';
@@ -7492,14 +7591,14 @@ async function loadYayinDurumu(){
 
 // Kaç sayfa geçmiş çekileceği — kullanıcı kendi seçsin (100 kayıt/sayfa)
 function ydDerinlik(n){
-  YD.sayfa = n;
+  YD.derinlik = n;
   try { localStorage.setItem('op_yd_sayfa', n); } catch(e) {}
   ydDerinlikCiz();
   loadYayinDurumu();
 }
 function ydDerinlikCiz(){
   document.querySelectorAll('#yd-derinlik .cat-chip').forEach(c =>
-    c.classList.toggle('sel', parseInt(c.dataset.sayfa) === YD.sayfa));
+    c.classList.toggle('sel', parseInt(c.dataset.sayfa) === YD.derinlik));
 }
 
 function ydUpdateCounts(){
@@ -7551,15 +7650,10 @@ function ydFilter(f){
 function renderYayinDurumu(){
   const el = document.getElementById('yd-list'); if (!el) return;
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-  let list = YD.items;
-  if (YD.filter !== 'all') list = list.filter(i=>i.status===YD.filter);
+  const tumu = YD.filter === 'all' ? YD.items : YD.items.filter(i=>i.status===YD.filter);
+  let list = ydFiltreliListe();
   // Yeniden gönderilip yayınlanmış eski hatalar listeden düşer
-  let gizlenen = 0;
-  if (!YD.cozulenGoster){
-    const once = list.length;
-    list = list.filter(i => !i._cozuldu);
-    gizlenen = once - list.length;
-  }
+  const gizlenen = tumu.length - list.length;
   const not = gizlenen
     ? '<div class="isl-not"><span>✓ ' + gizlenen + ' başarısız gönderim yeniden gönderilip yayınlandığı için gizlendi</span>'
       + '<button type="button" class="isl-btn" onclick="ydCozulenGoster(true)">yine de göster</button></div>'
@@ -7571,7 +7665,11 @@ function renderYayinDurumu(){
       : '<div style="color:var(--mt);text-align:center;padding:30px;font-size:14px">Bu filtrede kayıt yok</div>') + not;
     return;
   }
-  el.innerHTML = list.map(it=>{
+  // Sayfalama — 2500 kayda kadar çıkabildiği için tamamı tek seferde basılmaz
+  const toplam = list.length;
+  const cubuk = sayfaCubugu('yd-list', toplam, 'renderYayinDurumu', 20);
+  list = sayfaDilim('yd-list', list, 20);
+  el.innerHTML = cubuk + list.map(it=>{
     const realIdx = YD.items.indexOf(it);
     // Çözülmüş hata görünür kılındıysa yeşil ve "sonradan yayınlandı" etiketiyle
     const cz = it.status==='failed' && it._cozuldu;
@@ -7603,7 +7701,15 @@ function renderYayinDurumu(){
       <span style="font-size:12px;color:${stColor};font-weight:700;white-space:nowrap">${stLabel}</span>
       ${right}
     </div>`;
-  }).join('') + not;
+  }).join('') + not + cubuk;
+}
+
+// Filtre + "çözülmüş gizle" uygulanmış liste — sayfalama bunun üzerinden sayar
+function ydFiltreliListe(){
+  let list = YD.items;
+  if (YD.filter !== 'all') list = list.filter(i => i.status === YD.filter);
+  if (!YD.cozulenGoster) list = list.filter(i => !i._cozuldu);
+  return list;
 }
 
 // "yine de göster" — çözülmüş hataları da listele (oturumluk, kaydedilmez)
@@ -7738,7 +7844,7 @@ window.loadYayinDurumu=loadYayinDurumu;
 window.ydFilter=ydFilter; window.ydRetry=ydRetry; window.ydRetryClose=ydRetryClose; window.ydRetryConfirm=ydRetryConfirm; window.ydRetryPick=ydRetryPick;
 window.ydCozulenGoster=ydCozulenGoster; window.ydCozulenleriIsaretle=ydCozulenleriIsaretle; window.ydAnahtar=ydAnahtar;
 window.ydDerinlik=ydDerinlik; window.ydDerinlikCiz=ydDerinlikCiz;
-try { const _s=parseInt(localStorage.getItem('op_yd_sayfa')); if(_s>0) YD.sayfa=_s; } catch(e) {}
+try { const _s=parseInt(localStorage.getItem('op_yd_sayfa')); if(_s>0) YD.derinlik=_s; } catch(e) {}
 
 // ═══════════════════════════════════════════════════════════
 // #3 PROFİL HESAP SAĞLIĞI  +  #4 AKSİYON MERKEZİ
