@@ -1557,6 +1557,15 @@ td > .sayfa-cubuk{padding:4px 6px}
   <!-- Çekilen pencere dolduysa (daha eski kayıt var ama listede yok) burada yazar -->
   <div id="yd-kirpik" class="alert aw" style="display:none;margin-bottom:12px;font-size:12px"></div>
 
+  <!-- Üretilen her short Upload-Post'a girdi mi? -->
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div class="ct" style="margin:0">🔍 Kuyruk Denetimi <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— üretilen her short kuyruğa girdi mi?</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Sheet'teki (&lt;b&gt;short-kaydetme&lt;/b&gt;) her short'u Upload-Post'un &lt;b&gt;kuyruğu&lt;/b&gt; ve &lt;b&gt;yayın geçmişiyle&lt;/b&gt; karşılaştırır. Hiçbirinde görünmeyenler listelenir — bunlar Upload-Post'a hiç ulaşmamış olabilir.&lt;br&gt;&lt;br&gt;Eşleştirme &lt;b&gt;profil + başlık&lt;/b&gt; üzerinden yapılır (ilk 60 karakter). Bir short birden çok platforma gidebildiği için sayı değil VARLIK karşılaştırılır.&lt;br&gt;&lt;br&gt;Geçmiş taraması yukarıdaki &lt;b&gt;Derinlik&lt;/b&gt; ayarını kullanır.">ⓘ</button></div>
+      <button class="btn bp bsm" id="kd-btn" onclick="kuyrukDenetimi()">🔍 Denetle</button>
+    </div>
+    <div id="kd-sonuc" style="margin-top:10px"><div style="color:var(--mt);font-size:12.5px;padding:8px 2px">Sheet ile Upload-Post'u karşılaştırmak için <b>Denetle</b>'ye bas.</div></div>
+  </div>
+
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button class="btn bp bsm" onclick="loadYayinDurumu()">↻ Yenile</button>
     <span style="font-size:11px;color:var(--mt);letter-spacing:1px;text-transform:uppercase">Derinlik</span>
@@ -7452,6 +7461,118 @@ async function ydEnsureShorts(){
 }
 function ydRowUrl(r){ return r['short-url'] || r['shortUrl'] || r['uriForExport'] || ''; }
 
+// ═══════════════════════════════════════════════════════════════════════
+// KUYRUK DENETİMİ — üretilen her short Upload-Post'a girdi mi?
+// ═══════════════════════════════════════════════════════════════════════
+// Sheet (short-kaydetme) = ÜRETİLEN.  Upload-Post schedule = KUYRUKTA,
+// history = YAYINLANMIŞ/BAŞARISIZ. Üçü karşılaştırılıp hiçbirinde
+// görünmeyen short'lar listelenir — "gönderdiklerimin hepsi planlandı mı?"
+// sorusunun tek kesin cevabı bu.
+// Eşleştirme profil + başlık üzerinden: bir short birden çok platforma
+// gidebildiği için SAYI değil VARLIK karşılaştırılır. Upload-Post başlığı
+// 95 karaktere kesebildiğinden ilk 60 karakter anahtar olarak kullanılır.
+function kdAnahtar(profil, baslik){
+  const b = ydNorm(baslik).slice(0, 60);
+  if (!b) return '';
+  return String(profil||'').trim().toLowerCase() + '|' + b;
+}
+async function kuyrukDenetimi(){
+  const kutu = document.getElementById('kd-sonuc');
+  const btn  = document.getElementById('kd-btn');
+  if (!kutu) return;
+  if (!S.cfg.blot && !getN8N()) { kutu.innerHTML = durumHTML('kurulum',{alt:'Upload-Post API Key ya da n8n URL gerekli.'}); return; }
+  if (btn) btn.disabled = true;
+  kutu.innerHTML = '<div style="color:var(--mt);font-size:13px;padding:14px">⏳ Sheet + Upload-Post karşılaştırılıyor…</div>';
+  try{
+    // 1) ÜRETİLEN — Sheet short-kaydetme
+    await ydEnsureShorts();
+    const shorts = ydShortsAll();
+    if (!shorts.length){
+      kutu.innerHTML = durumHTML('kurulum',{alt:'short-kaydetme sayfası okunamadı — Sheet ID / n8n URL girili mi?'});
+      return;
+    }
+    // 2) KUYRUKTA — /uploadposts/schedule
+    const kuyruk = new Set();
+    try{
+      const { data } = await upFetchRetry('/uploadposts/schedule');
+      const arr = Array.isArray(data)?data:(data.scheduled_posts||data.scheduled||data.jobs||data.data||data.results||data.posts||data.schedules||[]);
+      arr.forEach(s => { const k = kdAnahtar(s.profile_username||s.profile||s.user, s.title||s.post_title); if(k) kuyruk.add(k); });
+    }catch(e){ console.warn('[KD] schedule:', e.message); }
+    // 3) YAYINLANMIŞ/BAŞARISIZ — /uploadposts/history (derinlik ayarını kullanır)
+    const gecmis = new Set();
+    let gecmisKirpik = false;
+    for (let pg = 1; pg <= YD.derinlik; pg++){
+      let data;
+      try { ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page=' + pg)); }
+      catch(e){ console.warn('[KD] history s'+pg+':', e.message); break; }
+      const h = Array.isArray(data)?data:(data.history||data.data||data.results||data.posts||data.items||[]);
+      h.forEach(x => { const k = kdAnahtar(x.profile_username||x.user, x.post_title||x.title||x.post_caption); if(k) gecmis.add(k); });
+      if (h.length < 100) break;
+      if (pg === YD.derinlik) gecmisKirpik = true;
+    }
+    // 4) KARŞILAŞTIR
+    const gorulen = new Set(), eksik = [];
+    shorts.forEach(r => {
+      const profil = String(r['profil']||r['Profil']||'').trim();
+      const baslik = r['title']||r['baslik']||'';
+      const k = kdAnahtar(profil, baslik);
+      if (!k) return;                       // başlıksız satır denetlenemez
+      if (gorulen.has(k)) return;           // aynı short birden çok satırda
+      gorulen.add(k);
+      if (!kuyruk.has(k) && !gecmis.has(k))
+        eksik.push({ profil, baslik, tarih: r['created-at']||r['tarih']||'' });
+    });
+    kdCiz({ uretilen: gorulen.size, kuyruk: kuyruk.size, gecmis: gecmis.size, eksik, gecmisKirpik });
+  } catch(e){
+    kutu.innerHTML = durumHTML('hata',{alt: e.message});
+  } finally { if (btn) btn.disabled = false; }
+}
+function kdCiz(s){
+  const kutu = document.getElementById('kd-sonuc'); if(!kutu) return;
+  const esc = t => String(t||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const oran = s.uretilen ? Math.round((s.uretilen - s.eksik.length)/s.uretilen*100) : 100;
+  const kutucuk = (ad,deger,renk) => `<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:9px 12px">`
+    + `<div style="font-size:10px;letter-spacing:1px;color:var(--mt);text-transform:uppercase">${ad}</div>`
+    + `<div style="font-family:var(--fh);font-size:19px;font-weight:800;color:${renk};font-variant-numeric:tabular-nums">${deger.toLocaleString('tr')}</div></div>`;
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px">'
+    + kutucuk('Üretilen (Sheet)', s.uretilen, 'var(--acc)')
+    + kutucuk('Kuyrukta', s.kuyruk, 'var(--wn)')
+    + kutucuk('Upload-Post geçmişi', s.gecmis, 'var(--ok)')
+    + kutucuk('Bulunamayan', s.eksik.length, s.eksik.length ? 'var(--er)' : 'var(--ok)')
+    + '</div>';
+  if (s.gecmisKirpik)
+    html += '<div class="alert aw" style="font-size:12px;margin-bottom:8px"><span>⚠</span><div>Geçmiş penceresi doldu ('
+      + (YD.derinlik*100) + ' kayıt). Daha eski yayınlar denetime girmedi; <b>Derinlik</b>\'i büyütüp tekrar çalıştır — '
+      + 'yoksa aslında yayınlanmış short\'lar "bulunamayan" görünebilir.</div></div>';
+  if (!s.eksik.length){
+    html += durumHTML('bos',{ic:'✓',bas:'Tamamı Upload-Post\'ta',
+      alt:'Sheet\'teki '+s.uretilen.toLocaleString('tr')+' short\'un tamamı ya kuyrukta ya da yayın geçmişinde bulundu.'});
+  } else {
+    html += '<div style="font-size:12.5px;color:var(--er);font-weight:600;margin-bottom:6px">⚠ '
+      + s.eksik.length.toLocaleString('tr') + ' short Upload-Post\'ta bulunamadı (%'+ (100-oran) +') — kuyruğa hiç girmemiş olabilir</div>'
+      + '<div style="max-height:260px;overflow-y:auto;border:1px solid var(--brd);border-radius:6px">'
+      + s.eksik.slice(0,200).map(x=>'<div style="display:flex;gap:9px;padding:6px 9px;border-bottom:1px solid var(--brd);font-size:12px">'
+        + '<span style="font-family:var(--fm);color:var(--acc3);flex-shrink:0;min-width:88px">'+esc(x.profil||'—')+'</span>'
+        + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)">'+esc(x.baslik)+'</span>'
+        + '<span style="color:var(--mt);flex-shrink:0">'+esc(String(x.tarih).slice(0,16))+'</span></div>').join('')
+      + '</div>'
+      + (s.eksik.length>200 ? '<div style="font-size:11px;color:var(--mt);padding:6px 2px">…ilk 200 gösteriliyor</div>' : '')
+      + '<button class="btn bg bsm" style="margin-top:8px" onclick="kdCsv()">⬇ CSV indir</button>';
+  }
+  KD.son = s;
+  kutu.innerHTML = html;
+}
+const KD = { son:null };
+function kdCsv(){
+  if (!KD.son || !KD.son.eksik.length) return;
+  const sat = [['profil','baslik','tarih']].concat(KD.son.eksik.map(x=>[x.profil,x.baslik,x.tarih]));
+  const csv = sat.map(r=>r.map(c=>'"'+String(c||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));
+  a.download = 'kuyruk-denetimi-eksikler.csv';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
 // short-kaydetme satırlarından kaynak mp4 + profil bul — PUANLI eşleşme.
 // Upload-Post history başlığı 95 karaktere kesik olabilir; Instagram'da
 // post_title yerine caption (safe-description) dönebilir → prefix/çapraz kontrol.
@@ -7882,6 +8003,7 @@ window.loadYayinDurumu=loadYayinDurumu;
 window.ydFilter=ydFilter; window.ydRetry=ydRetry; window.ydRetryClose=ydRetryClose; window.ydRetryConfirm=ydRetryConfirm; window.ydRetryPick=ydRetryPick;
 window.ydCozulenGoster=ydCozulenGoster; window.ydCozulenleriIsaretle=ydCozulenleriIsaretle; window.ydAnahtar=ydAnahtar;
 window.ydDerinlik=ydDerinlik; window.ydDerinlikCiz=ydDerinlikCiz;
+window.kuyrukDenetimi=kuyrukDenetimi; window.kdCsv=kdCsv; window.kdAnahtar=kdAnahtar; window.kdCiz=kdCiz;
 try { const _s=parseInt(localStorage.getItem('op_yd_sayfa')); if(_s>0) YD.derinlik=_s; } catch(e) {}
 
 // ═══════════════════════════════════════════════════════════
