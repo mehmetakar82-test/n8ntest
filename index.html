@@ -1535,8 +1535,18 @@ html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
   </div>
 
   <!-- Araç çubuğu -->
+  <!-- Çekilen pencere dolduysa (daha eski kayıt var ama listede yok) burada yazar -->
+  <div id="yd-kirpik" class="alert aw" style="display:none;margin-bottom:12px;font-size:12px"></div>
+
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button class="btn bp bsm" onclick="loadYayinDurumu()">↻ Yenile</button>
+    <span style="font-size:11px;color:var(--mt);letter-spacing:1px;text-transform:uppercase">Derinlik</span>
+    <div class="cat-chips" id="yd-derinlik" style="margin:0" title="Upload-Post geçmişinden kaç kayıt taranacak (sayfa başına 100)">
+      <span class="cat-chip" data-sayfa="1"  onclick="ydDerinlik(1)">100</span>
+      <span class="cat-chip sel" data-sayfa="5"  onclick="ydDerinlik(5)">500</span>
+      <span class="cat-chip" data-sayfa="10" onclick="ydDerinlik(10)">1.000</span>
+      <span class="cat-chip" data-sayfa="25" onclick="ydDerinlik(25)">2.500</span>
+    </div>
     <span id="yd-status" style="font-size:13px;color:var(--mt);font-family:var(--fm)"></span>
     <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
       <span class="badge bi"  id="yd-f-all"    onclick="ydFilter('all')"    style="cursor:pointer;opacity:.45">Tümü</span>
@@ -7247,7 +7257,12 @@ window.seedProfileLoad=seedProfileLoad;
 // ═══════════════════════════════════════════════════════════
 // cozulen: yeniden gönderilip başarıyla yayınlanmış eski hata sayısı
 // cozulenGoster: true olursa onlar da listelenir (varsayılan gizli)
-const YD = { items: [], filter: 'failed', retry: null, cozulen: 0, cozulenGoster: false };
+// sayfa: kaç sayfa geçmiş çekilecek (sayfa başına 100 kayıt).
+// ESKİDEN 1 SAYFAYDI: günde ~75 gönderimde bu ~1.3 gün demek, yani sayfa
+// "son 2 gün"ü gösterip daha eski hataları hiç görmüyordu. Raporlar 10,
+// Takvim 3 sayfa çekiyordu; hataları bulmakla görevli sayfa en sığıydı.
+const YD = { items: [], filter: 'failed', retry: null, cozulen: 0, cozulenGoster: false,
+             sayfa: 5, kirpik: false, kapsam: '' };
 const YD_PLATMAP   = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb', x:'x', twitter:'x', threads:'ig', linkedin:'fb' };
 
 // ── Ham Upload-Post/platform hata metnini SADE TÜRKÇE'ye çevir ──
@@ -7342,9 +7357,23 @@ function ydFindSource(title, thumb, profile, caption){
 // Upload-Post history + schedule → normalize (DOM'a dokunmaz; Aksiyon Merkezi de kullanır)
 async function ydFetchItems(){
   const items = [];
+  YD.kirpik = false;
   try {
-    const { data } = await upFetch('/uploadposts/history?limit=100');
-    const hist = Array.isArray(data) ? data : (data.history || data.data || data.results || data.posts || data.items || []);
+    const hist = [];
+    for (let pg = 1; pg <= YD.sayfa; pg++) {
+      let data;
+      try {
+        ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page=' + pg));
+      } catch(e) {
+        console.warn('[YD] history sayfa ' + pg + ':', e.message);
+        if (pg === 1) throw e;      // ilk sayfa düşerse geçmiş yok
+        break;                       // sonrakiler düşerse elimizdekiyle devam
+      }
+      const h = Array.isArray(data) ? data : (data.history || data.data || data.results || data.posts || data.items || []);
+      h.forEach(x => hist.push(x));
+      if (h.length < 100) break;                       // son sayfaya gelindi
+      if (pg === YD.sayfa) YD.kirpik = true;           // daha eski kayıt var
+    }
     (hist||[]).forEach(h => {
       const ok = h.success !== false && !h.error_message;
       const plat = YD_PLATMAP[String(h.platform||'').toLowerCase()] || (String(h.platform||'').toLowerCase() || 'yt');
@@ -7386,6 +7415,15 @@ async function ydFetchItems(){
   });
   items.sort((a,b)=>{ const ta=Date.parse(a.time)||0, tb=Date.parse(b.time)||0; return tb-ta; });
   YD.cozulen = ydCozulenleriIsaretle(items);
+  // Kaç günü kapsadığını AÇIKÇA yaz: "2 gün görünüyor" ile "2 günde sorun
+  // olmadı" birbirine karışmasın.
+  const gecmis = items.filter(i => i.status !== 'scheduled').map(i => Date.parse(i.time)||0).filter(Boolean);
+  if (gecmis.length){
+    const enEski = new Date(Math.min(...gecmis)), enYeni = new Date(Math.max(...gecmis));
+    const f = d => d.toLocaleDateString('tr',{day:'2-digit',month:'short'});
+    const gun = Math.max(1, Math.round((enYeni-enEski)/864e5));
+    YD.kapsam = gecmis.length + ' kayıt · ' + f(enEski) + ' – ' + f(enYeni) + ' (' + gun + ' gün)';
+  } else YD.kapsam = '';
   return items;
 }
 
@@ -7431,14 +7469,37 @@ async function loadYayinDurumu(){
     listEl.innerHTML = '<div style="color:var(--wn);text-align:center;padding:24px;font-size:14px">Ayarlar → <b>Upload-Post API Key</b> (veya n8n URL) gerekli</div>';
     return;
   }
-  listEl.innerHTML = '<div style="color:var(--mt);text-align:center;padding:24px;font-size:14px">⏳ Yükleniyor…</div>';
+  listEl.innerHTML = '<div style="color:var(--mt);text-align:center;padding:24px;font-size:14px">⏳ Yükleniyor… ('+YD.sayfa+' sayfaya kadar)</div>';
   if (stEl) stEl.textContent = '';
   const items = await ydFetchItems();
   YD.items = items;
   ydUpdateCounts();
-  if (stEl) stEl.textContent = items.length ? (items.length+' gönderim') : '';
+  if (stEl) stEl.textContent = YD.kapsam || (items.length ? (items.length+' gönderim') : '');
+  // Pencere doldu = daha eski kayıtlar var ama çekilmedi. Bunu söylemezsek
+  // "daha önce hiç sorun olmamış" gibi okunuyor.
+  const kEl = document.getElementById('yd-kirpik');
+  if (kEl){
+    kEl.innerHTML = YD.kirpik
+      ? '<span>⚠</span><div><b>Liste bu pencereyle sınırlı.</b> Upload-Post geçmişinin son <b>'+(YD.sayfa*100)+' kaydı</b> çekildi ve pencere doldu — '
+        + 'daha eski gönderimler <b>var</b> ama listede yok. Daha geriye gitmek için yukarıdaki <b>derinlik</b> seçeneğini büyüt.</div>'
+      : '';
+    kEl.style.display = YD.kirpik ? 'flex' : 'none';
+  }
+  ydDerinlikCiz();
   if (!items.length) addLog('warn','sistem','Yayın Durumu: Upload-Post history boş (konsol: [YD])');
   renderYayinDurumu();
+}
+
+// Kaç sayfa geçmiş çekileceği — kullanıcı kendi seçsin (100 kayıt/sayfa)
+function ydDerinlik(n){
+  YD.sayfa = n;
+  try { localStorage.setItem('op_yd_sayfa', n); } catch(e) {}
+  ydDerinlikCiz();
+  loadYayinDurumu();
+}
+function ydDerinlikCiz(){
+  document.querySelectorAll('#yd-derinlik .cat-chip').forEach(c =>
+    c.classList.toggle('sel', parseInt(c.dataset.sayfa) === YD.sayfa));
 }
 
 function ydUpdateCounts(){
@@ -7676,6 +7737,8 @@ async function ydDoRetry(payload, idx){
 window.loadYayinDurumu=loadYayinDurumu;
 window.ydFilter=ydFilter; window.ydRetry=ydRetry; window.ydRetryClose=ydRetryClose; window.ydRetryConfirm=ydRetryConfirm; window.ydRetryPick=ydRetryPick;
 window.ydCozulenGoster=ydCozulenGoster; window.ydCozulenleriIsaretle=ydCozulenleriIsaretle; window.ydAnahtar=ydAnahtar;
+window.ydDerinlik=ydDerinlik; window.ydDerinlikCiz=ydDerinlikCiz;
+try { const _s=parseInt(localStorage.getItem('op_yd_sayfa')); if(_s>0) YD.sayfa=_s; } catch(e) {}
 
 // ═══════════════════════════════════════════════════════════
 // #3 PROFİL HESAP SAĞLIĞI  +  #4 AKSİYON MERKEZİ
