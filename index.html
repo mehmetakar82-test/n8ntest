@@ -1394,6 +1394,8 @@ html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
 <div id="page-takvim" class="page">
   <div class="ph"><div class="pt">Takvim</div><div class="ps">Upload-Post yayın takvimi — zamanlanmış (⏰) + yayınlanmış (✓) postlar</div></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den gelir: <b>zamanlanmış işler</b> + <b>kuyruk yuvaları</b> (add_to_queue — profil başına) + <b>yayın geçmişi</b> (sayfalı, son ~300). Renkler: <b style="color:var(--ok)">yeşil yayınlandı</b> · <b style="color:var(--er)">kırmızı başarısız</b> · <b style="color:#00b8d4">mavi planlı</b>. Bir posta tıklayınca detay + <b>canlı izlenme metrikleri</b> açılır. Kuyruk yuvalarını görmek için önce <b>Platformlar → Yenile</b> ile profil listesini doldur.</span></div>
+  <!-- Yayın geçmişi çekilemezse burada yazar (sessizce boş takvim yerine) -->
+  <div id="tak-uyari" class="alert aw" style="display:none;margin-bottom:12px;font-size:12px"></div>
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
     <button class="btn bg bsm" onclick="takPrev()">←</button>
     <button class="btn bg bsm" onclick="takToday()">Bugün</button>
@@ -1405,6 +1407,7 @@ html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
       <button id="tak-v-gun" class="btn bg bsm" onclick="takView('gun')">Gün</button>
     </div>
     <button class="btn bp bsm" onclick="loadTakvim()">↻ Yenile</button>
+    <span id="tak-ozet" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
       <span style="font-size:12px;color:var(--mt);align-self:center">Platform:</span>
       <span class="badge bi" id="tak-f-ig" onclick="takFilter('ig')" style="cursor:pointer"><img class="pfav" src="https://www.google.com/s2/favicons?domain=instagram.com&sz=64" alt="" loading="lazy"/> IG</span>
@@ -3661,6 +3664,42 @@ async function upFetch(path, opts) {
   throw new Error('Upload-Post API Key yok (Ayarlar → Upload-Post API Key)');
 }
 
+// Upload-Post hız sınırı (429) ve geçici 5xx'lerde yeniden dener.
+// Takvim tek yüklemede 20+ istek atıyor; sınıra takılan çağrı eskiden
+// sessizce düşüyor ve o bölüm (çoğunlukla yayın geçmişi) boş kalıyordu.
+async function upFetchRetry(path, opts, deneme) {
+  deneme = deneme || 3;
+  let sonHata;
+  for (let i = 0; i < deneme; i++) {
+    try {
+      return await upFetch(path, opts);
+    } catch (e) {
+      sonHata = e;
+      const m = /HTTP (\d+)/.exec(e.message || '');
+      const kod = m ? parseInt(m[1]) : 0;
+      // Yalnız geçici hatalarda tekrar dene; 401/403/404 tekrarlamaya değmez
+      if (kod !== 429 && kod < 500) throw e;
+      if (i < deneme - 1) await new Promise(r => setTimeout(r, 400 * Math.pow(3, i)));
+    }
+  }
+  throw sonHata;
+}
+
+// Aynı anda kaç istek gideceğini sınırla — 15 profilin kuyruğunu tek seferde
+// istemek Upload-Post'u 429'a sokup sonraki geçmiş çağrılarını da düşürüyordu.
+async function upSirali(liste, isFn, esZaman) {
+  esZaman = esZaman || 4;
+  const sonuc = [];
+  let i = 0;
+  await Promise.all(Array.from({length: Math.min(esZaman, liste.length)}, async () => {
+    while (i < liste.length) {
+      const k = i++;
+      try { sonuc[k] = await isFn(liste[k]); } catch (e) { sonuc[k] = null; }
+    }
+  }));
+  return sonuc;
+}
+
 // ── Zamanlanmış açıklamalardan yer tutucu başlıkları toplu temizle ──
 // Kaynak düzeltmesi (Code in JavaScript3'te SABIT_BASLIK boşaltıldı) YALNIZ yeni
 // short'ları etkiler; Upload-Post kuyruğunda BEKLEYEN eski gönderiler hâlâ
@@ -5910,31 +5949,25 @@ async function loadTakvim() {
     });
   } catch(e) { console.warn('[TAK] schedule hata:', e.message); }
 
-  // 2) Kuyruk (add_to_queue) — profil başına dolu yuvalar
-  try {
-    const profs = takProfiles();
-    await Promise.all(profs.map(p =>
-      upFetch('/uploadposts/queue/preview?profile_username=' + encodeURIComponent(p) + '&count=50').then(({data}) => {
-        (data.slots || []).forEach(sl => {
-          const sp = sl.scheduled_post;
-          if (!sp || !sl.datetime_utc) return;
-          if (sp.job_id && seenJobs.has(sp.job_id)) return;
-          if (sp.job_id) seenJobs.add(sp.job_id);
-          const title = sp.title || '(başlıksız)';
-          items.push({ time:sl.datetime_utc, plat:'sch', status:'plan', profile:p, title, caption:'', thumb:'', jobId:sp.job_id||'', platforms:sp.platforms||[], r: {
-            title, 'preview-url':'', description:(sp.platforms||[]).join(', '),
-            'platform-status':'Kuyruk ⏳ ' + p, kategori:'queue'
-          }});
-        });
-      }).catch(e => console.warn('[TAK] queue ' + p + ':', e.message))
-    ));
-  } catch(e) { console.warn('[TAK] queue hata:', e.message); }
-
-  // 3) Yayın geçmişi — sayfalı (en fazla 3×100)
+  // 2) Yayın geçmişi — sayfalı (en fazla 3×100)
+  // SIRA ÖNEMLİ: bu blok eskiden 15 profillik kuyruk patlamasından SONRA
+  // çalışıyordu; Upload-Post 429 verince tek try/catch tüm geçmişi düşürüyor
+  // ve takvimde yalnız planlı postlar kalıyordu (yayınlanmışlar kayboluyordu).
+  // Artık kuyruktan ÖNCE çekiliyor, sayfa başına ayrı try, ve yeniden deneme var.
+  let gecmisHata = '';
+  let gecmisN = 0;
   try {
     let failN = 0;
     for (let pg = 1; pg <= 3; pg++) {
-      const { data } = await upFetch('/uploadposts/history?limit=100&page=' + pg);
+      let data;
+      try {
+        ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page=' + pg));
+      } catch (e) {
+        // Sayfa 1 düşerse geçmiş yok demektir; 2-3 düşerse elimizdekiyle devam
+        if (pg === 1) gecmisHata = e.message || 'bilinmeyen hata';
+        else console.warn('[TAK] history sayfa ' + pg + ':', e.message);
+        break;
+      }
       const hist = Array.isArray(data) ? data : (data.history || data.data || data.results || data.posts || data.items || []);
       hist.forEach(h => {
         const time = h.upload_timestamp || h.uploaded_at || h.created_at || h.timestamp || h.date || '';
@@ -5953,11 +5986,52 @@ async function loadTakvim() {
       if (hist.length < 100) break;
     }
     try { ydSetFailBadge(failN); } catch(e) {}
-  } catch(e) { console.warn('[TAK] history hata:', e.message); }
+  } catch(e) { gecmisHata = e.message || 'bilinmeyen hata'; console.warn('[TAK] history hata:', e.message); }
+  gecmisN = items.filter(x => x.status === 'pub' || x.status === 'fail').length;
+
+  // 3) Kuyruk (add_to_queue) — profil başına dolu yuvalar.
+  // Geçmişten SONRA ve en fazla 4 eşzamanlı istekle: 15 profili tek seferde
+  // istemek Upload-Post'u hız sınırına sokup geçmiş çağrılarını düşürüyordu.
+  try {
+    const profs = takProfiles();
+    await upSirali(profs, async p => {
+      try {
+        const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username=' + encodeURIComponent(p) + '&count=50');
+        (data.slots || []).forEach(sl => {
+          const sp = sl.scheduled_post;
+          if (!sp || !sl.datetime_utc) return;
+          if (sp.job_id && seenJobs.has(sp.job_id)) return;
+          if (sp.job_id) seenJobs.add(sp.job_id);
+          const title = sp.title || '(başlıksız)';
+          items.push({ time:sl.datetime_utc, plat:'sch', status:'plan', profile:p, title, caption:'', thumb:'', jobId:sp.job_id||'', platforms:sp.platforms||[], r: {
+            title, 'preview-url':'', description:(sp.platforms||[]).join(', '),
+            'platform-status':'Kuyruk ⏳ ' + p, kategori:'queue'
+          }});
+        });
+      } catch(e) { console.warn('[TAK] queue ' + p + ':', e.message); }
+    }, 4);
+  } catch(e) { console.warn('[TAK] queue hata:', e.message); }
 
   TAK.items = items;
-  console.log('[TAK] toplam item:', items.length);
+  const planN = items.length - gecmisN;
+  console.log('[TAK] toplam item:', items.length, '| yayınlanmış/başarısız:', gecmisN, '| planlı:', planN);
+
+  // Yayın geçmişi çekilemediyse SESSİZ kalma: takvimde yalnız planlı postlar
+  // kalır ve "yayınlanmışlar kayboldu" gibi görünür. Nedeni ekranda yazsın.
+  const uyari = document.getElementById('tak-uyari');
+  if (uyari) {
+    if (gecmisHata) {
+      uyari.innerHTML = '<span>⚠</span><div><b>Yayın geçmişi alınamadı</b> — takvimde şu an yalnız <b>planlı</b> postlar görünüyor, '
+        + 'yayınlanmışlar eksik. Sebep: <code>' + String(gecmisHata).slice(0,120).replace(/[<>&]/g,'') + '</code><br>'
+        + 'Upload-Post hız sınırı olabilir; birkaç saniye sonra <b>↻ Yenile</b>\'ye tekrar bas.</div>';
+      uyari.style.display = 'flex';
+    } else {
+      uyari.style.display = 'none';
+    }
+  }
+  setEl('tak-ozet', gecmisHata ? '' : (gecmisN + ' yayınlanmış · ' + planN + ' planlı'));
   if (!items.length) addLog('warn','sistem','Takvim: Upload-Post API\'den kayıt gelmedi (konsola bak: [TAK])');
+  if (gecmisHata) addLog('err','uploadpost','Takvim yayın geçmişi alınamadı: ' + gecmisHata);
   renderTakvim();
 }
 
