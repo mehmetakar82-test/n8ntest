@@ -324,6 +324,15 @@ tbody td{line-height:1.5}
 .pl-h-ad{font-size:12px;font-weight:600;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pl-h-alt{font-size:10.5px;color:var(--mt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pl-h-uyari{margin-left:auto;flex-shrink:0;font-size:11px;color:#f87171;font-weight:700}
+/* Profil düzenleme kısayolu — normalde soluk, karta gelince belirir */
+.pl-h-duzenle{margin-left:auto;flex-shrink:0;width:24px;height:24px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;text-decoration:none;
+  font-size:13px;line-height:1;color:var(--mt);border:1px solid transparent;opacity:.45;
+  transition:opacity .13s,border-color .13s,color .13s}
+.pl-hesap:hover .pl-h-duzenle{opacity:1;border-color:var(--brd-str)}
+.pl-h-duzenle:hover{color:var(--acc);border-color:var(--acc);background:rgba(0,229,255,.08)}
+.pl-h-duzenle:focus-visible{opacity:1;outline:2px solid var(--acc);outline-offset:1px}
+.pl-h-uyari + .pl-h-duzenle{margin-left:6px}
 /* fare ipucu — kart taşmasına takılmaması için fixed konumlanır (JS ile) */
 .pl-tip{position:fixed;z-index:9998;max-width:340px;background:#1c0e0e;
   border:1px solid rgba(248,113,113,.55);border-radius:10px;padding:11px 13px;
@@ -1347,7 +1356,7 @@ td > .sayfa-cubuk{padding:4px 6px}
 
 <!-- PLATFORMLAR -->
 <div id="page-platformlar" class="page">
-  <div class="ph"><div class="pt">Platformlar</div><div class="ps">Sosyal hesaplar <b>Upload-Post profiline göre</b> kümelenir — sorunlu olanlar kırmızı, üzerine gel sorunu göster, tıkla detay aç</div></div>
+  <div class="ph"><div class="pt">Platformlar</div><div class="ps">Sosyal hesaplar <b>Upload-Post profiline göre</b> kümelenir — sorunlu olanlar kırmızı, üzerine gel sorunu göster, tıkla detay aç. Hesabın <b>⚙</b> düğmesi o platformun profil düzenleme ekranını açar (ad ve görsel değişikliği API'den yapılamaz, elle yapılır).</div></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den (api.upload-post.com/api/uploadposts/users) gelir. Ayarlar → <b>Upload-Post API Key</b> gerekli. n8n bağlıysa proxy üzerinden gelir (CORS sorunu olmaz), değilse doğrudan API'ye istek atılır.</span></div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms()">↻ Yenile</button>
@@ -3499,6 +3508,50 @@ function platProfilSorun(g){
   return null;
 }
 // ── Hesapları Upload-Post profiline göre kümele ──
+// ── PROFİL DÜZENLEME KISAYOLU ──────────────────────────────────────────
+// Ad/görsel değiştirme API'lerle YAPILAMAZ: Upload-Post'ta böyle bir uç yok,
+// Instagram/TikTok hiç izin vermiyor, X yalnız eski v1.1'de, YouTube da
+// sadece kanal başlığını (handle'ı değil). Yani iş elle yapılmak zorunda —
+// tek kazandırabileceğimiz şey doğru ekrana tek tıkla gitmek.
+// Dönüş: {url, ipucu} ya da null (o platformda doğrudan adres yoksa).
+function platDuzenleHedef(plat, a){
+  const kul = cleanHandle(a.username || a.handle || '');
+  switch (plat) {
+    case 'instagram':
+      return { url:'https://www.instagram.com/accounts/edit/',
+               ipucu:'Instagram → Profili düzenle (ad, kullanıcı adı, biyografi). Fotoğraf için aynı sayfada "Fotoğrafı değiştir".' };
+    case 'youtube':
+      // Kanal kimliği varsa doğrudan O kanalın Studio sayfası açılır
+      return { url: (a.id && String(a.id).startsWith('UC'))
+                 ? 'https://studio.youtube.com/channel/' + a.id + '/editing/details'
+                 : 'https://studio.youtube.com/',
+               ipucu:'YouTube Studio → Özelleştirme → Temel bilgiler. Kanal adı ve @handle burada. DİKKAT: 14 günde en fazla 2 kez değiştirilebilir. Avatar için "Markalaşma" sekmesi.' };
+    // PLAT_LIST'te X'in anahtarı 'twitter' (alt:['x']) — ikisini de karşıla
+    case 'twitter': case 'x':
+      return { url:'https://x.com/settings/profile',
+               ipucu:'X → Ayarlar → Profil. Görünen ad, biyografi ve fotoğraf burada. Kullanıcı adı için Ayarlar → Hesap bilgileri.' };
+    case 'tiktok':
+      // TikTok'ta doğrudan düzenleme adresi YOK — profile gidip "Profili düzenle"
+      return { url: kul ? 'https://www.tiktok.com/@' + kul : 'https://www.tiktok.com/',
+               ipucu:'TikTok\'ta doğrudan düzenleme adresi yok: açılan profilde "Profili düzenle"ye bas. DİKKAT: kullanıcı adı 30 günde 1 kez değiştirilebilir.' };
+    case 'pinterest':
+      return { url:'https://www.pinterest.com/settings/',
+               ipucu:'Pinterest → Ayarlar → Profili düzenle.' };
+    case 'facebook':
+      return { url: a.id ? 'https://www.facebook.com/' + a.id : 'https://www.facebook.com/',
+               ipucu:'Facebook sayfa türüne göre düzenleme yolu değişiyor: açılan sayfada Ayarlar → Sayfa bilgileri.' };
+    default: {
+      // Kalanlar (LinkedIn, Threads, Bluesky…): kararlı bir düzenleme adresi
+      // yok, o yüzden profilin kendisine götürüp ne yapılacağını yazıyoruz.
+      const p = PLAT_MAP[plat];
+      if (!p || typeof p.link !== 'function') return null;
+      let url = ''; try { url = p.link(a); } catch(e) { return null; }
+      if (!url) return null;
+      return { url, ipucu: p.label + ' için doğrudan düzenleme adresi yok — açılan profilde "Profili düzenle"ye bas.' };
+    }
+  }
+}
+
 function platProfilGrupla(byPlat){
   const g = {};
   const al = ad => { const k=String(ad||'').trim()||'(profil bilgisi yok)';
@@ -3581,6 +3634,11 @@ function renderPlatformsGrid(byPlat) {
         +   '<div class="pl-h-alt">'+esc(h.p.label)+(kul?' · @'+esc(kul):'')+'</div>'
         + '</div>'
         + (hs ? '<span class="pl-h-uyari">⚠</span>' : '')
+        + (()=>{ const d = platDuzenleHedef(h.p.key, h.a); if(!d) return '';
+            // Kart tıklaması detay modalını açıyor → link kendi tıklamasını yutar
+            return '<a class="pl-h-duzenle" href="'+esc(d.url)+'" target="_blank" rel="noopener"'
+              + ' onclick="event.stopPropagation()" title="'+esc(d.ipucu)+'"'
+              + ' aria-label="'+esc(h.p.label)+' profilini düzenle">⚙</a>'; })()
         + '</div>';
     }).join('');
     const nokta = ps ? 'var(--er)' : 'var(--ok)';
