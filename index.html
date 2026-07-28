@@ -511,6 +511,18 @@ html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
 .sayfa-cubuk .btn:focus-visible,.sayfa-cubuk .cat-chip:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 td > .sayfa-cubuk{padding:4px 6px}
 
+/* ── Değişim göstergesi (artış / azalış) ──────────────────────────
+   Ana sayının yanında küçük, hizalı ve okunur. Renk anlam taşır:
+   yeşil iyi yön, kırmızı kötü yön (başarısızlıkta ters çevrilir). */
+.dlt{font-family:var(--fm);font-size:11px;font-weight:600;line-height:1;
+  padding:2px 5px;border-radius:4px;white-space:nowrap;
+  font-variant-numeric:tabular-nums;cursor:help}
+.dlt.art {color:var(--ok);background:rgba(52,211,153,.13)}
+.dlt.azal{color:var(--er);background:rgba(248,113,113,.13)}
+.dlt.esit{color:var(--mt);background:var(--sur2)}
+/* "7g" / "30g" ön eki: hangi pencere olduğunu söyler, sayıyı bastırmaz */
+.dlt i{font-style:normal;opacity:.62;margin-right:3px;font-size:9.5px;letter-spacing:.02em}
+
 /* ── İşlenmiş video gizleme notu ──────────────────────────────────
    Liste sessizce kısalmasın: kaç video gizlendiği ve nasıl geri
    getirileceği her listenin altında yazar. */
@@ -3128,23 +3140,127 @@ function rapAnalyticsTotals(){
   return tot;
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// DEĞİŞİM GÖSTERGELERİ (haftalık / aylık artış-azalış)
+// ═══════════════════════════════════════════════════════════════════════
+// İki farklı delta türü var, karıştırılmamalı:
+//  1) DÖNEM TOPLAMI (yayınlandı, üretilen short…) → önceki eşit pencereyi
+//     elimizdeki veriden sayabiliriz, geçmiş kayda gerek yok.
+//  2) ANLIK TOPLAM (takipçi, izlenme…) → "önceki değer" ancak bizim
+//     tuttuğumuz günlük anlık görüntüden gelir; ilk çalıştırmada yoktur.
+//     Uydurmak yerine boş bırakılır.
+function deltaEtiketi(fark, o){
+  o = o || {};
+  if (fark == null || !isFinite(fark)) return '';
+  const yuvarla = Math.round(fark);
+  // Yan yana iki çip olabiliyor (hafta + ay) — hangisi olduğu okunabilsin
+  const et = o.etiket ? '<i>'+o.etiket+'</i>' : '';
+  if (yuvarla === 0) return '<span class="dlt esit" title="'+(o.baslik||'')+'">'+et+'±0</span>';
+  const artis = yuvarla > 0;
+  // Başarısızlıkta ARTIŞ kötüdür → renk tersine çevrilir
+  const iyi = o.ters ? !artis : artis;
+  const cls = iyi ? 'art' : 'azal';
+  const ok  = artis ? '▲' : '▼';
+  // Yüzde ölçütlerinde birim "puan", diğerlerinde kısaltılmış sayı (1,3 B)
+  const mik = (artis ? '+' : '−') + (o.puan ? (Math.abs(yuvarla)+' puan') : ytkFmt(Math.abs(yuvarla)));
+  return '<span class="dlt '+cls+'" title="'+(o.baslik||'')+'">'+et+ok+' '+mik+'</span>';
+}
+// Aynı diziden ÖNCEKİ eşit pencereyi say: [şimdi-2N, şimdi-N)
+function rapOncekiPencere(liste, zamanAl, gun, suzgec){
+  const now = Date.now(), bas = now - 2*gun*864e5, bit = now - gun*864e5;
+  return (liste||[]).filter(x=>{
+    const t = zamanAl(x);
+    if (!t || t < bas || t >= bit) return false;
+    return suzgec ? suzgec(x) : true;
+  }).length;
+}
+// KRİTİK KORUMA: karşılaştırma penceresi verinin kapsadığı aralığın DIŞINDA
+// kalıyorsa delta gösterilmez. Yoksa "geçmiş yeterince derin çekilmedi"
+// durumu ekranda "büyük düşüş" gibi görünür — yanlış alarm.
+function rapKapsiyorMu(liste, zamanAl, gun){
+  const bas = Date.now() - 2*gun*864e5;
+  return (liste||[]).some(x=>{ const t = zamanAl(x); return t && t <= bas; });
+}
+// ── Anlık toplamlar için günlük anlık görüntü deposu ──
+// Gün başına tek kayıt; 400 günden eskiler atılır.
+function rapSnapOku(){
+  try { return JSON.parse(localStorage.getItem('op_rap_snap')||'{}') || {}; } catch(e){ return {}; }
+}
+function rapSnapYaz(tot){
+  if (!tot) return;
+  const s = rapSnapOku();
+  const gun = new Date().toISOString().slice(0,10);
+  s[gun] = { followers:Math.round(tot.followers||0), views:Math.round(tot.views||0),
+             likes:Math.round(tot.likes||0), reach:Math.round(tot.reach||0) };
+  const esik = Date.now() - 400*864e5;
+  Object.keys(s).forEach(k=>{ if((Date.parse(k)||0) < esik) delete s[k]; });
+  try { localStorage.setItem('op_rap_snap', JSON.stringify(s)); } catch(e){}
+}
+// N gün öncesine EN YAKIN kaydı bul (±%40 tolerans; yoksa null)
+function rapSnapGecmis(gun){
+  const s = rapSnapOku();
+  const hedef = Date.now() - gun*864e5;
+  const tol = gun*864e5*0.4;
+  let enIyi = null, enYakin = Infinity;
+  Object.keys(s).forEach(k=>{
+    const t = Date.parse(k)||0; if(!t) return;
+    const d = Math.abs(t-hedef);
+    if (d <= tol && d < enYakin){ enYakin = d; enIyi = s[k]; }
+  });
+  return enIyi;
+}
+// Anlık bir ölçüt için 7g + 30g delta etiketleri
+function rapAnlikDelta(alan, simdi){
+  if (simdi == null) return '';
+  let html = '';
+  [[7,'hafta'],[30,'ay']].forEach(([g,ad])=>{
+    const eski = rapSnapGecmis(g);
+    if (!eski || eski[alan] == null) return;
+    // Ölçüt hem şimdi hem geçmişte 0 ise o platform bu veriyi hiç vermiyor
+    // demektir; "±0" yazmak bilgi değil gürültü olur.
+    if (!simdi && !eski[alan]) return;
+    html += deltaEtiketi(simdi - eski[alan], {etiket: g+'g',
+             baslik: g+' gün önceye göre ('+ad+'lık değişim)'});
+  });
+  return html;
+}
+
 function rapRenderCore(){
   const days=RAP.period, cutoff=Date.now()-days*864e5;
   const inP=RAP.hist.filter(h=>{ const t=Date.parse(rapHistTime(h)); return t && t>=cutoff; });
   const pubN=inP.filter(rapOk).length, failN=inP.length-pubN;
   const tot=rapAnalyticsTotals();
+  // Anlık toplamları günlük depoya yaz — yarının deltası bugünden doğuyor
+  if (tot) rapSnapYaz(tot);
+
+  // ── DÖNEM TOPLAMLARI: önceki eşit pencereye göre değişim ──
+  const hT = h => Date.parse(rapHistTime(h)) || 0;
+  const kapsar = rapKapsiyorMu(RAP.hist, hT, days);
+  const oncePub = kapsar ? rapOncekiPencere(RAP.hist, hT, days, rapOk) : null;
+  const onceTum = kapsar ? rapOncekiPencere(RAP.hist, hT, days) : null;
+  const onceFail = (onceTum==null) ? null : (onceTum - oncePub);
+  const bilgi = 'önceki '+days+' güne göre';
+  const dPub  = oncePub==null ? '' : deltaEtiketi(pubN - oncePub, {baslik:bilgi});
+  const dFail = onceFail==null ? '' : deltaEtiketi(failN - onceFail, {baslik:bilgi, ters:true});
+  let dOran = '';
+  if (onceTum) {
+    const simdi = inP.length ? Math.round(pubN/inP.length*100) : null;
+    const eski  = Math.round(oncePub/onceTum*100);
+    if (simdi != null) dOran = deltaEtiketi(simdi - eski, {baslik:bilgi, puan:true});
+  }
+
   const kpi=[
-    ['YAYINLANDI ('+days+'G)', pubN, 'var(--ok)'],
-    ['BAŞARISIZ', failN, failN?'var(--er)':'var(--mt)'],
-    ['BAŞARI ORANI', inP.length?Math.round(pubN/inP.length*100)+'%':'–', 'var(--acc)'],
-    ['PLANLI + KUYRUK', RAP.plan.length, '#00b8d4'],
-    ['TAKİPÇİ (TOPLAM)', tot?ytkFmt(Math.round(tot.followers)):'…', 'var(--acc3)'],
-    ['İZLENME (TOPLAM)', tot?ytkFmt(Math.round(tot.views)):'…', 'var(--gld)'],
-    ['BEĞENİ', tot?ytkFmt(Math.round(tot.likes)):'…', 'var(--acc2)'],
-    ['ERİŞİM', tot?ytkFmt(Math.round(tot.reach)):'…', 'var(--ok)']
+    ['YAYINLANDI ('+days+'G)', pubN, 'var(--ok)', dPub],
+    ['BAŞARISIZ', failN, failN?'var(--er)':'var(--mt)', dFail],
+    ['BAŞARI ORANI', inP.length?Math.round(pubN/inP.length*100)+'%':'–', 'var(--acc)', dOran],
+    ['PLANLI + KUYRUK', RAP.plan.length, '#00b8d4', ''],
+    ['TAKİPÇİ (TOPLAM)', tot?ytkFmt(Math.round(tot.followers)):'…', 'var(--acc3)', tot?rapAnlikDelta('followers',Math.round(tot.followers)):''],
+    ['İZLENME (TOPLAM)', tot?ytkFmt(Math.round(tot.views)):'…', 'var(--gld)', tot?rapAnlikDelta('views',Math.round(tot.views)):''],
+    ['BEĞENİ', tot?ytkFmt(Math.round(tot.likes)):'…', 'var(--acc2)', tot?rapAnlikDelta('likes',Math.round(tot.likes)):''],
+    ['ERİŞİM', tot?ytkFmt(Math.round(tot.reach)):'…', 'var(--ok)', tot?rapAnlikDelta('reach',Math.round(tot.reach)):'']
   ];
   const kEl=document.getElementById('rap-kpi');
-  if(kEl) kEl.innerHTML=kpi.map(k=>`<div style="background:var(--sur);border:1px solid var(--brd);border-radius:8px;padding:11px 12px"><div style="font-size:9.5px;letter-spacing:1px;color:var(--mt)">${k[0]}</div><div style="font-family:var(--fh);font-size:21px;font-weight:800;color:${k[2]};font-variant-numeric:tabular-nums;margin-top:2px">${k[1]}</div></div>`).join('');
+  if(kEl) kEl.innerHTML=kpi.map(k=>`<div style="background:var(--sur);border:1px solid var(--brd);border-radius:8px;padding:11px 12px"><div style="font-size:9.5px;letter-spacing:1px;color:var(--mt)">${k[0]}</div><div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:2px"><span style="font-family:var(--fh);font-size:21px;font-weight:800;color:${k[2]};font-variant-numeric:tabular-nums">${k[1]}</span>${k[3]||''}</div></div>`).join('');
   rapRenderChart(inP, days);
   rapRenderPlatforms(inP);
   rapRenderProfiles(inP);
@@ -3354,15 +3470,25 @@ function rapRenderUretim(){
   const pick=(r,keys)=>{ for(const k of keys){ if(r[k]!=null&&String(r[k]).trim()!=='') return String(r[k]).trim(); } return ''; };
   const pT=r=>Date.parse(pick(r,['created-at','tarih','istek-tarihi','date','created_at','Tarih']))||0;
   const now=Date.now(), wa=now-7*864e5, ma=now-30*864e5;
+  // Sheet tarihli olduğu için önceki pencere doğrudan sayılabiliyor.
+  // Sheet o kadar geriye gitmiyorsa delta gizlenir (yanlış "düşüş" olmasın).
+  const d = (liste, gun, simdiSayi) => {
+    if (!rapKapsiyorMu(liste, pT, gun)) return '';
+    const once = rapOncekiPencere(liste, pT, gun);
+    return deltaEtiketi(simdiSayi - once, {baslik:'önceki '+gun+' güne göre'});
+  };
+  const s7=shorts.filter(r=>pT(r)>=wa).length, s30=shorts.filter(r=>pT(r)>=ma).length;
+  const v7=urls.filter(r=>pT(r)>=wa).length,   v30=urls.filter(r=>pT(r)>=ma).length;
   const tiles=[
-    ['SHORT (7G)', shorts.filter(r=>pT(r)>=wa).length, 'var(--acc)'],
-    ['SHORT (30G)', shorts.filter(r=>pT(r)>=ma).length, 'var(--acc)'],
-    ['VİDEO (7G)', urls.filter(r=>pT(r)>=wa).length, 'var(--acc3)'],
-    ['VİDEO (30G)', urls.filter(r=>pT(r)>=ma).length, 'var(--acc3)'],
-    ['TOPLAM SHORT', shorts.length, 'var(--gld)'],
-    ['TOPLAM VİDEO', urls.length, 'var(--gld)']
+    ['SHORT (7G)',  s7,  'var(--acc)',  d(shorts,7,s7)],
+    ['SHORT (30G)', s30, 'var(--acc)',  d(shorts,30,s30)],
+    ['VİDEO (7G)',  v7,  'var(--acc3)', d(urls,7,v7)],
+    ['VİDEO (30G)', v30, 'var(--acc3)', d(urls,30,v30)],
+    // Kümülatif toplamlarda "önceki toplam" anlamsız; son 30 günün katkısı yazılıyor
+    ['TOPLAM SHORT', shorts.length, 'var(--gld)', s30?deltaEtiketi(s30,{baslik:'son 30 günde eklenen'}):''],
+    ['TOPLAM VİDEO', urls.length,   'var(--gld)', v30?deltaEtiketi(v30,{baslik:'son 30 günde eklenen'}):'']
   ];
-  uEl.innerHTML=tiles.map(k=>`<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:10px 12px"><div style="font-size:9.5px;letter-spacing:1px;color:var(--mt)">${k[0]}</div><div style="font-family:var(--fh);font-size:19px;font-weight:800;color:${k[2]};font-variant-numeric:tabular-nums;margin-top:2px">${k[1]}</div></div>`).join('');
+  uEl.innerHTML=tiles.map(k=>`<div style="background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:10px 12px"><div style="font-size:9.5px;letter-spacing:1px;color:var(--mt)">${k[0]}</div><div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:2px"><span style="font-family:var(--fh);font-size:19px;font-weight:800;color:${k[2]};font-variant-numeric:tabular-nums">${k[1]}</span>${k[3]||''}</div></div>`).join('');
   if(kEl){
     const kc={}; shorts.forEach(r=>{ const k=pick(r,['kategori','category','Kategori'])||'genel'; kc[k]=(kc[k]||0)+1; });
     const keys=Object.keys(kc).sort((a,b)=>kc[b]-kc[a]);
