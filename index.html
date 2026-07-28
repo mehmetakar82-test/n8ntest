@@ -8386,6 +8386,10 @@ async function ydDoRetry(payload, idx){
       if (payload.description)  fd.append('description', payload.description);
       fd.append('async_upload','true');
       fd.append('add_to_queue','true');
+      // COPPA beyanını AÇIKÇA gönder. Gönderilmediğinde YouTube Studio'da
+      // "Is this video made for kids?" CEVAPSIZ kalıyor ve YouTube cevapsız
+      // videoyu önermiyor. false = "No, it's not made for kids".
+      fd.append('selfDeclaredMadeForKids','false');
       const r = await fetch('https://api.upload-post.com/api/upload',{ method:'POST', body:fd, headers:{'Authorization':'Apikey '+S.cfg.blot} });
       const j = await r.json().catch(()=>({}));
       ok = r.ok && j.success !== false; msg = j.message||j.error||('HTTP '+r.status);
