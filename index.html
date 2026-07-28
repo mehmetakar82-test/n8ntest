@@ -4189,6 +4189,67 @@ async function upSirali(liste, isFn, esZaman) {
   return sonuc;
 }
 
+// ── ÖLÜ BUTON DÜZELTMESİ ───────────────────────────────────────────────
+// testWH ve ytkTestApi HTML'de onclick ile çağrılıyordu ama hiç tanımlı
+// değildi: iki buton tıklanınca sessizce ReferenceError atıyordu (sistem
+// denetiminde bulundu). İşlevleri gerçekten yararlı olduğu için silmek
+// yerine yazıldı.
+
+// n8n webhook'u kayıtlı mı? Video GÖNDERMEDEN sınar.
+// Yöntem: webhook POST olarak kayıtlıysa n8n bir GET isteğine "bu webhook
+// GET için kayıtlı değil, POST mu demek istediniz?" diye 404 döner — yani
+// bu yanıt webhook'un VAR olduğunu kanıtlar. Hiç kayıtlı değilse mesaj
+// "not registered" olur. Böylece gerçek bir gönderim tetiklenmez.
+async function testWH(gosterId, sonucId){
+  const yol = (document.getElementById(gosterId) || {}).textContent || '';
+  const base = getN8N();
+  if (!base) return showRes(sonucId, 'Ayarlar\'dan n8n URL girin', 'warn');
+  if (!yol)  return showRes(sonucId, 'Webhook yolu okunamadı', 'err');
+  showRes(sonucId, '⏳ ' + yol + ' sınanıyor…', 'info');
+  try {
+    const r = await fetch(base + yol, { method:'GET' });
+    const t = (await r.text()).slice(0, 400);
+    if (r.ok)
+      return showRes(sonucId, '✓ ' + yol + ' yanıt verdi (HTTP ' + r.status + ')', 'ok');
+    // n8n'in "yanlış metot" mesajı = webhook KAYITLI demek
+    if (/not registered for GET|Did you mean to make a POST/i.test(t))
+      return showRes(sonucId, '✓ ' + yol + ' kayıtlı ve aktif (POST bekliyor — gönderim çalışır)', 'ok');
+    if (/not registered/i.test(t))
+      return showRes(sonucId, '✕ ' + yol + ' KAYITLI DEĞİL — n8n\'de workflow Active mi? Test modunda mı kaldı?', 'err');
+    showRes(sonucId, '⚠ HTTP ' + r.status + ' — ' + t.slice(0, 140), 'warn');
+  } catch(e) {
+    showRes(sonucId, '✕ Ulaşılamadı: ' + e.message + ' (URL yanlış ya da CORS engeli)', 'err');
+  }
+}
+
+// YouTube API anahtarını en ucuz uçla sınar (1 kota birimi).
+async function ytkTestApi(){
+  const el = document.getElementById('ytk-apikey');
+  const key = (el && el.value.trim()) || S.cfg.ytApiKey || '';
+  if (!key) return toast('Önce API Key gir','warn');
+  toast('⏳ Anahtar sınanıyor…','info',2000);
+  try {
+    const r = await fetch('https://www.googleapis.com/youtube/v3/i18nLanguages?part=snippet&key=' + encodeURIComponent(key));
+    const j = await r.json().catch(()=>({}));
+    if (r.ok && (j.items || []).length){
+      toast('✓ Anahtar çalışıyor (' + j.items.length + ' dil döndü)','ok',4000);
+      addLog('ok','sistem','YouTube API Key testi: geçerli');
+      return;
+    }
+    const hata = ((j.error||{}).message) || ('HTTP ' + r.status);
+    const kod  = (((j.error||{}).errors||[])[0]||{}).reason || '';
+    let ipucu = '';
+    if (/keyInvalid|API key not valid/i.test(hata+kod)) ipucu = ' → anahtar geçersiz, Console\'dan kopyalarken boşluk kalmış olabilir';
+    else if (/quota/i.test(hata+kod))                   ipucu = ' → günlük kota bitmiş, yarın sıfırlanır';
+    else if (/accessNotConfigured|disabled/i.test(hata+kod)) ipucu = ' → Cloud Console\'da YouTube Data API v3 etkin değil';
+    else if (/ipRefererBlocked|referer/i.test(hata+kod))     ipucu = ' → anahtarda HTTP referrer/IP kısıtlaması var, kaldır';
+    toast('✕ ' + hata.slice(0,90) + ipucu,'err',9000);
+    addLog('err','sistem','YouTube API Key testi: ' + hata.slice(0,90));
+  } catch(e){
+    toast('✕ İstek atılamadı: ' + e.message,'err',7000);
+  }
+}
+
 // ── Zamanlanmış açıklamalardan yer tutucu başlıkları toplu temizle ──
 // Kaynak düzeltmesi (Code in JavaScript3'te SABIT_BASLIK boşaltıldı) YALNIZ yeni
 // short'ları etkiler; Upload-Post kuyruğunda BEKLEYEN eski gönderiler hâlâ
@@ -6378,7 +6439,9 @@ document.addEventListener('DOMContentLoaded', function() {
       // UX paketi yardımcıları (onclick'lerden çağrılıyor)
       durumHTML,iskeletHTML,durumYaz,iskeletYaz,gitAyarlar,dmgYaz,dmgCiz,
       ipucAc,ipucKapat,geriAlinabilir,alertSadelestir,pzUygula,pzF,pzBol,
-      islenmisMi,islenmisAyikla,islenmisNotu,islenmisGoster];
+      islenmisMi,islenmisAyikla,islenmisNotu,islenmisGoster,
+      // HTML'de onclick ile çağrılıyor — window'a bağlanmazsa ölü buton olur
+      testWH,ytkTestApi];
     globals.forEach(fn => { if(typeof fn === 'function') window[fn.name] = fn; });
   }catch(e){console.error('Init hatasi:',e);}
 });
