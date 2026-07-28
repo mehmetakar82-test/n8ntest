@@ -2018,6 +2018,48 @@ function profilKategori(username){
   for (const k in KATEGORI_PROFIL_POOL) if (KATEGORI_PROFIL_POOL[k].includes(u)) return k;
   return '';
 }
+// ── YouTube kategorisi + etiketleri (n8n ile AYNI mantık) ──────────────
+// Bu iki fonksiyon n8n'deki Code in JavaScript3 / Video Hazirla / Direkt
+// Yayın Hazırla düğümlerindeki KATEGORI_YT_ID ve ytEtiketUret ile birebir
+// aynı olmalı — biri değişirse diğeri de değişmeli, yoksa panelden yeniden
+// gönderilen video n8n'in gönderdiğinden farklı kategori/etiket alır.
+// Kategori kimlikleri resmi videoCategories API'sinden (regionCode=TR,
+// assignable=true) alındı.
+const KATEGORI_YT_ID = {
+  film:'1', eglence:'24', bilim:'28', vlog:'22',
+  komedi:'23', oyun:'20', spor:'17', genel:'22', genel_en:'22'
+};
+const YT_KAT_ETIKET = {
+  film:'film sinema video', eglence:'eglence viral funny',
+  bilim:'bilim science ogren teknoloji', vlog:'vlog gunluk lifestyle',
+  komedi:'komedi guldur mizah kahkaha', oyun:'oyun gaming gamer gameplay',
+  spor:'spor sports futbol fitness', genel:'gundem bilgi',
+  genel_en:'shorts viral trending fyp'
+};
+function ytKategoriId(kat){ return KATEGORI_YT_ID[kat] || '22'; }
+// YouTube siniri: tags TOPLAMI 500 karakter. Etiket başı 30 karakter +
+// toplam 400 bütçe → 10 etiket her zaman sığar, invalidTags riski yok.
+function ytEtiketler(metin, kat){
+  const yedek = ['shorts','kesfet','video','izle','trend','viral','yeni','kisavideo','onerilen','populer'];
+  const kaynak = String(metin || '') + ' ' + (YT_KAT_ETIKET[kat] || '');
+  // Yalnız #etiketleri al (açıklamanın düz metnini değil), sonra # işaretini sil
+  const ham = (kaynak.match(/#[^\s#,]+/g) || []).map(s=>s.replace(/^#+/,'').trim())
+    .concat(String(YT_KAT_ETIKET[kat] || '').split(/\s+/))
+    .filter(s=>s && s.length<=30);
+  const gorulen = {}, out = [];
+  let butce = 400;
+  for (const t of ham.concat(yedek)) {
+    const k = t.toLowerCase();
+    if (gorulen[k]) continue;
+    const maliyet = t.length + (/\s/.test(t) ? 3 : 1);
+    if (butce - maliyet < 0) break;
+    gorulen[k] = 1; out.push(t); butce -= maliyet;
+    if (out.length === 10) break;
+  }
+  while (out.length < 10) out.push(yedek[out.length]);
+  return out;
+}
+
 function katLabel(k){
   if (!k) return '';
   if (k === 'genel_en') return 'Genel (EN)';
@@ -8390,6 +8432,14 @@ async function ydDoRetry(payload, idx){
       // "Is this video made for kids?" CEVAPSIZ kalıyor ve YouTube cevapsız
       // videoyu önermiyor. false = "No, it's not made for kids".
       fd.append('selfDeclaredMadeForKids','false');
+      // Yeniden gönderim de n8n hattıyla AYNI kategori ve etiketleri almalı,
+      // yoksa retry'lanan video kategorisiz (varsayılan 22) ve etiketsiz kalır.
+      // Burada FormData olduğu için tekrarlanan tags[] serbestçe eklenebiliyor.
+      if (payload.platform === 'youtube') {
+        fd.append('categoryId', ytKategoriId(profilKategori(payload.profil)));
+        ytEtiketler(payload.description || payload.title, profilKategori(payload.profil))
+          .forEach(t => fd.append('tags[]', t));
+      }
       const r = await fetch('https://api.upload-post.com/api/upload',{ method:'POST', body:fd, headers:{'Authorization':'Apikey '+S.cfg.blot} });
       const j = await r.json().catch(()=>({}));
       ok = r.ok && j.success !== false; msg = j.message||j.error||('HTTP '+r.status);
