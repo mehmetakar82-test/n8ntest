@@ -3411,17 +3411,52 @@ function rapSpark(ts){
   return ` <svg width="${W}" height="${H}" style="vertical-align:middle;margin-left:6px"><polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="1.5"/></svg>`;
 }
 
+// Analytics yanıtını NORMALLEŞTİR.
+// OpenAPI şeması "platform adıyla anahtarlanmış nesne" diyor ama pratikte
+// dizi ([{}]) ya da sarmalanmış ({analytics:{…}}) da gelebiliyor. Dizi
+// geldiğinde Object.keys sayısal indeks veriyordu ve kart platform adı
+// yerine "0" yazıyordu. Artık YALNIZ tanınan platform anahtarları alınır.
+const RAP_PLAT_BILINEN = ['instagram','youtube','tiktok','x','twitter','facebook',
+                          'linkedin','threads','pinterest','bluesky','reddit'];
+function rapAnalyticsNormal(data){
+  if (!data || typeof data !== 'object') return {};
+  // Sarmalayıcı alanları aç
+  for (const k of ['analytics','data','result','metrics']){
+    if (data[k] && typeof data[k] === 'object' && !Array.isArray(data[k])) { data = data[k]; break; }
+  }
+  const out = {};
+  const ekle = (k, v) => {
+    const ad = String(k||'').toLowerCase();
+    if (!RAP_PLAT_BILINEN.includes(ad)) return;
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return;
+    out[ad === 'twitter' ? 'x' : ad] = v;
+  };
+  if (Array.isArray(data)) {
+    // Dizi biçimi: her öğe kendi platformunu taşıyor olabilir
+    data.forEach(x => { if (x && typeof x === 'object') ekle(x.platform || x.name || x.key, x); });
+  } else {
+    Object.keys(data).forEach(k => ekle(k, data[k]));
+  }
+  return out;
+}
 function rapRenderLiveCard(u, data, err){
   const el=document.getElementById('rap-live'); if(!el) return;
   const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   const PN={instagram:PFAV('instagram.com')+' Instagram',tiktok:PFAV('tiktok.com')+' TikTok',youtube:PFAV('youtube.com')+' YouTube',x:PFAV('x.com')+' X',linkedin:PFAV('linkedin.com')+' LinkedIn',threads:PFAV('threads.net')+' Threads',pinterest:PFAV('pinterest.com')+' Pinterest',facebook:PFAV('facebook.com')+' Facebook'};
+  const norm = err ? {} : rapAnalyticsNormal(data);
   let inner;
-  if (err || !data || !Object.keys(data).length){
-    inner=`<div style="font-size:11px;color:var(--wn)">Metrik alınamadı${err?': '+esc(String(err).slice(0,70)):''}</div>`;
+  if (err){
+    // Hız sınırını diğer hatalardan ayır — çözümü farklı (bekle ve tekrar dene)
+    const hiz = /429|too many/i.test(String(err));
+    inner=`<div style="font-size:11.5px;color:${hiz?'var(--wn)':'var(--er)'}">`
+      + (hiz ? '⏳ Upload-Post hız sınırı — <b>↻ Raporu Oluştur</b>\'a tekrar bas, bu profil yeniden denenecek.'
+             : '✕ Metrik alınamadı: '+esc(String(err).slice(0,80))) + '</div>';
+  } else if (!Object.keys(norm).length){
+    inner=`<div style="font-size:11.5px;color:var(--mt)">Bu profil için metrik dönmedi — platform henüz veri üretmemiş olabilir (yeni hesap) ya da analitik izni yok.</div>`;
   } else {
     // Sabit sıra: Instagram → YouTube → TikTok → X (profilden profile değişmesin)
-    inner=rapPlatSirala(Object.keys(data)).map(pk=>{
-      const m=data[pk]||{};
+    inner=rapPlatSirala(Object.keys(norm)).map(pk=>{
+      const m=norm[pk]||{};
       if(typeof m!=='object') return '';
       const rows=[['Takipçi',m.followers],['İzlenme',m.views!=null?m.views:m.impressions],['Erişim',m.reach],['Beğeni',m.likes],['Yorum',m.comments],['Paylaşım',m.shares],['Kaydetme',m.saves]].filter(x=>x[1]!=null&&!isNaN(parseFloat(x[1])));
       return `<div style="margin-bottom:8px">
@@ -3447,19 +3482,34 @@ async function rapLoadAnalytics(profs){
     return { u:p.username, plats };
   }).filter(t=>t.u&&t.plats.length);
   if(!targets.length){ liveEl.innerHTML='<div style="color:var(--mt);font-size:12px;grid-column:1/-1;text-align:center;padding:10px">Bağlı sosyal hesap bulunamadı — Platformlar → Yenile ile profilleri doldur</div>'; if(stEl) stEl.textContent=''; return; }
-  liveEl.innerHTML=''; let done=0;
+  liveEl.innerHTML=''; let done=0, hizSiniri=0;
   if(stEl) stEl.textContent='— 0/'+targets.length;
-  await Promise.all(targets.map(async t=>{
+  // ESKİDEN Promise.all ile 15 profil AYNI ANDA isteniyordu → Upload-Post
+  // HTTP 429 ("Too many requests") veriyor ve o profillerin kartı hata
+  // gösteriyordu. Artık en fazla 3 eşzamanlı istek + 429/5xx'te yeniden deneme.
+  await upSirali(targets, async t=>{
     try{
-      const { data } = await upFetch('/analytics/'+encodeURIComponent(t.u)+'?platforms='+t.plats.join(','));
-      RAP.analytics[t.u]=data||{};
-      rapRenderLiveCard(t.u, data);
-    }catch(e){ rapRenderLiveCard(t.u, null, e.message); }
+      const { data } = await upFetchRetry('/analytics/'+encodeURIComponent(t.u)+'?platforms='+t.plats.join(','));
+      // Toplamlar da normalleştirilmiş veriden hesaplanmalı; ham dizi biçimi
+      // rapAnalyticsTotals'da 0 üretiyordu.
+      const norm = rapAnalyticsNormal(data);
+      RAP.analytics[t.u]=norm;
+      rapRenderLiveCard(t.u, norm);
+    }catch(e){
+      if(/429|too many/i.test(String(e.message))) hizSiniri++;
+      rapRenderLiveCard(t.u, null, e.message);
+    }
     done++;
     if(stEl) stEl.textContent='— '+done+'/'+targets.length+(done===targets.length?' ✓':'');
     rapRenderCore();
-  }));
+  }, 3);
   const st=document.getElementById('rap-status'); if(st) st.textContent='✓ rapor tamam';
+  // Hız sınırına takılan kaldıysa sessiz kalma — tekrar denemesi gerektiğini söyle
+  if (hizSiniri){
+    if(stEl) stEl.textContent='— '+done+'/'+targets.length+' · ⏳ '+hizSiniri+' profil hız sınırına takıldı';
+    toast(hizSiniri+' profil Upload-Post hız sınırına takıldı — Raporu Oluştur\'a tekrar bas','warn',6000);
+    addLog('warn','uploadpost','Rapor metrik: '+hizSiniri+' profil HTTP 429');
+  }
   addLog('ok','sistem','Rapor canlı metrikler: '+Object.keys(RAP.analytics).length+' profil');
 }
 
