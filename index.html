@@ -511,6 +511,55 @@ html.light-theme #tr-toolbar{box-shadow:0 6px 18px rgba(15,23,42,.12)}
 .sayfa-cubuk .btn:focus-visible,.sayfa-cubuk .cat-chip:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 td > .sayfa-cubuk{padding:4px 6px}
 
+/* ── GRAFİK PALETİ ────────────────────────────────────────────────
+   Marka renkleri (IG pembe, YT kırmızı, TT camgöbeği, X/FB mavi) grafik
+   markı olarak ÖLÇÜLDÜ ve düştü: Facebook↔X mavileri normal görüşte bile
+   ΔE 9.6 (taban 15), TikTok camgöbeği koyu yüzeyde açıklık bandının
+   dışında ve gri okuyor. Bu yüzden markalar doğrulanmış kategorik palete
+   eşlendi; marka tanınırlığını satır başındaki favicon + ad taşıyor.
+   Panel koyu varsayılan olduğu için koyu değerler burada, açık tema
+   html.light-theme altında — panelin kendi deseniyle aynı.
+   Doğrulama: koyu (yüzey #111822) 5 slot TÜM KONTROLLER GEÇTİ;
+   açık (yüzey #eef1f7) geçti, kontrast WARN'ı doğrudan etiket + tablo
+   görünümüyle karşılanıyor. */
+.viz{
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767; --s9:var(--mt);
+  --viz-yuzey:var(--sur2); --viz-eksen:var(--brd-str);
+}
+html.light-theme .viz{
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948; --s9:var(--mt);
+}
+/* Bileşim çubuğu: yatay %100 yığılmış. Ayırıcı = 2px YÜZEY boşluğu
+   (kenarlık değil — kenarlık veri olmayan mürekkep ekler). */
+.viz-bilesim{display:flex;gap:2px;height:30px;border-radius:5px;overflow:hidden;
+  background:var(--viz-yuzey)}
+.viz-bilesim > span{display:flex;align-items:center;justify-content:center;
+  min-width:2px;transition:filter .13s;cursor:help}
+.viz-bilesim > span:hover{filter:brightness(1.18)}
+.viz-bilesim b{font-family:var(--fm);font-size:10.5px;font-weight:700;color:#fff;
+  text-shadow:0 1px 2px rgba(0,0,0,.55);letter-spacing:.02em;white-space:nowrap;padding:0 4px}
+html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)}
+/* Efsane: 2+ seride her zaman var — kimlik asla yalnız renkte olmasın */
+.viz-efsane{display:flex;flex-wrap:wrap;gap:4px 12px;margin-top:8px}
+.viz-efsane span{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--mt)}
+.viz-efsane i{width:9px;height:9px;border-radius:2px;flex-shrink:0;display:inline-block}
+/* Küçük çoklu: ölçüt başına ayrı grafik, HER BİRİ KENDİ ÖLÇEĞİNDE
+   (tek eksen kuralı — iki ölçüt asla aynı eksene binmez). */
+.viz-kucuk{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-top:14px}
+.viz-kucuk h4{margin:0 0 7px;font-family:var(--fm);font-size:10px;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--mt);font-weight:600;
+  padding-bottom:5px;border-bottom:1px solid var(--viz-eksen)}
+.viz-sat{display:grid;grid-template-columns:74px 1fr auto;gap:7px;align-items:center;margin-bottom:5px}
+.viz-sat .ad{font-size:11px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.viz-sat .yol{height:9px;background:var(--viz-yuzey);border-radius:2px;overflow:hidden}
+/* 4px yuvarlak veri ucu, tabanda kare; ≤24px kalınlık */
+.viz-sat .cub{height:100%;border-radius:0 4px 4px 0;min-width:2px;transition:filter .13s}
+.viz-sat:hover .cub{filter:brightness(1.18)}
+.viz-sat .deg{font-family:var(--fm);font-size:10.5px;color:var(--tx);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+
 /* ── Değişim göstergesi (artış / azalış) ──────────────────────────
    Ana sayının yanında küçük, hizalı ve okunur. Renk anlam taşır:
    yeşil iyi yön, kırmızı kötü yön (başarısızlıkta ters çevrilir). */
@@ -3405,6 +3454,54 @@ function rapPlatDelta(pk, alan, simdi){
   });
   return html;
 }
+// Platform → kategorik renk yuvası. SABİT SIRA, asla döngüye girmez:
+// renk varlığı takip eder, sıralamayı değil — filtre platform çıkarsa
+// kalanların rengi değişmez. 8'den sonrası "Diğer" (gri) olur.
+const RAP_VIZ_SLOT = { instagram:1, youtube:2, tiktok:3, x:4, facebook:5,
+                       linkedin:6, threads:7, pinterest:8 };
+function rapVizRenk(pk){ return 'var(--s'+(RAP_VIZ_SLOT[pk] || 9)+')'; }
+
+// Yatay %100 yığılmış bileşim çubuğu — "payım nerede" sorusu.
+// Doğrudan etiket YALNIZ sığdığında (≥%9) basılır; kırpma yapılmaz.
+function rapVizBilesim(keys, by, alan){
+  const top = keys.reduce((s,k)=>s+(by[k][alan]||0), 0);
+  if (!top) return '';
+  const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const parca = keys.filter(k=>by[k][alan]>0).map(k=>{
+    const pay = by[k][alan]/top*100;
+    const ad = RAP_PLAT_AD[k]||k;
+    const et = pay>=9 ? '<b>'+Math.round(pay)+'%</b>' : '';
+    return '<span style="flex:'+by[k][alan]+' 0 0;background:'+rapVizRenk(k)+'"'
+      + ' title="'+esc(ad)+': '+ytkFmt(Math.round(by[k][alan]))+' (%'+pay.toFixed(1)+')">'+et+'</span>';
+  }).join('');
+  const efsane = keys.filter(k=>by[k][alan]>0).map(k=>
+    '<span><i style="background:'+rapVizRenk(k)+'"></i>'+esc(RAP_PLAT_AD[k]||k)+'</span>').join('');
+  return '<div class="viz-bilesim">'+parca+'</div>'
+    + (keys.length>1 ? '<div class="viz-efsane">'+efsane+'</div>' : '');
+}
+
+// Ölçüt başına küçük yatay çubuk grafiği. Her grafik KENDİ ölçeğinde —
+// takipçi (85 B) ile yorum (800) asla aynı eksene binmez.
+function rapVizKucuk(keys, by, alanlar){
+  const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const bloklar = alanlar.map(([alan, et])=>{
+    const sirali = keys.filter(k=>by[k][alan]>0).sort((a,b)=>by[b][alan]-by[a][alan]);
+    if (!sirali.length) return '';
+    const max = by[sirali[0]][alan];
+    const satirlar = sirali.map(k=>{
+      const v = by[k][alan];
+      return '<div class="viz-sat">'
+        + '<span class="ad" title="'+esc(RAP_PLAT_AD[k]||k)+'">'+esc(RAP_PLAT_AD[k]||k)+'</span>'
+        + '<span class="yol"><span class="cub" style="display:block;width:'
+        +   Math.max(2, Math.round(v/max*100))+'%;background:'+rapVizRenk(k)+'"'
+        +   ' title="'+esc(RAP_PLAT_AD[k]||k)+' · '+et+': '+ytkFmt(Math.round(v))+'"></span></span>'
+        + '<span class="deg">'+ytkFmt(Math.round(v))+'</span></div>';
+    }).join('');
+    return '<div><h4>'+esc(et)+'</h4>'+satirlar+'</div>';
+  }).filter(Boolean).join('');
+  return bloklar ? '<div class="viz-kucuk">'+bloklar+'</div>' : '';
+}
+
 function rapRenderPlatToplam(){
   const el = document.getElementById('rap-plat-toplam'); if (!el) return;
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
@@ -3420,10 +3517,14 @@ function rapRenderPlatToplam(){
   const gt = { hesap:0 }; RAP_PLAT_ALAN.forEach(([a])=>gt[a]=0);
   keys.forEach(k=>{ gt.hesap+=by[k].hesap; RAP_PLAT_ALAN.forEach(([a])=>gt[a]+=by[k][a]); });
 
+  // white-space:nowrap + flex-wrap:nowrap ŞART: delta çipleri eklendikten
+  // sonra çip içi satır kırılıyordu ("85" altına "B" düşüyordu). Çipin
+  // kendisi bir bütün olarak sarmalanır, içi asla bölünmez.
   const cip = (etiket, deger, delta) => !deger ? '' :
     `<span style="display:inline-flex;align-items:baseline;gap:5px;font-size:11px;color:var(--mt);`
     + `background:var(--bg);border:1px solid var(--brd);border-radius:5px;padding:3px 8px;`
-    + `font-variant-numeric:tabular-nums">${etiket}: <b style="color:var(--tx);font-size:13px">`
+    + `font-variant-numeric:tabular-nums;white-space:nowrap;flex-wrap:nowrap">${etiket}: `
+    + `<b style="color:var(--tx);font-size:13px;white-space:nowrap">`
     + `${ytkFmt(Math.round(deger))}</b>${delta||''}</span>`;
 
   const satir = (ad, ikon, b, pk, vurgu) => {
@@ -3437,14 +3538,26 @@ function rapRenderPlatToplam(){
     </div>`;
   };
 
-  el.innerHTML = `<div style="border:1px solid var(--brd);border-radius:8px;padding:11px 13px;background:var(--sur2)">
+  // Grafik katmanı: bileşim (pay) → karşılaştırma (büyüklük) → tablo (kesin sayı).
+  // Tablo hem kesin değeri hem "tablo görünümü" erişilebilirlik şartını karşılıyor;
+  // açık temadaki kontrast uyarısının gerektirdiği rahatlama da bu.
+  const bilesim = rapVizBilesim(keys, by, 'followers');
+  const kucuk   = rapVizKucuk(keys, by, [['followers','Takipçi'],['views','İzlenme'],['likes','Beğeni']]);
+
+  el.innerHTML = `<div class="viz" style="border:1px solid var(--brd);border-radius:8px;padding:11px 13px;background:var(--sur2)">
     <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:4px">
       📊 Platform Toplamları <span style="letter-spacing:0;text-transform:none">— tüm hesaplar birlikte</span></div>
+    ${bilesim ? `<div style="margin:10px 0 2px">
+      <div style="font-size:11px;color:var(--mt);margin-bottom:6px">Takipçi payı — hangi platform kitlenin ne kadarını taşıyor</div>
+      ${bilesim}</div>` : ''}
+    ${kucuk}
+    <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin:16px 0 2px;
+      padding-bottom:5px;border-bottom:1px solid var(--brd-str)">Kesin değerler</div>
     ${keys.map(k=>satir(RAP_PLAT_AD[k]||k, PFAV(RAP_PLAT_DOMAIN[k]||'example.com'), by[k], k, false)).join('')}
     ${keys.length>1 ? satir('TÜM PLATFORMLAR','Σ', gt, null, true) : ''}
     <div style="font-size:11px;color:var(--mt);margin-top:9px">Yalnız Upload-Post'un analitik döndürdüğü
-      hesaplar sayılır; metrik vermeyen hesap toplama girmez. Değişim çipleri günlük anlık görüntüden
-      hesaplanır — ilk raporda boş, sonraki günlerde dolar.</div>
+      hesaplar sayılır; metrik vermeyen hesap toplama girmez. Her ölçütün grafiği <b>kendi ölçeğinde</b> —
+      takipçi ile yorum aynı eksene binmez. Değişim çipleri günlük anlık görüntüden hesaplanır.</div>
   </div>`;
 }
 
