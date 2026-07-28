@@ -1349,7 +1349,7 @@ td > .sayfa-cubuk{padding:4px 6px}
     <div class="ct">📁 Upload-Post Profilleri <span id="rap-prof-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div class="tw"><table><thead><tr><th>Profil</th><th>Kategori</th><th>Platformlar</th><th title="Seçili rapor dönemi içinde">Yayınlanan <span style="color:var(--mt);font-weight:400">(dönem)</span></th><th title="Seçili rapor dönemi içinde">Başarısız</th><th>Planlı/Kuyruk</th><th title="Çekilen tüm geçmişteki en son yayın — rapor döneminden bağımsız">Son Yayın <span style="color:var(--mt);font-weight:400">(tüm)</span></th><th>Takipçi</th><th>İzlenme</th></tr></thead>
     <tbody id="rap-prof-tbody"><tr><td colspan="9" style="color:var(--mt);text-align:center;padding:14px">—</td></tr></tbody></table></div>
-    <div id="rap-kat-uyum" style="margin-top:12px"></div>
+    <div id="rap-plat-toplam" style="margin-top:12px"></div>
   </div>
 
   <!-- CANLI SOSYAL METRİKLER -->
@@ -1975,18 +1975,11 @@ function katLabel(k){
   const c = getCats()[k];
   return c ? c.label : k;
 }
-// Canlı Upload-Post profilleriyle haritayı karşılaştır → sapmaları bul
-function katProfilUyum(profiles){
-  const live = new Set((profiles||[]).map(p=>String(p.username||'').trim()).filter(Boolean));
-  const mapped = new Set();
-  Object.values(KATEGORI_PROFIL_POOL).forEach(arr=>arr.forEach(u=>mapped.add(u)));
-  return {
-    live,
-    bagsiz: [...live].filter(u=>!mapped.has(u)),        // Upload-Post'ta var, kategoriye bağlı değil → içerik almaz
-    hayalet: [...mapped].filter(u=>!live.has(u)),       // Haritada var, Upload-Post'ta yok → gönderim başarısız olur
-    bosKategori: Object.keys(KATEGORI_PROFIL_POOL).filter(k=>!KATEGORI_PROFIL_POOL[k].some(u=>live.has(u)))
-  };
-}
+// NOT: katProfilUyum() buradaydı — Raporlar'daki "Kategori ↔ Profil
+// Eşleşmesi" bloğu kaldırılınca çağrısız kaldı ve silindi. Aynı uyarılar
+// başka yerlerde duruyor: bağsız profil → Dashboard "⚠ kategorisiz"
+// etiketi, kopuk hesap → Platformlar sayfasındaki kırmızı vurgu ve
+// profil sağlık noktaları. Gerekirse git geçmişinden geri alınabilir.
 
 // ═══════════════════════════════════════════════════════════
 // NAV
@@ -3190,8 +3183,17 @@ function rapSnapYaz(tot){
   if (!tot) return;
   const s = rapSnapOku();
   const gun = new Date().toISOString().slice(0,10);
+  // Genel toplam + PLATFORM BAZLI toplam: Platform Toplamları tablosundaki
+  // 7g/30g çipleri buradan besleniyor.
+  const plat = {};
+  try {
+    const by = rapPlatToplamlar();
+    Object.keys(by).forEach(pk=>{
+      plat[pk] = {}; RAP_PLAT_ALAN.forEach(([a])=>{ plat[pk][a] = Math.round(by[pk][a]||0); });
+    });
+  } catch(e) {}
   s[gun] = { followers:Math.round(tot.followers||0), views:Math.round(tot.views||0),
-             likes:Math.round(tot.likes||0), reach:Math.round(tot.reach||0) };
+             likes:Math.round(tot.likes||0), reach:Math.round(tot.reach||0), plat };
   const esik = Date.now() - 400*864e5;
   Object.keys(s).forEach(k=>{ if((Date.parse(k)||0) < esik) delete s[k]; });
   try { localStorage.setItem('op_rap_snap', JSON.stringify(s)); } catch(e){}
@@ -3354,35 +3356,95 @@ function rapRenderProfiles(inP){
       <td style="font-variant-numeric:tabular-nums">${sum(m=>m.views!=null?m.views:m.impressions)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="9" style="color:var(--mt);text-align:center;padding:14px">Profil yok — Platformlar → Yenile</td></tr>';
-  rapRenderKatUyum(profs);
+  rapRenderPlatToplam();
 }
 
 // Kategori ↔ profil eşleşmesi + sapma denetimi
-function rapRenderKatUyum(profs){
-  const el=document.getElementById('rap-kat-uyum'); if(!el) return;
-  const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-  if(!(profs||[]).length){ el.innerHTML=''; return; }
-  const u=katProfilUyum(profs);
-  const satir=Object.keys(KATEGORI_PROFIL_POOL).map(k=>{
-    const chips=KATEGORI_PROFIL_POOL[k].map(pn=>{
-      const canli=u.live.has(pn);
-      return `<span class="badge ${canli?'bs2':'be'}" style="font-size:11px;font-family:var(--fm)" title="${canli?'Upload-Post baglantisi var':'Upload-Post listesinde YOK — bu profile gonderim basarisiz olur'}">${canli?'':'⚠ '}${esc(pn)}</span>`;
-    }).join(' ');
-    const bos=u.bosKategori.includes(k);
-    return `<div style="display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--brd)">
-      <span style="width:120px;flex-shrink:0;font-size:12px;color:${bos?'var(--er)':'var(--tx)'}">${esc(katLabel(k))}${bos?' ⚠':''}</span>
-      <span style="display:flex;gap:5px;flex-wrap:wrap">${chips}</span>
+// ── PLATFORM TOPLAMLARI ────────────────────────────────────────────────
+// Profil bazlı kartlar "hangi hesap ne yapıyor" sorusunu cevaplıyor;
+// buradaki tablo ise "Instagram'da toplam neredeyim" sorusunu. Tüm
+// Instagram hesapları tek satırda toplanır, YouTube tek satırda, vb.
+const RAP_PLAT_ALAN = [
+  ['followers','Takipçi'], ['views','İzlenme'], ['reach','Erişim'],
+  ['likes','Beğeni'], ['comments','Yorum'], ['shares','Paylaşım'], ['saves','Kaydetme']
+];
+const RAP_PLAT_DOMAIN = {instagram:'instagram.com', youtube:'youtube.com', tiktok:'tiktok.com',
+  x:'x.com', facebook:'facebook.com', linkedin:'linkedin.com', threads:'threads.net',
+  pinterest:'pinterest.com', bluesky:'bsky.app', reddit:'reddit.com'};
+function rapPlatToplamlar(){
+  const by = {};
+  Object.keys(RAP.analytics||{}).forEach(u=>{
+    const d = RAP.analytics[u] || {};
+    Object.keys(d).forEach(pk=>{
+      const m = d[pk];
+      if (!m || typeof m !== 'object') return;
+      if (!by[pk]) { by[pk] = { hesap:0 }; RAP_PLAT_ALAN.forEach(([a])=>by[pk][a]=0); }
+      const b = by[pk];
+      b.hesap++;
+      // İzlenmede views yoksa impressions (Instagram geriye uyumluluk alanı)
+      b.followers += parseFloat(m.followers)||0;
+      b.views     += parseFloat(m.views!=null?m.views:m.impressions)||0;
+      b.reach     += parseFloat(m.reach)||0;
+      b.likes     += parseFloat(m.likes)||0;
+      b.comments  += parseFloat(m.comments)||0;
+      b.shares    += parseFloat(m.shares)||0;
+      b.saves     += parseFloat(m.saves)||0;
+    });
+  });
+  return by;
+}
+// Platform + ölçüt için 7g/30g değişim (anlık görüntü deposundan)
+function rapPlatDelta(pk, alan, simdi){
+  let html = '';
+  [[7,'hafta'],[30,'ay']].forEach(([g,ad])=>{
+    const eski = rapSnapGecmis(g);
+    const v = eski && eski.plat && eski.plat[pk] ? eski.plat[pk][alan] : null;
+    if (v == null) return;
+    if (!simdi && !v) return;
+    html += deltaEtiketi(simdi - v, {etiket:g+'g', baslik:g+' gün önceye göre ('+ad+'lık değişim)'});
+  });
+  return html;
+}
+function rapRenderPlatToplam(){
+  const el = document.getElementById('rap-plat-toplam'); if (!el) return;
+  const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const by = rapPlatToplamlar();
+  const keys = rapPlatSirala(Object.keys(by));
+  if (!keys.length){
+    el.innerHTML = '<div style="border:1px solid var(--brd);border-radius:8px;padding:14px;background:var(--sur2);'
+      + 'font-size:12.5px;color:var(--mt);text-align:center">Platform toplamları için canlı metrik gerekli — '
+      + '<b>Raporu Oluştur</b>\'a bas. Upload-Post analitik vermiyorsa bu tablo boş kalır.</div>';
+    return;
+  }
+  // Genel toplam satırı için birikim
+  const gt = { hesap:0 }; RAP_PLAT_ALAN.forEach(([a])=>gt[a]=0);
+  keys.forEach(k=>{ gt.hesap+=by[k].hesap; RAP_PLAT_ALAN.forEach(([a])=>gt[a]+=by[k][a]); });
+
+  const cip = (etiket, deger, delta) => !deger ? '' :
+    `<span style="display:inline-flex;align-items:baseline;gap:5px;font-size:11px;color:var(--mt);`
+    + `background:var(--bg);border:1px solid var(--brd);border-radius:5px;padding:3px 8px;`
+    + `font-variant-numeric:tabular-nums">${etiket}: <b style="color:var(--tx);font-size:13px">`
+    + `${ytkFmt(Math.round(deger))}</b>${delta||''}</span>`;
+
+  const satir = (ad, ikon, b, pk, vurgu) => {
+    const cipler = RAP_PLAT_ALAN.map(([a,et])=>cip(et, b[a], pk?rapPlatDelta(pk,a,Math.round(b[a])):'')).join('');
+    return `<div style="display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--brd)">
+      <span style="flex-shrink:0;width:118px;display:flex;align-items:center;gap:6px;font-size:12.5px;
+        font-weight:${vurgu?'700':'600'};color:${vurgu?'var(--acc)':'var(--tx)'}">${ikon} ${esc(ad)}</span>
+      <span style="flex-shrink:0;width:64px;font-size:11px;color:var(--mt);font-variant-numeric:tabular-nums"
+        title="Bu platformda metrik dönen hesap sayısı">${b.hesap} hesap</span>
+      <span style="display:flex;flex-wrap:wrap;gap:5px;flex:1;min-width:0">${cipler||'<span style="font-size:11px;color:var(--mt)">veri yok</span>'}</span>
     </div>`;
-  }).join('');
-  const sorun=[];
-  if(u.hayalet.length) sorun.push(`<div style="color:var(--er);font-size:12px;margin-top:8px">⚠ Haritada var ama Upload-Post'ta <b>yok</b> (gönderim başarısız olur): <b>${u.hayalet.map(esc).join(', ')}</b></div>`);
-  if(u.bagsiz.length)  sorun.push(`<div style="color:var(--wn);font-size:12px;margin-top:6px">⚠ Upload-Post'ta var ama <b>hiçbir kategoriye bağlı değil</b> (içerik almaz): <b>${u.bagsiz.map(esc).join(', ')}</b></div>`);
-  if(u.bosKategori.length) sorun.push(`<div style="color:var(--er);font-size:12px;margin-top:6px">⚠ Bu kategorilerin <b>canlı profili yok</b>: <b>${u.bosKategori.map(k=>esc(katLabel(k))).join(', ')}</b></div>`);
-  const ok = !sorun.length;
-  el.innerHTML=`<div style="border:1px solid ${ok?'rgba(52,211,153,.3)':'rgba(248,113,113,.35)'};border-radius:8px;padding:11px 13px;background:var(--sur2)">
-    <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:8px">🔗 Kategori ↔ Profil Eşleşmesi ${ok?'<span style="color:var(--ok);letter-spacing:0;text-transform:none">— tam uyumlu ✓</span>':'<span style="color:var(--er);letter-spacing:0;text-transform:none">— sapma var</span>'}</div>
-    ${satir}${sorun.join('')}
-    <div style="font-size:11px;color:var(--mt);margin-top:9px">Bu harita n8n <code>Clips Parse Et</code> node'undaki <code>KATEGORI_PROFIL_POOL</code> ile birebir aynı olmalıdır; short üretilirken kategori, havuzdaki <b>en az yüklü</b> profile yönlendirilir.</div>
+  };
+
+  el.innerHTML = `<div style="border:1px solid var(--brd);border-radius:8px;padding:11px 13px;background:var(--sur2)">
+    <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:4px">
+      📊 Platform Toplamları <span style="letter-spacing:0;text-transform:none">— tüm hesaplar birlikte</span></div>
+    ${keys.map(k=>satir(RAP_PLAT_AD[k]||k, PFAV(RAP_PLAT_DOMAIN[k]||'example.com'), by[k], k, false)).join('')}
+    ${keys.length>1 ? satir('TÜM PLATFORMLAR','Σ', gt, null, true) : ''}
+    <div style="font-size:11px;color:var(--mt);margin-top:9px">Yalnız Upload-Post'un analitik döndürdüğü
+      hesaplar sayılır; metrik vermeyen hesap toplama girmez. Değişim çipleri günlük anlık görüntüden
+      hesaplanır — ilk raporda boş, sonraki günlerde dolar.</div>
   </div>`;
 }
 
