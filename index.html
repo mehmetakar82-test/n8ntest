@@ -1838,12 +1838,17 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div style="display:flex;gap:14px;flex-wrap:wrap">
           <div style="flex:1;min-width:260px">
             <div class="fg"><label>Görünen ad</label><input id="cer-f-ad" type="text" oninput="cerOnizle()"/></div>
+            <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 10px">
+              <div class="tg on" id="cer-f-tik" onclick="this.classList.toggle('on');cerOnizle()"></div>
+              <span style="font-size:12px;color:var(--mt)">Adın yanına <b>onay tiki</b> rozeti koy</span>
+            </div>
             <div class="fg"><label>@handle</label><input id="cer-f-handle" type="text" oninput="cerOnizle()"/></div>
             <div class="fg"><label>Buton metni <span style="color:var(--mt)">(boş = buton yok)</span></label><input id="cer-f-buton" type="text" oninput="cerOnizle()"/></div>
             <div style="display:flex;gap:8px">
               <div class="fg" style="flex:1"><label>Bant</label><input id="cer-f-bant" type="color" value="#ffffff" oninput="cerOnizle()" style="height:34px;padding:2px"/></div>
               <div class="fg" style="flex:1"><label>Buton</label><input id="cer-f-butonr" type="color" value="#e51b1b" oninput="cerOnizle()" style="height:34px;padding:2px"/></div>
               <div class="fg" style="flex:1"><label>Yazı</label><input id="cer-f-yazi" type="color" value="#0b0b0e" oninput="cerOnizle()" style="height:34px;padding:2px"/></div>
+              <div class="fg" style="flex:1"><label>Tik</label><input id="cer-f-tikr" type="color" value="#1d9bf0" oninput="cerOnizle()" style="height:34px;padding:2px"/></div>
             </div>
             <div class="fg"><label>Filigran <span style="color:var(--mt)">(videonun altına yarı saydam yazılır)</span></label><input id="cer-f-filigran" type="text" oninput="cerOnizle()"/></div>
             <div class="fg"><label>Logo <span style="color:var(--mt)">(kare PNG/JPG önerilir; yüklenmezse baş harfli rozet)</span></label><input id="cer-f-logo" type="file" accept="image/*" onchange="cerLogoSec(event)"/></div>
@@ -6678,7 +6683,9 @@ function cerDuzenle(u){
   v('cer-f-bant', c.bantRenk || '#ffffff');
   v('cer-f-butonr', c.butonRenk || '#e51b1b');
   v('cer-f-yazi', c.yaziRenk || '#0b0b0e');
+  v('cer-f-tikr', c.tikRenk || '#1d9bf0');
   v('cer-f-filigran', c.filigran !== undefined ? c.filigran : ('@'+cerElHazir(u)));
+  const tk = document.getElementById('cer-f-tik'); if (tk) tk.classList.toggle('on', c.tik !== false);
   const tg = document.getElementById('cer-f-aktif'); if (tg) tg.classList.toggle('on', c.aktif !== false);
   cerDurumYaz('');
   cerFontYukle().then(()=>cerOnizle());
@@ -6691,6 +6698,8 @@ function cerFormOku(){
     ad: g('cer-f-ad').trim(), handle: g('cer-f-handle').trim(),
     buton: g('cer-f-buton').trim(),
     bantRenk: g('cer-f-bant')||'#ffffff', butonRenk: g('cer-f-butonr')||'#e51b1b', yaziRenk: g('cer-f-yazi')||'#0b0b0e',
+    tik: (document.getElementById('cer-f-tik')||{classList:{contains:()=>true}}).classList.contains('on'),
+    tikRenk: g('cer-f-tikr')||'#1d9bf0',
     filigran: g('cer-f-filigran').trim(),
     aktif: (document.getElementById('cer-f-aktif')||{classList:{contains:()=>true}}).classList.contains('on'),
     logo: (CER.p[CER._sec]||{}).logo || '', bannerUrl: (CER.p[CER._sec]||{}).bannerUrl || ''
@@ -6715,6 +6724,30 @@ function cerLogoSec(ev){
   img.src = URL.createObjectURL(f);
 }
 
+// ── Onay tiki rozeti — path ile çizilir, fonta/emoji desteğine bağlı değil ──
+function cerTikCiz(ctx, x, y, r, renk){
+  ctx.save();
+  ctx.fillStyle = renk || '#1d9bf0';
+  ctx.beginPath();
+  const N = 144;                       // tırtıklı daire (12 loblu), yumuşak örnekleme
+  for (let i = 0; i <= N; i++){
+    const a = (i / N) * Math.PI * 2 - Math.PI / 2;
+    const rr = r * (0.93 + 0.07 * Math.cos(a * 12));
+    const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+    if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = Math.max(1, r * 0.26);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x - r * 0.40, y + r * 0.04);
+  ctx.lineTo(x - r * 0.08, y + r * 0.34);
+  ctx.lineTo(x + r * 0.42, y - r * 0.28);
+  ctx.stroke();
+  ctx.restore();
+}
+
 // ── Banner çizimi (1080×400 taban; scale ile ölçeklenir) ──
 function cerBannerCiz(ctx, cfg, sc, logoImg){
   const W = CER_SPEC.W*sc, H = CER_SPEC.BANT*sc;
@@ -6735,19 +6768,43 @@ function cerBannerCiz(ctx, cfg, sc, logoImg){
   ctx.restore();
   ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
   ctx.lineWidth = 4*sc; ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.stroke();
-  // ad + handle
+  // Ölçümler ÖLÇEKSİZ (1080 tabanı) yapılıp çizimde sc ile çarpılır — böylece
+  // önizleme (sc=0.3) ile gerçek banner (sc=1) birebir aynı yerleşimi verir.
+  const WU = CER_SPEC.W;
+  // buton genişliği: adın sınırını belirlediği için önce hesaplanır
+  let bwU = 0, bxU = WU;
+  if (cfg.buton){
+    ctx.font = '800 36px InterXB, "Segoe UI", sans-serif';
+    bwU = ctx.measureText(cfg.buton).width + 56;
+    bxU = WU - 40 - bwU;
+  }
+  // ad (+ onay tiki) — butona taşacaksa punto kademeli küçültülür
+  const TIK_R = 19, TIK_BOS = 12, adXU = 260, adBazU = 105;
+  const sinirU = (cfg.buton ? bxU - 24 : WU - 40) - adXU - (cfg.tik ? TIK_R*2 + TIK_BOS : 0);
+  let adMetin = String(cfg.ad || ''), adPxU = 54;
+  const adOlc = t => { ctx.font = '800 '+adPxU+'px InterXB, "Segoe UI", sans-serif'; return ctx.measureText(t).width; };
+  let adGU = adOlc(adMetin);
+  while (adGU > sinirU && adPxU > 30){ adPxU -= 2; adGU = adOlc(adMetin); }   // 1) punto küçült
+  if (adGU > sinirU){                                                          // 2) 30px tabanı: kısalt
+    let kes = adMetin;
+    while (kes.length > 1 && adOlc(kes.trim() + '…') > sinirU) kes = kes.slice(0, -1);
+    adMetin = kes.trim() + '…';
+    adGU = adOlc(adMetin);
+  }
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = cfg.yaziRenk||'#0b0b0e';
-  ctx.font = '800 '+(54*sc)+'px InterXB, "Segoe UI", sans-serif';
-  ctx.fillText(cfg.ad||'', 260*sc, 105*sc);
+  ctx.font = '800 '+(adPxU*sc)+'px InterXB, "Segoe UI", sans-serif';
+  ctx.fillText(adMetin, adXU*sc, adBazU*sc);
+  if (cfg.tik)
+    cerTikCiz(ctx, (adXU + adGU + TIK_BOS + TIK_R)*sc, (adBazU - 19)*sc, TIK_R*sc, cfg.tikRenk);
+  // handle
   ctx.fillStyle = '#5a5f6b';
   ctx.font = '600 '+(38*sc)+'px InterSB, "Segoe UI", sans-serif';
   ctx.fillText(cfg.handle||'', 262*sc, 158*sc);
   // buton (sağa dayalı)
   if (cfg.buton){
     ctx.font = '800 '+(36*sc)+'px InterXB, "Segoe UI", sans-serif';
-    const tw = ctx.measureText(cfg.buton).width;
-    const bw = tw + 56*sc, bh = 84*sc, bx = W - 40*sc - bw, by = 115*sc - bh/2, rr = 14*sc;
+    const bw = bwU*sc, bh = 84*sc, bx = bxU*sc, by = 115*sc - bh/2, rr = 14*sc;
     ctx.fillStyle = cfg.butonRenk||'#e51b1b';
     ctx.beginPath();
     ctx.moveTo(bx+rr,by); ctx.arcTo(bx+bw,by,bx+bw,by+bh,rr); ctx.arcTo(bx+bw,by+bh,bx,by+bh,rr);
