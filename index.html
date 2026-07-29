@@ -641,6 +641,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div class="ni" onclick="go('yayindurumu',this)"><span class="ic">🚦</span>Yayın Durumu<span class="ni-badge" id="badge-fail" style="background:var(--er)"></span></div>
     <div class="ns">Sistem</div>
     <div class="ni" onclick="go('platformlar',this)"><span class="ic">◎</span>Platformlar</div>
+    <div class="ni" onclick="go('cerceve',this)"><span class="ic">🖼</span>Çerçeve</div>
     <div class="ni" onclick="go('otoyakala',this)"><span class="ic">🎯</span>Oto Yakala</div>
     <div class="ni" onclick="go('ayarlar',this)"><span class="ic">⊞</span>Ayarlar</div>
     <div class="ni" onclick="go('loglar',this)"><span class="ic">⊟</span>Loglar<span class="ni-badge" id="badge-log"></span></div>
@@ -1818,6 +1819,84 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   </div>
 </div>
 
+<!-- ÇERÇEVE -->
+<div id="page-cerceve" class="page">
+  <div class="ph"><div class="pt">Çerçeve</div><div class="ps">Short'lara kanal bantı + başlık — profil başına özelleştirilir, Upload-Post FFmpeg ile videoya işlenir</div></div>
+  <div class="alert ai" style="margin-bottom:12px">Akış: profili özelleştir → <b>Banner'ı Yayınla</b> → sağdaki <b>uçtan uca testi</b> bir kez çalıştır → yeni workflow'u içe aktar → çerçeve yeni kliplere otomatik uygulanır. Kuyruktaki eski videolara dokunulmaz; çerçeve başarısız olursa klip <b>çerçevesiz yayınlanır</b>, asla bloklanmaz.</div>
+  <div class="g2" style="align-items:start">
+    <div>
+      <div class="card">
+        <div class="ct">Profiller <button class="btn bsm" style="float:right" onclick="cerProfilleriYukle()">↻ Yenile</button></div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mt);margin-bottom:10px">
+          <div class="tg" id="cer-genel-tg" onclick="cerGenelToggle()"></div>
+          <span><b>Çerçeve sistemi</b> — kapalıyken hiçbir klibe çerçeve eklenmez (profil ayarları saklanır)</span>
+        </div>
+        <div id="cer-profil-liste"></div>
+      </div>
+      <div class="card" id="cer-editor-card" style="display:none">
+        <div class="ct">Özelleştir: <span id="cer-ed-baslik" style="color:var(--acc)"></span>
+          <button class="btn bsm" style="float:right" onclick="cerEditorKapat()">✕ Kapat</button></div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <div class="fg"><label>Görünen ad</label><input id="cer-f-ad" type="text" oninput="cerOnizle()"/></div>
+            <div class="fg"><label>@handle</label><input id="cer-f-handle" type="text" oninput="cerOnizle()"/></div>
+            <div class="fg"><label>Buton metni <span style="color:var(--mt)">(boş = buton yok)</span></label><input id="cer-f-buton" type="text" oninput="cerOnizle()"/></div>
+            <div style="display:flex;gap:8px">
+              <div class="fg" style="flex:1"><label>Bant</label><input id="cer-f-bant" type="color" value="#ffffff" oninput="cerOnizle()" style="height:34px;padding:2px"/></div>
+              <div class="fg" style="flex:1"><label>Buton</label><input id="cer-f-butonr" type="color" value="#e51b1b" oninput="cerOnizle()" style="height:34px;padding:2px"/></div>
+              <div class="fg" style="flex:1"><label>Yazı</label><input id="cer-f-yazi" type="color" value="#0b0b0e" oninput="cerOnizle()" style="height:34px;padding:2px"/></div>
+            </div>
+            <div class="fg"><label>Filigran <span style="color:var(--mt)">(videonun altına yarı saydam yazılır)</span></label><input id="cer-f-filigran" type="text" oninput="cerOnizle()"/></div>
+            <div class="fg"><label>Logo <span style="color:var(--mt)">(kare PNG/JPG önerilir; yüklenmezse baş harfli rozet)</span></label><input id="cer-f-logo" type="file" accept="image/*" onchange="cerLogoSec(event)"/></div>
+            <div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px">
+              <div class="tg on" id="cer-f-aktif" onclick="this.classList.toggle('on');cerOnizle()"></div>
+              <span style="font-size:12px;color:var(--mt)">Bu profilde çerçeve aktif</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn bsm" onclick="cerKaydet()">💾 Kaydet</button>
+              <button class="btn bp bsm" id="cer-yayinla-btn" onclick="cerYayinla()">🚀 Banner'ı Yayınla</button>
+            </div>
+            <div id="cer-ed-durum" style="font-size:12px;margin-top:8px"></div>
+          </div>
+          <div style="flex:0 0 auto">
+            <div style="font-size:11px;color:var(--mt);margin-bottom:4px">Canlı önizleme (örnek başlıkla)</div>
+            <canvas id="cer-onizleme" width="324" height="576" style="border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,.35);background:#222"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="ct">FFmpeg Kotası <button class="btn bsm" style="float:right" onclick="cerKota()">↻ Sorgula</button></div>
+        <div id="cer-kota"><div style="font-size:12px;color:var(--mt)">Upload-Post API Key ile sorgulanır (Ayarlar → Upload-Post API Key)</div></div>
+        <div style="font-size:11px;color:var(--mt);margin-top:6px">Kota <b>giriş dakikası</b> üzerinden: günde ~75 short (~45 sn) ≈ ayda ~1.700 dk gerektirir. Kota yetmezse çerçeve otomatik atlanır, yayın durmaz.</div>
+      </div>
+      <div class="card">
+        <div class="ct">Uçtan Uca Test</div>
+        <div style="font-size:12px;color:var(--mt);margin-bottom:8px">Küçük bir <b>gerçek işle</b> dört şeyi ölçer: iş açma, Türkçe başlık + font, işlem süresi ve sonuç URL'sinin <b>erişim modu</b> (n8n'in çalışma şeklini bu belirler).</div>
+        <div class="fg"><label>Test videosu (mp4 URL)</label><input id="cer-test-url" type="text" placeholder="Bir short-url yapıştır (OpusClip Galeri → kopyala)"/></div>
+        <div class="fg"><label>Banner</label><select id="cer-test-banner"></select></div>
+        <button class="btn bp bsm" id="cer-test-btn" onclick="cerTest()">▶ Testi Çalıştır</button>
+        <div id="cer-test-sonuc" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <div class="ct">GitHub Yayınlama</div>
+        <div style="font-size:12px;color:var(--mt);margin-bottom:8px">Banner PNG'leri ffmpeg'in çekebilmesi için public repo'da barınır. Token yalnız bu tarayıcıda saklanır, panele gömülmez.</div>
+        <div class="fg"><label>Repo</label><input id="cer-gh-repo" type="text" placeholder="kullanici/repo" onchange="cerGhKaydet()"/></div>
+        <div class="fg"><label>Personal Access Token</label><input id="cer-gh-pat" type="password" placeholder="ghp_..." onchange="cerGhKaydet()"/></div>
+        <button class="btn bsm" onclick="cerGhTest()">Bağlantıyı Sına</button>
+        <span id="cer-gh-durum" style="font-size:12px;margin-left:8px"></span>
+      </div>
+      <div class="card">
+        <div class="ct">n8n Senkron</div>
+        <div style="font-size:12px;color:var(--mt);margin-bottom:8px">Kaydet/Yayınla/Test sonrası yapılandırma <code>/webhook/cerceve-ayar</code>'a gönderilir. n8n çerçeveyi bu ayarlarla uygular.</div>
+        <div style="font-size:12px;margin-bottom:8px">Son gönderim: <span id="cer-sync-son" style="color:var(--acc)">—</span></div>
+        <button class="btn bsm" onclick="cerAyarGonder(true)">⇪ Şimdi Gönder</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- LOGLAR -->
 <div id="page-loglar" class="page">
   <div class="ph"><div class="pt">Loglar</div><div class="ps">Tarih/saat, kategori ve seviyeye göre filtrelenmiş işlem geçmişi</div></div>
@@ -2091,6 +2170,7 @@ function go(id, el) {
     loglar:     ()=>{ renderLogs(); refreshBadges(); },
     gecmis:     initGecmis,
     platformlar: loadPlatforms,
+    cerceve:    initCerceve,
     takvim:     loadTakvim,
     yayindurumu: loadYayinDurumu,
     kuyruk:     ()=>loadSheetPage('kuyruk'),
@@ -6441,10 +6521,496 @@ document.addEventListener('DOMContentLoaded', function() {
       ipucAc,ipucKapat,geriAlinabilir,alertSadelestir,pzUygula,pzF,pzBol,
       islenmisMi,islenmisAyikla,islenmisNotu,islenmisGoster,
       // HTML'de onclick ile çağrılıyor — window'a bağlanmazsa ölü buton olur
-      testWH,ytkTestApi];
+      testWH,ytkTestApi,
+      // Çerçeve sayfası
+      initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
+      cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
     globals.forEach(fn => { if(typeof fn === 'function') window[fn.name] = fn; });
   }catch(e){console.error('Init hatasi:',e);}
 });
+
+// ═══════════════════════════════════════════════════════════
+// ÇERÇEVE — kanal bantı + başlık; Upload-Post FFmpeg ile işlenir
+// ═══════════════════════════════════════════════════════════
+// ÖLÇÜLER: n8n "Çerçeve Hazırla" düğümündeki kopyayla BİREBİR aynı kalmalı.
+// Banner PNG 1080×400 (bant 0..230, başlık alanı 230..400) videonun üstüne
+// bindirilir; başlık ve filigran ffmpeg drawtext ile klip başına yazılır.
+const CER_SPEC = {
+  W:1080, H:1920, BANT:400,
+  fontPx:52, l1Y:242, l2Y:312, tekY:272,   // başlık satırları (drawtext y = üst kenar)
+  wmPx:30, wmAlt:86,                        // filigran: y = h-86
+  satirMax:32,                              // başlık bu uzunluğu aşarsa 2 satıra bölünür
+  renk:'0x0B0B0E'
+};
+const CER = { p:{}, aktif:false, urlModu:'', ghRepo:'mehmetakar82-test/n8ntest', ghPat:'', syncSon:'', _sec:null, _test:false };
+
+function cerOku(){
+  try{
+    const j = JSON.parse(localStorage.getItem('opus_cerceve')||'{}');
+    CER.p = j.p||{}; CER.aktif = !!j.aktif; CER.urlModu = j.urlModu||'';
+    CER.ghRepo = j.ghRepo||CER.ghRepo; CER.ghPat = j.ghPat||''; CER.syncSon = j.syncSon||'';
+  }catch(e){}
+}
+function cerYaz(){
+  try{
+    localStorage.setItem('opus_cerceve', JSON.stringify({
+      p:CER.p, aktif:CER.aktif, urlModu:CER.urlModu,
+      ghRepo:CER.ghRepo, ghPat:CER.ghPat, syncSon:CER.syncSon
+    }));
+  }catch(e){ addLog('err','cerceve','Kaydedilemedi (localStorage dolu olabilir): '+e.message); }
+}
+function cerSlug(ad){
+  const tr = {'ç':'c','ğ':'g','ı':'i','ö':'o','ş':'s','ü':'u','Ç':'c','Ğ':'g','İ':'i','I':'i','Ö':'o','Ş':'s','Ü':'u'};
+  return String(ad||'').replace(/[çğıöşüÇĞİIÖŞÜ]/g, c=>tr[c]||c).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'profil';
+}
+function cerVarlik(dosya){ return 'https://raw.githubusercontent.com/'+CER.ghRepo+'/main/cerceve/'+dosya; }
+// setEl textContent yazar — durum satırı renkli HTML içerdiği için ayrı yardımcı
+function cerDurumYaz(m){ const e = document.getElementById('cer-ed-durum'); if (e) e.innerHTML = m; }
+
+let cerFontSoz = null;
+function cerFontYukle(){
+  if (cerFontSoz) return cerFontSoz;
+  cerFontSoz = Promise.all([
+    new FontFace('InterXB','url('+cerVarlik('Inter-ExtraBold.ttf')+')').load(),
+    new FontFace('InterSB','url('+cerVarlik('Inter-SemiBold.ttf')+')').load()
+  ]).then(fs=>{ fs.forEach(f=>document.fonts.add(f)); return true; })
+    .catch(e=>{ addLog('warn','cerceve','Web fontu yüklenemedi, sistem fontuyla çizilecek: '+e.message); return false; });
+  return cerFontSoz;
+}
+
+async function initCerceve(){
+  cerOku();
+  const g = document.getElementById('cer-gh-repo'); if (g && !g.value) g.value = CER.ghRepo;
+  const p = document.getElementById('cer-gh-pat');  if (p && !p.value && CER.ghPat) p.value = CER.ghPat;
+  const t = document.getElementById('cer-genel-tg'); if (t) t.classList.toggle('on', CER.aktif);
+  setEl('cer-sync-son', CER.syncSon ? new Date(CER.syncSon).toLocaleString('tr') : '—');
+  cerFontYukle();
+  cerProfilleriYukle();
+  if (S.cfg.blot) cerKota();
+}
+
+function cerGhKaydet(){
+  CER.ghRepo = ((document.getElementById('cer-gh-repo')||{}).value||CER.ghRepo).trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/$/,'');
+  CER.ghPat  = ((document.getElementById('cer-gh-pat')||{}).value||'').trim();
+  cerYaz();
+}
+function cerGenelToggle(){
+  CER.aktif = !CER.aktif;
+  const t = document.getElementById('cer-genel-tg'); if (t) t.classList.toggle('on', CER.aktif);
+  cerYaz(); cerAyarGonder();
+}
+function cerProfilToggle(u){
+  const c = CER.p[u] = CER.p[u]||{};
+  c.aktif = c.aktif === false;   // false ise aç, değilse kapat
+  cerYaz(); cerProfilRender(); cerAyarGonder();
+}
+
+// ── Profil listesi ──
+async function cerProfilleriYukle(){
+  const kutu = document.getElementById('cer-profil-liste');
+  if (!kutu) return;
+  kutu.innerHTML = durumHTML('yukleniyor', {kompakt:true, alt:'Upload-Post profilleri alınıyor'});
+  if (!S.uploadPostAccounts) { try{ await loadPlatforms(); }catch(e){} }
+  cerProfilRender();
+}
+function cerProfilAdlari(){
+  const d = S.uploadPostAccounts;
+  const adlar = [];
+  if (d && Array.isArray(d.profiles)) d.profiles.forEach(pr=>{ if (pr.username) adlar.push(pr.username); });
+  // localStorage'da olup API'de artık görünmeyenler de listede kalsın (yanlışlıkla silinmesin)
+  Object.keys(CER.p).forEach(u=>{ if (adlar.indexOf(u)<0) adlar.push(u); });
+  return adlar;
+}
+function cerElHazir(u){
+  // Upload-Post'taki sosyal hesaplardan ilk kullanıcı adını @handle önerisi yap
+  const d = S.uploadPostAccounts;
+  if (!d || !Array.isArray(d.profiles)) return u;
+  const pr = d.profiles.find(x=>x.username===u);
+  if (!pr) return u;
+  const sa = pr.social_accounts||pr.socialAccounts||{};
+  for (const k of ['instagram','youtube','tiktok','twitter','x','facebook']){
+    const a = sa[k]; if (!a) continue;
+    const h = (Array.isArray(a)?a[0]:a)||{};
+    const ad = h.username||h.handle||h.custom_url;
+    if (ad) return String(ad).replace(/^@/,'');
+  }
+  return u;
+}
+function cerProfilRender(){
+  const esc = s=>String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const kutu = document.getElementById('cer-profil-liste');
+  if (!kutu) return;
+  const adlar = cerProfilAdlari();
+  if (!adlar.length){ kutu.innerHTML = durumHTML('bos', {kompakt:true, alt:'Profil bulunamadı — Upload-Post API Key girin (Ayarlar) veya n8n bağlantısını kontrol edin'}); return; }
+  kutu.innerHTML = adlar.map(u=>{
+    const c = CER.p[u]||{};
+    const yayinli = !!c.bannerUrl;
+    const aktif = c.aktif !== false;
+    const dot = yayinli ? (aktif?'var(--ok)':'var(--mt)') : 'var(--er)';
+    const durum = yayinli ? (aktif?'yayınlı · aktif':'yayınlı · kapalı') : 'banner yayınlanmadı';
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--brd);border-radius:6px;margin-bottom:6px;background:var(--bg)">'
+      + '<span style="width:9px;height:9px;border-radius:50%;background:'+dot+';flex-shrink:0"></span>'
+      + '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">'+esc(c.ad||u)+'</div>'
+      + '<div style="font-size:11px;color:var(--mt)">'+esc(u)+' · '+durum+'</div></div>'
+      + '<div class="tg'+(aktif?' on':'')+'" onclick="cerProfilToggle(\''+esc(u)+'\')" title="Bu profilde çerçeve"></div>'
+      + '<button class="btn bsm" onclick="cerDuzenle(\''+esc(u)+'\')">✎ Özelleştir</button>'
+      + '</div>';
+  }).join('');
+  // Test banner listesi
+  const sel = document.getElementById('cer-test-banner');
+  if (sel){
+    const opts = adlar.filter(u=>(CER.p[u]||{}).bannerUrl).map(u=>'<option value="'+esc(CER.p[u].bannerUrl)+'">'+esc(CER.p[u].ad||u)+'</option>');
+    opts.unshift('<option value="'+esc(cerVarlik('banner-ornek.png'))+'">Örnek banner (repo)</option>');
+    sel.innerHTML = opts.join('');
+  }
+}
+
+// ── Editör ──
+function cerDuzenle(u){
+  CER._sec = u;
+  const c = CER.p[u]||{};
+  const kart = document.getElementById('cer-editor-card');
+  kart.style.display = '';
+  setEl('cer-ed-baslik', u);
+  const v = (id,val)=>{ const el=document.getElementById(id); if(el) el.value = val; };
+  v('cer-f-ad', c.ad || u);
+  v('cer-f-handle', c.handle || '@'+cerElHazir(u));
+  v('cer-f-buton', c.buton !== undefined ? c.buton : 'TAKİP ET ✋');
+  v('cer-f-bant', c.bantRenk || '#ffffff');
+  v('cer-f-butonr', c.butonRenk || '#e51b1b');
+  v('cer-f-yazi', c.yaziRenk || '#0b0b0e');
+  v('cer-f-filigran', c.filigran !== undefined ? c.filigran : ('@'+cerElHazir(u)));
+  const tg = document.getElementById('cer-f-aktif'); if (tg) tg.classList.toggle('on', c.aktif !== false);
+  cerDurumYaz('');
+  cerFontYukle().then(()=>cerOnizle());
+  kart.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function cerEditorKapat(){ CER._sec=null; document.getElementById('cer-editor-card').style.display='none'; }
+function cerFormOku(){
+  const g = id=>(document.getElementById(id)||{}).value||'';
+  return {
+    ad: g('cer-f-ad').trim(), handle: g('cer-f-handle').trim(),
+    buton: g('cer-f-buton').trim(),
+    bantRenk: g('cer-f-bant')||'#ffffff', butonRenk: g('cer-f-butonr')||'#e51b1b', yaziRenk: g('cer-f-yazi')||'#0b0b0e',
+    filigran: g('cer-f-filigran').trim(),
+    aktif: (document.getElementById('cer-f-aktif')||{classList:{contains:()=>true}}).classList.contains('on'),
+    logo: (CER.p[CER._sec]||{}).logo || '', bannerUrl: (CER.p[CER._sec]||{}).bannerUrl || ''
+  };
+}
+function cerLogoSec(ev){
+  const f = ev.target.files && ev.target.files[0];
+  if (!f) return;
+  const img = new Image();
+  img.onload = ()=>{
+    // 256px'e küçült — localStorage'ı şişirmemek için (banner zaten tam çözünürlükte üretilir)
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const x = c.getContext('2d');
+    const s = Math.min(img.width, img.height);
+    x.drawImage(img, (img.width-s)/2, (img.height-s)/2, s, s, 0, 0, 256, 256);
+    const u = CER._sec; if (!u) return;
+    CER.p[u] = CER.p[u]||{};
+    CER.p[u].logo = c.toDataURL(f.type==='image/png'?'image/png':'image/jpeg', 0.85);
+    cerYaz(); cerOnizle();
+  };
+  img.onerror = ()=>cerDurumYaz('<span style="color:var(--er)">Görsel okunamadı</span>');
+  img.src = URL.createObjectURL(f);
+}
+
+// ── Banner çizimi (1080×400 taban; scale ile ölçeklenir) ──
+function cerBannerCiz(ctx, cfg, sc, logoImg){
+  const W = CER_SPEC.W*sc, H = CER_SPEC.BANT*sc;
+  ctx.fillStyle = cfg.bantRenk||'#fff'; ctx.fillRect(0,0,W,H);
+  // logo (daire)
+  const cx = 150*sc, cy = 115*sc, r = 82*sc;
+  ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
+  if (logoImg) ctx.drawImage(logoImg, cx-r, cy-r, r*2, r*2);
+  else {
+    const gr = ctx.createRadialGradient(cx-r*.3,cy-r*.4,r*.2,cx,cy,r);
+    gr.addColorStop(0,'#2b3f8f'); gr.addColorStop(1,'#141c4a');
+    ctx.fillStyle = gr; ctx.fillRect(cx-r,cy-r,r*2,r*2);
+    ctx.fillStyle = '#ffd23f'; ctx.font = '800 '+(56*sc)+'px InterXB, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const bas = (cfg.ad||'?').split(/\s+/).map(k=>k[0]||'').join('').slice(0,2).toUpperCase();
+    ctx.fillText(bas, cx, cy+3*sc);
+  }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+  ctx.lineWidth = 4*sc; ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.stroke();
+  // ad + handle
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = cfg.yaziRenk||'#0b0b0e';
+  ctx.font = '800 '+(54*sc)+'px InterXB, "Segoe UI", sans-serif';
+  ctx.fillText(cfg.ad||'', 260*sc, 105*sc);
+  ctx.fillStyle = '#5a5f6b';
+  ctx.font = '600 '+(38*sc)+'px InterSB, "Segoe UI", sans-serif';
+  ctx.fillText(cfg.handle||'', 262*sc, 158*sc);
+  // buton (sağa dayalı)
+  if (cfg.buton){
+    ctx.font = '800 '+(36*sc)+'px InterXB, "Segoe UI", sans-serif';
+    const tw = ctx.measureText(cfg.buton).width;
+    const bw = tw + 56*sc, bh = 84*sc, bx = W - 40*sc - bw, by = 115*sc - bh/2, rr = 14*sc;
+    ctx.fillStyle = cfg.butonRenk||'#e51b1b';
+    ctx.beginPath();
+    ctx.moveTo(bx+rr,by); ctx.arcTo(bx+bw,by,bx+bw,by+bh,rr); ctx.arcTo(bx+bw,by+bh,bx,by+bh,rr);
+    ctx.arcTo(bx,by+bh,bx,by,rr); ctx.arcTo(bx,by,bx+bw,by,rr); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(cfg.buton, bx+bw/2, by+bh/2+2*sc);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  }
+}
+function cerLogoYukleAsync(cfg){
+  return new Promise(res=>{
+    if (!cfg.logo) return res(null);
+    const im = new Image();
+    im.onload = ()=>res(im); im.onerror = ()=>res(null);
+    im.src = cfg.logo;
+  });
+}
+async function cerOnizle(){
+  if (!CER._sec) return;
+  const cfg = cerFormOku();
+  const cv = document.getElementById('cer-onizleme'); if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const sc = cv.width / CER_SPEC.W;   // 324/1080 = 0.3
+  const logo = await cerLogoYukleAsync(cfg);
+  // sahte video zemini
+  const g = ctx.createLinearGradient(0,0,cv.width,cv.height);
+  g.addColorStop(0,'#5a6a52'); g.addColorStop(.6,'#8e8f7a'); g.addColorStop(1,'#57544a');
+  ctx.fillStyle = g; ctx.fillRect(0,0,cv.width,cv.height);
+  // banner
+  cerBannerCiz(ctx, cfg, sc, logo);
+  // örnek başlık — ffmpeg drawtext metrikleriyle aynı
+  const [l1,l2] = cerBaslikBol('Filmin en çok konuşulan sahnesi herkesi ikiye böldü');
+  ctx.fillStyle = CER_SPEC.renk.replace('0x','#');
+  ctx.font = '800 '+(CER_SPEC.fontPx*sc)+'px InterXB, "Segoe UI", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  if (l2){ ctx.fillText(l1, cv.width/2, CER_SPEC.l1Y*sc); ctx.fillText(l2, cv.width/2, CER_SPEC.l2Y*sc); }
+  else ctx.fillText(l1, cv.width/2, CER_SPEC.tekY*sc);
+  // örnek altyazı (OpusClip'in yaktığı — bilgi amaçlı)
+  ctx.font = '800 '+(46*sc)+'px InterXB, "Segoe UI", sans-serif';
+  ctx.fillStyle = '#fff'; ctx.shadowColor='rgba(0,0,0,.85)'; ctx.shadowBlur=6*sc;
+  ctx.fillText('bu sahneyi ilk kez', cv.width/2, cv.height*0.70);
+  ctx.fillText('fark eden var mı?', cv.width/2, cv.height*0.70+50*sc);
+  ctx.shadowBlur = 0;
+  // filigran
+  if (cfg.filigran){
+    ctx.font = '600 '+(CER_SPEC.wmPx*sc)+'px InterSB, "Segoe UI", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(cfg.filigran, cv.width/2, cv.height - CER_SPEC.wmAlt*sc);
+  }
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+}
+
+function cerKaydet(sessiz){
+  const u = CER._sec; if (!u) return;
+  const eski = CER.p[u]||{};
+  CER.p[u] = Object.assign({}, eski, cerFormOku());
+  cerYaz(); cerProfilRender();
+  if (!sessiz) cerDurumYaz('<span style="color:var(--ok)">✓ Kaydedildi (yayınlamayı unutma)</span>');
+}
+
+// ── GitHub yayınlama ──
+async function cerGhIstek(yol, metod, govde){
+  cerGhKaydet();
+  if (!CER.ghPat) throw new Error('GitHub token gerekli (sağdaki GitHub Yayınlama kartı)');
+  const r = await fetch('https://api.github.com/repos/'+CER.ghRepo+'/contents/'+yol, {
+    method: metod||'GET',
+    headers: { 'Authorization':'Bearer '+CER.ghPat, 'Accept':'application/vnd.github+json' },
+    body: govde ? JSON.stringify(govde) : undefined
+  });
+  if (r.status === 404 && (metod||'GET') === 'GET') return null;
+  const j = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error('GitHub HTTP '+r.status+': '+(j.message||'?'));
+  return j;
+}
+async function cerGhTest(){
+  const el = document.getElementById('cer-gh-durum');
+  el.textContent = '...';
+  try{
+    await cerGhIstek('cerceve/Inter-ExtraBold.ttf');
+    el.innerHTML = '<span style="color:var(--ok)">✓ Bağlantı ve yetki tamam</span>';
+  }catch(e){ el.innerHTML = '<span style="color:var(--er)">✗ '+e.message+'</span>'; }
+}
+async function cerYayinla(){
+  const u = CER._sec; if (!u) return;
+  cerKaydet(true);
+  const btn = document.getElementById('cer-yayinla-btn');
+  const durum = cerDurumYaz;
+  btn.disabled = true;
+  try{
+    durum('Banner çiziliyor…');
+    await cerFontYukle();
+    const cfg = CER.p[u];
+    const logo = await cerLogoYukleAsync(cfg);
+    const cv = document.createElement('canvas');
+    cv.width = CER_SPEC.W; cv.height = CER_SPEC.BANT;
+    cerBannerCiz(cv.getContext('2d'), cfg, 1, logo);
+    const b64 = cv.toDataURL('image/png').split(',')[1];
+    const yol = 'cerceve/banner-'+cerSlug(u)+'.png';
+    durum('GitHub\'a yükleniyor…');
+    const mevcut = await cerGhIstek(yol);
+    await cerGhIstek(yol, 'PUT', {
+      message: 'Çerçeve banner: '+u,
+      content: b64,
+      sha: mevcut ? mevcut.sha : undefined
+    });
+    cfg.bannerUrl = cerVarlik('banner-'+cerSlug(u)+'.png')+'?v='+Date.now();
+    cerYaz(); cerProfilRender();
+    durum('<span style="color:var(--ok)">✓ Yayınlandı</span> — n8n\'e bildiriliyor…');
+    await cerAyarGonder();
+    durum('<span style="color:var(--ok)">✓ Yayınlandı ve n8n\'e bildirildi</span>');
+    addLog('ok','cerceve','Banner yayınlandı: '+u);
+  }catch(e){
+    durum('<span style="color:var(--er)">✗ '+e.message+'</span>');
+    addLog('err','cerceve','Banner yayınlanamadı ('+u+'): '+e.message);
+  }finally{ btn.disabled = false; }
+}
+
+// ── n8n senkron ──
+async function cerAyarGonder(manuel){
+  const base = getN8N();
+  if (!base){ if (manuel) alert('Önce Ayarlar\'dan n8n URL girin'); return; }
+  const profiller = {};
+  Object.keys(CER.p).forEach(u=>{
+    const c = CER.p[u];
+    profiller[u] = { aktif: c.aktif !== false, bannerUrl: c.bannerUrl||'', filigran: c.filigran||'', ad: c.ad||u };
+  });
+  const r = await faf(base+'/webhook/cerceve-ayar', {
+    aktif: CER.aktif, urlModu: CER.urlModu, apikey: S.cfg.blot||'',
+    fontUrl: cerVarlik('Inter-ExtraBold.ttf'), profiller: profiller
+  });
+  CER.syncSon = new Date().toISOString(); cerYaz();
+  setEl('cer-sync-son', new Date().toLocaleString('tr'));
+  if (manuel && r && r.corsOrNetwork) alert('Gönderilemedi — n8n URL/workflow aktif mi? (cerceve-ayar webhook yeni workflow ile gelir)');
+}
+
+// ── FFmpeg komutu (n8n "Çerçeve Hazırla" ile BİREBİR aynı mantık) ──
+function cerDtEsc(s){
+  return String(s||'')
+    .replace(/[\u2018\u2019']/g,'\u2019').replace(/["\u201C\u201D]/g,'\u201D')
+    .replace(/[\\`$;\[\]{}]/g,'')
+    .replace(/%/g,'\\%').replace(/:/g,'\\:');
+}
+function cerBaslikBol(t){
+  t = String(t||'').trim().replace(/\s+/g,' ');
+  const M = CER_SPEC.satirMax;
+  if (t.length <= M) return [t, ''];
+  let k = t.lastIndexOf(' ', M);
+  if (k < 12) k = t.indexOf(' ', M);
+  if (k < 0) k = M;
+  let l1 = t.slice(0,k).trim(), l2 = t.slice(k).trim();
+  if (l2.length > M+4) l2 = l2.slice(0, M+1).trim()+'…';
+  return [l1, l2];
+}
+function cerFfKomut(baslik, filigran){
+  const C = CER_SPEC;
+  const p = ['[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0]','[v0][1:v]overlay=0:0[v1]'];
+  let son = 'v1', i = 2;
+  const dt = (metin,boy,renk,y)=>{ p.push('['+son+']drawtext=fontfile={input2}:text=\''+cerDtEsc(metin)+'\':fontsize='+boy+':fontcolor='+renk+':x=(w-text_w)/2:y='+y+'[v'+i+']'); son='v'+(i++); };
+  const [l1,l2] = cerBaslikBol(baslik);
+  if (l2){ dt(l1,C.fontPx,C.renk,C.l1Y); dt(l2,C.fontPx,C.renk,C.l2Y); }
+  else if (l1) dt(l1,C.fontPx,C.renk,C.tekY);
+  if (filigran) dt(filigran,C.wmPx,'white@0.6','h-'+C.wmAlt);
+  return 'ffmpeg -y -i {input0} -i {input1} -filter_complex "'+p.join(';')+'" -map "['+son+']" -map 0:a? -c:v libx264 -preset veryfast -crf 21 -c:a copy -movflags +faststart {output}';
+}
+
+// ── Kota ──
+async function cerKota(){
+  const kutu = document.getElementById('cer-kota'); if (!kutu) return;
+  if (!S.cfg.blot){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return null; }
+  kutu.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Kota sorgulanıyor'});
+  try{
+    const { data } = await upFetch('/uploadposts/ffmpeg/consumption');
+    const c = data.consumption||{};
+    const kota = c.quota_minutes!=null ? c.quota_minutes : (data.quota_info||{}).quota_minutes;
+    const kalan = c.remaining_minutes, kul = c.used_minutes||0;
+    const yuzde = kota ? Math.min(100, Math.round(kul/kota*100)) : 0;
+    const renk = yuzde>85 ? 'var(--er)' : (yuzde>60 ? '#f5a623' : 'var(--ok)');
+    kutu.innerHTML =
+      '<div style="font-size:13px;margin-bottom:6px">Plan: <b>'+(c.plan||(data.quota_info||{}).plan||'?')+'</b> · Ay: '+(c.current_month||'')+'</div>'
+      +'<div style="height:10px;background:var(--bg);border:1px solid var(--brd);border-radius:5px;overflow:hidden;margin-bottom:6px"><div style="height:100%;width:'+yuzde+'%;background:'+renk+'"></div></div>'
+      +'<div style="font-size:12px;color:var(--mt)">'+Math.round(kul)+' dk kullanıldı · <b style="color:var(--tx)">'+(kalan!=null?Math.round(kalan)+' dk kaldı':'?')+'</b>'+(kota?' / '+Math.round(kota)+' dk':'')+' · '+(c.total_requests||0)+' iş</div>'
+      +((kota && kota < 1700) ? '<div style="font-size:11px;color:var(--er);margin-top:6px">⚠ Kota aylık ihtiyacın (~1.700 dk) altında — çerçeve kota bitince otomatik atlanır, yayın durmaz.</div>' : '');
+    CER._kota = { kota, kalan, kul };
+    return CER._kota;
+  }catch(e){
+    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kota alınamadı: '+e.message});
+    return null;
+  }
+}
+
+// ── Uçtan uca test ──
+async function cerTest(){
+  if (CER._test) return;
+  const kutu = document.getElementById('cer-test-sonuc');
+  const btn = document.getElementById('cer-test-btn');
+  const esc = s=>String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const videoUrl = ((document.getElementById('cer-test-url')||{}).value||'').trim();
+  const bannerUrl = (document.getElementById('cer-test-banner')||{}).value||'';
+  if (!S.cfg.blot){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
+  if (!/^https?:\/\//.test(videoUrl)){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Bir mp4 URL yapıştır (OpusClip Galeri\'den bir short-url kopyalanabilir)'}); return; }
+  CER._test = true; btn.disabled = true;
+  const adimlar = [];
+  const ciz = ()=>{ kutu.innerHTML = adimlar.map(a=>'<div style="font-size:12px;padding:3px 0">'+a+'</div>').join(''); };
+  const adim = m=>{ adimlar.push(m); ciz(); };
+  const son = m=>{ adimlar[adimlar.length-1] = m; ciz(); };
+  const t0 = Date.now();
+  try{
+    adim('⏳ FFmpeg işi açılıyor…');
+    const komut = cerFfKomut('Çerçeve testi — Türkçe ğüşiöç ĞÜŞİÖÇ çalışıyor mu?', '@cerceve-test');
+    const { data: is } = await upFetch('/uploadposts/ffmpeg/jobs/upload', { method:'POST', body:{
+      files: [videoUrl, bannerUrl, cerVarlik('Inter-ExtraBold.ttf')],
+      full_command: komut, output_extension: 'mp4'
+    }});
+    if (!is.job_id) throw new Error('job_id dönmedi: '+JSON.stringify(is).slice(0,200));
+    son('✓ İş açıldı: <code>'+esc(is.job_id)+'</code>');
+    adim('⏳ İşleniyor (5 sn\'de bir yoklanıyor)…');
+    let durum = '';
+    for (let i=0; i<36; i++){
+      await new Promise(r=>setTimeout(r, 5000));
+      const { data: j } = await upFetch('/uploadposts/ffmpeg/jobs/'+is.job_id);
+      durum = (j.status||'').toUpperCase();
+      son('⏳ İşleniyor… '+Math.round((Date.now()-t0)/1000)+' sn — durum: '+esc(durum||'?'));
+      if (durum === 'FINISHED' || durum === 'ERROR') break;
+    }
+    if (durum !== 'FINISHED') throw new Error(durum==='ERROR' ? 'İş ERROR verdi — komut veya girdiler sorunlu (font {input2} desteklenmiyor olabilir)' : 'Zaman aşımı (3 dk) — iş hâlâ bitmedi');
+    son('✓ İş bitti ('+Math.round((Date.now()-t0)/1000)+' sn)');
+    // URL erişim modu — n8n'in video URL'sini Upload-Post'a nasıl vereceğini belirler
+    adim('⏳ Sonuç URL erişim modu ölçülüyor…');
+    const dl = 'https://api.upload-post.com/api/uploadposts/ffmpeg/jobs/'+is.job_id+'/download';
+    let modu = '', blob = null;
+    const dene = async (url, opts)=>{ try{ const r = await fetch(url, opts); return r.ok ? r : null; }catch(e){ return null; } };
+    let r = await dene(dl);
+    if (r){ modu = 'public'; blob = await r.blob(); }
+    if (!modu){ r = await dene(dl+'?apikey='+encodeURIComponent(S.cfg.blot)); if (r){ modu='query'; blob = await r.blob(); } }
+    if (!modu){ r = await dene(dl+'?api_key='+encodeURIComponent(S.cfg.blot)); if (r){ modu='query2'; blob = await r.blob(); } }
+    if (!modu){ r = await dene(dl, {headers:{'Authorization':'Apikey '+S.cfg.blot}}); if (r){ modu='header'; blob = await r.blob(); } }
+    if (!modu) throw new Error('Sonuç hiçbir yöntemle indirilemedi');
+    const MODU_ACIKLAMA = {
+      public:  '✓ <b>public</b> — indirme linki açık; n8n URL\'yi doğrudan kullanır (EN İYİ durum)',
+      query:   '✓ <b>query</b> — <code>?apikey=</code> ile erişiliyor; n8n URL\'ye anahtar ekler',
+      query2:  '✓ <b>query</b> (api_key paramı) — n8n URL\'ye anahtar ekler',
+      header:  '⚠ <b>header</b> — yalnız Authorization başlığıyla iniyor; bu modda n8n çerçeveyi <b>atlar</b> (bana bildir, ikili aktarım gerekir)'
+    };
+    son(MODU_ACIKLAMA[modu]);
+    CER.urlModu = (modu==='query2') ? 'query2' : modu;
+    cerYaz();
+    adim('⏳ n8n\'e bildiriliyor…');
+    await cerAyarGonder();
+    son('✓ Ayar n8n\'e gönderildi (urlModu: '+CER.urlModu+')');
+    if (blob){
+      const src = URL.createObjectURL(blob);
+      adimlar.push('<video controls src="'+src+'" style="width:200px;border-radius:8px;margin-top:6px"></video>'
+        +'<div style="font-size:11px;color:var(--mt)">Videoyu aç: bant + Türkçe başlık + filigran görünüyor mu?</div>');
+      ciz();
+    }
+    cerKota();
+    addLog('ok','cerceve','Uçtan uca test tamam — urlModu: '+CER.urlModu);
+  }catch(e){
+    adim('<span style="color:var(--er)">✗ '+esc(e.message)+'</span>');
+    addLog('err','cerceve','Test başarısız: '+e.message);
+  }finally{ CER._test = false; btn.disabled = false; }
+}
 
 // ═══════════════════════════════════════════════════════════
 // TAKVİM
