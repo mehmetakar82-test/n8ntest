@@ -1695,16 +1695,9 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
 
       <!-- PLATFORM FİLTRE SEKMELERİ -->
       <div style="display:flex;gap:0;margin-bottom:-1px">
-        <button id="dm-tab-all" onclick="dmFilter('all')" style="padding:8px 16px;font-size:12px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid #00e5ff;background:transparent;color:#00e5ff;text-transform:uppercase;transition:all .15s">Tümü</button>
-        <button id="dm-tab-ig"  onclick="dmFilter('ig')"  style="padding:8px 16px;font-size:12px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--mt);text-transform:uppercase;transition:all .15s">
-          <span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366)"></span>Instagram</span>
-        </button>
-        <button id="dm-tab-yt"  onclick="dmFilter('yt')"  style="padding:8px 16px;font-size:12px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--mt);text-transform:uppercase;transition:all .15s">
-          <span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff0000"></span>YouTube</span>
-        </button>
-        <button id="dm-tab-tt"  onclick="dmFilter('tt')"  style="padding:8px 16px;font-size:12px;letter-spacing:1.5px;font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--mt);text-transform:uppercase;transition:all .15s">
-          <span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:linear-gradient(135deg,#69c9d0,#010101)"></span>TikTok</span>
-        </button>
+        <!-- Sekmeler _dmRenderAll içinde üretilir: yalnız o gün VAR OLAN
+             platformlar, yanlarında adetleriyle birlikte -->
+        <div id="dm-tabs" style="display:flex;gap:0;flex-wrap:wrap"></div>
         <!-- SIRALAMA -->
         <div style="margin-left:auto;display:flex;align-items:center;gap:6px;padding-bottom:6px">
           <span style="font-size:11px;letter-spacing:1px;color:var(--mt);text-transform:uppercase">Sırala</span>
@@ -7657,33 +7650,36 @@ function openDayModal(dayNum) {
 function _dmRenderAll() {
   const allItems = DM.items;
 
-  // Platform sayıları
-  const igC = allItems.filter(i=>i.plat==='ig').length;
-  const ytC = allItems.filter(i=>i.plat==='yt').length;
-  const ttC = allItems.filter(i=>i.plat==='tt').length;
+  // Platform sayıları — TÜM platformlar üzerinden sayılır.
+  // Önce yalnız ig/yt/tt sayılıyordu; Facebook/X/kuyruk kayıtları hiçbir
+  // sayaca girmediği için üstteki dağılım toplamı tutmuyordu (53 ≠ 75).
+  const PLAT_SIRA = ['ig','yt','tt','fb','x','sch'];
+  const say = {};
+  allItems.forEach(i => { say[i.plat] = (say[i.plat]||0) + 1; });
+  const varOlan = PLAT_SIRA.filter(k => say[k]);
+  const bilinmeyen = allItems.length - varOlan.reduce((t,k)=>t+say[k], 0);
 
-  // Sub satırı
   document.getElementById('dm-sub').innerHTML =
-    `<span style="color:#e1306c">📸 ${igC} IG</span>` +
-    `<span style="color:#ff4444">▶ ${ytC} YT</span>` +
-    `<span style="color:#69c9d0">♪ ${ttC} TT</span>` +
+    varOlan.map(k => `<span style="color:${PLAT_META[k].color}">${PLAT_META[k].label} ${say[k]}</span>`).join('') +
+    (bilinmeyen ? `<span style="color:var(--mt)">Diğer ${bilinmeyen}</span>` : '') +
     `<span>Toplam: ${allItems.length} yayın</span>`;
 
-  // Sekme aktiflik
-  ['all','ig','yt','tt'].forEach(k => {
-    const btn = document.getElementById('dm-tab-'+k);
-    if (!btn) return;
-    const meta = PLAT_META[k];
-    const active = DM.filter === k;
-    if (active) {
-      const col = k === 'all' ? '#00e5ff' : meta.accent;
-      btn.style.borderBottomColor = col;
-      btn.style.color = col;
-    } else {
-      btn.style.borderBottomColor = 'transparent';
-      btn.style.color = 'var(--mt)';
-    }
-  });
+  // Sekmeler — yalnız o günde gerçekten VAR OLAN platformlar için üretilir
+  const tabKutu = document.getElementById('dm-tabs');
+  if (tabKutu) {
+    const tabBtn = (k, etiket, renk, adet) => {
+      const aktif = DM.filter === k;
+      return `<button onclick="dmFilter('${k}')" style="padding:8px 14px;font-size:12px;letter-spacing:1.5px;`
+        + `font-family:'DM Mono',monospace;cursor:pointer;border:none;border-bottom:2px solid `
+        + `${aktif?renk:'transparent'};background:transparent;color:${aktif?renk:'var(--mt)'};`
+        + `text-transform:uppercase;transition:all .15s;white-space:nowrap">`
+        + `${etiket} <span style="opacity:.65">${adet}</span></button>`;
+    };
+    tabKutu.innerHTML = tabBtn('all','Tümü','#00e5ff',allItems.length)
+      + varOlan.map(k => tabBtn(k, PLAT_META[k].label, PLAT_META[k].accent, say[k])).join('');
+  }
+  // Filtrelenen platform o gün yoksa 'Tümü'ye dön (boş ekranda kalmasın)
+  if (DM.filter !== 'all' && !say[DM.filter]) DM.filter = 'all';
 
   // Sıralama butonu
   document.getElementById('dm-sort-label').textContent = DM.sortAsc ? 'Saat ↑' : 'Saat ↓';
@@ -7701,12 +7697,17 @@ function _dmRenderAll() {
   // Render kartlar
   _dmRenderList(filtered);
 
-  // Footer
-  const bekliyorC = filtered.filter(i => (i.r['platform-status']||'').includes('Bekliyor') || !(i.r['platform-status'])).length;
-  const yayinC = filtered.length - bekliyorC;
+  // Footer — satır rozetiyle AYNI kaynağı kullanır (item.status).
+  // Önce 'platform-status' metnine bakılıyordu: "Hata: ..." ne "Bekliyor"
+  // içeriyor ne de boş olduğu için başarısızlar yayınlanmış sayılıyordu.
+  const dur = i => i.status || (/yayın|tamamland/i.test(i.r && i.r['platform-status'] || '') ? 'pub' : 'plan');
+  const yayinC    = filtered.filter(i => dur(i) === 'pub').length;
+  const hataC     = filtered.filter(i => dur(i) === 'fail').length;
+  const bekliyorC = filtered.length - yayinC - hataC;
   document.getElementById('dm-footer').innerHTML =
     `<span>📋 ${filtered.length} yayın gösteriliyor</span>` +
     `<span style="color:#10b981">✓ ${yayinC} yayınlandı</span>` +
+    (hataC ? `<span style="color:#ef4444;font-weight:700">✕ ${hataC} başarısız</span>` : '') +
     `<span style="color:#f59e0b">◐ ${bekliyorC} bekliyor</span>`;
 }
 
@@ -7736,9 +7737,20 @@ function _dmRenderList(items) {
     const hesap  = pick(item.r, platAccKeys[item.plat] || []);
     const hashtags = (item.r['hashtags'] || item.r['hashtags-ig'] || '').split(/\s+/).filter(h=>h.startsWith('#')).slice(0,4);
 
-    const isPublished = status.toLowerCase().includes('yayın') || status === 'Tamamlandı';
-    const statusDot  = isPublished ? '#10b981' : '#f59e0b';
-    const statusText = isPublished ? status : 'Bekliyor';
+    // DURUM: item.status tek doğru kaynak ('pub'|'fail'|'plan') — loadTakvim
+    // bunu API yanıtından kuruyor. Daha önce Türkçe 'platform-status' metni
+    // ayrıştırılıyordu; başarısız kayıtta metin "Hata: ..." olduğu için satır
+    // "Bekliyor" görünüyor, altta ise yayınlanmış sayılıyordu (hata görünmezdi).
+    // status alanı yoksa (başka bir kaynaktan gelen kayıt) metne düşülür
+    const durum = item.status || (/yayın|tamamland/i.test(status) ? 'pub' : 'plan');
+    const isPublished = durum === 'pub';
+    const isFailed    = durum === 'fail';
+    const statusDot  = isFailed ? '#ef4444' : (isPublished ? '#10b981' : '#f59e0b');
+    const statusText = isFailed ? 'Başarısız' : (isPublished ? 'Yayınlandı' : 'Bekliyor');
+    const rozetBg    = isFailed ? 'rgba(239,68,68,.12)' : (isPublished ? 'rgba(16,185,129,.12)' : 'rgba(245,158,11,.1)');
+    const rozetBrd   = isFailed ? 'rgba(239,68,68,.35)' : (isPublished ? 'rgba(16,185,129,.3)' : 'rgba(245,158,11,.25)');
+    // Başarısızsa sebebi göster — asıl işe yarayan bilgi bu
+    const hataMetni = isFailed ? (item.error || String(status).replace(/^Hata:\s*/i,'') || 'sebep belirtilmemiş') : '';
 
     // Platform rozeti stili
     const platBadgeStyle = item.plat === 'ig'
@@ -7770,12 +7782,13 @@ function _dmRenderList(items) {
         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px">
           <div style="font-size:12px;font-weight:700;color:var(--tx);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">${title}</div>
           <!-- DURUM ROZETİ -->
-          <div style="flex-shrink:0;display:flex;align-items:center;gap:4px;background:${isPublished?'rgba(16,185,129,.12)':'rgba(245,158,11,.1)'};border:1px solid ${isPublished?'rgba(16,185,129,.3)':'rgba(245,158,11,.25)'};border-radius:20px;padding:2px 9px">
+          <div style="flex-shrink:0;display:flex;align-items:center;gap:4px;background:${rozetBg};border:1px solid ${rozetBrd};border-radius:20px;padding:2px 9px">
             <span style="width:5px;height:5px;border-radius:50%;background:${statusDot};display:inline-block;flex-shrink:0"></span>
             <span style="font-size:11px;color:${statusDot};font-family:'DM Mono',monospace;white-space:nowrap">${statusText}</span>
           </div>
         </div>
 
+        ${hataMetni ? `<div style="font-size:11.5px;color:#ef4444;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:4px;padding:4px 8px;margin-bottom:6px;word-break:break-word">⚠ ${hataMetni}</div>` : ''}
         <div style="font-size:12px;color:var(--mt);line-height:1.55;margin-bottom:7px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${desc || '(açıklama yok)'}</div>
 
         <!-- ALT SATIR: platform + saat + hesap + hashtaglar -->
