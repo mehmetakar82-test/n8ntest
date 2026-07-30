@@ -1425,6 +1425,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <button class="btn bg bsm" id="plat-temizle-btn" onclick="upTemizleBasliklar()" title="Upload-Post kuyruğunda BEKLEYEN zamanlanmış gönderilerin açıklamalarından 'İstediğin Başlık' / 'Your Title Here' yer tutucularını toplu kaldırır">🧹 Açıklamaları Temizle</button>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-ozet" style="font-size:12px;color:var(--tx);align-self:center"></span>
+    <span id="plat-ozet2" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
   <div id="pl-grid" class="g3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
@@ -3905,9 +3906,20 @@ async function loadPlatforms() {
   }
   setEl('plat-src','Kaynak: ' + kaynak);
   const byPlat = normalizePlatforms(raw);
-  renderPlatformsGrid(byPlat);
+  renderPlatformsGrid(byPlat);                 // 1) hesaplar hemen görünsün
   setEl('plat-last','Son: ' + new Date().toLocaleTimeString('tr'));
   addLog('ok','uploadpost','Platform verileri güncellendi ('+kaynak+')');
+  // 2) yayın geçmişini tara, gerçekten hata alan hesapları kırmızıya çevir
+  try {
+    setEl('plat-ozet2','⏳ yayın geçmişi taranıyor…');
+    await platYayinHatalariCek();
+    renderPlatformsGrid(byPlat);
+    const hatali = Object.values(PLAT_HATA).filter(g => g.adet && !(g.sonBasari && g.sonBasari >= g.sonZaman)).length;
+    addLog(hatali?'warn':'ok','uploadpost','Yayın geçmişi: '+PLAT_HATA_DURUM+(hatali?' · '+hatali+' hesapta aktif yayın hatası':''));
+  } catch(e){
+    setEl('plat-ozet2','⚠ yayın geçmişi taranamadı');
+    console.warn('[PLAT] yayın hataları:', e.message);
+  }
 }
 
 // Upload-Post response format: { profiles: [{ username, social_accounts: { instagram:{}, tiktok:{}, ... } }] }
@@ -3948,6 +3960,74 @@ function platHamDurum(a){
     .forEach(k=>{ const v=a&&a[k]; if(v&&typeof v==='string'&&v.trim()) ham.push(k+': '+v.trim()); });
   return ham.join(' · ');
 }
+// ── GERÇEK YAYIN HATALARI (Upload-Post geçmişinden) ────────────────────
+// platHesapSorun yalnız BAĞLANTI durumuna bakar (jeton süresi, yeniden
+// bağlanma vb.). Ama hesap "bağlı" görünürken gönderim yine de hata
+// alabiliyor — asıl önemli olan bu. /uploadposts/history her kaydın
+// platform + profile_username + error_message alanlarını verdiği için
+// hataları hesap düzeyinde eşleştirebiliyoruz.
+const PLAT_HATA = {};          // "profil|platform" -> {adet, sonHata, sonZaman, sonBasari}
+let PLAT_HATA_DURUM = '';      // özet metni (kaç kayıt tarandı / neden yok)
+const YAYIN_HATA_GUN = 14;     // bu kadar geriye bakılır
+
+function phAnahtar(profil, plat){ return String(profil||'').trim().toLowerCase()+'|'+String(plat||'').trim().toLowerCase(); }
+function phPlatNormal(p){ const s=String(p||'').toLowerCase().trim(); return s==='x' ? 'twitter' : s; }
+
+async function platYayinHatalariCek(derinlik){
+  Object.keys(PLAT_HATA).forEach(k => delete PLAT_HATA[k]);
+  PLAT_HATA_DURUM = '';
+  if (!S.cfg.blot && !getN8N()){ PLAT_HATA_DURUM = 'geçmiş taranamadı (API Key yok)'; return; }
+  const sinir = Date.now() - YAYIN_HATA_GUN*24*60*60*1000;
+  const N = derinlik || 5;
+  let kayit = 0, kirpik = false;
+  for (let pg = 1; pg <= N; pg++){
+    let data;
+    try { ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page='+pg)); }
+    catch(e){
+      // Sayfa 1 düşerse hiç veri yok; sonrakiler düşerse elimizdekiyle devam
+      if (pg === 1){ PLAT_HATA_DURUM = 'geçmiş alınamadı: '+e.message; return; }
+      console.warn('[PLAT] history s'+pg+':', e.message); break;
+    }
+    const h = Array.isArray(data) ? data : (data.history||data.data||data.results||data.posts||data.items||[]);
+    let pencereDisi = 0;
+    h.forEach(x => {
+      const t = Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0;
+      if (t && t < sinir){ pencereDisi++; return; }
+      kayit++;
+      const k = phAnahtar(x.profile_username||x.user, phPlatNormal(x.platform));
+      const basarili = x.success !== false && !x.error_message;
+      const g = PLAT_HATA[k] || (PLAT_HATA[k] = {adet:0, sonHata:'', sonZaman:0, sonBasari:0});
+      if (basarili){ if (t > g.sonBasari) g.sonBasari = t; }
+      else {
+        g.adet++;
+        if (t >= g.sonZaman){ g.sonZaman = t; g.sonHata = String(x.error_message || x.error || 'sebep belirtilmemiş'); }
+      }
+    });
+    if (h.length < 100) break;              // son sayfa
+    if (pencereDisi === h.length) break;    // tamamı pencere dışı → daha eskisine bakma
+    if (pg === N) kirpik = true;
+  }
+  PLAT_HATA_DURUM = kayit+' kayıt tarandı ('+YAYIN_HATA_GUN+' gün)'+(kirpik?' — daha eskisi de var':'');
+}
+
+// Hesabın AKTİF yayın sorunu var mı?
+// Son hatadan SONRA başarılı gönderim varsa hesap toparlamış demektir —
+// aksi halde bir kere hata alan hesap sonsuza dek kırmızı kalırdı.
+function phYayinSorun(a){
+  if (!a || !a._platform) return null;
+  const g = PLAT_HATA[phAnahtar(a._profile, a._platform)];
+  if (!g || !g.adet) return null;
+  if (g.sonBasari && g.sonBasari >= g.sonZaman) return null;
+  const ne = g.sonZaman ? new Date(g.sonZaman).toLocaleString('tr') : 'zamanı bilinmiyor';
+  return {
+    kisa: g.adet > 1 ? g.adet+' yayın hatası' : 'Yayın hatası',
+    detay: 'Son başarısız gönderim: '+ne+'\n'+g.sonHata
+         + '\n\nBu hesapta son gönderim başarısız oldu ve sonrasında başarılı gönderim YOK. '
+         + 'Yayın Durumu sayfasından yeniden gönderebilirsin.',
+    api: g.sonHata
+  };
+}
+
 function platHesapSorun(a){
   if (!a || typeof a!=='object')
     return {kisa:'Hesap verisi yok', detay:'Upload-Post bu hesap için hiç veri döndürmedi.', api:''};
@@ -3965,7 +4045,9 @@ function platHesapSorun(a){
   if (/invalid/.test(s))    return S_({k:'Geçersiz hesap', d:'Upload-Post hesabı geçersiz olarak işaretlemiş.'});
   if (!phAcctConnected(a))
     return S_({k:'Kimlik bilgisi eksik', d:'Hesabın kullanıcı adı / ID bilgisi gelmedi. Gönderim sırasında hedef bulunamayabilir.'});
-  return null;
+  // Bağlantı sağlam görünüyor — ama gönderim gerçekten hata alıyor mu?
+  // (Bağlantı sorunları ÖNCE gelir: jeton süresi dolmuşsa asıl sebep odur.)
+  return phYayinSorun(a);
 }
 // ── Profil düzeyinde sorun ──
 function platProfilSorun(g){
@@ -4150,6 +4232,14 @@ function renderPlatformsGrid(byPlat) {
   }).join('');
   setEl('plat-ozet', gruplar.length+' profil · '+toplamHesap+' hesap'
     + (bozukProfil||bozukHesap ? ' · ⚠ '+bozukProfil+' profil / '+bozukHesap+' hesap sorunlu' : ' · tümü sağlıklı ✓'));
+  // Yayın hatası ayrı gösterilir: "bağlantı sorunu" ile "gönderim hatası" farklı şeyler
+  const yh = Object.values(PLAT_HATA).filter(g => g.adet && !(g.sonBasari && g.sonBasari >= g.sonZaman)).length;
+  const e2 = document.getElementById('plat-ozet2');
+  if (e2){
+    if (!PLAT_HATA_DURUM) e2.textContent = '';
+    else if (yh){ e2.innerHTML = '· <b style="color:var(--er)">🔴 '+yh+' hesapta yayın hatası</b> <span style="color:var(--mt)">('+esc(PLAT_HATA_DURUM)+')</span>'; }
+    else e2.innerHTML = '· <span style="color:var(--ok)">yayın hatası yok</span> <span style="color:var(--mt)">('+esc(PLAT_HATA_DURUM)+')</span>';
+  }
 }
 
 function platAccName(a, p) {
@@ -4208,6 +4298,13 @@ function platOpenModal(platKey, idx) {
       ${stat('Takipçi', followers)}${stat('Takip', following)}${stat('Gönderi', posts)}
     </div>
     ${rowsHtml ? `<div style="background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:10px 14px;margin-bottom:14px">${rowsHtml}</div>` : ''}
+    ${(()=>{ const s = platHesapSorun(a); if(!s) return '';
+        const e = t => String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+        return `<div style="background:rgba(239,68,68,.10);border:1px solid var(--er);border-radius:4px;padding:10px 14px;margin-bottom:14px">
+          <div style="font-size:13px;font-weight:700;color:var(--er);margin-bottom:4px">⚠ ${e(s.kisa)}</div>
+          <div style="font-size:12.5px;color:var(--tx);white-space:pre-wrap;line-height:1.5">${e(s.detay)}</div>
+          ${s.api ? `<div style="font-size:11px;color:var(--mt);margin-top:6px;font-family:var(--fm);word-break:break-all">API: ${e(s.api)}</div>` : ''}
+        </div>`; })()}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <a href="${link}" target="_blank" rel="noopener" class="btn bp bsm" style="text-decoration:none">↗ ${p.label}'da Aç</a>
       <button class="btn bg bsm" onclick="platCopyLink('${link.replace(/'/g,"\\'")}')">📋 Linki Kopyala</button>
