@@ -6539,10 +6539,15 @@ document.addEventListener('DOMContentLoaded', function() {
 // ÖLÇÜLER: n8n "Çerçeve Hazırla" düğümündeki kopyayla BİREBİR aynı kalmalı.
 // Banner PNG 1080×400 (bant 0..230, başlık alanı 230..400) videonun üstüne
 // bindirilir; başlık ve filigran ffmpeg drawtext ile klip başına yazılır.
+// EMNİYET ALANLARI (ölçülerek belirlendi): platformlar 1080×1920'nin üst
+// ~200-250 px'i ile alt ~400-420 px'ini kendi arayüzleriyle kaplıyor.
+// UST=150 → logo/ad/buton ve başlık 150 px aşağıda; beyaz bant yine y=0'dan
+// başlar (yamuk görünmesin) ama boyu 550. Filigran alttan 470 px'te, yani
+// alt UI şeridinin üstünde kalıyor.
 const CER_SPEC = {
-  W:1080, H:1920, BANT:400,
-  fontPx:52, l1Y:242, l2Y:312, tekY:272,   // başlık satırları (drawtext y = üst kenar)
-  wmPx:30, wmAlt:86,                        // filigran: y = h-86
+  W:1080, H:1920, BANT:550, UST:150,
+  fontPx:52, l1Y:392, l2Y:462, tekY:422,   // başlık satırları (drawtext y = üst kenar)
+  wmPx:30, wmAlt:470,                       // filigran: y = h-470
   satirMax:32,                              // başlık bu uzunluğu aşarsa 2 satıra bölünür
   renk:'0x0B0B0E'
 };
@@ -6748,12 +6753,12 @@ function cerTikCiz(ctx, x, y, r, renk){
   ctx.restore();
 }
 
-// ── Banner çizimi (1080×400 taban; scale ile ölçeklenir) ──
+// ── Banner çizimi (1080×550 taban; scale ile ölçeklenir) ──
 function cerBannerCiz(ctx, cfg, sc, logoImg){
-  const W = CER_SPEC.W*sc, H = CER_SPEC.BANT*sc;
+  const W = CER_SPEC.W*sc, H = CER_SPEC.BANT*sc, UST = CER_SPEC.UST;
   ctx.fillStyle = cfg.bantRenk||'#fff'; ctx.fillRect(0,0,W,H);
-  // logo (daire)
-  const cx = 150*sc, cy = 115*sc, r = 82*sc;
+  // logo (daire) — UST kadar aşağıda, platform üst arayüzünün altında
+  const cx = 150*sc, cy = (115+UST)*sc, r = 82*sc;
   ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.clip();
   if (logoImg) ctx.drawImage(logoImg, cx-r, cy-r, r*2, r*2);
   else {
@@ -6779,7 +6784,7 @@ function cerBannerCiz(ctx, cfg, sc, logoImg){
     bxU = WU - 40 - bwU;
   }
   // ad (+ onay tiki) — butona taşacaksa punto kademeli küçültülür
-  const TIK_R = 19, TIK_BOS = 12, adXU = 260, adBazU = 105;
+  const TIK_R = 19, TIK_BOS = 12, adXU = 260, adBazU = 105 + UST;
   const sinirU = (cfg.buton ? bxU - 24 : WU - 40) - adXU - (cfg.tik ? TIK_R*2 + TIK_BOS : 0);
   let adMetin = String(cfg.ad || ''), adPxU = 54;
   const adOlc = t => { ctx.font = '800 '+adPxU+'px InterXB, "Segoe UI", sans-serif'; return ctx.measureText(t).width; };
@@ -6800,11 +6805,11 @@ function cerBannerCiz(ctx, cfg, sc, logoImg){
   // handle
   ctx.fillStyle = '#5a5f6b';
   ctx.font = '600 '+(38*sc)+'px InterSB, "Segoe UI", sans-serif';
-  ctx.fillText(cfg.handle||'', 262*sc, 158*sc);
+  ctx.fillText(cfg.handle||'', 262*sc, (158+UST)*sc);
   // buton (sağa dayalı)
   if (cfg.buton){
     ctx.font = '800 '+(36*sc)+'px InterXB, "Segoe UI", sans-serif';
-    const bw = bwU*sc, bh = 84*sc, bx = bxU*sc, by = 115*sc - bh/2, rr = 14*sc;
+    const bw = bwU*sc, bh = 84*sc, bx = bxU*sc, by = (115+UST)*sc - bh/2, rr = 14*sc;
     ctx.fillStyle = cfg.butonRenk||'#e51b1b';
     ctx.beginPath();
     ctx.moveTo(bx+rr,by); ctx.arcTo(bx+bw,by,bx+bw,by+bh,rr); ctx.arcTo(bx+bw,by+bh,bx,by+bh,rr);
