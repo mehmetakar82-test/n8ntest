@@ -1427,11 +1427,6 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <span id="plat-ozet" style="font-size:12px;color:var(--tx);align-self:center"></span>
     <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
-  <div class="card" style="margin-bottom:12px">
-    <div class="ct">🏷 Kullanıcı Adı Planı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— hedef ad ile <b>mevcut</b> adı karşılaştırır; ⚙ o platformun düzenleme ekranını açar</span></div>
-    <div id="ad-plan-ozet" style="font-size:12px;color:var(--mt);margin-bottom:8px"></div>
-    <div id="ad-plan" style="overflow-x:auto"></div>
-  </div>
   <div id="pl-grid" class="g3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
     <div style="color:var(--mt);font-size:13px;padding:16px;text-align:center;grid-column:1/-1">Yenile'ye bas veya Ayarlar → API Key gir</div>
   </div>
@@ -4095,70 +4090,7 @@ const AD_HEDEF = {
   'General-5':'kadrajkesiti', 'General-6':'kahkahanotu',  'General-7':'pikselkesiti',
   'General-8':'mackenari',    'eglence-1-tr':'keyifambari','vlog-1-tr':'gezikesiti'
 };
-const AD_PLAN_PLAT = ['instagram','youtube','tiktok','twitter','facebook'];
-let AD_PLAN_SON = null;   // son byPlat — ⚙ tıklamasında hesabı bulmak için
-
-function adPlanGit(plat, profil){
-  const a = ((AD_PLAN_SON||{})[plat]||[]).find(x => String(x._profile||'') === profil);
-  if (!a) return;
-  const h = platDuzenleHedef(plat, a);
-  if (h && h.url) window.open(h.url, '_blank', 'noopener');
-}
-
-function adPlanRender(byPlat){
-  const esc = s => String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const kutu = document.getElementById('ad-plan'); if (!kutu) return;
-  AD_PLAN_SON = byPlat || {};
-  // profil -> platform -> hesap
-  const harita = {};
-  AD_PLAN_PLAT.forEach(k => (AD_PLAN_SON[k]||[]).forEach(a => {
-    const pr = String(a._profile||'').trim(); if (!pr) return;
-    (harita[pr] = harita[pr] || {})[k] = a;
-  }));
-  // AD_HEDEF sırası korunur; Upload-Post'ta olup haritada olmayanlar sona eklenir
-  const profiller = Object.keys(AD_HEDEF)
-    .concat(Object.keys(harita).filter(p => !(p in AD_HEDEF)).sort());
-  if (!profiller.length){ kutu.innerHTML = durumHTML('bos',{kompakt:true, alt:'Profil bulunamadı — Yenile\'ye bas'}); return; }
-
-  let degisecek = 0, uyan = 0, hesapsiz = 0;
-  const bas = '<tr><th style="text-align:left">Profil</th><th style="text-align:left">Hedef ad</th>'
-    + AD_PLAN_PLAT.map(k => '<th>'+ (PLAT_MAP[k] ? PLAT_MAP[k].icon : k) + '</th>').join('')
-    + '</tr>';
-  const satirlar = profiller.map(pr => {
-    const hedef = AD_HEDEF[pr] || '';
-    const huc = hedef
-      ? '<code style="color:var(--acc)">@'+esc(hedef)+'</code>'
-      : '<span style="color:var(--mt)">hedef yok</span>';
-    const huc2 = AD_PLAN_PLAT.map(k => {
-      const a = (harita[pr]||{})[k];
-      if (!a){ hesapsiz++; return '<td style="text-align:center;color:var(--mt)">—</td>'; }
-      const mevcut = cleanHandle(a.username || a.handle || a.custom_url || '');
-      if (!hedef) return '<td style="text-align:center;font-size:11px">'+esc(mevcut||'?')+'</td>';
-      const ok = mevcut && mevcut.toLowerCase() === hedef.toLowerCase();
-      if (ok) uyan++; else degisecek++;
-      const renk = ok ? 'var(--ok)' : '#f5a623';
-      return '<td style="text-align:center;white-space:nowrap">'
-        + '<span style="color:'+renk+';font-size:11px">'+(ok?'✓':'≠')+' '+esc(mevcut||'(boş)')+'</span>'
-        + (ok ? '' : ' <button class="btn bsm" style="padding:1px 5px;font-size:10px"'
-            + ' onclick="adPlanGit(\''+esc(k)+'\',\''+esc(pr)+'\')" title="Düzenleme ekranını aç">⚙</button>')
-        + '</td>';
-    }).join('');
-    const yok = !harita[pr];
-    return '<tr'+(yok?' style="opacity:.55"':'')+'>'
-      + '<td style="white-space:nowrap"><b>'+esc(pr)+'</b>'+(yok?' <span style="font-size:10px;color:var(--er)">hesap yok</span>':'')+'</td>'
-      + '<td style="white-space:nowrap">'+huc+'</td>' + huc2 + '</tr>';
-  }).join('');
-
-  kutu.innerHTML = '<style>#ad-plan td,#ad-plan th{padding:3px 7px;border-bottom:1px solid var(--brd)}'
-    + '#ad-plan tbody tr:hover{background:var(--sur2)}</style>'
-    + '<table style="width:100%;border-collapse:collapse;font-size:12px">'
-    + '<thead style="color:var(--mt);font-size:11px">'+bas+'</thead><tbody>'+satirlar+'</tbody></table>';
-  setEl('ad-plan-ozet', degisecek + ' hesapta ad değişmeli · ' + uyan + ' zaten uyuyor · '
-    + hesapsiz + ' platformda hesap yok (— işareti)');
-}
-
 function renderPlatformsGrid(byPlat) {
-  try { adPlanRender(byPlat); } catch(e){ console.warn('adPlanRender:', e.message); }
   const grid = document.getElementById('pl-grid'); if (!grid) return;
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   const gruplar = platProfilGrupla(byPlat);
@@ -4205,6 +4137,11 @@ function renderPlatformsGrid(byPlat) {
       + '<div class="pl-prof-bas"'+hataAttr(ps)+'>'
       +   '<span class="pl-nokta" style="background:'+nokta+'"></span>'
       +   '<span class="pl-prof-ad">'+esc(g.profil)+'</span>'
+      +   (AD_HEDEF[g.profil]
+            ? '<span style="flex-shrink:0;font-size:11px;color:var(--acc);font-weight:600;margin-left:6px"'
+              + ' title="Bu profil için hedeflenen kullanıcı adı — 5 platformda da boş olduğu doğrulandı">→ @'
+              + esc(AD_HEDEF[g.profil]) + '</span>'
+            : '')
       +   (ps ? '<span style="margin-left:auto;flex-shrink:0;font-size:10.5px;color:#fca5a5;font-weight:700">⚠ '+esc(ps.kisa)+'</span>' : '')
       + '</div>'
       + '<div class="pl-prof-alt">'+altSatir+'</div>'
@@ -6604,7 +6541,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ipucAc,ipucKapat,geriAlinabilir,alertSadelestir,pzUygula,pzF,pzBol,
       islenmisMi,islenmisAyikla,islenmisNotu,islenmisGoster,
       // HTML'de onclick ile çağrılıyor — window'a bağlanmazsa ölü buton olur
-      testWH,ytkTestApi,adPlanRender,adPlanGit,
+      testWH,ytkTestApi,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
