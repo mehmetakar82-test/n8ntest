@@ -4012,11 +4012,25 @@ function platHamDurum(a){
 // sorgu yok — onlar Upload-Post kaydına mahkûm.
 const YT_CANLI = {};        // channelId -> { ad, handle }
 let YT_CANLI_DURUM = '';
+// Kanal kimliği Upload-Post yanıtında hangi alanda? Belgelenmemiş — önce
+// bilinen alanlara, son çare hesabın TAMAMINDA UC... desenine bakılır
+// (kanal kimliği 'UC' + 22 karakterdir, URL içinde geçse bile yakalanır).
+function ytKanalIdBul(a){
+  if (!a || typeof a !== 'object') return '';
+  for (const k of ['id','channel_id','channelId','channel','account_id','accountId']){
+    const v = String(a[k]||'');
+    if (/^UC[A-Za-z0-9_-]{22}$/.test(v)) return v;
+  }
+  const m = JSON.stringify(a).match(/UC[A-Za-z0-9_-]{22}/);
+  return m ? m[0] : '';
+}
 async function platYtCanliAdlar(byPlat){
   const key = S.cfg.ytApiKey || '';
-  const idler = [...new Set((byPlat.youtube||[]).map(a=>String(a.id||'')).filter(id=>id.startsWith('UC')))]
-    .filter(id => !YT_CANLI[id]);
-  if (!idler.length) return;
+  const ytHesaplar = byPlat.youtube || [];
+  const tumIdler = [...new Set(ytHesaplar.map(ytKanalIdBul).filter(Boolean))];
+  if (ytHesaplar.length && !tumIdler.length){ YT_CANLI_DURUM = 'kimlik-yok'; return; }
+  const idler = tumIdler.filter(id => !YT_CANLI[id]);
+  if (!idler.length) return;   // hepsi zaten önbellekte (durum korunur)
   if (!key){ YT_CANLI_DURUM = 'anahtar-yok'; return; }
   try {
     for (let i = 0; i < idler.length; i += 50){
@@ -4157,9 +4171,9 @@ function platDuzenleHedef(plat, a){
                ipucu:'Instagram → Profili düzenle (ad, kullanıcı adı, biyografi). Fotoğraf için aynı sayfada "Fotoğrafı değiştir".' };
     case 'youtube':
       // Kanal kimliği varsa doğrudan O kanalın Studio sayfası açılır
-      return { url: (a.id && String(a.id).startsWith('UC'))
-                 ? 'https://studio.youtube.com/channel/' + a.id + '/editing/details'
-                 : 'https://studio.youtube.com/',
+      return { url: (()=>{ const kid = ytKanalIdBul(a);
+                 return kid ? 'https://studio.youtube.com/channel/' + kid + '/editing/details'
+                            : 'https://studio.youtube.com/'; })(),
                ipucu:'YouTube Studio → Özelleştirme → Temel bilgiler. Kanal adı ve @handle burada. DİKKAT: 14 günde en fazla 2 kez değiştirilebilir. Avatar için "Markalaşma" sekmesi.' };
     // PLAT_LIST'te X'in anahtarı 'twitter' (alt:['x']) — ikisini de karşıla
     case 'twitter': case 'x':
@@ -4277,7 +4291,7 @@ function renderPlatformsGrid(byPlat) {
       // orada görünmüyor — canlı okunan satır CANLI rozetiyle işaretlenir.
       let canliRozet = '';
       if (h.p.key === 'youtube'){
-        const c = YT_CANLI[String(h.a.id||'')];
+        const c = YT_CANLI[ytKanalIdBul(h.a)];
         if (c && (c.ad || c.handle)){
           const eskiAd = ad, eskiKul = kul;
           if (c.ad) ad = c.ad;
@@ -4330,9 +4344,20 @@ function renderPlatformsGrid(byPlat) {
   const yh = Object.values(PLAT_HATA).filter(g => g.adet && !(g.sonBasari && g.sonBasari >= g.sonZaman)).length;
   const e2 = document.getElementById('plat-ozet2');
   if (e2){
-    if (!PLAT_HATA_DURUM) e2.textContent = '';
-    else if (yh){ e2.innerHTML = '· <b style="color:var(--er)">🔴 '+yh+' hesapta yayın hatası</b> <span style="color:var(--mt)">('+esc(PLAT_HATA_DURUM)+')</span>'; }
-    else e2.innerHTML = '· <span style="color:var(--ok)">yayın hatası yok</span> <span style="color:var(--mt)">('+esc(PLAT_HATA_DURUM)+')</span>';
+    let m = '';
+    if (PLAT_HATA_DURUM){
+      m = yh
+        ? '· <b style="color:var(--er)">🔴 '+yh+' hesapta yayın hatası</b> <span style="color:var(--mt)">('+esc(PLAT_HATA_DURUM)+')</span>'
+        : '· <span style="color:var(--ok)">yayın hatası yok</span> <span style="color:var(--mt)">('+esc(PLAT_HATA_DURUM)+')</span>';
+    }
+    // YouTube canlı okuma NEDEN çalışmadıysa ekranda söylenir — sessiz atlama
+    // "adlar hâlâ eski" diye görünüp sebebini gizliyordu.
+    const ytN = Object.keys(YT_CANLI).length;
+    if (ytN)                                     m += ' · <span style="color:var(--ok)">YouTube canlı: '+ytN+' kanal ✓</span>';
+    else if (YT_CANLI_DURUM === 'anahtar-yok')   m += ' · <span style="color:#f5a623">⚠ YouTube canlı okunamadı — YT Kanal sayfasına <b>YouTube API anahtarı</b> girip Kaydet\'e bas</span>';
+    else if (YT_CANLI_DURUM === 'kimlik-yok')    m += ' · <span style="color:#f5a623">⚠ YouTube canlı okunamadı — Upload-Post verisinde kanal kimliği (UC…) yok</span>';
+    else if (YT_CANLI_DURUM)                     m += ' · <span style="color:#f5a623">⚠ YouTube canlı okunamadı ('+esc(YT_CANLI_DURUM)+')</span>';
+    e2.innerHTML = m;
   }
 }
 
@@ -4375,7 +4400,7 @@ function platOpenModal(platKey, idx) {
   const rows = [];
   if (a._profile)          rows.push(['Upload-Post profili', a._profile]);
   // YouTube: platformdan canlı okunan güncel ad — Upload-Post kaydı bayat olabilir
-  const canli = (platKey === 'youtube') ? YT_CANLI[String(a.id||'')] : null;
+  const canli = (platKey === 'youtube') ? YT_CANLI[ytKanalIdBul(a)] : null;
   if (canli && (canli.ad || canli.handle))
     rows.push(['Güncel (canlı) ✓', (canli.ad||'') + (canli.handle ? ' · @'+canli.handle : '')]);
   if (name && name!==handle) rows.push([canli ? 'Upload-Post kaydı (ad)' : 'Görünen ad', name]);
