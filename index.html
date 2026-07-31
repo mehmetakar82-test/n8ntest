@@ -1647,6 +1647,15 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <span class="cat-chip" data-sayfa="10" onclick="ydDerinlik(10)">1.000</span>
       <span class="cat-chip" data-sayfa="25" onclick="ydDerinlik(25)">2.500</span>
     </div>
+    <select id="yd-toplu-plat" style="font-size:12px;padding:4px 6px;background:var(--bg);border:1px solid var(--brd);color:var(--tx);border-radius:4px;width:auto;flex:0 0 auto;max-width:160px" title="Hangi platformun başarısızları kuyruğa alınsın">
+      <option value="">tüm platformlar</option>
+      <option value="fb">ⓕ Facebook</option>
+      <option value="ig">📸 Instagram</option>
+      <option value="yt">▶ YouTube</option>
+      <option value="tt">♪ TikTok</option>
+      <option value="x">𝕏 X</option>
+    </select>
+    <button class="btn bg bsm" id="yd-toplu-btn" onclick="ydTopluKuyruk()" title="Başarısız gönderimleri profilin kuyruğuna ekler — hepsi aynı anda yayınlanmaz, sıradaki boş yuvalara doğal aralıklarla dağılır">↻ Başarısızları Kuyruğa Al</button>
     <span id="yd-status" style="font-size:13px;color:var(--mt);font-family:var(--fm)"></span>
     <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
       <span class="badge bi"  id="yd-f-all"    onclick="ydFilter('all')"    style="cursor:pointer;opacity:.45">Tümü</span>
@@ -9270,6 +9279,100 @@ async function ydRetryConfirm(){
   const idx = YD.retry.idx; ydRetryClose();
   await ydDoRetry({ profil: it.profile, platform: ydPlatApi(it.plat), video: v, title: it.title, description: it.caption }, idx);
 }
+// ── TOPLU KUYRUĞA ALMA ─────────────────────────────────────────────────
+// Başarısız gönderimleri profilin KUYRUĞUNA ekler (add_to_queue=true).
+// Neden native retry (/posts/retry) DEĞİL: o, işi anında yeniden yayınlar;
+// 30 başarısız kayıtta 30 video aynı anda düşer. add_to_queue ise her birini
+// sıradaki boş kuyruk yuvasına koyar, yani profilin kendi yayın ritmi korunur.
+// API çağrıları da ayrıca kısıtlanır (eşzamanlı 2) — 429 yememek için.
+async function ydTopluGonder(it){
+  const profil = it._profil || it.profile;
+  const video  = it._video;
+  const platform = ydPlatApi(it.plat);
+  if (!video)  return { ok:false, sebep:'kaynak-yok' };
+  if (!profil) return { ok:false, sebep:'profil-yok' };
+  try {
+    if (S.cfg.blot){
+      const fd = new FormData();
+      fd.append('user', profil);
+      fd.append('platform[]', platform);
+      fd.append('video', video);
+      if (it.title)  fd.append('title', String(it.title).slice(0,95));
+      const aciklama = it._caption || it.caption || '';
+      if (aciklama)  fd.append('description', aciklama);
+      fd.append('async_upload','true');
+      fd.append('add_to_queue','true');          // ← doğal akış: sıradaki boş yuva
+      fd.append('selfDeclaredMadeForKids','false');
+      if (platform === 'youtube'){
+        fd.append('categoryId', ytKategoriId(profilKategori(profil)));
+        ytEtiketler(aciklama || it.title, profilKategori(profil)).forEach(t => fd.append('tags[]', t));
+      }
+      const r = await fetch('https://api.upload-post.com/api/upload',{ method:'POST', body:fd, headers:{'Authorization':'Apikey '+S.cfg.blot} });
+      const j = await r.json().catch(()=>({}));
+      if (r.ok && j.success !== false) return { ok:true };
+      return { ok:false, sebep:'api', mesaj: j.message||j.error||('HTTP '+r.status) };
+    }
+    const base = getN8N();
+    if (!base) return { ok:false, sebep:'yapilandirma', mesaj:'API Key veya n8n URL yok' };
+    const res = await faf(base+'/webhook/yeniden-gonder', {
+      profil, platform, video, title: it.title, description: it._caption||it.caption||'', kuyruk:true });
+    return (res && res.ok === true) ? { ok:true } : { ok:false, sebep:'n8n', mesaj:'webhook yanıt vermedi' };
+  } catch(e){ return { ok:false, sebep:'istisna', mesaj:e.message }; }
+}
+
+async function ydTopluKuyruk(){
+  const btn = document.getElementById('yd-toplu-btn');
+  const platSec = (document.getElementById('yd-toplu-plat')||{}).value || '';
+  // Yalnız BAŞARISIZ kayıtlar; çözülmüş işaretliler dışarıda
+  let hedef = YD.items.filter(i => i.status === 'failed' && !i._cozuldu);
+  if (platSec) hedef = hedef.filter(i => i.plat === platSec);
+  // YD_PLAT_LABEL içinde <img> var; confirm/toast düz metin istiyor
+  const platAd = platSec ? ({ig:'Instagram',yt:'YouTube',tt:'TikTok',fb:'Facebook',x:'X'}[platSec]||platSec) : 'tüm platformlar';
+  if (!hedef.length) return toast('Kuyruğa alınacak başarısız gönderim yok ('+platAd+')','warn');
+
+  // Kaynak videoları çöz — eşleşmeyen varsa kullanıcı baştan bilsin
+  await ydEnsureShorts();
+  hedef.forEach(it => {
+    if (it._video) return;
+    const s = ydFindSource(it.title, it.thumb, it.profile, it.caption);
+    if (s && s.video){ it._video = s.video; it._profil = s.profil || it.profile; it._caption = s.caption || it.caption; }
+  });
+  const gonderilebilir = hedef.filter(i => i._video);
+  const kaynaksiz = hedef.length - gonderilebilir.length;
+  if (!gonderilebilir.length)
+    return toast('Hiçbirinin kaynak videosu bulunamadı — tek tek "Yeniden Gönder" ile mp4 URL girebilirsin','err',6000);
+
+  if (!confirm(gonderilebilir.length+' başarısız gönderim ('+platAd+') profilin KUYRUĞUNA eklenecek.\n\n'
+      + 'Hepsi aynı anda yayınlanmaz — Upload-Post her birini sıradaki boş yuvaya koyar, '
+      + 'yani mevcut yayın ritmin bozulmaz.\n'
+      + (kaynaksiz ? '\n⚠ '+kaynaksiz+' kaydın kaynak videosu bulunamadı, onlar atlanacak.\n' : '')
+      + '\nDevam edilsin mi?')) return;
+
+  if (btn){ btn.disabled = true; btn.textContent = '⏳ 0/'+gonderilebilir.length; }
+  let ok=0, hata=0; const hatalar=[];
+  await upSirali(gonderilebilir, async (it) => {
+    const s = await ydTopluGonder(it);
+    if (s.ok){
+      ok++;
+      it.status='retried';
+      it.error=(it.error?it.error+' · ':'')+'↻ kuyruğa alındı';
+    } else {
+      hata++;
+      if (hatalar.length < 4) hatalar.push((it.profile||'?')+': '+(s.mesaj||s.sebep));
+    }
+    if (btn) btn.textContent = '⏳ '+(ok+hata)+'/'+gonderilebilir.length;
+  }, 2);
+  if (btn){ btn.disabled = false; btn.textContent = '↻ Başarısızları Kuyruğa Al'; }
+
+  ydUpdateCounts(); renderYayinDurumu();
+  const ozet = ok+' kuyruğa alındı'
+    + (hata ? ' · '+hata+' başarısız' : '')
+    + (kaynaksiz ? ' · '+kaynaksiz+' kaynaksız atlandı' : '');
+  toast((ok?'✓ ':'✕ ')+ozet, ok?'ok':'err', 7000);
+  addLog(hata?'warn':'ok','uploadpost','Toplu kuyruk ('+platAd+'): '+ozet+(hatalar.length?' | '+hatalar.join(' | '):''));
+  if (hata) console.warn('[YD] toplu kuyruk hataları:', hatalar);
+}
+
 async function ydDoRetry(payload, idx){
   if (!payload.video) return toast('Kaynak video yok','err');
   toast('↻ Yeniden gönderiliyor: '+(payload.profil||'')+' ['+payload.platform+']','info');
@@ -9323,6 +9426,7 @@ window.loadYayinDurumu=loadYayinDurumu;
 window.ydFilter=ydFilter; window.ydRetry=ydRetry; window.ydRetryClose=ydRetryClose; window.ydRetryConfirm=ydRetryConfirm; window.ydRetryPick=ydRetryPick;
 window.ydCozulenGoster=ydCozulenGoster; window.ydCozulenleriIsaretle=ydCozulenleriIsaretle; window.ydAnahtar=ydAnahtar;
 window.ydDerinlik=ydDerinlik; window.ydDerinlikCiz=ydDerinlikCiz;
+window.ydTopluKuyruk=ydTopluKuyruk; window.ydTopluGonder=ydTopluGonder;
 window.kuyrukDenetimi=kuyrukDenetimi; window.kdCsv=kdCsv; window.kdAnahtar=kdAnahtar; window.kdCiz=kdCiz;
 try { const _s=parseInt(localStorage.getItem('op_yd_sayfa')); if(_s>0) YD.derinlik=_s; } catch(e) {}
 
