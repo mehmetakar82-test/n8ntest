@@ -1419,7 +1419,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
 <!-- PLATFORMLAR -->
 <div id="page-platformlar" class="page">
   <div class="ph"><div class="pt">Platformlar</div><div class="ps">Sosyal hesaplar <b>Upload-Post profiline göre</b> kümelenir — sorunlu olanlar kırmızı, üzerine gel sorunu göster, tıkla detay aç. Hesabın <b>⚙</b> düğmesi o platformun profil düzenleme ekranını açar (ad ve görsel değişikliği API'den yapılamaz, elle yapılır).</div></div>
-  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den (api.upload-post.com/api/uploadposts/users) gelir. Ayarlar → <b>Upload-Post API Key</b> gerekli. n8n bağlıysa proxy üzerinden gelir (CORS sorunu olmaz), değilse doğrudan API'ye istek atılır.</span></div>
+  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den gelir ve hesap adları <b>bağlama anındaki</b> kayıttır — platformda adı değiştirince burada kendiliğinden güncellenmez (Upload-Post'ta tazeleme ucu yok; yayınlar yine doğru hesaba gider). <b>YouTube</b> adları kanal kimliğinden <b style="color:var(--ok)">CANLI</b> okunur; IG/TikTok/FB/X için güncel adı görmek istersen Upload-Post'ta hesabı yeniden bağla.</span></div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms(true)" title="Önbelleği atlar, Upload-Post'tan taze veri çeker">↻ Yenile</button>
     <button class="btn bg bsm" id="plat-temizle-btn" onclick="upTemizleBasliklar()" title="Upload-Post kuyruğunda BEKLEYEN zamanlanmış gönderilerin açıklamalarından 'İstediğin Başlık' / 'Your Title Here' yer tutucularını toplu kaldırır">🧹 Açıklamaları Temizle</button>
@@ -3952,10 +3952,10 @@ async function loadPlatforms(zorla) {
   renderPlatformsGrid(byPlat);                 // 1) hesaplar hemen görünsün
   setEl('plat-last','Son: ' + new Date().toLocaleTimeString('tr'));
   addLog('ok','uploadpost','Platform verileri güncellendi ('+kaynak+')');
-  // 2) yayın geçmişini tara, gerçekten hata alan hesapları kırmızıya çevir
+  // 2) yayın geçmişini tara + YouTube adlarını canlı oku, sonra yeniden çiz
   try {
     setEl('plat-ozet2','⏳ yayın geçmişi taranıyor…');
-    await platYayinHatalariCek();
+    await Promise.all([ platYayinHatalariCek(), platYtCanliAdlar(byPlat) ]);
     renderPlatformsGrid(byPlat);
     const hatali = Object.values(PLAT_HATA).filter(g => g.adet && !(g.sonBasari && g.sonBasari >= g.sonZaman)).length;
     addLog(hatali?'warn':'ok','uploadpost','Yayın geçmişi: '+PLAT_HATA_DURUM+(hatali?' · '+hatali+' hesapta aktif yayın hatası':''));
@@ -4003,6 +4003,39 @@ function platHamDurum(a){
     .forEach(k=>{ const v=a&&a[k]; if(v&&typeof v==='string'&&v.trim()) ham.push(k+': '+v.trim()); });
   return ham.join(' · ');
 }
+// ── YOUTUBE CANLI AD ZENGİNLEŞTİRME ────────────────────────────────────
+// Upload-Post /users hesap adlarını BAĞLAMA ANINDAKİ haliyle saklar ve
+// tazeleme ucu yok (OpenAPI tarandı). Kullanıcı platformda adı değiştirince
+// panel eski adı gösterir. YouTube'da kanal kimliği (UC...) elimizde olduğu
+// için güncel ad + @handle YouTube API'sinden canlı okunabilir (50 kanal
+// tek çağrıda, ~1 kota birimi). Diğer platformlarda kimlikle herkese açık
+// sorgu yok — onlar Upload-Post kaydına mahkûm.
+const YT_CANLI = {};        // channelId -> { ad, handle }
+let YT_CANLI_DURUM = '';
+async function platYtCanliAdlar(byPlat){
+  const key = S.cfg.ytApiKey || '';
+  const idler = [...new Set((byPlat.youtube||[]).map(a=>String(a.id||'')).filter(id=>id.startsWith('UC')))]
+    .filter(id => !YT_CANLI[id]);
+  if (!idler.length) return;
+  if (!key){ YT_CANLI_DURUM = 'anahtar-yok'; return; }
+  try {
+    for (let i = 0; i < idler.length; i += 50){
+      const parca = idler.slice(i, i+50);
+      const r = await fetch('https://www.googleapis.com/youtube/v3/channels?part=snippet&maxResults=50&id='+parca.join(',')+'&key='+encodeURIComponent(key));
+      const j = await r.json().catch(()=>({}));
+      if (!r.ok){
+        YT_CANLI_DURUM = 'api-'+r.status;
+        addLog('warn','uploadpost','YouTube canlı ad okunamadı: '+((j.error&&j.error.message)||('HTTP '+r.status)));
+        return;
+      }
+      (j.items||[]).forEach(c => {
+        YT_CANLI[c.id] = { ad: (c.snippet&&c.snippet.title)||'', handle: String((c.snippet&&c.snippet.customUrl)||'').replace(/^@/,'') };
+      });
+    }
+    YT_CANLI_DURUM = 'ok';
+  } catch(e){ YT_CANLI_DURUM = 'hata'; console.warn('[PLAT] YouTube canlı ad:', e.message); }
+}
+
 // ── GERÇEK YAYIN HATALARI (Upload-Post geçmişinden) ────────────────────
 // platHesapSorun yalnız BAĞLANTI durumuna bakar (jeton süresi, yeniden
 // bağlanma vb.). Ama hesap "bağlı" görünürken gönderim yine de hata
@@ -4237,13 +4270,31 @@ function renderPlatformsGrid(byPlat) {
       const hs = platHesapSorun(h.a);
       if (hs) bozukHesap++;
       toplamHesap++;
-      const ad = platAccName(h.a, h.p);
-      const kul = cleanHandle(h.a.username || h.a.handle);
+      let ad = platAccName(h.a, h.p);
+      let kul = cleanHandle(h.a.username || h.a.handle);
+      // YouTube: güncel ad platformdan canlı okunduysa onu göster.
+      // Upload-Post kaydı bağlama anında donduğu için ad değişiklikleri
+      // orada görünmüyor — canlı okunan satır CANLI rozetiyle işaretlenir.
+      let canliRozet = '';
+      if (h.p.key === 'youtube'){
+        const c = YT_CANLI[String(h.a.id||'')];
+        if (c && (c.ad || c.handle)){
+          const eskiAd = ad, eskiKul = kul;
+          if (c.ad) ad = c.ad;
+          if (c.handle) kul = c.handle;
+          const degisti = (c.handle && eskiKul && c.handle.toLowerCase() !== eskiKul.toLowerCase())
+                       || (c.ad && eskiAd && c.ad !== eskiAd);
+          canliRozet = ' <span style="font-size:9px;color:var(--ok);border:1px solid var(--ok);border-radius:3px;padding:0 3px;vertical-align:1px" title="'
+            + (degisti ? 'YouTube&#39;dan canlı okundu. Upload-Post&#39;taki eski kayıt: '+esc(eskiAd)+(eskiKul?' (@'+esc(eskiKul)+')':'')
+                       : 'YouTube&#39;dan canlı okundu — Upload-Post kaydıyla aynı')
+            + '">CANLI</span>';
+        }
+      }
       return '<div class="pl-hesap'+(hs?' bozuk':'')+'"'+hataAttr(hs)
         + ' onclick="platOpenModal(\''+h.p.key+'\','+h.idx+')">'
         + '<div class="pl-h-ikon" style="background:'+h.p.color+'22;color:'+h.p.color+'">'+h.p.icon+'</div>'
         + '<div style="min-width:0;flex:1">'
-        +   '<div class="pl-h-ad">'+esc(ad)+'</div>'
+        +   '<div class="pl-h-ad">'+esc(ad)+canliRozet+'</div>'
         +   '<div class="pl-h-alt">'+esc(h.p.label)+(kul?' · @'+esc(kul):'')+'</div>'
         + '</div>'
         + (hs ? '<span class="pl-h-uyari">⚠</span>' : '')
@@ -4323,8 +4374,12 @@ function platOpenModal(platKey, idx) {
   const stat = (label, val) => val != null && val !== '' ? `<div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:11px;color:var(--mt);text-transform:uppercase">${label}</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${ytkFmt(val)}</div></div>` : '';
   const rows = [];
   if (a._profile)          rows.push(['Upload-Post profili', a._profile]);
-  if (name && name!==handle) rows.push(['Görünen ad', name]);
-  if (handle)              rows.push(['Kullanıcı adı', '@'+handle]);
+  // YouTube: platformdan canlı okunan güncel ad — Upload-Post kaydı bayat olabilir
+  const canli = (platKey === 'youtube') ? YT_CANLI[String(a.id||'')] : null;
+  if (canli && (canli.ad || canli.handle))
+    rows.push(['Güncel (canlı) ✓', (canli.ad||'') + (canli.handle ? ' · @'+canli.handle : '')]);
+  if (name && name!==handle) rows.push([canli ? 'Upload-Post kaydı (ad)' : 'Görünen ad', name]);
+  if (handle)              rows.push([canli ? 'Upload-Post kaydı (kullanıcı adı)' : 'Kullanıcı adı', '@'+handle]);
   if (a.id)                rows.push(['Hesap ID', a.id]);
   if (a.urn)               rows.push(['URN', a.urn]);
   const rowsHtml = rows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:13px"><span style="color:var(--mt)">${k}</span><span style="color:var(--tx);font-family:var(--fm);word-break:break-all;text-align:right">${v}</span></div>`).join('');
