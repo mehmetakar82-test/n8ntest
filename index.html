@@ -1421,7 +1421,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div class="ph"><div class="pt">Platformlar</div><div class="ps">Sosyal hesaplar <b>Upload-Post profiline göre</b> kümelenir — sorunlu olanlar kırmızı, üzerine gel sorunu göster, tıkla detay aç. Hesabın <b>⚙</b> düğmesi o platformun profil düzenleme ekranını açar (ad ve görsel değişikliği API'den yapılamaz, elle yapılır).</div></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den (api.upload-post.com/api/uploadposts/users) gelir. Ayarlar → <b>Upload-Post API Key</b> gerekli. n8n bağlıysa proxy üzerinden gelir (CORS sorunu olmaz), değilse doğrudan API'ye istek atılır.</span></div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-    <button class="btn bp bsm" onclick="loadPlatforms()">↻ Yenile</button>
+    <button class="btn bp bsm" onclick="loadPlatforms(true)" title="Önbelleği atlar, Upload-Post'tan taze veri çeker">↻ Yenile</button>
     <button class="btn bg bsm" id="plat-temizle-btn" onclick="upTemizleBasliklar()" title="Upload-Post kuyruğunda BEKLEYEN zamanlanmış gönderilerin açıklamalarından 'İstediğin Başlık' / 'Your Title Here' yer tutucularını toplu kaldırır">🧹 Açıklamaları Temizle</button>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-ozet" style="font-size:12px;color:var(--tx);align-self:center"></span>
@@ -3868,14 +3868,43 @@ const PLAT_LIST = [
 
 const PLAT_MAP = PLAT_LIST.reduce((o,p)=>{o[p.key]=p;return o;},{});
 
-async function loadPlatforms() {
+// zorla=true → "Yenile" düğmesi. İKİ önbellek katmanı da temizlenir ve en
+// taze kaynaktan (doğrudan API) okunur.
+// Neden gerekti: sayfa açılışında S._panelCache.accounts varsa fonksiyon
+// hep ORADAN okuyordu ve o önbellek hiçbir yerde tazelenmiyordu. Kullanıcı
+// Upload-Post'ta kullanıcı adını değiştirse bile panel eski adı gösteriyor,
+// "Yenile" de aynı önbelleği okuduğu için hiçbir şey değişmiyordu.
+async function loadPlatforms(zorla) {
   setEl('plat-last','Yükleniyor...');
   setEl('plat-src','');
-  addLog('info','uploadpost','Upload-Post profil bilgileri çekiliyor');
+  addLog('info','uploadpost','Upload-Post profil bilgileri çekiliyor'+(zorla?' (zorla tazeleme)':''));
   let raw = null, kaynak = '';
+
+  let taze = false;
+  if (zorla) {
+    // DİKKAT: önbellek burada SİLİNMEZ. Silinirse taze çekim başarısız
+    // olduğunda (ağ yok, 401, CORS) geri düşecek veri kalmaz ve ekran
+    // tamamen boşalır. Önbellek yalnız başarılı çekimde üzerine yazılır.
+    n8nCacheClear('/webhook/uploadpost-profiller');
+    n8nCacheClear('/webhook/panel-data');
+    // Zorlamada doğrudan API önce denenir: aradaki katman ne kadar azsa
+    // veri o kadar taze olur.
+    if (S.cfg.blot) {
+      try {
+        const r = await fetch('https://api.upload-post.com/api/uploadposts/users', { headers: { 'Authorization': 'Apikey ' + S.cfg.blot } });
+        const j = await r.json();
+        if (r.ok) { raw = j; kaynak = 'doğrudan API ✓ taze'; taze = true; }
+        else addLog('warn','uploadpost','API '+r.status+': '+(j.message||j.error||'?'));
+      } catch(e) { addLog('warn','uploadpost','Doğrudan API başarısız (muhtemelen CORS): '+e.message); }
+    }
+  }
+
   // 1) Panel cache (n8n panel-data içinden accounts)
-  if (S._panelCache && S._panelCache.accounts && Object.keys(S._panelCache.accounts).length) {
-    raw = S._panelCache.accounts; kaynak = 'panel-data cache';
+  //    Zorlamada bile buraya düşülebilir: taze veri alınamadıysa eldeki
+  //    veriyle devam etmek, boş ekrandan iyidir — ama etiketi farklı olur.
+  if (!raw && S._panelCache && S._panelCache.accounts && Object.keys(S._panelCache.accounts).length) {
+    raw = S._panelCache.accounts;
+    kaynak = zorla ? 'panel-data cache — TAZELENEMEDİ' : 'panel-data cache';
   }
   // 2) n8n webhook (var ve CORS izinli)
   if (!raw) {
@@ -3892,12 +3921,24 @@ async function loadPlatforms() {
     } catch(e) { addLog('warn','uploadpost','Doğrudan API başarısız (muhtemelen CORS): '+e.message); }
   }
   S.uploadPostAccounts = raw;
+  // Taze veriyi ortak önbelleğe de yaz: Takvim, Raporlar ve profil sağlık
+  // kontrolü phFetchAccounts() üzerinden aynı yerden okuyor.
+  if (raw && taze){
+    if (!S._panelCache) S._panelCache = {};
+    S._panelCache.accounts = raw;
+  }
   if (!raw) {
     document.getElementById('pl-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--mt);font-size:13px">Bağlanılamadı — n8n URL veya Upload-Post API Key girin</div>';
     setEl('plat-last','Bağlanılamadı');
     return;
   }
-  setEl('plat-src','Kaynak: ' + kaynak);
+  // Önbellekten okunduysa bunu SAKLAMA: kullanıcı adı değişikliği gibi
+  // güncellemeler önbellekte görünmez, "Yenile" gerektiği belli olsun.
+  const eskiMi = !taze;
+  const srcEl = document.getElementById('plat-src');
+  if (srcEl) srcEl.innerHTML = eskiMi
+    ? '<span style="color:#f5a623">⚠ Kaynak: '+kaynak+' — güncel değilse <b>Yenile</b>\'ye bas</span>'
+    : '<span style="color:var(--ok)">Kaynak: '+kaynak+'</span>';
   const byPlat = normalizePlatforms(raw);
   renderPlatformsGrid(byPlat);                 // 1) hesaplar hemen görünsün
   setEl('plat-last','Son: ' + new Date().toLocaleTimeString('tr'));
