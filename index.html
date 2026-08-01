@@ -3775,10 +3775,24 @@ function rapRenderLiveCard(u, data, err){
   el.appendChild(card);
 }
 
+// Facebook analitiği page_id İSTER (şemada zorunlu) — profil başına sayfa
+// kimliği bir kez çekilip önbelleklenir. Kimliği bulunamayan profilde
+// facebook istekten çıkarılır ki tüm çağrı hata vermesin.
+const RAP_FB_SAYFA = {};   // profil -> page_id ('' = bulunamadı)
+async function rapFbSayfaId(u){
+  if (u in RAP_FB_SAYFA) return RAP_FB_SAYFA[u];
+  try {
+    const { data } = await upFetchRetry('/uploadposts/facebook/pages?profile='+encodeURIComponent(u));
+    const pages = (data && (data.pages || data.data)) || [];
+    RAP_FB_SAYFA[u] = (pages[0] && String(pages[0].page_id || pages[0].id || '')) || '';
+  } catch(e){ RAP_FB_SAYFA[u] = ''; }
+  return RAP_FB_SAYFA[u];
+}
+
 async function rapLoadAnalytics(profs){
   const stEl=document.getElementById('rap-live-status');
   const liveEl=document.getElementById('rap-live'); if(!liveEl) return;
-  const valid=['instagram','tiktok','linkedin','x','youtube','threads','pinterest'];
+  const valid=['instagram','tiktok','linkedin','x','youtube','threads','pinterest','facebook'];
   const targets=(profs||[]).map(p=>{
     const sa=p.social_accounts||p.socialAccounts||{};
     // İstek sırası da aynı olsun ki Upload-Post yanıtı zaten sıralı gelsin
@@ -3791,9 +3805,20 @@ async function rapLoadAnalytics(profs){
   // ESKİDEN Promise.all ile 15 profil AYNI ANDA isteniyordu → Upload-Post
   // HTTP 429 ("Too many requests") veriyor ve o profillerin kartı hata
   // gösteriyordu. Artık en fazla 3 eşzamanlı istek + 429/5xx'te yeniden deneme.
+  let fbSayfasiz = 0;
   await upSirali(targets, async t=>{
     try{
-      const { data } = await upFetchRetry('/analytics/'+encodeURIComponent(t.u)+'?platforms='+t.plats.join(','));
+      // Facebook varsa sayfa kimliğini ekle; kimlik yoksa facebook'u çıkar
+      let ek = '';
+      if (t.plats.includes('facebook')){
+        const pid = await rapFbSayfaId(t.u);
+        if (pid) ek = '&page_id='+encodeURIComponent(pid);
+        else { t.plats = t.plats.filter(p=>p!=='facebook'); fbSayfasiz++; }
+      }
+      // return KULLANILMAZ: worker'ın sonundaki done++/durum satırı atlanır
+      if (!t.plats.length)
+        throw new Error('Facebook sayfa kimliği bulunamadı — analitik istenemedi');
+      const { data } = await upFetchRetry('/analytics/'+encodeURIComponent(t.u)+'?platforms='+t.plats.join(',')+ek);
       // Toplamlar da normalleştirilmiş veriden hesaplanmalı; ham dizi biçimi
       // rapAnalyticsTotals'da 0 üretiyordu.
       const norm = rapAnalyticsNormal(data);
@@ -3813,6 +3838,10 @@ async function rapLoadAnalytics(profs){
     if(stEl) stEl.textContent='— '+done+'/'+targets.length+' · ⏳ '+hizSiniri+' profil hız sınırına takıldı';
     toast(hizSiniri+' profil Upload-Post hız sınırına takıldı — Raporu Oluştur\'a tekrar bas','warn',6000);
     addLog('warn','uploadpost','Rapor metrik: '+hizSiniri+' profil HTTP 429');
+  }
+  if (fbSayfasiz){
+    if(stEl) stEl.textContent += ' · ⚠ '+fbSayfasiz+' profilde Facebook sayfası bulunamadı';
+    addLog('warn','uploadpost','Rapor: '+fbSayfasiz+' profilde Facebook sayfa kimliği alınamadı — o profillerde FB analitiği istenmedi');
   }
   addLog('ok','sistem','Rapor canlı metrikler: '+Object.keys(RAP.analytics).length+' profil');
 }
