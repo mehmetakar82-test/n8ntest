@@ -7146,15 +7146,29 @@ async function cerGhIstek(yol, metod, govde){
   });
   if (r.status === 404 && (metod||'GET') === 'GET') return null;
   const j = await r.json().catch(()=>({}));
-  if (!r.ok) throw new Error('GitHub HTTP '+r.status+': '+(j.message||'?'));
+  if (!r.ok) throw new Error('GitHub HTTP '+r.status+': '+(j.message||'?')
+    + (r.status === 403 ? ' — token ayarında Repository access: "Only select repositories" → repo seçili VE Contents: "Read and write" olmalı' : ''));
   return j;
 }
+// Testin YAZMA yetkisini de ölçmesi şart: fine-grained token varsayılanı
+// "Public repositories (read-only)" — dosya OKUMA testi ✓ verirken banner
+// yayınlama 403 atıyordu (yaşandı). /repos yanıtındaki permissions.push
+// alanı, dosya oluşturmadan yazma yetkisini söylüyor.
 async function cerGhTest(){
   const el = document.getElementById('cer-gh-durum');
   el.textContent = '...';
   try{
-    await cerGhIstek('cerceve/Inter-ExtraBold.ttf');
-    el.innerHTML = '<span style="color:var(--ok)">✓ Bağlantı ve yetki tamam</span>';
+    cerGhKaydet();
+    if (!CER.ghPat) throw new Error('GitHub token gerekli');
+    const r = await fetch('https://api.github.com/repos/'+CER.ghRepo, {
+      headers: { 'Authorization':'Bearer '+CER.ghPat, 'Accept':'application/vnd.github+json' } });
+    const j = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error('HTTP '+r.status+': '+(j.message||'?'));
+    if (!(j.permissions && j.permissions.push))
+      throw new Error('Token repoyu okuyabiliyor ama YAZAMIYOR — token ayarında '
+        + 'Repository access: "Only select repositories" → '+CER.ghRepo.split('/')[1]
+        + ' seç ve Contents iznini "Read and write" yap');
+    el.innerHTML = '<span style="color:var(--ok)">✓ Bağlantı ve YAZMA yetkisi tamam</span>';
   }catch(e){ el.innerHTML = '<span style="color:var(--er)">✗ '+e.message+'</span>'; }
 }
 async function cerYayinla(){
