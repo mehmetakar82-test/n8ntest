@@ -4655,7 +4655,7 @@ async function platDoldurTara(){
       if (h.mevcut.has(n)){ zatenVar.push(hamBaslik); return; }   // hedefte zaten var → atla
       const s = ydFindSource(hamBaslik, '', profil, '');
       if (s && s.video) aday.push({ _profil: profil, _video: s.video, _caption: s.caption||'', _tarih: s.tarih||'',
-                                    _clipId: s.clipId||'', _onizle: s.onizle||'', plat: PD_PLAT_KEY[hedef], title: hamBaslik });
+                                    _clipId: s.clipId||'', plat: PD_PLAT_KEY[hedef], title: hamBaslik });
       else kaynaksiz.push(hamBaslik);
     });
     // ÖN KONTROL: linkler gerçekten indirilebiliyor mu? Eski short'ların
@@ -9895,8 +9895,7 @@ function ydFindSource(title, thumb, profile, caption){
     profil: String(best['profil']||best['Profil']||profile||'').trim(),
     caption:best['safe-description'] || best['safeDescription'] || best['description'] || '',
     tarih:  best['created-at'] || best['createdAt'] || best['tarih'] || best['Tarih'] || '',
-    clipId: String(best['clip-id'] || best['clipId'] || '').trim(),
-    onizle: String(best['preview-url'] || best['previewUrl'] || '').trim()
+    clipId: String(best['clip-id'] || best['clipId'] || '').trim()
   };
 }
 
