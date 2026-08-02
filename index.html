@@ -1422,12 +1422,14 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den gelir ve hesap adları <b>bağlama anındaki</b> kayıttır — platformda adı değiştirince burada kendiliğinden güncellenmez (Upload-Post'ta tazeleme ucu yok; yayınlar yine doğru hesaba gider). <b>YouTube</b> adları kanal kimliğinden <b style="color:var(--ok)">CANLI</b> okunur; IG/TikTok/FB/X için güncel adı görmek istersen Upload-Post'ta hesabı yeniden bağla.</span></div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms(true)" title="Önbelleği atlar, Upload-Post'tan taze veri çeker">↻ Yenile</button>
+    <button class="btn bg bsm" id="plat-kapsama-btn" onclick="platKapsama()" title="Profil × platform matrisi: her bağlı hesabın yayınlanmış / başarısız / planlı sayıları. Hiç kaydı olmayan hesaplar kırmızı HİÇ ile işaretlenir — 'bu hesaba hiç video gitmemiş' sorusunun cevabı">📋 Kapsama Denetimi</button>
     <button class="btn bg bsm" id="plat-temizle-btn" onclick="upTemizleBasliklar()" title="Upload-Post kuyruğunda BEKLEYEN zamanlanmış gönderilerin açıklamalarından 'İstediğin Başlık' / 'Your Title Here' yer tutucularını toplu kaldırır">🧹 Açıklamaları Temizle</button>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-ozet" style="font-size:12px;color:var(--tx);align-self:center"></span>
     <span id="plat-ozet2" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
+  <div id="plat-kapsama" style="margin-bottom:12px"></div>
   <div id="pl-grid" class="g3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
     <div style="color:var(--mt);font-size:13px;padding:16px;text-align:center;grid-column:1/-1">Yenile'ye bas veya Ayarlar → API Key gir</div>
   </div>
@@ -2265,7 +2267,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-1';
+const PANEL_YAPI = 'y2026.08.02-2';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4080,6 +4082,111 @@ async function platYtCanliAdlar(byPlat){
     }
     YT_CANLI_DURUM = 'ok';
   } catch(e){ YT_CANLI_DURUM = 'hata'; console.warn('[PLAT] YouTube canlı ad:', e.message); }
+}
+
+// ── KAPSAMA DENETİMİ ───────────────────────────────────────────────────
+// "Bu hesaba bugüne kadar HİÇ video gitti mi?" — profil × platform matrisi.
+// Üç kaynak birleştirilir: history (yayınlanmış/başarısız), schedule
+// (tarihli planlar) ve queue/preview (kuyruk yuvaları). Üçünde de kaydı
+// olmayan BAĞLI hesap kırmızı HİÇ ile işaretlenir. Bilinen tuzak: sayfasız
+// Facebook hesabına gönderim SESSİZCE düşer (facebook_page_id boş gider,
+// istek reddedilir, hata yutulur) — bu denetim tam o kara deliği gösterir.
+const KAPSAMA_SAYFA = 10;   // history taraması: 10×100 = 1000 kayıt
+async function platKapsama(){
+  const btn = document.getElementById('plat-kapsama-btn');
+  const kutu = document.getElementById('plat-kapsama'); if (!kutu) return;
+  if (!S.cfg.blot && !getN8N()){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
+  if (btn) btn.disabled = true;
+  kutu.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Geçmiş + plan + kuyruk taranıyor (birkaç sn sürer)…'});
+  try {
+    const raw = S.uploadPostAccounts || await phFetchAccounts();
+    const profs = (raw && Array.isArray(raw.profiles)) ? raw.profiles : [];
+    if (!profs.length){ kutu.innerHTML = durumHTML('bos',{kompakt:true, alt:'Profil bulunamadı — önce Yenile\'ye bas'}); if(btn) btn.disabled=false; return; }
+    const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook',
+                 x:'x', twitter:'x', threads:'threads', linkedin:'linkedin', pinterest:'pinterest', bluesky:'bluesky' };
+    const K = {};   // profil -> platform -> {pub,fail,plan}
+    const hucre = (u,p)=>{ const a = K[u] = K[u]||{}; return a[p] = a[p]||{pub:0,fail:0,plan:0}; };
+
+    // 1) Yayın geçmişi (sayfalı)
+    let kayit = 0, kirpik = false;
+    for (let pg = 1; pg <= KAPSAMA_SAYFA; pg++){
+      let data;
+      try { ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page='+pg)); }
+      catch(e){ if (pg === 1) throw e; break; }
+      const h = Array.isArray(data) ? data : (data.history||data.data||data.results||data.items||[]);
+      h.forEach(x => {
+        kayit++;
+        const u = x.profile_username || x.user || '';
+        const p = NP[String(x.platform||'').toLowerCase()];
+        if (!u || !p) return;
+        const c = hucre(u,p);
+        (x.success !== false && !x.error_message) ? c.pub++ : c.fail++;
+      });
+      if (h.length < 100) break;
+      if (pg === KAPSAMA_SAYFA) kirpik = true;
+    }
+    // 2) Tarihli planlar
+    try {
+      const { data } = await upFetchRetry('/uploadposts/schedule');
+      const s = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
+      s.forEach(x => {
+        const u = x.profile_username || '';
+        const pl = x.platforms || (x.platform ? [x.platform] : []);
+        pl.forEach(z => { const p = NP[String(z).toLowerCase()]; if (u && p) hucre(u,p).plan++; });
+      });
+    } catch(e){ console.warn('[KAPSAMA] schedule:', e.message); }
+    // 3) Kuyruk yuvaları (profil başına, en fazla 4 eşzamanlı)
+    await upSirali(profs.map(p=>p.username).filter(Boolean), async u => {
+      try {
+        const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(u)+'&count=50');
+        (data.slots||[]).forEach(sl => {
+          const sp = sl.scheduled_post; if (!sp) return;
+          (sp.platforms||[]).forEach(z => { const p = NP[String(z).toLowerCase()]; if (p) hucre(u,p).plan++; });
+        });
+      } catch(e){ console.warn('[KAPSAMA] queue '+u+':', e.message); }
+    }, 4);
+
+    // 4) Matris
+    const esc = s=>String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const PLATS = [['instagram','📸 IG'],['youtube','▶ YT'],['tiktok','♪ TT'],['facebook','ⓕ FB'],['x','𝕏 X']];
+    const sifirlar = [];
+    const bagliMi = (sa,p)=>{
+      const keys = p==='x' ? ['twitter','x'] : [p];
+      return keys.some(k=>{ const v=sa[k]; const a=Array.isArray(v)?v[0]:v; return a&&(a.username||a.id||a.display_name||a.name); });
+    };
+    const rows = profs.map(pr => {
+      const u = pr.username||''; const sa = pr.social_accounts||pr.socialAccounts||{};
+      const tds = PLATS.map(([p]) => {
+        if (!bagliMi(sa,p)) return '<td style="text-align:center;color:var(--mt)">—</td>';
+        const c = (K[u]||{})[p] || {pub:0,fail:0,plan:0};
+        if (!c.pub && !c.fail && !c.plan){
+          sifirlar.push({u, p});
+          return '<td style="text-align:center"><span style="color:var(--er);font-weight:800;font-size:11px;border:1px solid var(--er);border-radius:3px;padding:1px 6px" title="Bağlı hesap ama taranan pencerede tek bir yayın/plan/kuyruk kaydı yok — bu hesaba video hiç ulaşmıyor olabilir (Facebook\'ta en sık sebep: bağlantıda SAYFA yok)">HİÇ</span></td>';
+        }
+        return '<td style="text-align:center;white-space:nowrap;font-size:11.5px">'
+          + (c.pub  ? '<span style="color:var(--ok)" title="yayınlandı">✓'+c.pub+'</span> '  : '')
+          + (c.fail ? '<span style="color:var(--er)" title="başarısız">✕'+c.fail+'</span> ' : '')
+          + (c.plan ? '<span style="color:#00b8d4" title="planlı/kuyrukta">⏰'+c.plan+'</span>' : '')
+          + '</td>';
+      }).join('');
+      return '<tr><td style="white-space:nowrap"><b>'+esc(u)+'</b></td>'+tds+'</tr>';
+    }).join('');
+    const ozet = sifirlar.length
+      ? '<div style="font-size:12.5px;color:var(--er);margin-bottom:8px"><b>🛑 '+sifirlar.length+' hesapta HİÇ kayıt yok:</b> '
+        + sifirlar.map(s=>esc(s.u)+' · '+s.p).join(' &nbsp;|&nbsp; ')
+        + '<div style="color:var(--mt);margin-top:4px">Facebook için ilk şüphe: hesabın bağlantısında <b>Sayfa</b> yok — kartta FB satırına tıkla → "Sayfaları Yükle" boş geliyorsa Upload-Post\'ta hesabı bir Facebook <b>Sayfasıyla</b> yeniden bağla (Reels yalnız Sayfalara yayınlanır).</div></div>'
+      : '<div style="font-size:12.5px;color:var(--ok);margin-bottom:8px">✓ Bağlı her hesapta en az bir kayıt var</div>';
+    kutu.innerHTML = '<div class="card">'
+      + '<div class="ct">📋 Kapsama Denetimi <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— '+kayit+' geçmiş kaydı'+(kirpik?' (pencere doldu: daha eski kayıtlar taranamadı — "HİÇ" bu pencere içindir)':'')+' + plan + kuyruk</span>'
+      + '<button class="btn bsm" style="float:right" onclick="document.getElementById(\'plat-kapsama\').innerHTML=\'\'">✕</button></div>'
+      + ozet
+      + '<div style="overflow-x:auto"><style>#plat-kapsama td,#plat-kapsama th{padding:3px 8px;border-bottom:1px solid var(--brd)}#plat-kapsama tbody tr:hover{background:var(--sur2)}</style>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="color:var(--mt);font-size:11px"><tr><th style="text-align:left">Profil</th>'
+      + PLATS.map(([,l])=>'<th>'+l+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+    addLog(sifirlar.length?'warn':'ok','uploadpost','Kapsama: '+kayit+' kayıt tarandı, '+sifirlar.length+' hesapta hiç kayıt yok');
+  } catch(e){
+    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kapsama denetimi başarısız: '+e.message});
+  } finally { if (btn) btn.disabled = false; }
 }
 
 // ── GERÇEK YAYIN HATALARI (Upload-Post geçmişinden) ────────────────────
@@ -6794,7 +6901,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ipucAc,ipucKapat,geriAlinabilir,alertSadelestir,pzUygula,pzF,pzBol,
       islenmisMi,islenmisAyikla,islenmisNotu,islenmisGoster,
       // HTML'de onclick ile çağrılıyor — window'a bağlanmazsa ölü buton olur
-      testWH,ytkTestApi,
+      testWH,ytkTestApi,platKapsama,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
