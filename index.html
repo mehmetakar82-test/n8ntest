@@ -2312,7 +2312,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-10';
+const PANEL_YAPI = 'y2026.08.02-11';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4459,15 +4459,21 @@ async function platDoldurTara(){
       + sat('var(--tx)', PD_AD[kaynak]+'\'da bulunan short', k.yayinlanan.size, 'yayınlanmış + planlı + kuyrukta')
       + sat('var(--mt)', PD_AD[hedef]+'\'da zaten var (atlanacak)', zatenVar.length, 'çift gönderim önlendi')
       + sat(kaynaksiz.length?'#f5a623':'var(--mt)', 'Kaynak mp4 bulunamadı (atlanacak)', kaynaksiz.length, 'short-kaydetme tablosunda eşleşmedi')
-      + sat(olu.length?'#f5a623':'var(--mt)', 'Kaynak linki ölü (atlanacak)', olu.length, 'mp4 artık indirilemiyor — OpusClip projesi silinmiş olabilir')
+      + sat(olu.length?'#f5a623':'var(--mt)', 'Kaynak linki ölü (atlanacak)', olu.length, 'mp4 artık indirilemiyor — OpusClip medyası erişilemez durumda')
       + sat(aday.length?'var(--ok)':'var(--er)', '→ Kuyruğa alınacak', aday.length, '')
       + '</div>'
+      // NOT: .alert bir flex kabı — içine düz metin + <b> konursa her parça
+      // ayrı sütun oluyor (yaşandı). Kendi kutumuzu kuruyoruz.
       + (olu.length && !aday.length
-          ? '<div class="alert aw" style="font-size:12px;margin-bottom:10px">Kaynak videoların <b>hiçbiri</b> indirilemiyor. '
-            + 'OpusClip projeleri varsayılan olarak <b>30 gün</b> sonra siliniyor; tablodaki mp4 linkleri o depoyu gösterdiği için '
-            + 'eski short\'lar geri getirilemez. OpusClip hesabında <b>auto-save</b> açıksa yeni projeler kalıcı olur ve bu sorun '
-            + 'ileride tekrarlamaz.<br><br>Sınama senin tarayıcında yanılmış olabilir (eklenti/ağ engeli) — '
+          ? '<div style="background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.35);border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:12px;line-height:1.6;color:var(--tx)">'
+            + '<div style="font-weight:700;margin-bottom:4px">Kaynak videoların hiçbiri indirilemiyor</div>'
+            + '<div style="color:var(--mt)">Bu short\'lar yayınlanırken linkler çalışıyordu, şimdi çalışmıyor — yani OpusClip '
+            + 'tarafında medya artık erişilebilir değil. Panel bunu düzeltemez; kuyruğa göndermek için indirilebilir bir mp4 şart.</div>'
+            + '<div style="color:var(--mt);margin-top:6px">Taze link de çekilemiyor: OpusClip API\'sinde klibi yalnız <code>clip-id</code> '
+            + 'ile arayan bir uç yok (proje kimliği gerekiyor) ve tabloda proje kimliği tutulmuyor.</div>'
+            + '<div style="margin-top:8px">Sınama senin tarayıcında yanılmış olabilir (eklenti/ağ engeli): '
             + '<button class="btn bsm" style="padding:1px 7px;font-size:11px" onclick="platDoldurYineDe()">yine de '+olu.length+' short\'u dene</button></div>'
+            + '</div>'
           : '')
       + (aday.length ? '<div style="max-height:220px;overflow-y:auto">'
           + aday.slice(0,60).map(a=>'<div style="font-size:11.5px;color:var(--mt);padding:2px 0;border-bottom:1px solid var(--brd);word-break:break-word">'+esc(a.title)+'</div>').join('')
@@ -4518,9 +4524,8 @@ async function platDoldurGonder(){
   const eEl = document.getElementById('pd-durum');
   if (eEl){
     eEl.innerHTML = esc0(ozet + (hatalar.length ? ' — '+hatalar[0] : ''))
-      + (erisimHatasi ? '<div style="color:#f5a623;margin-top:4px;font-size:11.5px">Kaynak mp4\'ler indirilemiyor: '
-          + 'OpusClip projeleri varsayılan <b>30 gün</b> sonra siliniyor, eski short\'ların linkleri ölü. '
-          + 'Geriye dönük doldurma bu short\'lar için mümkün değil.</div>' : '');
+      + (erisimHatasi ? '<div style="color:#f5a623;margin-top:4px;font-size:11.5px">Kaynak mp4\'ler OpusClip tarafında '
+          + 'artık erişilemiyor. Geriye dönük doldurma bu short\'lar için mümkün değil.</div>' : '');
   }
   toast((ok?'✓ ':'✕ ')+ozet, ok?'ok':'err', 7000);
   addLog(hata?'warn':'ok','uploadpost','Hesabı doldur ('+PLAT_DOLDUR.profil+' '+PLAT_DOLDUR.kaynak+'→'+PLAT_DOLDUR.hedef+'): '+ozet
