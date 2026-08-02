@@ -2312,7 +2312,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-11';
+const PANEL_YAPI = 'y2026.08.02-12';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4386,11 +4386,11 @@ async function pdBasliklar(profil, platlar){
   return out;
 }
 
-// Kaynak mp4 GERÇEKTEN indirilebiliyor mu? OpusClip projeleri varsayılan
-// 30 günde siliniyor; Sheet'teki short-url o depoyu gösterdiği için eski
-// short'ların linkleri ölü oluyor ("Video URL is not accessible"). fetch
-// CORS'a takılacağı için <video preload=metadata> ile sınanır: medya
-// elemanları çapraz kaynak yüklemede CORS istemez.
+// Kaynak mp4 GERÇEKTEN indirilebiliyor mu? Sheet'teki short-url OpusClip
+// deposunu gösteriyor ve eski short'larda ölü çıkabiliyor ("Video URL is
+// not accessible"). Sebebi bilinmiyor — sadece ÖLÇÜLÜR. fetch CORS'a
+// takılacağı için <video preload=metadata> ile sınanır: medya elemanları
+// çapraz kaynak yüklemede CORS istemez.
 function pdVideoErisilebilir(url, ms){
   return new Promise(resolve => {
     if (!url) return resolve(false);
@@ -4409,6 +4409,94 @@ function pdVideoErisilebilir(url, ms){
     v.onerror = () => kapat(false);
     v.src = url;
   });
+}
+
+// OpusClip export linki org (hesap) kimliğini YOLUNDA taşır:
+//   https://ext.cdn.opus.pro/media/org_ABC123/VIDEO.mp4?v=…
+// Birden fazla OpusClip hesabı kullanıldıysa org kimliği de birden fazla
+// olur. Bu yüzden "ölü linkler ikinci hesaptan mı?" sorusu tahmin değil
+// SAYIM işi: ölü/canlı ayrımı org bazında sayılır.
+function pdOrgKimlik(url){
+  const u = String(url||'');
+  const m = u.match(/org_[A-Za-z0-9]+/);
+  if (m) return m[0];
+  try { return (new URL(u)).hostname || '(bilinmiyor)'; } catch(e){ return '(bilinmiyor)'; }
+}
+
+// Ölü linklerin kaynağını veriyle açıklar. İki ayrı soruyu ayrı ayrı yanıtlar:
+//   1) HESAP: ölü olanlar tek bir org'da mı toplanmış?
+//   2) YAŞ:   ölüler eski, canlılar yeni mi? (öyleyse sebep hesap değil)
+// Hiçbiri kesin değilse öyle yazar — uydurma sebep üretmez.
+function pdKaynakTanisi(liste, sonuclar){
+  const esc = s=>String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const grup = new Map();
+  const tOlu = [], tCanli = [];
+  liste.forEach((a,i) => {
+    const org = pdOrgKimlik(a._video);
+    if (!grup.has(org)) grup.set(org, { canli:0, olu:0 });
+    const canli = sonuclar[i] === true;
+    grup.get(org)[canli ? 'canli' : 'olu']++;
+    const t = Date.parse(a._tarih || '');
+    if (!isNaN(t)) (canli ? tCanli : tOlu).push(t);
+  });
+  if (!grup.size) return '';
+  const gun = t => new Date(t).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'});
+  const aralik = arr => !arr.length ? '' : (arr.length===1 ? gun(arr[0])
+                        : gun(Math.min.apply(null,arr))+' – '+gun(Math.max.apply(null,arr)));
+  const orglar = Array.from(grup.entries()).sort((a,b)=>(b[1].olu+b[1].canli)-(a[1].olu+a[1].canli));
+  const oluOrg   = orglar.filter(o => o[1].olu   > 0);
+  const canliOrg = orglar.filter(o => o[1].canli > 0);
+
+  // Kimliği okunamayan linkler hükme KATILMAZ: bilinmeyeni "tek hesap"
+  // sayarsak olmayan bir bilgiyi iddia etmiş oluruz. Özellikle ÖLÜ tarafta
+  // kimliksiz link varsa hiçbir eleme yapılamaz — o zaman öyle yazılır.
+  const BIL = '(bilinmiyor)';
+  const bilinen   = orglar.filter(o => o[0] !== BIL);
+  const oluBilinen = oluOrg.filter(o => o[0] !== BIL);
+  const oluKimliksiz = (grup.get(BIL) || { olu:0 }).olu;
+  let hukum, hukumRenk = 'var(--tx)';
+  if (!bilinen.length){
+    hukum = 'Linklerden OpusClip hesap (org) kimliği okunamadı — bu veriyle hesap ayrımı yapılamıyor.';
+    hukumRenk = 'var(--mt)';
+  } else if (oluKimliksiz){
+    hukum = oluKimliksiz + ' ölü linkin hesap kimliği okunamadı, dolayısıyla ölü short\'ların hangi hesaptan '
+          + 'geldiği kesinleştirilemiyor.';
+    hukumRenk = 'var(--mt)';
+  } else if (bilinen.length === 1){
+    hukum = bilinen[0][1].canli
+      ? 'Ölü ve çalışan linklerin hepsi AYNI OpusClip hesabında (' + esc(bilinen[0][0]) + '). '
+        + 'İkinci hesabın bununla ilgisi yok — aynı hesabın bir kısmı çalışıyor, bir kısmı ölü.'
+      : 'Ölü short\'ların hepsi tek bir OpusClip hesabına ait (' + esc(bilinen[0][0]) + '), ama bu taramada '
+        + 'karşılaştıracak çalışan link çıkmadı — ikinci hesabın etkisi bu veriyle elenemiyor.';
+    if (!bilinen[0][1].canli) hukumRenk = 'var(--mt)';
+  } else if (oluBilinen.length === 1 && canliOrg.length && !canliOrg.some(o=>o[0]===oluBilinen[0][0])){
+    hukum = 'EVET — ölü linklerin hepsi tek bir hesapta (' + esc(oluBilinen[0][0]) + '), çalışanlar ise '
+          + 'başka hesapta. İki OpusClip hesabı olması bu tabloyu açıklıyor: o hesabın medyası artık erişilemiyor.';
+    hukumRenk = '#f5a623';
+  } else {
+    hukum = 'Hayır — ölü linkler tek bir hesapta toplanmıyor, birden fazla hesapta hem ölü hem çalışan link var. '
+          + 'Yani sebep hesap ayrımı değil.';
+  }
+  const yasSatiri = (tOlu.length && tCanli.length)
+    ? (Math.max.apply(null,tOlu) < Math.min.apply(null,tCanli)
+        ? '<div style="color:#f5a623;margin-top:6px">Yaş ayrımı net: ölü olanların hepsi çalışanlardan ESKİ '
+          + '(ölü ' + aralik(tOlu) + ' · çalışan ' + aralik(tCanli) + '). Bu, hesap farkından çok medyanın '
+          + 'zamanla erişilemez hâle geldiğine işaret ediyor.</div>'
+        : '<div style="color:var(--mt);margin-top:6px">Tarihler iç içe (ölü ' + aralik(tOlu) + ' · çalışan '
+          + aralik(tCanli) + ') — yani mesele yalnızca eskilik değil.</div>')
+    : (tOlu.length ? '<div style="color:var(--mt);margin-top:6px">Ölü short\'ların tarih aralığı: '
+        + aralik(tOlu) + ' (karşılaştıracak çalışan link yok).</div>' : '');
+
+  return '<div style="background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:10px 14px;'
+    + 'margin-bottom:10px;font-size:12px;line-height:1.6">'
+    + '<div style="font-weight:700;color:var(--tx);margin-bottom:6px">Ölü linkler hangi OpusClip hesabından?</div>'
+    + orglar.map(([org,g]) =>
+        '<div style="color:var(--mt);font-family:ui-monospace,monospace;font-size:11.5px">'
+        + esc(org) + ' → <span style="color:var(--er)">' + g.olu + ' ölü</span>'
+        + ' · <span style="color:var(--ok)">' + g.canli + ' çalışıyor</span></div>').join('')
+    + '<div style="color:' + hukumRenk + ';margin-top:8px">' + hukum + '</div>'
+    + yasSatiri
+    + '</div>';
 }
 
 async function platDoldurTara(){
@@ -4431,13 +4519,13 @@ async function platDoldurTara(){
     k.yayinlanan.forEach((hamBaslik, n) => {
       if (h.mevcut.has(n)){ zatenVar.push(hamBaslik); return; }   // hedefte zaten var → atla
       const s = ydFindSource(hamBaslik, '', profil, '');
-      if (s && s.video) aday.push({ _profil: profil, _video: s.video, _caption: s.caption||'', plat: PD_PLAT_KEY[hedef], title: hamBaslik });
+      if (s && s.video) aday.push({ _profil: profil, _video: s.video, _caption: s.caption||'', _tarih: s.tarih||'', plat: PD_PLAT_KEY[hedef], title: hamBaslik });
       else kaynaksiz.push(hamBaslik);
     });
-    // ÖN KONTROL: linkler gerçekten indirilebiliyor mu? OpusClip projeleri
-    // 30 günde silindiği için eski short'ların mp4'ü ölü oluyor. Bunu
-    // göndermeden ÖNCE bilmezsek kullanıcıya 30 vaat edip 0 teslim ederiz.
-    let olu = [];
+    // ÖN KONTROL: linkler gerçekten indirilebiliyor mu? Eski short'ların
+    // mp4'ü ölü çıkabiliyor. Bunu göndermeden ÖNCE bilmezsek kullanıcıya
+    // 30 short vaat edip 0 teslim ederiz.
+    let olu = [], tani = '';
     PLAT_DOLDUR.olu = [];
     if (aday.length){
       let bakilan = 0;
@@ -4449,6 +4537,9 @@ async function platDoldurTara(){
         return ok;
       }, 6);
       olu = aday.filter((_,i) => sonuclar[i] !== true);
+      // Tanı, aday listesi budanmadan ÖNCE kurulmalı: sonuclar[] bu dizinin
+      // sırasına bağlı, splice sonrası hizalama bozulurdu.
+      if (olu.length) tani = pdKaynakTanisi(aday, sonuclar);
       for (let i = aday.length-1; i >= 0; i--) if (sonuclar[i] !== true) aday.splice(i,1);
       PLAT_DOLDUR.olu = olu;
     }
@@ -4475,6 +4566,7 @@ async function platDoldurTara(){
             + '<button class="btn bsm" style="padding:1px 7px;font-size:11px" onclick="platDoldurYineDe()">yine de '+olu.length+' short\'u dene</button></div>'
             + '</div>'
           : '')
+      + tani
       + (aday.length ? '<div style="max-height:220px;overflow-y:auto">'
           + aday.slice(0,60).map(a=>'<div style="font-size:11.5px;color:var(--mt);padding:2px 0;border-bottom:1px solid var(--brd);word-break:break-word">'+esc(a.title)+'</div>').join('')
           + (aday.length>60?'<div style="font-size:11.5px;color:var(--mt);padding:4px 0">… ve '+(aday.length-60)+' tane daha</div>':'')
@@ -4519,7 +4611,7 @@ async function platDoldurGonder(){
   btn.textContent = '↻ Kuyruğa Al';
   const ozet = ok+' kuyruğa alındı'+(hata?' · '+hata+' başarısız':'');
   // "Video URL is not accessible" tek başına ne yapılacağını söylemiyor —
-  // sebebi (OpusClip 30 günlük proje ömrü) burada yazılsın.
+  // ne anlama geldiği burada yazılsın.
   const erisimHatasi = hatalar.some(h => /not accessible|inaccessible|could not download|failed to fetch/i.test(String(h)));
   const eEl = document.getElementById('pd-durum');
   if (eEl){
@@ -7404,6 +7496,7 @@ document.addEventListener('DOMContentLoaded', function() {
       testWH,ytkTestApi,platKapsama,kapsamaHataAc,kapsamaHataKapat,pdVideoErisilebilir,
       kapsamaHataCiz,kapsamaHataGonder,kapsamaHataTumu,
       platDoldurAc,platDoldurKapat,platDoldurTara,platDoldurGonder,pdBagliPlatformlar,platDoldurYineDe,
+      pdOrgKimlik,pdKaynakTanisi,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
@@ -9661,7 +9754,8 @@ function ydFindSource(title, thumb, profile, caption){
   return {
     video:  ydRowUrl(best),
     profil: String(best['profil']||best['Profil']||profile||'').trim(),
-    caption:best['safe-description'] || best['safeDescription'] || best['description'] || ''
+    caption:best['safe-description'] || best['safeDescription'] || best['description'] || '',
+    tarih:  best['created-at'] || best['createdAt'] || best['tarih'] || best['Tarih'] || ''
   };
 }
 
