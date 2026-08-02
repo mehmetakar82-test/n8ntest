@@ -2309,7 +2309,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-7';
+const PANEL_YAPI = 'y2026.08.02-8';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4133,6 +4133,36 @@ async function platYtCanliAdlar(byPlat){
 // olmayan BAĞLI hesap kırmızı HİÇ ile işaretlenir. Bilinen tuzak: sayfasız
 // Facebook hesabına gönderim SESSİZCE düşer (facebook_page_id boş gider,
 // istek reddedilir, hata yutulur) — bu denetim tam o kara deliği gösterir.
+// ── PAYLAŞILAN GEÇMİŞ ÖNBELLEĞİ ────────────────────────────────────────
+// Yayın hataları, Kapsama Denetimi ve Hesabı Doldur AYNI geçmişi istiyordu;
+// her biri 10 sayfa çekince Upload-Post HTTP 429 veriyordu. Artık geçmiş
+// TEK kez çekilip 2 dk paylaşılıyor, sayfalar arasına da nefes payı kondu.
+const HIST_TTL = 120000;
+const HIST_ONB = { t:0, kayitlar:null, kirpik:false, sayfa:0 };
+async function histCek(sayfa){
+  sayfa = sayfa || 10;
+  if (HIST_ONB.kayitlar && HIST_ONB.sayfa >= sayfa && Date.now()-HIST_ONB.t < HIST_TTL) return HIST_ONB;
+  const kayitlar = []; let kirpik = false;
+  for (let pg = 1; pg <= sayfa; pg++){
+    let data;
+    try { ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page='+pg)); }
+    catch(e){ if (pg === 1) throw e; console.warn('[HIST] s'+pg+':', e.message); break; }
+    const h = Array.isArray(data) ? data : (data.history||data.data||data.results||data.items||[]);
+    h.forEach(x => kayitlar.push(x));
+    if (h.length < 100) break;
+    if (pg === sayfa) kirpik = true;
+    await new Promise(r => setTimeout(r, 220));   // hız sınırına nefes payı
+  }
+  HIST_ONB.t = Date.now(); HIST_ONB.kayitlar = kayitlar; HIST_ONB.kirpik = kirpik; HIST_ONB.sayfa = sayfa;
+  return HIST_ONB;
+}
+// 429'u diğer hatalardan ayır — çözümü farklı (bekle ve tekrar dene)
+function histHataMetni(e){
+  return /429|too many/i.test(String(e && e.message))
+    ? 'Upload-Post hız sınırı (429) — 1-2 dakika bekleyip tekrar dene. Aynı anda birden fazla tarama çalıştırma.'
+    : ((e && e.message) || 'bilinmeyen hata');
+}
+
 const KAPSAMA_SAYFA = 10;   // history taraması: 10×100 = 1000 kayıt
 const KAPSAMA_HATA = {};    // "profil|platform" -> ÇÖZÜLMEMİŞ hata kayıtları (pop-up için)
 async function platKapsama(){
@@ -4154,29 +4184,21 @@ async function platKapsama(){
     // 1) Yayın geçmişi (sayfalı) — önce HAM toplanır, çözülmüş hataları
     //    ayıklamak için tüm pencereyi görmek gerekiyor.
     const kayitlar = [];
-    let kayit = 0, kirpik = false;
-    for (let pg = 1; pg <= KAPSAMA_SAYFA; pg++){
-      let data;
-      try { ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page='+pg)); }
-      catch(e){ if (pg === 1) throw e; break; }
-      const h = Array.isArray(data) ? data : (data.history||data.data||data.results||data.items||[]);
-      h.forEach(x => {
-        kayit++;
-        const u = x.profile_username || x.user || '';
-        const p = NP[String(x.platform||'').toLowerCase()];
-        if (!u || !p) return;
-        kayitlar.push({
-          u, p,
-          ok: x.success !== false && !x.error_message,
-          t: Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0,
-          baslik: String(x.post_title || x.title || x.post_caption || ''),
-          hata: String(x.error_message || x.error || 'sebep belirtilmemiş'),
-          url: String(x.post_url || '')
-        });
+    const onb = await histCek(KAPSAMA_SAYFA);      // paylaşılan önbellek
+    const kayit = (onb.kayitlar || []).length, kirpik = onb.kirpik;
+    (onb.kayitlar || []).forEach(x => {
+      const u = x.profile_username || x.user || '';
+      const p = NP[String(x.platform||'').toLowerCase()];
+      if (!u || !p) return;
+      kayitlar.push({
+        u, p,
+        ok: x.success !== false && !x.error_message,
+        t: Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0,
+        baslik: String(x.post_title || x.title || x.post_caption || ''),
+        hata: String(x.error_message || x.error || 'sebep belirtilmemiş'),
+        url: String(x.post_url || '')
       });
-      if (h.length < 100) break;
-      if (pg === KAPSAMA_SAYFA) kirpik = true;
-    }
+    });
     // ÇÖZÜLMÜŞ HATALARI DÜŞ: aynı short (profil|platform|başlık) sonradan
     // başarıyla yayınlandıysa o hata artık sorun değil. Ölçüt Yayın
     // Durumu'ndaki ydAnahtar/ydCozulenleriIsaretle ile AYNI — iki ekran
@@ -4264,7 +4286,7 @@ async function platKapsama(){
       + PLATS.map(([,l])=>'<th>'+l+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
     addLog(sifirlar.length?'warn':'ok','uploadpost','Kapsama: '+kayit+' kayıt tarandı, '+sifirlar.length+' hesapta hiç kayıt yok');
   } catch(e){
-    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kapsama denetimi başarısız: '+e.message});
+    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kapsama denetimi başarısız: '+histHataMetni(e)});
   } finally { if (btn) btn.disabled = false; }
 }
 
@@ -4320,50 +4342,44 @@ function platDoldurKapat(){ const m=document.getElementById('plat-doldur-modal')
 // Profilin bir platformdaki TÜM short başlıklarını topla (yayınlanmış +
 // tarihli plan + kuyruk). Üç kaynak da taranır ki "zaten var mı" kontrolü
 // eksik kalmasın — yoksa kuyrukta bekleyen short ikinci kez gönderilir.
-async function pdBasliklar(profil, plat){
+// İKİ platformu TEK geçişte toplar. Eskiden kaynak ve hedef için ayrı ayrı
+// (üstelik paralel) çağrılıyordu: aynı geçmiş iki kez çekiliyor, Kapsama
+// Denetimi de üçüncü kez isteyince Upload-Post HTTP 429 veriyordu.
+async function pdBasliklar(profil, platlar){
   const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook', x:'x', twitter:'x' };
   const norm = t => String(t||'').trim().toLowerCase().replace(/\s+/g,' ');
-  const yayinlanan = new Map();   // normBaslik -> ham baslik
-  const mevcut = new Set();       // normBaslik (herhangi bir durumda)
-  for (let pg = 1; pg <= KAPSAMA_SAYFA; pg++){
-    let data;
-    try { ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page='+pg)); }
-    catch(e){ if (pg === 1) throw e; break; }
-    const h = Array.isArray(data) ? data : (data.history||data.data||data.results||data.items||[]);
-    h.forEach(x => {
-      if (String(x.profile_username||x.user||'') !== profil) return;
-      if (NP[String(x.platform||'').toLowerCase()] !== plat) return;
-      const b = String(x.post_title || x.title || x.post_caption || '');
-      const n = norm(b); if (!n || n.length < 6) return;
-      mevcut.add(n);
-      if (x.success !== false && !x.error_message) yayinlanan.set(n, b);
-    });
-    if (h.length < 100) break;
-  }
+  const out = {};
+  platlar.forEach(p => out[p] = { yayinlanan: new Map(), mevcut: new Set() });
+  const ekle = (p, b, yayindaMi) => {
+    if (!out[p]) return;
+    const n = norm(b); if (!n || n.length < 6) return;
+    out[p].mevcut.add(n);
+    if (yayindaMi) out[p].yayinlanan.set(n, b);
+  };
+  const onb = await histCek(KAPSAMA_SAYFA);          // paylaşılan önbellek
+  (onb.kayitlar || []).forEach(x => {
+    if (String(x.profile_username||x.user||'') !== profil) return;
+    const p = NP[String(x.platform||'').toLowerCase()];
+    if (!p) return;
+    ekle(p, String(x.post_title || x.title || x.post_caption || ''), x.success !== false && !x.error_message);
+  });
   try {
     const { data } = await upFetchRetry('/uploadposts/schedule');
     const s = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
     s.forEach(x => {
       if (String(x.profile_username||'') !== profil) return;
-      const pl = (x.platforms || (x.platform?[x.platform]:[])).map(z=>NP[String(z).toLowerCase()]);
-      if (!pl.includes(plat)) return;
-      const b = String(x.title || x.post_title || ''); const n = norm(b);
-      if (!n || n.length < 6) return;
-      mevcut.add(n); yayinlanan.set(n, b);
+      (x.platforms || (x.platform?[x.platform]:[])).forEach(z =>
+        ekle(NP[String(z).toLowerCase()], String(x.title || x.post_title || ''), true));
     });
   } catch(e){ console.warn('[PD] schedule:', e.message); }
   try {
     const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(profil)+'&count=50');
     (data.slots||[]).forEach(sl => {
       const sp = sl.scheduled_post; if (!sp) return;
-      const pl = (sp.platforms||[]).map(z=>NP[String(z).toLowerCase()]);
-      if (!pl.includes(plat)) return;
-      const b = String(sp.title||''); const n = norm(b);
-      if (!n || n.length < 6) return;
-      mevcut.add(n); yayinlanan.set(n, b);
+      (sp.platforms||[]).forEach(z => ekle(NP[String(z).toLowerCase()], String(sp.title||''), true));
     });
   } catch(e){ console.warn('[PD] queue:', e.message); }
-  return { yayinlanan, mevcut };
+  return out;
 }
 
 async function platDoldurTara(){
@@ -4379,7 +4395,8 @@ async function platDoldurTara(){
   kutu.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Geçmiş + plan + kuyruk taranıyor…'});
   try {
     await ydEnsureShorts();
-    const [k, h] = await Promise.all([ pdBasliklar(profil, kaynak), pdBasliklar(profil, hedef) ]);
+    const ikili = await pdBasliklar(profil, [kaynak, hedef]);   // TEK tarama
+    const k = ikili[kaynak], h = ikili[hedef];
     const esc = s=>String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const aday = [], zatenVar = [], kaynaksiz = [];
     k.yayinlanan.forEach((hamBaslik, n) => {
@@ -4407,7 +4424,7 @@ async function platDoldurTara(){
       setEl('pd-durum','');
     }
   } catch(e){
-    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Tarama başarısız: '+e.message});
+    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Tarama başarısız: '+histHataMetni(e)});
   } finally { btn.disabled = false; }
 }
 
@@ -4512,21 +4529,16 @@ async function platYayinHatalariCek(derinlik){
   PLAT_HATA_DURUM = '';
   if (!S.cfg.blot && !getN8N()){ PLAT_HATA_DURUM = 'geçmiş taranamadı (API Key yok)'; return; }
   const sinir = Date.now() - YAYIN_HATA_GUN*24*60*60*1000;
-  const N = derinlik || 5;
   let kayit = 0, kirpik = false;
-  for (let pg = 1; pg <= N; pg++){
-    let data;
-    try { ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page='+pg)); }
-    catch(e){
-      // Sayfa 1 düşerse hiç veri yok; sonrakiler düşerse elimizdekiyle devam
-      if (pg === 1){ PLAT_HATA_DURUM = 'geçmiş alınamadı: '+e.message; return; }
-      console.warn('[PLAT] history s'+pg+':', e.message); break;
-    }
-    const h = Array.isArray(data) ? data : (data.history||data.data||data.results||data.posts||data.items||[]);
-    let pencereDisi = 0;
+  {
+    let onb;
+    try { onb = await histCek(derinlik || 5); }
+    catch(e){ PLAT_HATA_DURUM = 'geçmiş alınamadı: '+histHataMetni(e); return; }
+    kirpik = onb.kirpik;
+    const h = onb.kayitlar || [];
     h.forEach(x => {
       const t = Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0;
-      if (t && t < sinir){ pencereDisi++; return; }
+      if (t && t < sinir) return;
       kayit++;
       const k = phAnahtar(x.profile_username||x.user, phPlatNormal(x.platform));
       const basarili = x.success !== false && !x.error_message;
@@ -4545,9 +4557,6 @@ async function platYayinHatalariCek(derinlik){
         if (t >= g.sonZaman){ g.sonZaman = t; g.sonHata = String(x.error_message || x.error || 'sebep belirtilmemiş'); }
       }
     });
-    if (h.length < 100) break;              // son sayfa
-    if (pencereDisi === h.length) break;    // tamamı pencere dışı → daha eskisine bakma
-    if (pg === N) kirpik = true;
   }
   PLAT_HATA_DURUM = kayit+' kayıt tarandı ('+YAYIN_HATA_GUN+' gün)'+(kirpik?' — daha eskisi de var':'');
 }
