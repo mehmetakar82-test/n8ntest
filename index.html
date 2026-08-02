@@ -646,7 +646,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div class="ni" onclick="go('ayarlar',this)"><span class="ic">⊞</span>Ayarlar</div>
     <div class="ni" onclick="go('loglar',this)"><span class="ic">⊟</span>Loglar<span class="ni-badge" id="badge-log"></span></div>
   </nav>
-  <div class="sb-foot"><span class="dot"></span><span id="conn-status">Hazır</span></div>
+  <div class="sb-foot"><span class="dot"></span><span id="conn-status">Hazır</span><span id="panel-surum" style="float:right;opacity:.6"></span></div>
 </aside>
 
 <main class="main">
@@ -2263,6 +2263,9 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // API HELPERS
 // ═══════════════════════════════════════════════════════════
+// Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
+// "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
+const PANEL_YAPI = 'y2026.08.02-1';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -6739,8 +6742,9 @@ document.addEventListener('DOMContentLoaded', function() {
     renderSentURLs();
     updateLogStats();
     setEl('conn-status', S.cfg.n8n?'Bagli':'URL girilmedi');
+    setEl('panel-surum', PANEL_YAPI);
     setEl('dr-sent-cnt', S.sentURLs.size);
-    addLog('ok','sistem','Panel v9 baslatildi — Kanal Listesi Arama/Video Detay/Kworb');
+    addLog('ok','sistem','Panel v9 baslatildi ('+PANEL_YAPI+') — Kanal Listesi Arama/Video Detay/Kworb');
     toggleAutoLog();
     // YENİ: hızlı gönder, servis durumu, rozetler
     try { renderUretimTabs(); } catch(e){}
