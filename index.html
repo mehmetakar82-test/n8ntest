@@ -2312,7 +2312,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-13';
+const PANEL_YAPI = 'y2026.08.02-14';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4793,6 +4793,7 @@ function kapsamaHataCiz(){
       r._video = (s && s.video) || '';
       r._profilSheet = (s && s.profil) || u;
       r._caption = (s && s.caption) || '';
+      r._clipId = (s && s.clipId) || '';        // ölü linki OpusClip'ten tazelemek için
     }
   });
   const kalan = liste.filter(r => !r._gonderildi);
@@ -4812,6 +4813,7 @@ function kapsamaHataCiz(){
       + '<div style="color:var(--mt);margin-bottom:4px">Hata sebepleri:</div>'
       + enSik.map(([s,n])=>'<div style="color:var(--er);word-break:break-word">• '+esc(s)+' <b>('+n+')</b></div>').join('')
       + '</div>' : '')
+    + khYapilandirmaUyarisi(kalan)
     + liste.map((r,i) => {
         const bitti = !!r._gonderildi;
         return '<div style="border:1px solid var(--brd);border-left:3px solid '+(bitti?'var(--ok)':'var(--er)')+';border-radius:6px;padding:8px 12px;margin-bottom:6px;background:var(--bg)'+(bitti?';opacity:.6':'')+'">'
@@ -4836,25 +4838,112 @@ function kapsamaHataCiz(){
     : (kalan.length ? '<span style="font-size:11.5px;color:#f5a623">Hiçbirinin kaynak videosu bulunamadı — Yayın Durumu\'ndan mp4 URL girerek tek tek gönderebilirsin</span>' : '');
 }
 
+// "Video URL is not accessible" = kaynak mp4 ölü. Diğer hatalardan
+// ayrılmalı, çünkü çaresi farklı: link tazelenir, hesap ayarı değil.
+function khErisimHatasi(s){
+  const m = String((s && (s.mesaj || s.sebep)) || s || '');
+  return /not accessible|inaccessible|could not download|failed to (fetch|download)/i.test(m);
+}
+// Yapılandırma hatası: video ne olursa olsun gönderim yine reddedilir.
+// Kullanıcıyı boşuna "Gönder"e bastırmamak için ayrı uyarılır.
+function khYapilandirmaHatasi(m){
+  return /no facebook pages found|not supported by the facebook api|configuration-permissions|permission|not authorized|unauthorized|invalid.*(token|credential)|reconnect|re-?connect/i.test(String(m||''));
+}
+function khYapilandirmaUyarisi(kalan){
+  const sebepler = Array.from(new Set(kalan.map(r => String(r.hata||''))));
+  const yap = sebepler.filter(khYapilandirmaHatasi);
+  if (!yap.length) return '';
+  const fbSayfa = yap.some(s => /no facebook pages found|personal profiles is not supported/i.test(s));
+  return '<div style="background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.35);border-radius:6px;'
+    + 'padding:10px 14px;margin-bottom:10px;font-size:12px;line-height:1.6;color:var(--tx)">'
+    + '<div style="font-weight:700;margin-bottom:4px">Bu hata yeniden göndermekle çözülmez</div>'
+    + '<div style="color:var(--mt)">Sebep videoda değil, hesap yapılandırmasında. Ayar düzeltilmeden '
+    + 'kuyruğa alınan short yine reddedilir.</div>'
+    + (fbSayfa
+        ? '<div style="color:var(--mt);margin-top:6px">Upload-Post bu profile bağlı bir Facebook <b>Sayfası</b> bulamıyor. '
+          + 'Facebook API kişisel profile Reels göndermeye izin vermiyor — Upload-Post\'ta bu profilin Facebook '
+          + 'bağlantısını bir <b>Sayfa</b> seçerek yeniden kur, sonra buradan gönder.</div>'
+        : '')
+    + '</div>';
+}
+
+// Ölü kaynakları OpusClip'ten tazeler (clip-id ile). Kaç kaydın linki
+// yenilendiğini döndürür — çağıran dürüstçe raporlasın diye.
+async function khTazele(kayitlar, ilerle){
+  const olu = [];
+  let n = 0;
+  await upSirali(kayitlar, async r => {
+    const ok = await pdVideoErisilebilir(r._video, 8000);
+    n++; if (ilerle) ilerle('Kaynaklar sınanıyor ('+n+'/'+kayitlar.length+')…');
+    if (!ok) olu.push(r);
+  }, 6);
+  if (!olu.length) return { olu:0, tazelenen:0, kalan:[] };
+  const harita = await pdTazeLinkler(olu.map(r => r._clipId), ilerle);
+  const tazelenen = [], kalan = [];
+  await upSirali(olu, async r => {
+    const yeni = r._clipId ? harita.get(String(r._clipId)) : null;
+    if (!yeni) { kalan.push(r); return; }
+    if (await pdVideoErisilebilir(yeni, 8000)) { r._video = yeni; tazelenen.push(r); }
+    else kalan.push(r);
+  }, 4);
+  return { olu: olu.length, tazelenen: tazelenen.length, kalan };
+}
+
 // Kuyruğa ekler (add_to_queue): hepsi aynı anda yayınlanmaz, profilin
 // sıradaki boş yuvalarına dağılır.
 async function kapsamaHataGonder(i){
   const liste = KAPSAMA_HATA[KH.u+'|'+KH.p] || [];
   const r = liste[i]; if (!r || r._gonderildi || !r._video) return;
-  const s = await ydTopluGonder({ _profil: r._profilSheet || KH.u, _video: r._video,
-                                  _caption: r._caption, plat: PD_PLAT_KEY[KH.p] || KH.p, title: r.baslik });
+  const yolla = () => ydTopluGonder({ _profil: r._profilSheet || KH.u, _video: r._video,
+                                      _caption: r._caption, plat: PD_PLAT_KEY[KH.p] || KH.p, title: r.baslik });
+  let s = await yolla();
+  // Kaynak ölüyse kullanıcıyı aynı hataya ikinci kez bastırma: OpusClip'ten
+  // taze link çekip BİR KEZ yeniden dene.
+  if (!s.ok && khErisimHatasi(s) && r._clipId && !r._tazeDenendi){
+    r._tazeDenendi = true;
+    toast('Kaynak linki ölü — OpusClip\'ten taze link deneniyor…','warn',4000);
+    try {
+      const harita = await pdTazeLinkler([r._clipId]);
+      const yeni = harita.get(String(r._clipId));
+      if (yeni){ r._video = yeni; s = await yolla(); }
+      else s = { ok:false, mesaj:'Kaynak mp4 indirilemiyor ve klip OpusClip\'te bulunamadı' };
+    } catch(e){ s = { ok:false, mesaj:'Taze link alınamadı: '+e.message }; }
+  }
   if (s.ok){ r._gonderildi = true; toast('✓ Kuyruğa alındı','ok'); kapsamaHataCiz(); }
-  else toast('✕ Gönderilemedi: '+(s.mesaj||s.sebep),'err',6000);
+  else toast('✕ Gönderilemedi: '+(s.mesaj||s.sebep),'err',7000);
 }
 
 async function kapsamaHataTumu(){
   const liste = KAPSAMA_HATA[KH.u+'|'+KH.p] || [];
-  const hedef = liste.filter(r => !r._gonderildi && r._video);
+  let hedef = liste.filter(r => !r._gonderildi && r._video);   // tazelenemeyenler aşağıda elenir
   if (!hedef.length) return;
   if (!confirm(hedef.length+' short, '+KH.u+' profilinin '+(KH_PL[KH.p]||KH.p)+' KUYRUĞUNA eklenecek.\n\n'
     + 'Hepsi aynı anda yayınlanmaz — sıradaki boş yuvalara dağıtılır.\n\nDevam edilsin mi?')) return;
   const btn = document.getElementById('kh-toplu-btn');
   if (btn) btn.disabled = true;
+  // ÖN KONTROL: ölü kaynakları gönderMEDEN önce tazele. Yoksa hepsi
+  // "Video URL is not accessible" ile düşer ve kullanıcı sebebini bilmez.
+  let tazeNot = '';
+  try {
+    const t = await khTazele(hedef, m => { if (btn) btn.textContent = '⏳ '+m; });
+    if (t.olu) tazeNot = ' · '+t.olu+' ölü kaynaktan '+t.tazelenen+' tanesi tazelendi';
+    if (t.kalan.length){
+      const kalanSet = new Set(t.kalan);
+      hedef = hedef.filter(r => !kalanSet.has(r));
+      tazeNot += ' · '+t.kalan.length+' tanesi atlandı (kaynak yok)';
+    }
+  } catch(e){
+    // Konsola da yazılır: burada bir KOD hatası olursa işlevsel bir
+    // durum gibi görünüp gizlenmesin (bir kez yaşandı: const'a atama).
+    console.error('[KH] tazeleme:', e);
+    tazeNot = ' · tazeleme yapılamadı ('+e.message+')';
+  }
+  if (!hedef.length){
+    if (btn){ btn.disabled = false; btn.textContent = '↻ Kuyruğa Al'; }
+    kapsamaHataCiz();
+    toast('✕ Gönderilecek short kalmadı'+tazeNot,'err',8000);
+    return;
+  }
   let ok=0, hata=0; const hatalar=[];
   await upSirali(hedef, async r => {
     const s = await ydTopluGonder({ _profil: r._profilSheet || KH.u, _video: r._video,
@@ -4863,8 +4952,8 @@ async function kapsamaHataTumu(){
     if (btn) btn.textContent = '⏳ '+(ok+hata)+'/'+hedef.length;
   }, 2);
   kapsamaHataCiz();
-  const ozet = ok+' kuyruğa alındı'+(hata?' · '+hata+' başarısız':'');
-  toast((ok?'✓ ':'✕ ')+ozet+(hatalar.length?' — '+hatalar[0]:''), ok?'ok':'err', 7000);
+  const ozet = ok+' kuyruğa alındı'+(hata?' · '+hata+' başarısız':'')+tazeNot;
+  toast((ok?'✓ ':'✕ ')+ozet+(hatalar.length?' — '+hatalar[0]:''), ok?'ok':'err', 8000);
   addLog(hata?'warn':'ok','uploadpost','Kapsama pop-up ('+KH.u+' '+KH.p+'): '+ozet+(hatalar.length?' | '+hatalar.join(' | '):''));
 }
 
@@ -7636,6 +7725,7 @@ document.addEventListener('DOMContentLoaded', function() {
       kapsamaHataCiz,kapsamaHataGonder,kapsamaHataTumu,
       platDoldurAc,platDoldurKapat,platDoldurTara,platDoldurGonder,pdBagliPlatformlar,platDoldurYineDe,
       pdOrgKimlik,pdKaynakTanisi,platDoldurTazele,pdTazeLinkler,pdProjeKimligi,
+      khErisimHatasi,khYapilandirmaHatasi,khYapilandirmaUyarisi,khTazele,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
