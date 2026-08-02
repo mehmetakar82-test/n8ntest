@@ -1435,6 +1435,20 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   </div>
 </div>
 
+<!-- KAPSAMA: BAŞARISIZ SHORT LİSTESİ -->
+<div id="kapsama-hata-modal" style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)kapsamaHataKapat()">
+  <div style="width:min(620px,calc(94vw / var(--pz)));max-height:80vh;display:flex;flex-direction:column;background:var(--sur2);border:1px solid var(--er);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.6)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--brd)">
+      <div style="font-family:var(--fh);font-size:14px;font-weight:700;color:var(--tx)" id="kh-baslik">Başarısız short'lar</div>
+      <button class="btn bg bsm" onclick="kapsamaHataKapat()">✕ Kapat</button>
+    </div>
+    <div id="kh-govde" style="padding:14px 18px;overflow-y:auto"></div>
+    <div style="padding:10px 18px;border-top:1px solid var(--brd);font-size:11.5px;color:var(--mt)">
+      Yeniden gönderilip yayınlanmış hatalar bu listede <b>yer almaz</b>. Toplu yeniden gönderim için <b>Yayın Durumu → Başarısızları Kuyruğa Al</b>.
+    </div>
+  </div>
+</div>
+
 <!-- HESAP DETAY MODAL -->
 <div id="plat-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;padding:40px;overflow-y:auto" onclick="if(event.target===this)platCloseModal()">
   <div style="max-width:560px;margin:0 auto;background:var(--sur);border:1px solid var(--acc);border-radius:8px;box-shadow:0 8px 40px rgba(0,229,255,.15)">
@@ -2267,7 +2281,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-4';
+const PANEL_YAPI = 'y2026.08.02-5';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4092,6 +4106,7 @@ async function platYtCanliAdlar(byPlat){
 // Facebook hesabına gönderim SESSİZCE düşer (facebook_page_id boş gider,
 // istek reddedilir, hata yutulur) — bu denetim tam o kara deliği gösterir.
 const KAPSAMA_SAYFA = 10;   // history taraması: 10×100 = 1000 kayıt
+const KAPSAMA_HATA = {};    // "profil|platform" -> ÇÖZÜLMEMİŞ hata kayıtları (pop-up için)
 async function platKapsama(){
   const btn = document.getElementById('plat-kapsama-btn');
   const kutu = document.getElementById('plat-kapsama'); if (!kutu) return;
@@ -4104,10 +4119,13 @@ async function platKapsama(){
     if (!profs.length){ kutu.innerHTML = durumHTML('bos',{kompakt:true, alt:'Profil bulunamadı — önce Yenile\'ye bas'}); if(btn) btn.disabled=false; return; }
     const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook',
                  x:'x', twitter:'x', threads:'threads', linkedin:'linkedin', pinterest:'pinterest', bluesky:'bluesky' };
-    const K = {};   // profil -> platform -> {pub,fail,plan}
-    const hucre = (u,p)=>{ const a = K[u] = K[u]||{}; return a[p] = a[p]||{pub:0,fail:0,plan:0}; };
+    const K = {};   // profil -> platform -> {pub,fail,plan,cozuldu}
+    const hucre = (u,p)=>{ const a = K[u] = K[u]||{}; return a[p] = a[p]||{pub:0,fail:0,plan:0,cozuldu:0}; };
+    Object.keys(KAPSAMA_HATA).forEach(k=>delete KAPSAMA_HATA[k]);
 
-    // 1) Yayın geçmişi (sayfalı)
+    // 1) Yayın geçmişi (sayfalı) — önce HAM toplanır, çözülmüş hataları
+    //    ayıklamak için tüm pencereyi görmek gerekiyor.
+    const kayitlar = [];
     let kayit = 0, kirpik = false;
     for (let pg = 1; pg <= KAPSAMA_SAYFA; pg++){
       let data;
@@ -4119,12 +4137,40 @@ async function platKapsama(){
         const u = x.profile_username || x.user || '';
         const p = NP[String(x.platform||'').toLowerCase()];
         if (!u || !p) return;
-        const c = hucre(u,p);
-        (x.success !== false && !x.error_message) ? c.pub++ : c.fail++;
+        kayitlar.push({
+          u, p,
+          ok: x.success !== false && !x.error_message,
+          t: Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0,
+          baslik: String(x.post_title || x.title || x.post_caption || ''),
+          hata: String(x.error_message || x.error || 'sebep belirtilmemiş'),
+          url: String(x.post_url || '')
+        });
       });
       if (h.length < 100) break;
       if (pg === KAPSAMA_SAYFA) kirpik = true;
     }
+    // ÇÖZÜLMÜŞ HATALARI DÜŞ: aynı short (profil|platform|başlık) sonradan
+    // başarıyla yayınlandıysa o hata artık sorun değil. Ölçüt Yayın
+    // Durumu'ndaki ydAnahtar/ydCozulenleriIsaretle ile AYNI — iki ekran
+    // farklı sayı gösterirse hangisine güvenileceği belirsiz olurdu.
+    const kAnahtar = r => {
+      const t = r.baslik.trim().toLowerCase().replace(/\s+/g,' ');
+      if (!t || t === '(başlıksız)' || t.length < 6) return '';   // ayırt edici değil
+      return r.u+'|'+r.p+'|'+t;
+    };
+    const sonBasari = {};
+    kayitlar.forEach(r => { if (!r.ok) return; const k = kAnahtar(r); if (!k) return;
+      if (sonBasari[k] == null || r.t > sonBasari[k]) sonBasari[k] = r.t; });
+    let cozulenTop = 0;
+    kayitlar.forEach(r => {
+      const c = hucre(r.u, r.p);
+      if (r.ok){ c.pub++; return; }
+      const k = kAnahtar(r);
+      if (k && sonBasari[k] != null && sonBasari[k] >= r.t){ c.cozuldu++; cozulenTop++; return; }
+      c.fail++;
+      (KAPSAMA_HATA[r.u+'|'+r.p] = KAPSAMA_HATA[r.u+'|'+r.p] || []).push(r);
+    });
+    Object.values(KAPSAMA_HATA).forEach(l => l.sort((a,b)=>b.t-a.t));   // en yeni üstte
     // 2) Tarihli planlar
     try {
       const { data } = await upFetchRetry('/uploadposts/schedule');
@@ -4165,7 +4211,10 @@ async function platKapsama(){
         }
         return '<td style="text-align:center;white-space:nowrap;font-size:11.5px">'
           + (c.pub  ? '<span style="color:var(--ok)" title="yayınlandı">✓'+c.pub+'</span> '  : '')
-          + (c.fail ? '<span style="color:var(--er)" title="başarısız">✕'+c.fail+'</span> ' : '')
+          + (c.fail ? '<span style="color:var(--er);cursor:pointer;text-decoration:underline dotted"'
+                      + ' onclick="event.stopPropagation();kapsamaHataAc(\''+esc(u).replace(/'/g,"\\'")+'\',\''+p+'\')"'
+                      + ' title="Çözülmemiş '+c.fail+' hata — listeyi görmek için tıkla">✕'+c.fail+'</span> ' : '')
+          + (c.cozuldu ? '<span style="color:var(--mt)" title="'+c.cozuldu+' hata yeniden gönderilip yayınlandı — sayıma dahil değil">↻'+c.cozuldu+'</span> ' : '')
           + (c.plan ? '<span style="color:#00b8d4" title="planlı/kuyrukta">⏰'+c.plan+'</span>' : '')
           + '</td>';
       }).join('');
@@ -4177,7 +4226,9 @@ async function platKapsama(){
         + '<div style="color:var(--mt);margin-top:4px">Facebook için ilk şüphe: hesabın bağlantısında <b>Sayfa</b> yok — kartta FB satırına tıkla → "Sayfaları Yükle" boş geliyorsa Upload-Post\'ta hesabı bir Facebook <b>Sayfasıyla</b> yeniden bağla (Reels yalnız Sayfalara yayınlanır).</div></div>'
       : '<div style="font-size:12.5px;color:var(--ok);margin-bottom:8px">✓ Bağlı her hesapta en az bir kayıt var</div>';
     kutu.innerHTML = '<div class="card">'
-      + '<div class="ct">📋 Kapsama Denetimi <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— '+kayit+' geçmiş kaydı'+(kirpik?' (pencere doldu: daha eski kayıtlar taranamadı — "HİÇ" bu pencere içindir)':'')+' + plan + kuyruk</span>'
+      + '<div class="ct">📋 Kapsama Denetimi <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— '+kayit+' geçmiş kaydı'+(kirpik?' (pencere doldu: daha eski kayıtlar taranamadı — "HİÇ" bu pencere içindir)':'')+' + plan + kuyruk'
+      + (cozulenTop?' · <b style="color:var(--ok)">'+cozulenTop+' hata yeniden gönderilip çözülmüş, sayımdan düşürüldü (↻)</b>':'')
+      + ' · <b>✕ sayısına tıkla</b> → başarısız short listesi</span>'
       + '<button class="btn bsm" style="float:right" onclick="document.getElementById(\'plat-kapsama\').innerHTML=\'\'">✕</button></div>'
       + ozet
       + '<div style="overflow-x:auto"><style>#plat-kapsama td,#plat-kapsama th{padding:3px 8px;border-bottom:1px solid var(--brd)}#plat-kapsama tbody tr:hover{background:var(--sur2)}</style>'
@@ -4188,6 +4239,38 @@ async function platKapsama(){
     kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kapsama denetimi başarısız: '+e.message});
   } finally { if (btn) btn.disabled = false; }
 }
+
+// Kapsama tablosunda ✕ sayısına tıklanınca: o hesabın ÇÖZÜLMEMİŞ
+// başarısız short'ları. Yeniden gönderilip yayınlanmış olanlar zaten
+// listeye girmiyor (sayımdan da düşürüldüler).
+function kapsamaHataAc(u, p){
+  const esc = s=>String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const liste = KAPSAMA_HATA[u+'|'+p] || [];
+  const PL = {instagram:'Instagram',youtube:'YouTube',tiktok:'TikTok',facebook:'Facebook',x:'X',threads:'Threads',linkedin:'LinkedIn',pinterest:'Pinterest',bluesky:'Bluesky'};
+  setEl('kh-baslik', u + ' · ' + (PL[p]||p) + ' — ' + liste.length + ' çözülmemiş hata');
+  const govde = document.getElementById('kh-govde');
+  if (!liste.length){
+    govde.innerHTML = '<div style="color:var(--mt);font-size:13px;padding:16px;text-align:center">Çözülmemiş hata yok</div>';
+  } else {
+    // Aynı hata mesajı tekrarlıyorsa kullanıcı bunu görsün — kök sebep tektir
+    const sebepler = {};
+    liste.forEach(r => { sebepler[r.hata] = (sebepler[r.hata]||0)+1; });
+    const enSik = Object.entries(sebepler).sort((a,b)=>b[1]-a[1]);
+    govde.innerHTML =
+      (enSik.length ? '<div style="background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px">'
+        + '<div style="color:var(--mt);margin-bottom:4px">Hata sebepleri:</div>'
+        + enSik.map(([s,n])=>'<div style="color:var(--er);word-break:break-word">• '+esc(s)+' <b>('+n+')</b></div>').join('')
+        + '</div>' : '')
+      + liste.map(r =>
+          '<div style="border:1px solid var(--brd);border-left:3px solid var(--er);border-radius:6px;padding:8px 12px;margin-bottom:6px;background:var(--bg)">'
+          + '<div style="font-size:12.5px;font-weight:600;color:var(--tx);word-break:break-word">'+esc(r.baslik||'(başlıksız)')+'</div>'
+          + '<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(r.t?esc(new Date(r.t).toLocaleString('tr')):'zamanı bilinmiyor')+'</div>'
+          + '<div style="font-size:11.5px;color:var(--er);margin-top:4px;word-break:break-word">⚠ '+esc(r.hata)+'</div>'
+          + '</div>').join('');
+  }
+  document.getElementById('kapsama-hata-modal').style.display = 'flex';
+}
+function kapsamaHataKapat(){ const m=document.getElementById('kapsama-hata-modal'); if(m) m.style.display='none'; }
 
 // ── GERÇEK YAYIN HATALARI (Upload-Post geçmişinden) ────────────────────
 // platHesapSorun yalnız BAĞLANTI durumuna bakar (jeton süresi, yeniden
@@ -6956,7 +7039,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ipucAc,ipucKapat,geriAlinabilir,alertSadelestir,pzUygula,pzF,pzBol,
       islenmisMi,islenmisAyikla,islenmisNotu,islenmisGoster,
       // HTML'de onclick ile çağrılıyor — window'a bağlanmazsa ölü buton olur
-      testWH,ytkTestApi,platKapsama,
+      testWH,ytkTestApi,platKapsama,kapsamaHataAc,kapsamaHataKapat,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
