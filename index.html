@@ -1422,7 +1422,6 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Veriler <b>Upload-Post API</b>'den gelir ve hesap adları <b>bağlama anındaki</b> kayıttır — platformda adı değiştirince burada kendiliğinden güncellenmez (Upload-Post'ta tazeleme ucu yok; yayınlar yine doğru hesaba gider). <b>YouTube</b> adları kanal kimliğinden <b style="color:var(--ok)">CANLI</b> okunur; IG/TikTok/FB/X için güncel adı görmek istersen Upload-Post'ta hesabı yeniden bağla.</span></div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms(true)" title="Önbelleği atlar, Upload-Post'tan taze veri çeker">↻ Yenile</button>
-    <button class="btn bg bsm" id="plat-doldur-btn" onclick="platDoldurAc()" title="Bir profilin bir platformdaki short'larını, aynı profilin başka bir platformuna kuyruk üzerinden doldurur. Yeniden bağlanan hesabı geçmişe yetiştirmek için.">🔁 Hesabı Doldur</button>
     <button class="btn bg bsm" id="plat-kapsama-btn" onclick="platKapsama()" title="Profil × platform matrisi: her bağlı hesabın yayınlanmış / başarısız / planlı sayıları. Hiç kaydı olmayan hesaplar kırmızı HİÇ ile işaretlenir — 'bu hesaba hiç video gitmemiş' sorusunun cevabı">📋 Kapsama Denetimi</button>
     <button class="btn bg bsm" id="plat-temizle-btn" onclick="upTemizleBasliklar()" title="Upload-Post kuyruğunda BEKLEYEN zamanlanmış gönderilerin açıklamalarından 'İstediğin Başlık' / 'Your Title Here' yer tutucularını toplu kaldırır">🧹 Açıklamaları Temizle</button>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
@@ -1440,7 +1439,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
 <div id="plat-doldur-modal" style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)platDoldurKapat()">
   <div style="width:min(660px,calc(94vw / var(--pz)));max-height:84vh;display:flex;flex-direction:column;background:var(--sur2);border:1px solid var(--acc);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.6)">
     <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--brd)">
-      <div style="font-family:var(--fh);font-size:14px;font-weight:700;color:var(--tx)">🔁 Hesabı Doldur</div>
+      <div style="font-family:var(--fh);font-size:14px;font-weight:700;color:var(--tx)" id="pd-modal-baslik">🔁 Hesabı Doldur</div>
       <button class="btn bg bsm" onclick="platDoldurKapat()">✕ Kapat</button>
     </div>
     <div style="padding:14px 18px;overflow-y:auto">
@@ -1450,15 +1449,9 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         yayınlanmaz — Upload-Post sıradaki boş yuvalara doğal aralıklarla dağıtır.
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
-        <div class="fg" style="flex:1;min-width:150px;margin:0"><label>Profil</label><select id="pd-profil"></select></div>
-        <div class="fg" style="flex:0 0 130px;margin:0"><label>Kaynak</label><select id="pd-kaynak">
-          <option value="youtube">▶ YouTube</option><option value="instagram">📸 Instagram</option>
-          <option value="tiktok">♪ TikTok</option><option value="facebook">ⓕ Facebook</option><option value="x">𝕏 X</option>
-        </select></div>
-        <div class="fg" style="flex:0 0 130px;margin:0"><label>Hedef</label><select id="pd-hedef">
-          <option value="tiktok">♪ TikTok</option><option value="instagram">📸 Instagram</option>
-          <option value="youtube">▶ YouTube</option><option value="facebook">ⓕ Facebook</option><option value="x">𝕏 X</option>
-        </select></div>
+        <div class="fg" style="flex:1;min-width:150px;margin:0"><label>Profil (kart)</label><select id="pd-profil" disabled></select></div>
+        <div class="fg" style="flex:0 0 130px;margin:0"><label>Kaynak</label><select id="pd-kaynak"></select></div>
+        <div class="fg" style="flex:0 0 130px;margin:0"><label>Hedef</label><select id="pd-hedef"></select></div>
         <button class="btn bp bsm" id="pd-tara-btn" onclick="platDoldurTara()">🔍 Tara</button>
       </div>
       <div id="pd-sonuc"></div>
@@ -2316,7 +2309,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-6';
+const PANEL_YAPI = 'y2026.08.02-7';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4283,15 +4276,43 @@ const PLAT_DOLDUR = { aday: [], profil:'', kaynak:'', hedef:'' };
 const PD_AD = { instagram:'Instagram', youtube:'YouTube', tiktok:'TikTok', facebook:'Facebook', x:'X' };
 const PD_PLAT_KEY = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb', x:'x' };
 
-function platDoldurAc(){
-  const sel = document.getElementById('pd-profil');
+const PD_IKON = { instagram:'📸', youtube:'▶', tiktok:'♪', facebook:'ⓕ', x:'𝕏' };
+
+// Profilin GERÇEKTEN bağlı platformları — olmayan platformu hedef olarak
+// önermenin anlamı yok, gönderim zaten reddedilirdi.
+function pdBagliPlatformlar(profil){
   const raw = S.uploadPostAccounts;
-  const profs = (raw && Array.isArray(raw.profiles)) ? raw.profiles.map(p=>p.username).filter(Boolean) : [];
-  if (!profs.length){ toast('Önce Platformlar → Yenile ile profilleri yükle','warn'); return; }
+  const pr = (raw && Array.isArray(raw.profiles)) ? raw.profiles.find(p=>p.username===profil) : null;
+  if (!pr) return [];
+  const sa = pr.social_accounts || pr.socialAccounts || {};
+  const dolu = k => { const v = sa[k]; const a = Array.isArray(v)?v[0]:v; return !!(a && (a.username||a.id||a.display_name||a.name)); };
+  return ['instagram','youtube','tiktok','facebook','x']
+    .filter(p => p === 'x' ? (dolu('twitter') || dolu('x')) : dolu(p));
+}
+
+// Profil kartındaki "🔁 Doldur" düğmesinden açılır — profil kilitli gelir.
+function platDoldurAc(profil){
   const esc = s=>String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  sel.innerHTML = profs.map(u=>'<option value="'+esc(u)+'">'+esc(u)+'</option>').join('');
+  if (!profil){ toast('Profil kartındaki 🔁 Doldur düğmesini kullan','warn'); return; }
+  const platlar = pdBagliPlatformlar(profil);
+  if (platlar.length < 2){
+    toast(profil+': doldurma için en az iki bağlı platform gerekiyor (şu an '+platlar.length+')','warn',6000);
+    return;
+  }
+  const sel = document.getElementById('pd-profil');
+  sel.innerHTML = '<option value="'+esc(profil)+'">'+esc(profil)+'</option>';
+  sel.value = profil;
+  sel.disabled = true;                    // kart hangisiyse o — yanlış profile göndermeyi imkânsız kılar
+  const opt = p => '<option value="'+p+'">'+PD_IKON[p]+' '+PD_AD[p]+'</option>';
+  const kSel = document.getElementById('pd-kaynak'), hSel = document.getElementById('pd-hedef');
+  kSel.innerHTML = platlar.map(opt).join('');
+  hSel.innerHTML = platlar.map(opt).join('');
+  kSel.value = platlar[0];
+  hSel.value = platlar.find(p => p !== platlar[0]);
+  setEl('pd-modal-baslik', '🔁 Hesabı Doldur — ' + profil);
   document.getElementById('pd-sonuc').innerHTML = '';
   document.getElementById('pd-alt').style.display = 'none';
+  PLAT_DOLDUR.aday = [];
   document.getElementById('plat-doldur-modal').style.display = 'flex';
 }
 function platDoldurKapat(){ const m=document.getElementById('plat-doldur-modal'); if(m) m.style.display='none'; }
@@ -4778,7 +4799,12 @@ function renderPlatformsGrid(byPlat) {
             : '')
       +   (ps ? '<span style="margin-left:auto;flex-shrink:0;font-size:10.5px;color:#fca5a5;font-weight:700">⚠ '+esc(ps.kisa)+'</span>' : '')
       + '</div>'
-      + '<div class="pl-prof-alt">'+altSatir+'</div>'
+      + '<div class="pl-prof-alt" style="display:flex;align-items:center;gap:8px">'
+      +   '<span>'+altSatir+'</span>'
+      +   (g.eksik ? '' : '<button class="btn bsm" style="margin-left:auto;padding:1px 7px;font-size:10.5px;flex-shrink:0"'
+            + ' onclick="event.stopPropagation();platDoldurAc(\''+esc(g.profil).replace(/'/g,"\\'")+'\')"'
+            + ' title="Bu profilin bir platformdaki short&#39;larını, aynı profilin başka bir platformuna kuyrukla doldur">🔁 Doldur</button>')
+      + '</div>'
       + (hesapHtml || '<div style="font-size:11.5px;color:var(--mt);padding:6px 2px">— bağlı hesap yok —</div>')
       + '</div>';
   }).join('');
@@ -7214,7 +7240,7 @@ document.addEventListener('DOMContentLoaded', function() {
       islenmisMi,islenmisAyikla,islenmisNotu,islenmisGoster,
       // HTML'de onclick ile çağrılıyor — window'a bağlanmazsa ölü buton olur
       testWH,ytkTestApi,platKapsama,kapsamaHataAc,kapsamaHataKapat,
-      platDoldurAc,platDoldurKapat,platDoldurTara,platDoldurGonder,
+      platDoldurAc,platDoldurKapat,platDoldurTara,platDoldurGonder,pdBagliPlatformlar,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
