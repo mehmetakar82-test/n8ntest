@@ -1471,8 +1471,11 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <button class="btn bg bsm" onclick="kapsamaHataKapat()">✕ Kapat</button>
     </div>
     <div id="kh-govde" style="padding:14px 18px;overflow-y:auto"></div>
-    <div style="padding:10px 18px;border-top:1px solid var(--brd);font-size:11.5px;color:var(--mt)">
-      Yeniden gönderilip yayınlanmış hatalar bu listede <b>yer almaz</b>. Toplu yeniden gönderim için <b>Yayın Durumu → Başarısızları Kuyruğa Al</b>.
+    <div style="padding:10px 18px;border-top:1px solid var(--brd)">
+      <div id="kh-alt-eylem" style="margin-bottom:6px"></div>
+      <div style="font-size:11.5px;color:var(--mt)">
+        Gönderimler <b>kuyruğa</b> eklenir — hepsi aynı anda yayınlanmaz. Yeniden gönderilip yayınlanmış hatalar bu listede <b>yer almaz</b>.
+      </div>
     </div>
   </div>
 </div>
@@ -2309,7 +2312,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-8';
+const PANEL_YAPI = 'y2026.08.02-9';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4455,34 +4458,105 @@ async function platDoldurGonder(){
 // Kapsama tablosunda ✕ sayısına tıklanınca: o hesabın ÇÖZÜLMEMİŞ
 // başarısız short'ları. Yeniden gönderilip yayınlanmış olanlar zaten
 // listeye girmiyor (sayımdan da düşürüldüler).
-function kapsamaHataAc(u, p){
+const KH = { u:'', p:'' };
+const KH_PL = {instagram:'Instagram',youtube:'YouTube',tiktok:'TikTok',facebook:'Facebook',x:'X',threads:'Threads',linkedin:'LinkedIn',pinterest:'Pinterest',bluesky:'Bluesky'};
+
+async function kapsamaHataAc(u, p){
+  KH.u = u; KH.p = p;
+  document.getElementById('kapsama-hata-modal').style.display = 'flex';
+  setEl('kh-baslik', u + ' · ' + (KH_PL[p]||p));
+  document.getElementById('kh-govde').innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Kaynak videolar eşleştiriliyor…'});
+  try { await ydEnsureShorts(); } catch(e){}
+  kapsamaHataCiz();
+}
+function kapsamaHataKapat(){ const m=document.getElementById('kapsama-hata-modal'); if(m) m.style.display='none'; }
+
+function kapsamaHataCiz(){
   const esc = s=>String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const u = KH.u, p = KH.p;
   const liste = KAPSAMA_HATA[u+'|'+p] || [];
-  const PL = {instagram:'Instagram',youtube:'YouTube',tiktok:'TikTok',facebook:'Facebook',x:'X',threads:'Threads',linkedin:'LinkedIn',pinterest:'Pinterest',bluesky:'Bluesky'};
-  setEl('kh-baslik', u + ' · ' + (PL[p]||p) + ' — ' + liste.length + ' çözülmemiş hata');
+  // Kaynak mp4'ü bir kez çöz (short-kaydetme tablosundan) — kuyruğa yeni
+  // gönderim olarak gireceği için video şart.
+  liste.forEach(r => {
+    if (r._video === undefined){
+      const s = ydFindSource(r.baslik, '', u, '');
+      r._video = (s && s.video) || '';
+      r._profilSheet = (s && s.profil) || u;
+      r._caption = (s && s.caption) || '';
+    }
+  });
+  const kalan = liste.filter(r => !r._gonderildi);
+  const gonderilebilir = kalan.filter(r => r._video);
+  setEl('kh-baslik', u + ' · ' + (KH_PL[p]||p) + ' — ' + kalan.length + ' çözülmemiş hata');
   const govde = document.getElementById('kh-govde');
   if (!liste.length){
     govde.innerHTML = '<div style="color:var(--mt);font-size:13px;padding:16px;text-align:center">Çözülmemiş hata yok</div>';
-  } else {
-    // Aynı hata mesajı tekrarlıyorsa kullanıcı bunu görsün — kök sebep tektir
-    const sebepler = {};
-    liste.forEach(r => { sebepler[r.hata] = (sebepler[r.hata]||0)+1; });
-    const enSik = Object.entries(sebepler).sort((a,b)=>b[1]-a[1]);
-    govde.innerHTML =
-      (enSik.length ? '<div style="background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px">'
-        + '<div style="color:var(--mt);margin-bottom:4px">Hata sebepleri:</div>'
-        + enSik.map(([s,n])=>'<div style="color:var(--er);word-break:break-word">• '+esc(s)+' <b>('+n+')</b></div>').join('')
-        + '</div>' : '')
-      + liste.map(r =>
-          '<div style="border:1px solid var(--brd);border-left:3px solid var(--er);border-radius:6px;padding:8px 12px;margin-bottom:6px;background:var(--bg)">'
-          + '<div style="font-size:12.5px;font-weight:600;color:var(--tx);word-break:break-word">'+esc(r.baslik||'(başlıksız)')+'</div>'
-          + '<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(r.t?esc(new Date(r.t).toLocaleString('tr')):'zamanı bilinmiyor')+'</div>'
-          + '<div style="font-size:11.5px;color:var(--er);margin-top:4px;word-break:break-word">⚠ '+esc(r.hata)+'</div>'
-          + '</div>').join('');
+    document.getElementById('kh-alt-eylem').innerHTML = '';
+    return;
   }
-  document.getElementById('kapsama-hata-modal').style.display = 'flex';
+  const sebepler = {};
+  kalan.forEach(r => { sebepler[r.hata] = (sebepler[r.hata]||0)+1; });
+  const enSik = Object.entries(sebepler).sort((a,b)=>b[1]-a[1]);
+  govde.innerHTML =
+    (enSik.length ? '<div style="background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px">'
+      + '<div style="color:var(--mt);margin-bottom:4px">Hata sebepleri:</div>'
+      + enSik.map(([s,n])=>'<div style="color:var(--er);word-break:break-word">• '+esc(s)+' <b>('+n+')</b></div>').join('')
+      + '</div>' : '')
+    + liste.map((r,i) => {
+        const bitti = !!r._gonderildi;
+        return '<div style="border:1px solid var(--brd);border-left:3px solid '+(bitti?'var(--ok)':'var(--er)')+';border-radius:6px;padding:8px 12px;margin-bottom:6px;background:var(--bg)'+(bitti?';opacity:.6':'')+'">'
+        + '<div style="display:flex;align-items:flex-start;gap:8px">'
+        +   '<div style="flex:1;min-width:0">'
+        +     '<div style="font-size:12.5px;font-weight:600;color:var(--tx);word-break:break-word'+(bitti?';text-decoration:line-through':'')+'">'+esc(r.baslik||'(başlıksız)')+'</div>'
+        +     '<div style="font-size:11px;color:var(--mt);margin-top:2px">'+(r.t?esc(new Date(r.t).toLocaleString('tr')):'zamanı bilinmiyor')+'</div>'
+        +   '</div>'
+        +   (bitti
+              ? '<span style="flex-shrink:0;font-size:11px;color:var(--ok);white-space:nowrap">✓ kuyruğa alındı</span>'
+              : (r._video
+                  ? '<button class="btn bsm" style="flex-shrink:0;padding:2px 8px;font-size:11px" onclick="kapsamaHataGonder('+i+')" title="Bu short&#39;u kuyruğa ekle">↻ Gönder</button>'
+                  : '<span style="flex-shrink:0;font-size:10.5px;color:#f5a623;white-space:nowrap" title="short-kaydetme tablosunda bu başlıkla eşleşen mp4 bulunamadı">kaynak yok</span>'))
+        + '</div>'
+        + (bitti ? '' : '<div style="font-size:11.5px;color:var(--er);margin-top:4px;word-break:break-word">⚠ '+esc(r.hata)+'</div>')
+        + '</div>';
+      }).join('');
+  const kaynaksiz = kalan.length - gonderilebilir.length;
+  document.getElementById('kh-alt-eylem').innerHTML = gonderilebilir.length
+    ? '<button class="btn bp bsm" id="kh-toplu-btn" onclick="kapsamaHataTumu()">↻ '+gonderilebilir.length+' short\'u kuyruğa al</button>'
+      + (kaynaksiz ? '<span style="font-size:11.5px;color:#f5a623;margin-left:8px">'+kaynaksiz+' kaydın kaynak videosu bulunamadı, atlanacak</span>' : '')
+    : (kalan.length ? '<span style="font-size:11.5px;color:#f5a623">Hiçbirinin kaynak videosu bulunamadı — Yayın Durumu\'ndan mp4 URL girerek tek tek gönderebilirsin</span>' : '');
 }
-function kapsamaHataKapat(){ const m=document.getElementById('kapsama-hata-modal'); if(m) m.style.display='none'; }
+
+// Kuyruğa ekler (add_to_queue): hepsi aynı anda yayınlanmaz, profilin
+// sıradaki boş yuvalarına dağılır.
+async function kapsamaHataGonder(i){
+  const liste = KAPSAMA_HATA[KH.u+'|'+KH.p] || [];
+  const r = liste[i]; if (!r || r._gonderildi || !r._video) return;
+  const s = await ydTopluGonder({ _profil: r._profilSheet || KH.u, _video: r._video,
+                                  _caption: r._caption, plat: PD_PLAT_KEY[KH.p] || KH.p, title: r.baslik });
+  if (s.ok){ r._gonderildi = true; toast('✓ Kuyruğa alındı','ok'); kapsamaHataCiz(); }
+  else toast('✕ Gönderilemedi: '+(s.mesaj||s.sebep),'err',6000);
+}
+
+async function kapsamaHataTumu(){
+  const liste = KAPSAMA_HATA[KH.u+'|'+KH.p] || [];
+  const hedef = liste.filter(r => !r._gonderildi && r._video);
+  if (!hedef.length) return;
+  if (!confirm(hedef.length+' short, '+KH.u+' profilinin '+(KH_PL[KH.p]||KH.p)+' KUYRUĞUNA eklenecek.\n\n'
+    + 'Hepsi aynı anda yayınlanmaz — sıradaki boş yuvalara dağıtılır.\n\nDevam edilsin mi?')) return;
+  const btn = document.getElementById('kh-toplu-btn');
+  if (btn) btn.disabled = true;
+  let ok=0, hata=0; const hatalar=[];
+  await upSirali(hedef, async r => {
+    const s = await ydTopluGonder({ _profil: r._profilSheet || KH.u, _video: r._video,
+                                    _caption: r._caption, plat: PD_PLAT_KEY[KH.p] || KH.p, title: r.baslik });
+    if (s.ok){ ok++; r._gonderildi = true; } else { hata++; if (hatalar.length<3) hatalar.push(s.mesaj||s.sebep); }
+    if (btn) btn.textContent = '⏳ '+(ok+hata)+'/'+hedef.length;
+  }, 2);
+  kapsamaHataCiz();
+  const ozet = ok+' kuyruğa alındı'+(hata?' · '+hata+' başarısız':'');
+  toast((ok?'✓ ':'✕ ')+ozet+(hatalar.length?' — '+hatalar[0]:''), ok?'ok':'err', 7000);
+  addLog(hata?'warn':'ok','uploadpost','Kapsama pop-up ('+KH.u+' '+KH.p+'): '+ozet+(hatalar.length?' | '+hatalar.join(' | '):''));
+}
 
 // ── GERÇEK YAYIN HATALARI (Upload-Post geçmişinden) ────────────────────
 // platHesapSorun yalnız BAĞLANTI durumuna bakar (jeton süresi, yeniden
@@ -7249,6 +7323,7 @@ document.addEventListener('DOMContentLoaded', function() {
       islenmisMi,islenmisAyikla,islenmisNotu,islenmisGoster,
       // HTML'de onclick ile çağrılıyor — window'a bağlanmazsa ölü buton olur
       testWH,ytkTestApi,platKapsama,kapsamaHataAc,kapsamaHataKapat,
+      kapsamaHataCiz,kapsamaHataGonder,kapsamaHataTumu,
       platDoldurAc,platDoldurKapat,platDoldurTara,platDoldurGonder,pdBagliPlatformlar,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
