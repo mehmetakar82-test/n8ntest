@@ -2267,7 +2267,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-2';
+const PANEL_YAPI = 'y2026.08.02-3';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -6869,7 +6869,10 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(()=>{ try{ dmgCiz(); }catch(e){} }, 30000);           // tazelik damgalarını canlı tut
     try{ alertSadelestir(); }catch(e){ console.warn('[boot] alertSadelestir:', e.message); }
     try{ pzUygula(pzOku()); }catch(e){ console.warn('[boot] pzUygula:', e.message); }   // ölçek chip'ini işaretle
-    setInterval(()=>{ try{ notifCheck(false); }catch(e){} }, 5*60*1000);  // ucuz periyodik kontrol
+    // 15 dk: her tur n8n webhook'larına gerçek istek atıyor ve n8n cloud'da
+    // her istek 1 çalıştırma sayılıyor — 5 dk'lık yoklama panel açıkken
+    // günde ~288 çalıştırma yakıyordu (kota şikayeti üzerine uzatıldı).
+    setInterval(()=>{ try{ notifCheck(false); }catch(e){} }, 15*60*1000);
     // Tüm global fonksiyonları window'a bağla
     const globals = [go,showTab,goUretim,renderUretimTabs,trTabCount,refreshDash,sendSingle,sendBulkURLs,sendSearch,
       loadDriveSheet,sendDriveURLs,clearSentURLs,
