@@ -2267,7 +2267,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-3';
+const PANEL_YAPI = 'y2026.08.02-4';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4202,8 +4202,35 @@ const YAYIN_HATA_GUN = 14;     // bu kadar geriye bakılır
 function phAnahtar(profil, plat){ return String(profil||'').trim().toLowerCase()+'|'+String(plat||'').trim().toLowerCase(); }
 function phPlatNormal(p){ const s=String(p||'').toLowerCase().trim(); return s==='x' ? 'twitter' : s; }
 
+// ── PERMALINK'TEN KULLANICI ADI ────────────────────────────────────────
+// Upload-Post'un sakladığı ad BAĞLANMA anındandır ve tazelenemez. Ama
+// yayın geçmişindeki permalink SON YAYIN anındaki adı taşır — TikTok ve X
+// linkleri handle içerir. Ek API çağrısı gerekmez: geçmiş zaten taranıyor.
+// Instagram (/reel/kod) ve YouTube (/shorts/kod) linkleri ad taşımaz.
+const PLAT_SON_AD = {};   // "profil|platform" -> { handle, zaman }
+function phLinktenHandle(plat, url){
+  const u = String(url||''); if (!u) return '';
+  let m;
+  if (plat === 'tiktok'){
+    m = u.match(/tiktok\.com\/@([^/?#]+)/i);
+    return m ? m[1] : '';
+  }
+  if (plat === 'twitter'){
+    m = u.match(/(?:x|twitter)\.com\/([^/?#]+)\/status/i);
+    // x.com/i/status/... biçiminde 'i' handle değildir
+    return (m && m[1].toLowerCase() !== 'i') ? m[1] : '';
+  }
+  if (plat === 'facebook'){
+    m = u.match(/facebook\.com\/([^/?#]+)\/(?:videos|reel|posts)/i);
+    const kotu = /^(reel|watch|video|videos|permalink\.php|story\.php|profile\.php|share|groups|pages|people)$/i;
+    return (m && !kotu.test(m[1]) && !/^\d+$/.test(m[1])) ? m[1] : '';
+  }
+  return '';
+}
+
 async function platYayinHatalariCek(derinlik){
   Object.keys(PLAT_HATA).forEach(k => delete PLAT_HATA[k]);
+  Object.keys(PLAT_SON_AD).forEach(k => delete PLAT_SON_AD[k]);
   PLAT_HATA_DURUM = '';
   if (!S.cfg.blot && !getN8N()){ PLAT_HATA_DURUM = 'geçmiş taranamadı (API Key yok)'; return; }
   const sinir = Date.now() - YAYIN_HATA_GUN*24*60*60*1000;
@@ -4226,6 +4253,14 @@ async function platYayinHatalariCek(derinlik){
       const k = phAnahtar(x.profile_username||x.user, phPlatNormal(x.platform));
       const basarili = x.success !== false && !x.error_message;
       const g = PLAT_HATA[k] || (PLAT_HATA[k] = {adet:0, sonHata:'', sonZaman:0, sonBasari:0});
+      // Başarılı yayının permalink'i o anki kullanıcı adını taşıyor olabilir
+      if (basarili){
+        const hnd = phLinktenHandle(phPlatNormal(x.platform), x.post_url || x.url || '');
+        if (hnd){
+          const s = PLAT_SON_AD[k];
+          if (!s || t > s.zaman) PLAT_SON_AD[k] = { handle: hnd, zaman: t };
+        }
+      }
       if (basarili){ if (t > g.sonBasari) g.sonBasari = t; }
       else {
         g.adet++;
@@ -4443,6 +4478,19 @@ function renderPlatformsGrid(byPlat) {
             + '">CANLI</span>';
         }
       }
+      // TikTok / X / Facebook: son yayının permalink'i handle taşıyorsa
+      // ve Upload-Post kaydından FARKLIYSA, taze olan permalink'tekidir.
+      if (!canliRozet){
+        const sa = PLAT_SON_AD[phAnahtar(h.a._profile, h.p.key)];
+        if (sa && sa.handle && kul && sa.handle.toLowerCase() !== kul.toLowerCase()){
+          const eskiKul = kul;
+          kul = sa.handle;
+          canliRozet = ' <span style="font-size:9px;color:#00b8d4;border:1px solid #00b8d4;border-radius:3px;padding:0 3px;vertical-align:1px" title="'
+            + 'Son yayının bağlantısından okundu ('+esc(new Date(sa.zaman).toLocaleDateString('tr'))+'). '
+            + 'Upload-Post&#39;taki eski kayıt: @'+esc(eskiKul)+'. Bu tarihten SONRA adı değiştirdiysen o da burada görünmez.'
+            + '">SON YAYIN</span>';
+        }
+      }
       return '<div class="pl-hesap'+(hs?' bozuk':'')+'"'+hataAttr(hs)
         + ' onclick="platOpenModal(\''+h.p.key+'\','+h.idx+')">'
         + '<div class="pl-h-ikon" style="background:'+h.p.color+'22;color:'+h.p.color+'">'+h.p.icon+'</div>'
@@ -4542,6 +4590,10 @@ function platOpenModal(platKey, idx) {
   const canli = (platKey === 'youtube') ? YT_CANLI[ytKanalIdBul(a)] : null;
   if (canli && (canli.ad || canli.handle))
     rows.push(['Güncel (canlı) ✓', (canli.ad||'') + (canli.handle ? ' · @'+canli.handle : '')]);
+  // TikTok/X/Facebook: son yayın bağlantısından okunan handle
+  const sonAd = !canli ? PLAT_SON_AD[phAnahtar(a._profile, platKey)] : null;
+  if (sonAd && sonAd.handle)
+    rows.push(['Son yayında (' + new Date(sonAd.zaman).toLocaleDateString('tr') + ')', '@'+sonAd.handle]);
   if (name && name!==handle) rows.push([canli ? 'Upload-Post kaydı (ad)' : 'Görünen ad', name]);
   if (handle)              rows.push([canli ? 'Upload-Post kaydı (kullanıcı adı)' : 'Kullanıcı adı', '@'+handle]);
   if (a.id)                rows.push(['Hesap ID', a.id]);
