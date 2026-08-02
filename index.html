@@ -2312,7 +2312,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-12';
+const PANEL_YAPI = 'y2026.08.02-13';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4499,6 +4499,141 @@ function pdKaynakTanisi(liste, sonuclar){
     + '</div>';
 }
 
+// ── ÖLÜ LİNKLERİ OPUSCLIP'TEN TAZELE ───────────────────────────────────
+// Sheet'te short'un clip-id'si duruyor. OpusClip'te klip hâlâ varsa TAZE
+// bir uriForExport alınabilir — Drive'a kopyalamaya gerek kalmadan.
+// Panelin OpusClip Galeri sayfası bu iki ucu zaten kullanıyor:
+//   GET /clip-projects?pageSize=100              → projeler
+//   GET /exportable-clips?q=findByProjectId&…    → kliplerin taze linki
+// clip-id birleşik ({projectId}.{clipId}) ise proje listesine hiç gerek
+// yok: doğrudan o proje sorulur. Değilse projeler taranıp indeks kurulur.
+// İki OpusClip takımı da ayrı anahtarla denenir (klip hangisindeyse).
+const PD_PROJE_TAVAN = 60;          // taranacak azami proje — sonsuz döngü olmasın
+
+function pdProjeKimligi(clipId){
+  const s = String(clipId||'').trim();
+  const i = s.indexOf('.');
+  return (i > 0) ? s.slice(0, i) : '';
+}
+
+// Bir projenin kliplerini, klibin ait olduğu takımı bulana dek dener.
+async function pdProjeKlipleri(projectId, takimlar, onbellek){
+  if (onbellek.has(projectId)) return onbellek.get(projectId);
+  let klipler = [];
+  for (const t of takimlar){
+    try {
+      const d = await opcApiFetch('https://api.opus.pro/api/exportable-clips?q=findByProjectId&projectId='
+                                  + encodeURIComponent(projectId), t.key);
+      const l = Array.isArray(d) ? d : (d.list || d.data || d.clips || d.items || []);
+      if (l.length){ klipler = l; break; }
+    } catch(e){ /* bu takımda yok ya da erişilemedi — diğerini dene */ }
+  }
+  onbellek.set(projectId, klipler);
+  return klipler;
+}
+
+function pdKlipEkle(harita, klip){
+  const url = klip.uriForExport || klip.exportUrl || klip.url || '';
+  if (!url) return;
+  // Hem birleşik kimlik hem de noktadan sonraki kısım anahtar olsun:
+  // Sheet'te hangi biçim saklandıysa yakalansın.
+  [klip.id, klip.clipId, String(klip.id||'').split('.').pop()].forEach(k => {
+    const s = String(k||'').trim();
+    if (s && !harita.has(s)) harita.set(s, url);
+  });
+}
+
+// clipId → taze mp4 linki. ilerle(metin) ile ilerleme bildirilir.
+async function pdTazeLinkler(clipIdler, ilerle){
+  const takimlar = (typeof opusTakimlar === 'function') ? opusTakimlar() : [];
+  if (!takimlar.length) throw new Error('OpusClip API Key girilmemiş — Ayarlar sayfasından ekle');
+  const istenen = new Set(clipIdler.filter(Boolean).map(String));
+  const harita = new Map(), projeOnbellek = new Map();
+  if (!istenen.size) return harita;
+
+  // 1) Birleşik kimlikler: proje doğrudan biliniyor
+  const projeler = new Set();
+  istenen.forEach(id => { const p = pdProjeKimligi(id); if (p) projeler.add(p); });
+  const dogrudan = Array.from(projeler);
+  if (dogrudan.length){
+    let n = 0;
+    await upSirali(dogrudan, async pid => {
+      const kl = await pdProjeKlipleri(pid, takimlar, projeOnbellek);
+      kl.forEach(k => pdKlipEkle(harita, k));
+      n++; if (ilerle) ilerle('Proje sorgulanıyor ('+n+'/'+dogrudan.length+')…');
+    }, 3);
+  }
+
+  // 2) Kalanlar için proje listesi taranır
+  const kalan = Array.from(istenen).filter(id => !harita.has(id));
+  if (kalan.length){
+    if (ilerle) ilerle('Proje listesi çekiliyor…');
+    const tumProjeler = [];
+    for (const t of takimlar){
+      try {
+        const d = await opcApiFetch('https://api.opus.pro/api/clip-projects?pageSize=100', t.key);
+        const l = Array.isArray(d) ? d : (d.list || d.data || d.projects || d.items || []);
+        l.forEach(p => { const id = p.projectId || p.id; if (id && !projeOnbellek.has(id)) tumProjeler.push(String(id)); });
+      } catch(e){ console.warn('[PD] proje listesi ('+t.ad+'):', e.message); }
+    }
+    const hedefler = tumProjeler.slice(0, PD_PROJE_TAVAN);
+    let n = 0, bulundu = 0;
+    for (const pid of hedefler){
+      const kl = await pdProjeKlipleri(pid, takimlar, projeOnbellek);
+      kl.forEach(k => pdKlipEkle(harita, k));
+      n++;
+      bulundu = kalan.filter(id => harita.has(id)).length;
+      if (ilerle) ilerle('Projeler taranıyor ('+n+'/'+hedefler.length+') · '+bulundu+'/'+kalan.length+' klip bulundu…');
+      if (bulundu === kalan.length) break;      // hepsi bulundu, boşuna devam etme
+    }
+  }
+  // Yalnız istenenleri döndür
+  const sonuc = new Map();
+  istenen.forEach(id => { if (harita.has(id)) sonuc.set(id, harita.get(id)); });
+  return sonuc;
+}
+
+// Ölü listesini OpusClip'ten tazelemeyi dener ve sonucu DÜRÜSTÇE raporlar:
+// tazelenen, klibi bulunamayan, taze linki de ölü olan ayrı ayrı sayılır.
+async function platDoldurTazele(){
+  const olu = (PLAT_DOLDUR.olu || []).slice();
+  const kutu = document.getElementById('pd-tazele-durum');
+  const btn  = document.getElementById('pd-tazele-btn');
+  if (!olu.length || !kutu) return;
+  const yaz = m => { kutu.innerHTML = '<span style="color:var(--mt)">'+esc0(m)+'</span>'; };
+  if (btn) btn.disabled = true;
+  try {
+    const kimliksiz = olu.filter(a => !a._clipId).length;
+    yaz('OpusClip sorgulanıyor…');
+    const harita = await pdTazeLinkler(olu.map(a => a._clipId), yaz);
+    const tazelenen = [], bulunamadi = [], hala = [];
+    let n = 0;
+    await upSirali(olu, async a => {
+      const yeni = a._clipId ? harita.get(String(a._clipId)) : null;
+      n++;
+      if (!yeni){ bulunamadi.push(a); yaz('Taze linkler sınanıyor ('+n+'/'+olu.length+')…'); return; }
+      const ok = await pdVideoErisilebilir(yeni, 8000);
+      yaz('Taze linkler sınanıyor ('+n+'/'+olu.length+')…');
+      if (ok){ a._video = yeni; tazelenen.push(a); } else hala.push(a);
+    }, 4);
+    if (tazelenen.length){
+      PLAT_DOLDUR.aday = (PLAT_DOLDUR.aday || []).concat(tazelenen);
+      PLAT_DOLDUR.olu  = bulunamadi.concat(hala);
+      document.getElementById('pd-alt').style.display = '';
+      document.getElementById('pd-gonder-btn').textContent = '↻ '+PLAT_DOLDUR.aday.length+' short\'u kuyruğa al';
+    }
+    const parca = [];
+    if (tazelenen.length)  parca.push('<b style="color:var(--ok)">'+tazelenen.length+' short\'un linki tazelendi</b>');
+    if (bulunamadi.length) parca.push(bulunamadi.length+' klip OpusClip\'te bulunamadı'
+                             + (kimliksiz ? ' ('+kimliksiz+' tanesinin clip-id\'si tabloda yok)' : ''));
+    if (hala.length)       parca.push(hala.length+' taze link de indirilemedi');
+    kutu.innerHTML = parca.join(' · ') || 'Sonuç yok';
+    addLog(tazelenen.length?'ok':'warn','sistem','OpusClip taze link: '+parca.join(' · ').replace(/<[^>]+>/g,''));
+  } catch(e){
+    kutu.innerHTML = '<span style="color:var(--er)">'+esc0(e.message||'tazeleme başarısız')+'</span>';
+  } finally { if (btn) btn.disabled = false; }
+}
+
 async function platDoldurTara(){
   const btn = document.getElementById('pd-tara-btn');
   const kutu = document.getElementById('pd-sonuc');
@@ -4519,7 +4654,8 @@ async function platDoldurTara(){
     k.yayinlanan.forEach((hamBaslik, n) => {
       if (h.mevcut.has(n)){ zatenVar.push(hamBaslik); return; }   // hedefte zaten var → atla
       const s = ydFindSource(hamBaslik, '', profil, '');
-      if (s && s.video) aday.push({ _profil: profil, _video: s.video, _caption: s.caption||'', _tarih: s.tarih||'', plat: PD_PLAT_KEY[hedef], title: hamBaslik });
+      if (s && s.video) aday.push({ _profil: profil, _video: s.video, _caption: s.caption||'', _tarih: s.tarih||'',
+                                    _clipId: s.clipId||'', _onizle: s.onizle||'', plat: PD_PLAT_KEY[hedef], title: hamBaslik });
       else kaynaksiz.push(hamBaslik);
     });
     // ÖN KONTROL: linkler gerçekten indirilebiliyor mu? Eski short'ların
@@ -4555,15 +4691,18 @@ async function platDoldurTara(){
       + '</div>'
       // NOT: .alert bir flex kabı — içine düz metin + <b> konursa her parça
       // ayrı sütun oluyor (yaşandı). Kendi kutumuzu kuruyoruz.
-      + (olu.length && !aday.length
+      + (olu.length
           ? '<div style="background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.35);border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:12px;line-height:1.6;color:var(--tx)">'
-            + '<div style="font-weight:700;margin-bottom:4px">Kaynak videoların hiçbiri indirilemiyor</div>'
-            + '<div style="color:var(--mt)">Bu short\'lar yayınlanırken linkler çalışıyordu, şimdi çalışmıyor — yani OpusClip '
-            + 'tarafında medya artık erişilebilir değil. Panel bunu düzeltemez; kuyruğa göndermek için indirilebilir bir mp4 şart.</div>'
-            + '<div style="color:var(--mt);margin-top:6px">Taze link de çekilemiyor: OpusClip API\'sinde klibi yalnız <code>clip-id</code> '
-            + 'ile arayan bir uç yok (proje kimliği gerekiyor) ve tabloda proje kimliği tutulmuyor.</div>'
-            + '<div style="margin-top:8px">Sınama senin tarayıcında yanılmış olabilir (eklenti/ağ engeli): '
-            + '<button class="btn bsm" style="padding:1px 7px;font-size:11px" onclick="platDoldurYineDe()">yine de '+olu.length+' short\'u dene</button></div>'
+            + '<div style="font-weight:700;margin-bottom:4px">'+olu.length+' short\'un kaynak videosu indirilemiyor</div>'
+            + '<div style="color:var(--mt)">Bu short\'lar yayınlanırken linkler çalışıyordu, şimdi çalışmıyor. '
+            + 'Ama tabloda <code>clip-id</code> duruyor: klip OpusClip\'te hâlâ varsa TAZE bir link alınabilir '
+            + '— Drive\'a kopyalamaya gerek yok.</div>'
+            + '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+            + '<button class="btn bp bsm" id="pd-tazele-btn" style="padding:2px 9px;font-size:11px" '
+            + 'onclick="platDoldurTazele()">⟳ OpusClip\'ten taze link çek</button>'
+            + '<button class="btn bsm" style="padding:2px 9px;font-size:11px" onclick="platDoldurYineDe()">'
+            + 'sınamayı atla, yine de dene</button></div>'
+            + '<div id="pd-tazele-durum" style="font-size:11.5px;margin-top:6px;color:var(--mt)"></div>'
             + '</div>'
           : '')
       + tani
@@ -4616,8 +4755,8 @@ async function platDoldurGonder(){
   const eEl = document.getElementById('pd-durum');
   if (eEl){
     eEl.innerHTML = esc0(ozet + (hatalar.length ? ' — '+hatalar[0] : ''))
-      + (erisimHatasi ? '<div style="color:#f5a623;margin-top:4px;font-size:11.5px">Kaynak mp4\'ler OpusClip tarafında '
-          + 'artık erişilemiyor. Geriye dönük doldurma bu short\'lar için mümkün değil.</div>' : '');
+      + (erisimHatasi ? '<div style="color:#f5a623;margin-top:4px;font-size:11.5px">Kaynak mp4 indirilemedi. '
+          + 'Taramayı yeniden çalıştırıp <b>OpusClip\'ten taze link çek</b> düğmesini dene.</div>' : '');
   }
   toast((ok?'✓ ':'✕ ')+ozet, ok?'ok':'err', 7000);
   addLog(hata?'warn':'ok','uploadpost','Hesabı doldur ('+PLAT_DOLDUR.profil+' '+PLAT_DOLDUR.kaynak+'→'+PLAT_DOLDUR.hedef+'): '+ozet
@@ -7496,7 +7635,7 @@ document.addEventListener('DOMContentLoaded', function() {
       testWH,ytkTestApi,platKapsama,kapsamaHataAc,kapsamaHataKapat,pdVideoErisilebilir,
       kapsamaHataCiz,kapsamaHataGonder,kapsamaHataTumu,
       platDoldurAc,platDoldurKapat,platDoldurTara,platDoldurGonder,pdBagliPlatformlar,platDoldurYineDe,
-      pdOrgKimlik,pdKaynakTanisi,
+      pdOrgKimlik,pdKaynakTanisi,platDoldurTazele,pdTazeLinkler,pdProjeKimligi,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
@@ -9755,7 +9894,9 @@ function ydFindSource(title, thumb, profile, caption){
     video:  ydRowUrl(best),
     profil: String(best['profil']||best['Profil']||profile||'').trim(),
     caption:best['safe-description'] || best['safeDescription'] || best['description'] || '',
-    tarih:  best['created-at'] || best['createdAt'] || best['tarih'] || best['Tarih'] || ''
+    tarih:  best['created-at'] || best['createdAt'] || best['tarih'] || best['Tarih'] || '',
+    clipId: String(best['clip-id'] || best['clipId'] || '').trim(),
+    onizle: String(best['preview-url'] || best['previewUrl'] || '').trim()
   };
 }
 
