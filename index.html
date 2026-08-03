@@ -2396,7 +2396,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-21';
+const PANEL_YAPI = 'y2026.08.03-22';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4406,17 +4406,27 @@ async function hrkGonderTumu(kat, i){
     + 'Zaten yayınlanmış ya da kuyrukta olanlar çift korumasıyla elenir.\n\nDevam edilsin mi?')) return;
   const btn = document.getElementById('hrk-toplu-'+kat+'-'+i);
   if (btn) btn.disabled = true;
-  let ok=0, cift=0, hata=0; const hatalar=[];
+  let ok=0, cift=0, hata=0, atlanan=0, kuyrukDoldu=false; const hatalar=[];
   await upSirali(hedef, async it => {
+    // Kuyruk dolduysa kalanları DENEMEDEN geç: aynı profil+platforma
+    // gidecekler, hepsi aynı hatayı alır.
+    if (kuyrukDoldu){ atlanan++; return; }
     const s = await hrkTekGonder(k, it);
     if (s.ok){ ok++; it._ok = true; it._hata=''; }
     else if (s.sebep === 'cift'){ cift++; it._ok = true; it._cift = true; it._hata=''; }
-    else { hata++; it._hata = s.mesaj || s.sebep || 'gönderilemedi'; if (hatalar.length<3) hatalar.push(it._hata); }
+    else {
+      hata++; it._hata = s.mesaj || s.sebep || 'gönderilemedi';
+      if (hatalar.length<3) hatalar.push(it._hata);
+      if (kuyrukDoluMu(s)) kuyrukDoldu = true;
+    }
     if (btn) btn.textContent = '⏳ '+(ok+cift+hata)+'/'+hedef.length;
   }, 2);
   hrkListeCiz(kat, i);
-  const ozet = ok+' kuyruğa alındı'+(cift?' · '+cift+' çift önlendi':'')+(hata?' · '+hata+' başarısız':'');
-  toast((ok?'✓ ':(cift?'⚠ ':'✕ '))+k.u+' · '+(PA[k.p]||k.p)+': '+ozet+(hatalar.length?' — '+hatalar[0]:''), ok?'ok':(cift?'warn':'err'), 8000);
+  const ozet = ok+' kuyruğa alındı'+(cift?' · '+cift+' çift önlendi':'')+(hata?' · '+hata+' başarısız':'')
+    + (atlanan?' · '+atlanan+' denenmedi (kuyruk dolu)':'');
+  toast((ok?'✓ ':(cift?'⚠ ':'✕ '))+k.u+' · '+(PA[k.p]||k.p)+': '+ozet
+    + (kuyrukDoldu ? ' — '+hataCevir('No available queue slots found').cozum : (hatalar.length?' — '+hatalar[0]:'')),
+    ok?'ok':(cift?'warn':'err'), kuyrukDoldu?12000:8000);
   addLog(hata?'warn':'ok','uploadpost','Hareket denetimi gönderim ('+k.u+' '+k.p+'): '+ozet);
 }
 
@@ -6224,17 +6234,26 @@ async function esitleGonder(){
   btn.disabled = true;
   // Çift koruması tarafından elenenler HATA DEĞİL — ayrı sayılır, yoksa
   // "başarısız" sütunu korumanın çalışmasını arıza gibi gösterir.
-  let ok=0, hata=0, cift=0; const hatalar=[];
+  let ok=0, hata=0, cift=0, atlanan=0; const hatalar=[];
+  const doluPlat = new Set();      // kuyruğu dolan platformlar — kalanları deneme
   await upSirali(aday, async it => {
+    if (doluPlat.has(it.platform)){ atlanan++; return; }
     const s = await ydTopluGonder(it);
     if (s.ok){ ok++; it._ok = true; kapsamaPlanArtir(ESITLE.profil, it.platform); }
     else if (s.sebep === 'cift'){ cift++; it._ok = true; }   // zaten var → listeden düşsün
-    else { hata++; if (hatalar.length<4) hatalar.push(PD_AD[it.platform]+': '+(s.mesaj||s.sebep)); }
+    else {
+      hata++; if (hatalar.length<4) hatalar.push(PD_AD[it.platform]+': '+(s.mesaj||s.sebep));
+      // Kuyruk dolduğunda AYNI platformdaki kalanlar da düşer; diğer
+      // platformlar etkilenmez, onlar denenmeye devam eder.
+      if (kuyrukDoluMu(s)) doluPlat.add(it.platform);
+    }
     btn.textContent = '⏳ '+(ok+hata+cift)+'/'+aday.length;
   }, 2);
   btn.disabled = false;
-  const ozet = ok+' kuyruğa alındı'+(cift?' · '+cift+' çift önlendi':'')+(hata?' · '+hata+' başarısız':'');
-  setEl('es-durum', ozet + (hatalar.length ? ' — '+hatalar[0] : ''));
+  const ozet = ok+' kuyruğa alındı'+(cift?' · '+cift+' çift önlendi':'')+(hata?' · '+hata+' başarısız':'')
+    + (atlanan?' · '+atlanan+' denenmedi (kuyruk dolu)':'');
+  setEl('es-durum', ozet + (doluPlat.size ? ' — '+hataCevir('No available queue slots found').cozum
+                                          : (hatalar.length ? ' — '+hatalar[0] : '')));
   toast((ok?'✓ ':(cift?'⚠ ':'✕ '))+ESITLE.profil+' eşitleme: '+ozet, ok?'ok':(cift?'warn':'err'), 7000);
   addLog(hata?'warn':'ok','uploadpost','Eşitle ('+ESITLE.profil+'): '+ozet+(hatalar.length?' | '+hatalar.join(' | '):''));
   // Gönderilen/elenen düşer. TÜMÜ üzerinden süzülür: sınır uygulandıysa
@@ -6326,6 +6345,16 @@ function kapsamaHataCiz(){
       + (kaynaksiz ? '<span style="font-size:11.5px;color:#f5a623;margin-left:8px">'+kaynaksiz+' kaydın kaynak videosu bulunamadı, atlanacak</span>' : '')
     : (kalan.length ? '<span style="font-size:11.5px;color:#f5a623">Hiçbirinin kaynak videosu tabloda bulunamadı</span>' : ''))
     + araDugmesi;
+}
+
+// add_to_queue, profilin YAPILANDIRILMIŞ yuvalarını kullanır (Upload-Post
+// queue settings: günde en fazla 24 saat/dakika çifti × aktif günler).
+// Yuvalar dolunca "No available queue slots found" gelir. Bu hata GEÇİCİ
+// DEĞİL ve aynı profil+platforma yapılacak sonraki gönderimler de AYNI
+// hatayı alır — döngü erken durmalı, yoksa 20 istek boşa gider ve hız
+// sınırını yer (yaşandı: 4 başarılı sonra 6 aynı hata).
+function kuyrukDoluMu(s){
+  return /no available queue slot|queue is full|no free slot/i.test(String((s && (s.mesaj||s.sebep)) || s || ''));
 }
 
 // "Video URL is not accessible" = kaynak mp4 ölü. Diğer hatalardan
@@ -6445,19 +6474,24 @@ async function kapsamaHataTumu(){
     toast('✕ Gönderilecek short kalmadı'+tazeNot,'err',8000);
     return;
   }
-  let ok=0, hata=0; const hatalar=[];
+  let ok=0, hata=0, atlanan=0, kuyrukDoldu=false; const hatalar=[];
   await upSirali(hedef, async r => {
+    if (kuyrukDoldu){ atlanan++; return; }        // kalanlar da aynı hatayı alır
     const s = await ydTopluGonder({ _profil: KH.u, _video: r._video,
                                     _caption: r._caption, plat: PD_PLAT_KEY[KH.p] || KH.p, title: r.baslik });
     if (s.ok){
       ok++; r._gonderildi = true;
       gndIsaretle(KH.u, KH.p, r.baslik);
       kapsamaYenidenGonderildi(KH.u, KH.p);
-    } else { hata++; if (hatalar.length<3) hatalar.push(s.mesaj||s.sebep); }
+    } else {
+      hata++; if (hatalar.length<3) hatalar.push(s.mesaj||s.sebep);
+      if (kuyrukDoluMu(s)) kuyrukDoldu = true;
+    }
     if (btn) btn.textContent = '⏳ '+(ok+hata)+'/'+hedef.length;
   }, 2);
   kapsamaHataCiz();
-  const ozet = ok+' kuyruğa alındı'+(hata?' · '+hata+' başarısız':'')+tazeNot;
+  const ozet = ok+' kuyruğa alındı'+(hata?' · '+hata+' başarısız':'')
+    + (atlanan?' · '+atlanan+' denenmedi (kuyruk dolu)':'') + tazeNot;
   toast((ok?'✓ ':'✕ ')+ozet+(hatalar.length?' — '+hatalar[0]:''), ok?'ok':'err', 8000);
   addLog(hata?'warn':'ok','uploadpost','Kapsama pop-up ('+KH.u+' '+KH.p+'): '+ozet+(hatalar.length?' | '+hatalar.join(' | '):''));
 }
@@ -9279,7 +9313,7 @@ document.addEventListener('DOMContentLoaded', function() {
       khKaynakAra,pdKlipDizini,pdBaslikEslesme,
       platCiftKontrol,esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
-      ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,
+      ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,kuyrukDoluMu,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
       rapHareketDenetimi,rapHareketCiz,rapHareketListe,hrkGonder,hrkGonderTumu,hrkListeCiz,hrkKaynakCoz,
       nabizCiz,dashTumunuYenile,kuyrukDerinlik,kuyrukCiz,
@@ -11553,6 +11587,11 @@ const HATA_KURALLARI = [
   // izin kuralına takılıp "Yayınlama izni yok" diye YANLIŞ sınıflanıyordu
   // (kullanıcının 22 "izin yok" hatasının kaynağı buydu). Çözümü de
   // farklı: izin değil, bağlantıda Sayfa seçilmemiş.
+  // Kuyrukta boş yuva kalmaması bir ARIZA değil, KAPASİTE sınırı: profilin
+  // günlük yuva sayısı × aktif günler kadar gönderi alınabiliyor.
+  [/no available queue slot|queue is full|no free slot/i,
+    'Kuyrukta boş yuva kalmadı',
+    'Bu profilin kuyruğu dolu — add_to_queue yerleştirecek yuva bulamıyor. Çözüm: Upload-Post → profil → Configuration → Posting Times\'tan günlük yuva sayısını artır (günde en fazla 24) ya da kuyruk boşalana kadar bekle. Dashboard → 📦 Kuyruk Derinliği kuyruğun ne zaman biteceğini gösteriyor.', 'kritik'],
   [/no facebook pages? found|personal profiles is not supported|select a facebook page/i,
     'Facebook Sayfası seçili değil',
     'Facebook Reels yalnız SAYFALARA yayınlanabiliyor, kişisel profile değil. Upload-Post’ta bu profilin Facebook bağlantısını bir Sayfa seçerek yeniden kur. (n8n tarafındaki boş page_id hatası y2026.08.03-12 ile düzeltildi — workflow’u içe aktarmayı unutma.)', 'kritik'],
