@@ -2345,7 +2345,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-10';
+const PANEL_YAPI = 'y2026.08.03-11';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -3639,9 +3639,18 @@ function rapPlatToplamlar(){
     Object.keys(d).forEach(pk=>{
       const m = d[pk];
       if (!m || typeof m !== 'object') return;
-      if (!by[pk]) { by[pk] = { hesap:0 }; RAP_PLAT_ALAN.forEach(([a])=>by[pk][a]=0); }
+      if (!by[pk]) { by[pk] = { hesap:0, _olculdu:{} }; RAP_PLAT_ALAN.forEach(([a])=>by[pk][a]=0); }
       const b = by[pk];
       b.hesap++;
+      // "Sıfır" ile "platform bu ölçütü hiç döndürmedi" AYRI şeyler.
+      // İkisi de gizlenince kullanıcı "veri çekilmiyor mu?" diye soruyor
+      // (yaşandı: Facebook beğeni satırı hiç görünmüyordu). Ölçütün
+      // yanıtta VAR OLUP OLMADIĞI ayrıca işaretleniyor.
+      const gordu = (a, v) => { if (v != null && !isNaN(parseFloat(v))) b._olculdu[a] = true; };
+      gordu('followers', m.followers);
+      gordu('views', m.views != null ? m.views : m.impressions);
+      gordu('reach', m.reach); gordu('likes', m.likes); gordu('comments', m.comments);
+      gordu('shares', m.shares); gordu('saves', m.saves);
       // İzlenmede views yoksa impressions (Instagram geriye uyumluluk alanı)
       b.followers += parseFloat(m.followers)||0;
       b.views     += parseFloat(m.views!=null?m.views:m.impressions)||0;
@@ -3753,7 +3762,9 @@ function rapVizKucuk(keys, by, alanlar){
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   const bloklar = alanlar.map(([alan, et])=>{
     const sirali = keys.filter(k=>by[k][alan]>0).sort((a,b)=>by[b][alan]-by[a][alan]);
-    if (!sirali.length) return '';
+    // Hiç veri yoksa blok atlanır; ama SIFIR değerler ve "döndürmedi"
+    // notu da içerik sayılır — eskiden erken çıkış onları da yutuyordu.
+    if (!sirali.length && !keys.length) return '';
     // Başlık tıklanabilir: üstteki bileşim çubuğunu bu ölçüte çevirir.
     // Seçili olan vurgulanır ki hangi ölçütün gösterildiği belirsiz kalmasın.
     const secili = (alan === RAP_VIZ_OLCUT);
@@ -3764,7 +3775,7 @@ function rapVizKucuk(keys, by, alanlar){
       + (secili ? 'color:var(--acc);border-bottom:2px solid var(--acc)'
                 : 'border-bottom:2px solid var(--viz-eksen)')   // seçili değilken mevcut eksen çizgisi korunur
       + '">' + esc(et) + (secili ? ' ▲' : '') + '</h4>';
-    const max = by[sirali[0]][alan];
+    const max = sirali.length ? by[sirali[0]][alan] : 0;
     const satirlar = sirali.map(k=>{
       const v = by[k][alan];
       return '<div class="viz-sat">'
@@ -3774,7 +3785,20 @@ function rapVizKucuk(keys, by, alanlar){
         +   ' title="'+esc(RAP_PLAT_AD[k]||k)+' · '+et+': '+ytkFmt(Math.round(v))+'"></span></span>'
         + '<span class="deg">'+ytkFmt(Math.round(v))+'</span></div>';
     }).join('');
-    return '<div>'+baslik+satirlar+'</div>';
+    // Değeri SIFIR olanlar da yazılır: "0" ile "hiç dönmedi" farklı şeyler.
+    const sifir = keys.filter(k => !(by[k][alan] > 0) && by[k]._olculdu && by[k]._olculdu[alan]);
+    const sifirlar = sifir.map(k =>
+      '<div class="viz-sat" title="'+esc(RAP_PLAT_AD[k]||k)+' bu ölçütü bildirdi ama değer sıfır">'
+      + '<span class="ad">'+esc(RAP_PLAT_AD[k]||k)+'</span>'
+      + '<span class="yol"></span><span class="deg">0</span></div>').join('');
+    // Hiç bildirmeyenler ayrı ve AÇIKÇA yazılır — satırın kaybolması
+    // "veri çekilmiyor" gibi okunuyordu.
+    const yok = keys.filter(k => !(by[k]._olculdu && by[k]._olculdu[alan]));
+    const yokNot = yok.length
+      ? '<div style="font-size:10.5px;color:var(--mt);margin-top:5px" title="Bu platformlar yanıtta bu ölçütü hiç döndürmedi — sıfır demek değil, bilinmiyor demek">'
+        + yok.map(k=>esc(RAP_PLAT_AD[k]||k)).join(', ') + ': bu ölçütü döndürmedi</div>'
+      : '';
+    return '<div>'+baslik+satirlar+sifirlar+yokNot+'</div>';
   }).filter(Boolean).join('');
   return bloklar ? '<div class="viz-kucuk">'+bloklar+'</div>' : '';
 }
@@ -3791,13 +3815,18 @@ function rapRenderPlatToplam(){
     return;
   }
   // Genel toplam satırı için birikim
-  const gt = { hesap:0 }; RAP_PLAT_ALAN.forEach(([a])=>gt[a]=0);
-  keys.forEach(k=>{ gt.hesap+=by[k].hesap; RAP_PLAT_ALAN.forEach(([a])=>gt[a]+=by[k][a]); });
+  const gt = { hesap:0, _olculdu:{} }; RAP_PLAT_ALAN.forEach(([a])=>gt[a]=0);
+  keys.forEach(k=>{ gt.hesap+=by[k].hesap; RAP_PLAT_ALAN.forEach(([a])=>{
+    gt[a]+=by[k][a];
+    if (by[k]._olculdu && by[k]._olculdu[a]) gt._olculdu[a] = true;   // biri bildirdiyse toplam da bildirilmiş sayılır
+  }); });
 
   // white-space:nowrap + flex-wrap:nowrap ŞART: delta çipleri eklendikten
   // sonra çip içi satır kırılıyordu ("85" altına "B" düşüyordu). Çipin
   // kendisi bir bütün olarak sarmalanır, içi asla bölünmez.
-  const cip = (etiket, deger, delta) => !deger ? '' :
+  // olculdu=true ise SIFIR da yazılır (platform bildirdi, değer 0);
+  // hiç bildirilmemişse çip basılmaz ve satır sonunda ayrıca not düşülür.
+  const cip = (etiket, deger, delta, olculdu) => (!deger && !olculdu) ? '' :
     `<span style="display:inline-flex;align-items:baseline;gap:5px;font-size:11px;color:var(--mt);`
     + `background:var(--bg);border:1px solid var(--brd);border-radius:5px;padding:3px 8px;`
     + `font-variant-numeric:tabular-nums;white-space:nowrap;flex-wrap:nowrap">${etiket}: `
@@ -3805,13 +3834,22 @@ function rapRenderPlatToplam(){
     + `${ytkFmt(Math.round(deger))}</b>${delta||''}</span>`;
 
   const satir = (ad, ikon, b, pk, vurgu) => {
-    const cipler = RAP_PLAT_ALAN.map(([a,et])=>cip(et, b[a], pk?rapPlatDelta(pk,a,Math.round(b[a])):'')).join('');
+    const olc = b._olculdu || {};
+    const cipler = RAP_PLAT_ALAN.map(([a,et])=>cip(et, b[a], pk?rapPlatDelta(pk,a,Math.round(b[a])):'', olc[a])).join('');
+    // Bu platformun HİÇ döndürmediği ölçütler açıkça yazılır
+    const dondurmedi = RAP_PLAT_ALAN.filter(([a])=>!olc[a]).map(([,et])=>et);
+    const not = (pk && dondurmedi.length)
+      ? `<div style="font-size:10.5px;color:var(--mt);margin-top:4px" title="Upload-Post bu platform için bu ölçütleri yanıtta hiç döndürmedi — sıfır değil, bilinmiyor">döndürmedi: ${esc(dondurmedi.join(', '))}</div>`
+      : '';
     return `<div style="display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--brd)">
       <span style="flex-shrink:0;width:118px;display:flex;align-items:center;gap:6px;font-size:12.5px;
         font-weight:${vurgu?'700':'600'};color:${vurgu?'var(--acc)':'var(--tx)'}">${ikon} ${esc(ad)}</span>
       <span style="flex-shrink:0;width:64px;font-size:11px;color:var(--mt);font-variant-numeric:tabular-nums"
         title="Bu platformda metrik dönen hesap sayısı">${b.hesap} hesap</span>
-      <span style="display:flex;flex-wrap:wrap;gap:5px;flex:1;min-width:0">${cipler||'<span style="font-size:11px;color:var(--mt)">veri yok</span>'}</span>
+      <span style="flex:1;min-width:0">
+        <span style="display:flex;flex-wrap:wrap;gap:5px">${cipler||'<span style="font-size:11px;color:var(--mt)">veri yok</span>'}</span>
+        ${not}
+      </span>
     </div>`;
   };
 
