@@ -2312,7 +2312,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-17';
+const PANEL_YAPI = 'y2026.08.02-18';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4659,6 +4659,92 @@ async function pdTazeLinkler(clipIdler, ilerle){
   return sonuc;
 }
 
+// ── KAYNAK YOK: OPUSCLIP'TE BAŞLIKLA ARA ───────────────────────────────
+// short-kaydetme tablosunda eşleşmeyen kayıtlarda ne video ne clip-id var.
+// Son çare: OpusClip'teki kliplerin başlıklarıyla eşleştir.
+// Eşleştirme KATI tutulur — yanlış eşleşme YANLIŞ VİDEO yayımlar.
+const PD_DIZIN = { t:0, liste:null };
+const PD_DIZIN_TTL = 600000;
+
+async function pdKlipDizini(ilerle){
+  if (PD_DIZIN.liste && Date.now()-PD_DIZIN.t < PD_DIZIN_TTL) return PD_DIZIN.liste;
+  const takimlar = (typeof opusTakimlar === 'function') ? opusTakimlar() : [];
+  if (!takimlar.length) throw new Error('OpusClip API Key girilmemiş — Ayarlar sayfasından ekle');
+  const projeler = [], onbellek = new Map();
+  for (const t of takimlar){
+    try {
+      const d = await opcApiFetch('https://api.opus.pro/api/clip-projects?pageSize=100', t.key);
+      const l = Array.isArray(d) ? d : (d.list || d.data || d.projects || d.items || []);
+      l.forEach(p => { const id = p.projectId || p.id; if (id) projeler.push(String(id)); });
+    } catch(e){ console.warn('[PD] dizin proje listesi ('+t.ad+'):', e.message); }
+  }
+  const hedefler = projeler.slice(0, PD_PROJE_TAVAN);
+  const liste = [];
+  let n = 0;
+  for (const pid of hedefler){
+    const kl = await pdProjeKlipleri(pid, takimlar, onbellek);
+    kl.forEach(k => {
+      const url = k.uriForExport || k.exportUrl || k.url || '';
+      const baslik = String(k.title || k.headline || '');
+      if (url && baslik) liste.push({ baslik, url, n: ydNorm(baslik) });
+    });
+    n++;
+    if (ilerle) ilerle('OpusClip taranıyor ('+n+'/'+hedefler.length+') · '+liste.length+' klip…');
+  }
+  PD_DIZIN.t = Date.now(); PD_DIZIN.liste = liste;
+  return liste;
+}
+
+// KATI eşleştirme: normalize başlıklar birebir aynı olacak ya da biri
+// diğerinin başlangıcı olacak (Upload-Post başlığı 95 karaktere kesiyor).
+// Eşik yüksek: kısa/genel başlıkta yanlış videoyu yayımlamaktansa
+// "bulunamadı" demek daha iyi. Birden çok aday varsa da eşleştirme YAPILMAZ.
+function pdBaslikEslesme(dizin, baslik){
+  const n = ydNorm(baslik);
+  if (!n || n.length < 25) return null;                 // ayırt edici değil
+  const tam = dizin.filter(k => k.n === n);
+  if (tam.length === 1) return tam[0];
+  if (tam.length > 1) return null;                      // belirsiz — dokunma
+  const on = dizin.filter(k => k.n.length >= 25 &&
+              (k.n.startsWith(n.slice(0,80)) || n.startsWith(k.n.slice(0,80))));
+  return on.length === 1 ? on[0] : null;
+}
+
+// Pop-up'taki "kaynak yok" kayıtlarını OpusClip başlıklarıyla eşleştirmeyi
+// dener. Bulduğunu SINAR; indirilemeyeni kabul etmez.
+async function khKaynakAra(){
+  const liste = KAPSAMA_HATA[KH.u+'|'+KH.p] || [];
+  const hedef = liste.filter(r => !r._gonderildi && !r._video);
+  const kutu = document.getElementById('kh-ara-durum');
+  const btn  = document.getElementById('kh-ara-btn');
+  if (!hedef.length || !kutu) return;
+  const yaz = m => { kutu.innerHTML = '<span style="color:var(--mt)">'+esc0(m)+'</span>'; };
+  if (btn) btn.disabled = true;
+  try {
+    yaz('OpusClip klipleri taranıyor…');
+    const dizin = await pdKlipDizini(yaz);
+    let bulundu = 0, olu = 0, yok = 0, n = 0;
+    await upSirali(hedef, async r => {
+      const k = pdBaslikEslesme(dizin, r.baslik);
+      n++; yaz('Eşleştiriliyor ('+n+'/'+hedef.length+')…');
+      if (!k){ yok++; return; }
+      if (await pdVideoErisilebilir(k.url, 8000)){
+        r._video = k.url; r._profilSheet = r._profilSheet || KH.u; bulundu++;
+      } else olu++;
+    }, 4);
+    kapsamaHataCiz();
+    const p = [];
+    if (bulundu) p.push('<b style="color:var(--ok)">'+bulundu+' kaydın kaynağı bulundu</b>');
+    if (yok)     p.push(yok+' tanesi OpusClip\'te eşleşmedi');
+    if (olu)     p.push(olu+' tanesinin linki indirilemedi');
+    const el = document.getElementById('kh-ara-durum');
+    if (el) el.innerHTML = p.join(' · ') || 'Sonuç yok';
+  } catch(e){
+    console.error('[KH] kaynak ara:', e);
+    kutu.innerHTML = '<span style="color:var(--er)">'+esc0(e.message||'arama başarısız')+'</span>';
+  } finally { if (btn) btn.disabled = false; }
+}
+
 // Ölü listesini OpusClip'ten tazelemeyi dener ve sonucu DÜRÜSTÇE raporlar:
 // tazelenen, klibi bulunamayan, taze linki de ölü olan ayrı ayrı sayılır.
 async function platDoldurTazele(){
@@ -4901,10 +4987,19 @@ function kapsamaHataCiz(){
         + '</div>';
       }).join('');
   const kaynaksiz = kalan.length - gonderilebilir.length;
-  document.getElementById('kh-alt-eylem').innerHTML = gonderilebilir.length
+  // "Kaynak yok" = short-kaydetme tablosunda başlık eşleşmedi; clip-id de
+  // yok. Son çare OpusClip'te BAŞLIKLA aramak — düğme onun için.
+  const araDugmesi = kaynaksiz
+    ? '<button class="btn bsm" id="kh-ara-btn" style="margin-left:8px" onclick="khKaynakAra()" '
+      + 'title="short-kaydetme tablosunda eşleşmeyen kayıtları OpusClip klip başlıklarıyla eşleştirmeyi dener">'
+      + '🔎 '+kaynaksiz+' kaydın kaynağını OpusClip\'te ara</button>'
+      + '<div id="kh-ara-durum" style="font-size:11.5px;color:var(--mt);margin-top:6px"></div>'
+    : '';
+  document.getElementById('kh-alt-eylem').innerHTML = (gonderilebilir.length
     ? '<button class="btn bp bsm" id="kh-toplu-btn" onclick="kapsamaHataTumu()">↻ '+gonderilebilir.length+' short\'u kuyruğa al</button>'
       + (kaynaksiz ? '<span style="font-size:11.5px;color:#f5a623;margin-left:8px">'+kaynaksiz+' kaydın kaynak videosu bulunamadı, atlanacak</span>' : '')
-    : (kalan.length ? '<span style="font-size:11.5px;color:#f5a623">Hiçbirinin kaynak videosu bulunamadı — Yayın Durumu\'ndan mp4 URL girerek tek tek gönderebilirsin</span>' : '');
+    : (kalan.length ? '<span style="font-size:11.5px;color:#f5a623">Hiçbirinin kaynak videosu tabloda bulunamadı</span>' : ''))
+    + araDugmesi;
 }
 
 // "Video URL is not accessible" = kaynak mp4 ölü. Diğer hatalardan
@@ -4980,7 +5075,16 @@ async function kapsamaHataGonder(i){
       else s = { ok:false, mesaj:'Kaynak mp4 indirilemiyor ve klip OpusClip\'te bulunamadı' };
     } catch(e){ s = { ok:false, mesaj:'Taze link alınamadı: '+e.message }; }
   }
-  if (s.ok){ r._gonderildi = true; toast('✓ Kuyruğa alındı','ok'); kapsamaHataCiz(); }
+  if (s.ok){
+    r._gonderildi = true;
+    // Kayıt kimliği KH.u/KH.p — yükleme için kullanılan profil (r._profilSheet)
+    // Sheet'ten gelir ve FARKLI olabilir. Kapsama sayımı Upload-Post
+    // kimliğiyle tutulmalı, yoksa hücre düşmez (yaşandı: General-3).
+    gndIsaretle(KH.u, KH.p, r.baslik);
+    kapsamaSayimDus(KH.u, KH.p);
+    toast('✓ Kuyruğa alındı','ok');
+    kapsamaHataCiz();
+  }
   else toast('✕ Gönderilemedi: '+(s.mesaj||s.sebep),'err',7000);
 }
 
@@ -5019,7 +5123,11 @@ async function kapsamaHataTumu(){
   await upSirali(hedef, async r => {
     const s = await ydTopluGonder({ _profil: r._profilSheet || KH.u, _video: r._video,
                                     _caption: r._caption, plat: PD_PLAT_KEY[KH.p] || KH.p, title: r.baslik });
-    if (s.ok){ ok++; r._gonderildi = true; } else { hata++; if (hatalar.length<3) hatalar.push(s.mesaj||s.sebep); }
+    if (s.ok){
+      ok++; r._gonderildi = true;
+      gndIsaretle(KH.u, KH.p, r.baslik);          // kayıt kimliği: Upload-Post profili
+      kapsamaSayimDus(KH.u, KH.p);
+    } else { hata++; if (hatalar.length<3) hatalar.push(s.mesaj||s.sebep); }
     if (btn) btn.textContent = '⏳ '+(ok+hata)+'/'+hedef.length;
   }, 2);
   kapsamaHataCiz();
@@ -7798,6 +7906,7 @@ document.addEventListener('DOMContentLoaded', function() {
       pdOrgKimlik,pdKaynakTanisi,platDoldurTazele,pdTazeLinkler,pdProjeKimligi,
       khErisimHatasi,khYapilandirmaHatasi,khYapilandirmaUyarisi,khTazele,
       gndIsaretle,gndCozuldu,gndAnahtar,kapsamaMatrisCiz,kapsamaSayimDus,
+      khKaynakAra,pdKlipDizini,pdBaslikEslesme,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
@@ -10350,6 +10459,9 @@ async function ydNativeRetry(it, idx){
       msg = ok ? '' : 'n8n Active mi / yeniden-gonder webhook var mı?';
     }
     if (ok){
+      // Bu da hatayı çözer — Kapsama sayımı bunu da bilmeli
+      gndIsaretle(it.profile, ydPlatApi(it.plat), it.title);
+      kapsamaSayimDus(it.profile, ydPlatApi(it.plat));
       toast('✓ Yeniden kuyruğa alındı — '+(it.profile||'')+' ['+it.plat+']','ok');
       addLog('ok','uploadpost','Native retry OK: '+(it.reqId||it.jobId));
       it.status='retried'; it.error=(it.error?it.error+' · ':'')+'↻ Upload-Post yeniden denedi';
@@ -10474,24 +10586,14 @@ async function ydTopluGonder(it){
         ytEtiketler(aciklama || it.title, profilKategori(profil)).forEach(t => fd.append('tags[]', t));
       }
       const u = await upYukle(fd);                 // 429'da bekleyip yeniden dener
-      if (u.ok){
-        // Kapsama ekranı da bilsin: kuyruğa alınan short artık ✕ sayılmasın
-        gndIsaretle(profil, platform, it.title);
-        kapsamaSayimDus(profil, platform);
-        return { ok:true };
-      }
+      if (u.ok) return { ok:true };
       return { ok:false, sebep:'api', mesaj: u.mesaj };
     }
     const base = getN8N();
     if (!base) return { ok:false, sebep:'yapilandirma', mesaj:'API Key veya n8n URL yok' };
     const res = await faf(base+'/webhook/yeniden-gonder', {
       profil, platform, video, title: it.title, description: it._caption||it.caption||'', kuyruk:true });
-    if (res && res.ok === true){
-      gndIsaretle(profil, platform, it.title);
-      kapsamaSayimDus(profil, platform);
-      return { ok:true };
-    }
-    return { ok:false, sebep:'n8n', mesaj:'webhook yanıt vermedi' };
+    return (res && res.ok === true) ? { ok:true } : { ok:false, sebep:'n8n', mesaj:'webhook yanıt vermedi' };
   } catch(e){ return { ok:false, sebep:'istisna', mesaj:e.message }; }
 }
 
@@ -10531,6 +10633,8 @@ async function ydTopluKuyruk(){
       ok++;
       it.status='retried';
       it.error=(it.error?it.error+' · ':'')+'↻ kuyruğa alındı';
+      gndIsaretle(it.profile, ydPlatApi(it.plat), it.title);   // kimlik: Upload-Post profili
+      kapsamaSayimDus(it.profile, ydPlatApi(it.plat));
     } else {
       hata++;
       if (hatalar.length < 4) hatalar.push((it.profile||'?')+': '+(s.mesaj||s.sebep));
@@ -10585,8 +10689,12 @@ async function ydDoRetry(payload, idx){
     if (ok){
       // Yayın Durumu'ndan gönderim de Kapsama ekranına yansısın — eskiden
       // Kapsama'nın bundan hiç haberi olmuyor, short orada ✕ kalıyordu.
-      gndIsaretle(payload.profil, payload.platform, payload.title);
-      kapsamaSayimDus(payload.profil, payload.platform);
+      // Kimlik YD kaydının KENDİ profili olmalı: payload.profil Sheet'ten
+      // gelmiş olabilir ve Upload-Post profilinden farklı olabilir.
+      const _yd = YD.items[idx];
+      const _kp = (_yd && _yd.profile) || payload.profil;
+      gndIsaretle(_kp, payload.platform, payload.title);
+      kapsamaSayimDus(_kp, payload.platform);
       toast('✓ Yeniden gönderildi — '+(payload.profil||'')+' ['+payload.platform+']','ok');
       addLog('ok','uploadpost','Retry OK: '+payload.profil+' ['+payload.platform+']');
       const it = YD.items[idx]; if (it){ it.status='retried'; it.error=(it.error?it.error+' · ':'')+'↻ yeniden gönderildi'; }
