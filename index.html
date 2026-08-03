@@ -2376,7 +2376,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-03';
+const PANEL_YAPI = 'y2026.08.04-04';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4867,10 +4867,15 @@ function gndIsaretle(profil, platform, baslik){
   try { localStorage.setItem(GND_ANAHTAR, JSON.stringify(GONDERILDI)); } catch(e){}
 }
 function gndCozuldu(profil, platform, baslik, hataZamani){
+  return gndZamani(profil, platform, baslik, hataZamani) > 0;
+}
+// Yeniden gönderim ZAMANINI döndürür (yoksa 0). gndCozuldu yalnız evet/hayır
+// diyor; Yayın Durumu "ne zaman gönderdim" diye de yazdığı için ayrıldı.
+function gndZamani(profil, platform, baslik, hataZamani){
   const k = gndAnahtar(profil, platform, baslik);
-  if (!k) return false;
+  if (!k) return 0;
   const t = GONDERILDI[k];
-  return t != null && t >= (hataZamani || 0);
+  return (t != null && t >= (hataZamani || 0)) ? t : 0;
 }
 
 // ── ÇİFT KORUMASI — kuyruğa almadan önce "zaten var mı?" ───────────────
@@ -9372,7 +9377,7 @@ document.addEventListener('DOMContentLoaded', function() {
       platDoldurAc,platDoldurKapat,platDoldurTara,platDoldurGonder,pdBagliPlatformlar,platDoldurYineDe,
       pdOrgKimlik,pdKaynakTanisi,platDoldurTazele,pdTazeLinkler,pdProjeKimligi,
       khErisimHatasi,khYapilandirmaHatasi,khYapilandirmaUyarisi,khTazele,
-      gndIsaretle,gndCozuldu,gndAnahtar,kapsamaMatrisCiz,kapsamaYenidenGonderildi,
+      gndIsaretle,gndCozuldu,gndZamani,gndAnahtar,kapsamaMatrisCiz,kapsamaYenidenGonderildi,ydYenidenCozmez,
       khKaynakAra,pdKlipDizini,pdBaslikEslesme,
       esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
@@ -11837,14 +11842,30 @@ function ydCozulenleriIsaretle(items){
   });
   let n = 0;
   items.forEach(it => {
-    delete it._cozuldu;
+    delete it._cozuldu; delete it._yeniden;
     if (it.status !== 'failed') return;
     const k = ydAnahtar(it); if (!k) return;
-    const b = basarili[k]; if (!b) return;
     const tf = Date.parse(it.time) || 0;
-    if (b.t >= tf) { it._cozuldu = b; n++; }   // başarı hatadan SONRA gelmiş
+    const b = basarili[k];
+    if (b && b.t >= tf) { it._cozuldu = b; n++; return; }   // başarı hatadan SONRA gelmiş
+    // Yayınlanmış kaydı YOK ama panelden yeniden gönderilmiş. Bu bilgi
+    // localStorage'da duruyor (gndIsaretle) ama Yayın Durumu listesi onu
+    // HİÇ OKUMUYORDU: ydNativeRetry'nin yazdığı it.status='retried' yalnız
+    // bellekte kaldığı için liste yenilenince kayıt yine ham "❌ Başarısız"
+    // olarak dönüyor ve kullanıcı aynı gönderimi tekrar tekrar gönderiyordu.
+    // ÇÖZÜLMÜŞ SAYILMAZ (yayın kanıtı yok) — ama "gönderdim" izi korunur.
+    const ty = gndZamani(it.profile, ydPlatApi(it.plat), it.title, tf);
+    if (ty) it._yeniden = ty;
   });
   return n;
+}
+
+// Yeniden göndermekle ÇÖZÜLMEYEN hatalar: hesap bağlantısı/izin sınıfı.
+// Bunlarda kaynak sorun giderilmeden her deneme aynı hatayı alır; kullanıcıyı
+// boşuna düğmeye bastırmamak için satırda açıkça yazılır.
+function ydYenidenCozmez(hataMetni){
+  const s = String(hataMetni||'').replace(/https?:\/\/\S+/gi, ' ');
+  return /session (has )?expired|reconnect|token (is )?expired|invalid[_ ]?token|reauth|not authorized|unauthorized|forbidden|permission|no facebook pages found/i.test(s);
 }
 
 async function loadYayinDurumu(){
@@ -11948,10 +11969,17 @@ function renderYayinDurumu(){
   let list = ydFiltreliListe();
   // Yeniden gönderilip yayınlanmış eski hatalar listeden düşer
   const gizlenen = tumu.length - list.length;
-  const not = gizlenen
-    ? '<div class="isl-not"><span>✓ ' + gizlenen + ' başarısız gönderim yeniden gönderilip yayınlandığı için gizlendi</span>'
-      + '<button type="button" class="isl-btn" onclick="ydCozulenGoster(true)">yine de göster</button></div>'
-    : '';
+  // Yeniden gönderilmiş ama henüz yayınlanmamışlar AYRI sayılır: gizlenmezler
+  // (yayın kanıtı yok) ama "bunlara zaten dokundum" bilgisi üstte de görünsün.
+  const bekleyen = list.filter(i => i._yeniden).length;
+  const not = (gizlenen
+      ? '<div class="isl-not"><span>✓ ' + gizlenen + ' başarısız gönderim yeniden gönderilip yayınlandığı için gizlendi</span>'
+        + '<button type="button" class="isl-btn" onclick="ydCozulenGoster(true)">yine de göster</button></div>'
+      : '')
+    + (bekleyen
+      ? '<div class="isl-not"><span>↻ ' + bekleyen + ' gönderim yeniden gönderildi ama henüz yayınlanmadı — '
+        + 'yayınlandığında kendiliğinden listeden düşer, tekrar göndermene gerek yok</span></div>'
+      : '');
   if (!list.length){
     el.innerHTML = (gizlenen
       ? durumHTML('bos',{ic:'✓',bas:'Bekleyen hata yok',
@@ -11967,8 +11995,11 @@ function renderYayinDurumu(){
     const realIdx = YD.items.indexOf(it);
     // Çözülmüş hata görünür kılındıysa yeşil ve "sonradan yayınlandı" etiketiyle
     const cz = it.status==='failed' && it._cozuldu;
-    const stColor = cz?'var(--ok)':it.status==='published'?'var(--ok)':it.status==='failed'?'var(--er)':it.status==='retried'?'var(--acc)':'var(--wn)';
-    const stLabel = cz?'✓ Sonradan yayınlandı':it.status==='published'?'✅ Yayınlandı':it.status==='failed'?'❌ Başarısız':it.status==='retried'?'↻ Tekrar denendi':'⏰ Planlı';
+    // Yeniden gönderilmiş ama henüz yayın kanıtı yok — çözülmüş DEĞİL,
+    // ham hatadan da farklı: kullanıcı zaten bir kez gönderdi.
+    const yn = it.status==='failed' && !cz && it._yeniden;
+    const stColor = cz?'var(--ok)':yn?'var(--acc)':it.status==='published'?'var(--ok)':it.status==='failed'?'var(--er)':it.status==='retried'?'var(--acc)':'var(--wn)';
+    const stLabel = cz?'✓ Sonradan yayınlandı':yn?'↻ Yeniden gönderildi':it.status==='published'?'✅ Yayınlandı':it.status==='failed'?'❌ Başarısız':it.status==='retried'?'↻ Tekrar denendi':'⏰ Planlı';
     const platLabel = YD_PLAT_LABEL[it.plat] || (it.plat==='sch'?'':it.plat);
     const t = it.time ? new Date(it.time).toLocaleString('tr',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
     const thumb = it.thumb ? `<img src="${esc(it.thumb)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0" onerror="this.style.display='none'"/>` : '';
@@ -11983,7 +12014,11 @@ function renderYayinDurumu(){
       const native = !!(it.reqId || it.jobId);
       const known = native ? ' title="Upload-Post yerel yeniden deneme — tek tık, yalnız başarısız platform"'
                    : (it._video ? ' title="Kaynak video bulundu — tek tık"' : ' title="Kaynak bilinmiyor — mp4 sorulacak"');
-      right = `<button class="btn bp bsm" onclick="ydRetry(${realIdx})"${known}>↻ Yeniden Gönder${(native||it._video)?'':' *'}</button>`;
+      // Zaten gönderilmişse düğme İKİNCİL: kullanıcı bir kez gönderdi, ana
+      // eylem artık tekrar göndermek değil (çoğu kez aynı hatayı alır).
+      const sinif = yn ? 'btn bg bsm' : 'btn bp bsm';
+      const etiket = yn ? '↻ Tekrar dene' : '↻ Yeniden Gönder';
+      right = `<button class="${sinif}" onclick="ydRetry(${realIdx})"${known}>${etiket}${(native||it._video)?'':' *'}</button>`;
     }
     return `<div style="display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--brd);border-left:3px solid ${stColor};border-radius:6px;margin-bottom:6px;background:var(--sur)">
       ${thumb}
@@ -11991,6 +12026,15 @@ function renderYayinDurumu(){
         <div style="font-size:14px;color:var(--tx);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.title)}</div>
         <div style="font-size:12px;color:var(--mt);margin-top:2px">${platLabel} · ${esc(it.profile||'—')} ${t?'· '+t:''}</div>
         ${it.status==='failed'&&it.error?(()=>{ const h=hataCevir(it.error); return `<div style="margin-top:4px"><div style="font-size:12px;color:var(--er);font-weight:600">${HATA_IKON[h.ciddiyet]||'⚠'} ${esc(h.baslik)}</div><div style="font-size:11px;color:var(--mt);margin-top:1px">${esc(h.cozum)}</div><div style="font-size:10px;color:var(--mt);opacity:.65;margin-top:1px" title="Platformdan gelen ham mesaj">${esc(h.ham).slice(0,90)}</div></div>`; })():''}
+        ${yn?(()=>{
+          const dk = Math.max(0, Math.round((Date.now()-it._yeniden)/60000));
+          const ne = dk<60 ? (dk+' dk önce') : (dk<1440 ? (Math.round(dk/60)+' saat önce') : (Math.round(dk/1440)+' gün önce'));
+          return `<div style="margin-top:4px;font-size:11.5px;color:var(--acc)">↻ Bu gönderimi ${ne} yeniden gönderdin — henüz yayınlanmadı.`
+            + (ydYenidenCozmez(it.error)
+                ? `<div style="color:var(--wn);margin-top:1px">Bu hata yeniden göndermekle geçmez: önce yukarıdaki bağlantı sorununu gider, sonra tekrar dene.</div>`
+                : `<div style="color:var(--mt);margin-top:1px">Kuyruğa alındıysa sırası gelince yayınlanır; yayınlandığında bu kayıt listeden kendiliğinden düşer.</div>`)
+            + `</div>`;
+        })():''}
       </div>
       <span style="font-size:12px;color:${stColor};font-weight:700;white-space:nowrap">${stLabel}</span>
       ${right}
@@ -12074,7 +12118,11 @@ async function ydNativeRetry(it, idx){
       ckEkle(it.profile, ydPlatApi(it.plat), it.title);
       toast('✓ Yeniden kuyruğa alındı — '+(it.profile||'')+' ['+it.plat+']','ok');
       addLog('ok','uploadpost','Native retry OK: '+(it.reqId||it.jobId));
-      it.status='retried'; it.error=(it.error?it.error+' · ':'')+'↻ Upload-Post yeniden denedi';
+      // status='retried' YAPILMIYOR: kayıt "başarısız" süzgecinden anında
+      // düşüyordu ama liste yenilenince ham hata olarak geri geliyordu.
+      // Kalıcı işaretle aynı görünüm — yenilemeden önce/sonra fark yok.
+      it._yeniden = Date.now();
+      it.error=(it.error?it.error+' · ':'')+'↻ Upload-Post yeniden denedi';
       ydUpdateCounts(); renderYayinDurumu();
     } else {
       toast('✕ Yeniden denenemedi: '+msg,'err');
@@ -12248,11 +12296,18 @@ async function ydTopluKuyruk(){
   const profSec = (document.getElementById('yd-profil')||{}).value || '';
   // Ekranda görünen kapsamla AYNI: profil + platform süzgeci uygulanır,
   // yalnız BAŞARISIZ kayıtlar alınır (çözülmüş işaretliler dışarıda).
-  const hedef = ydKapsam().filter(i => i.status === 'failed' && !i._cozuldu);
+  // Zaten yeniden gönderilmişler DIŞARIDA: eskiden status='retried' yapılıp
+  // eleniyorlardı, artık status 'failed' kaldığı için burada elenmeleri gerek —
+  // yoksa düğmeye ikinci kez basınca aynı gönderim tekrar kuyruğa girerdi.
+  const tumHatalar = ydKapsam().filter(i => i.status === 'failed' && !i._cozuldu);
+  const hedef = tumHatalar.filter(i => !i._yeniden);
+  const zatenGonderilmis = tumHatalar.length - hedef.length;
   // YD_PLAT_LABEL içinde <img> var; confirm/toast düz metin istiyor
   const platAd = platSec ? ({ig:'Instagram',yt:'YouTube',tt:'TikTok',fb:'Facebook',x:'X'}[platSec]||platSec) : 'tüm platformlar';
   const kapsamAd = (profSec || 'tüm profiller') + ' · ' + platAd;
-  if (!hedef.length) return toast('Kuyruğa alınacak başarısız gönderim yok ('+kapsamAd+')','warn');
+  if (!hedef.length) return toast(zatenGonderilmis
+    ? zatenGonderilmis+' başarısız gönderimin hepsi zaten yeniden gönderilmiş, yayın bekleniyor ('+kapsamAd+') — tekrar göndermek için satırdaki "↻ Tekrar dene"yi kullan'
+    : 'Kuyruğa alınacak başarısız gönderim yok ('+kapsamAd+')','warn', 7000);
 
   // Kaynak videoları çöz — eşleşmeyen varsa kullanıcı baştan bilsin
   await ydEnsureShorts();
@@ -12270,6 +12325,7 @@ async function ydTopluKuyruk(){
       + 'Hepsi aynı anda yayınlanmaz — Upload-Post her birini sıradaki boş yuvaya koyar, '
       + 'yani mevcut yayın ritmin bozulmaz.\n'
       + (kaynaksiz ? '\n⚠ '+kaynaksiz+' kaydın kaynak videosu bulunamadı, onlar atlanacak.\n' : '')
+      + (zatenGonderilmis ? '\nℹ '+zatenGonderilmis+' kayıt zaten yeniden gönderilmişti, ikinci kez gönderilmeyecek.\n' : '')
       + '\nDevam edilsin mi?')) return;
 
   if (btn){ btn.disabled = true; btn.textContent = '⏳ 0/'+gonderilebilir.length; }
@@ -12278,7 +12334,7 @@ async function ydTopluKuyruk(){
     const s = await ydTopluGonder(it);
     if (s.ok){
       ok++;
-      it.status='retried';
+      it._yeniden = Date.now();               // status'ü değiştirme — yenilemede kaybolurdu
       it.error=(it.error?it.error+' · ':'')+'↻ kuyruğa alındı';
       gndIsaretle(it.profile, ydPlatApi(it.plat), it.title);   // kimlik: Upload-Post profili
       kapsamaYenidenGonderildi(it.profile, ydPlatApi(it.plat));
@@ -12345,7 +12401,7 @@ async function ydDoRetry(payload, idx){
       ckEkle(payload.profil, payload.platform, payload.title);
       toast('✓ Yeniden gönderildi — '+(payload.profil||'')+' ['+payload.platform+']','ok');
       addLog('ok','uploadpost','Retry OK: '+payload.profil+' ['+payload.platform+']');
-      const it = YD.items[idx]; if (it){ it.status='retried'; it.error=(it.error?it.error+' · ':'')+'↻ yeniden gönderildi'; }
+      const it = YD.items[idx]; if (it){ it._yeniden = Date.now(); it.error=(it.error?it.error+' · ':'')+'↻ yeniden gönderildi'; }
       ydUpdateCounts(); renderYayinDurumu();
     } else {
       toast('✕ Gönderilemedi: '+msg,'err');
