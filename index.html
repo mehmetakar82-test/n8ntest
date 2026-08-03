@@ -2345,7 +2345,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-7';
+const PANEL_YAPI = 'y2026.08.03-8';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -3673,23 +3673,68 @@ const RAP_VIZ_SLOT = { instagram:1, youtube:2, tiktok:3, x:4, facebook:5,
                        linkedin:6, threads:7, pinterest:8 };
 function rapVizRenk(pk){ return 'var(--s'+(RAP_VIZ_SLOT[pk] || 9)+')'; }
 
+// Bileşim çubuğunun gösterdiği ölçüt — başlıklara tıklanınca değişir
+let RAP_VIZ_OLCUT = 'followers';
+const RAP_VIZ_OLCUT_AD = { followers:'Takipçi', views:'İzlenme', likes:'Beğeni' };
+function rapVizOlcut(a){
+  if (!RAP_VIZ_OLCUT_AD[a]) return;
+  RAP_VIZ_OLCUT = a;
+  rapRenderPlatToplam();          // veriyi yeniden çekmez, elde olanı çizer
+}
+
+// PROFİL bazlı toplam: RAP.analytics[profil][platform] → profil başına tek
+// sayı. Bileşim çubuğu artık "hangi PROFİL kitlenin ne kadarını taşıyor"
+// sorusunu cevaplıyor; platform kırılımı zaten alttaki üç sütunda.
+function rapProfilToplamlar(){
+  const by = {};
+  Object.keys(RAP.analytics||{}).forEach(u=>{
+    const d = RAP.analytics[u] || {};
+    Object.keys(d).forEach(pk=>{
+      const m = d[pk];
+      if (!m || typeof m !== 'object') return;
+      if (!by[u]){ by[u] = {}; RAP_PLAT_ALAN.forEach(([a])=>by[u][a]=0); }
+      const b = by[u];
+      b.followers += parseFloat(m.followers)||0;
+      b.views     += parseFloat(m.views!=null?m.views:m.impressions)||0;
+      b.reach     += parseFloat(m.reach)||0;
+      b.likes     += parseFloat(m.likes)||0;
+      b.comments  += parseFloat(m.comments)||0;
+      b.shares    += parseFloat(m.shares)||0;
+      b.saves     += parseFloat(m.saves)||0;
+    });
+  });
+  return by;
+}
+
 // Yatay %100 yığılmış bileşim çubuğu — "payım nerede" sorusu.
 // Doğrudan etiket YALNIZ sığdığında (≥%9) basılır; kırpma yapılmaz.
-function rapVizBilesim(keys, by, alan){
-  const top = keys.reduce((s,k)=>s+(by[k][alan]||0), 0);
-  if (!top) return '';
+// Segment sırası = efsane sırası (büyükten küçüğe): renk hangi profile ait,
+// bakışta anlaşılsın. 8'den sonrası tek "Diğer" segmentinde toplanır —
+// 15 profil ayrı ayrı çizilse hem renkler tekrarlanır hem şerit okunmaz.
+const RAP_VIZ_ILK = 8;
+function rapVizBilesim(byProfil, alan){
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-  const parca = keys.filter(k=>by[k][alan]>0).map(k=>{
-    const pay = by[k][alan]/top*100;
-    const ad = RAP_PLAT_AD[k]||k;
+  const adlar = Object.keys(byProfil).filter(u => (byProfil[u][alan]||0) > 0)
+    .sort((a,b) => byProfil[b][alan] - byProfil[a][alan]);
+  const top = adlar.reduce((s,u)=>s+(byProfil[u][alan]||0), 0);
+  if (!top) return '';
+  const ilk = adlar.slice(0, RAP_VIZ_ILK);
+  const kalan = adlar.slice(RAP_VIZ_ILK);
+  const kalanTop = kalan.reduce((s,u)=>s+byProfil[u][alan], 0);
+  const dilim = ilk.map((u,i)=>({ ad:u, v:byProfil[u][alan], renk:'var(--s'+(i+1)+')', ipucu:u }));
+  if (kalanTop > 0) dilim.push({ ad:kalan.length+' profil daha', v:kalanTop, renk:'var(--s9)',
+                                 ipucu:kalan.join(', ') });
+  const parca = dilim.map(d=>{
+    const pay = d.v/top*100;
     const et = pay>=9 ? '<b>'+Math.round(pay)+'%</b>' : '';
-    return '<span style="flex:'+by[k][alan]+' 0 0;background:'+rapVizRenk(k)+'"'
-      + ' title="'+esc(ad)+': '+ytkFmt(Math.round(by[k][alan]))+' (%'+pay.toFixed(1)+')">'+et+'</span>';
+    return '<span style="flex:'+d.v+' 0 0;background:'+d.renk+'"'
+      + ' title="'+esc(d.ipucu)+': '+ytkFmt(Math.round(d.v))+' (%'+pay.toFixed(1)+')">'+et+'</span>';
   }).join('');
-  const efsane = keys.filter(k=>by[k][alan]>0).map(k=>
-    '<span><i style="background:'+rapVizRenk(k)+'"></i>'+esc(RAP_PLAT_AD[k]||k)+'</span>').join('');
+  const efsane = dilim.map(d=>
+    '<span title="'+esc(d.ipucu)+': '+ytkFmt(Math.round(d.v))+'"><i style="background:'+d.renk+'"></i>'
+    + esc(d.ad)+'</span>').join('');
   return '<div class="viz-bilesim">'+parca+'</div>'
-    + (keys.length>1 ? '<div class="viz-efsane">'+efsane+'</div>' : '');
+    + (dilim.length>1 ? '<div class="viz-efsane">'+efsane+'</div>' : '');
 }
 
 // Ölçüt başına küçük yatay çubuk grafiği. Her grafik KENDİ ölçeğinde —
@@ -3699,6 +3744,16 @@ function rapVizKucuk(keys, by, alanlar){
   const bloklar = alanlar.map(([alan, et])=>{
     const sirali = keys.filter(k=>by[k][alan]>0).sort((a,b)=>by[b][alan]-by[a][alan]);
     if (!sirali.length) return '';
+    // Başlık tıklanabilir: üstteki bileşim çubuğunu bu ölçüte çevirir.
+    // Seçili olan vurgulanır ki hangi ölçütün gösterildiği belirsiz kalmasın.
+    const secili = (alan === RAP_VIZ_OLCUT);
+    const baslik = '<h4 onclick="rapVizOlcut(\''+alan+'\')" role="button" tabindex="0"'
+      + ' onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();rapVizOlcut(\''+alan+'\')}"'
+      + ' title="Üstteki pay çubuğunu ' + esc(et) + ' ölçütüne çevir"'
+      + ' style="cursor:pointer;user-select:none;'
+      + (secili ? 'color:var(--acc);border-bottom:2px solid var(--acc)'
+                : 'border-bottom:2px solid var(--viz-eksen)')   // seçili değilken mevcut eksen çizgisi korunur
+      + '">' + esc(et) + (secili ? ' ▲' : '') + '</h4>';
     const max = by[sirali[0]][alan];
     const satirlar = sirali.map(k=>{
       const v = by[k][alan];
@@ -3709,7 +3764,7 @@ function rapVizKucuk(keys, by, alanlar){
         +   ' title="'+esc(RAP_PLAT_AD[k]||k)+' · '+et+': '+ytkFmt(Math.round(v))+'"></span></span>'
         + '<span class="deg">'+ytkFmt(Math.round(v))+'</span></div>';
     }).join('');
-    return '<div><h4>'+esc(et)+'</h4>'+satirlar+'</div>';
+    return '<div>'+baslik+satirlar+'</div>';
   }).filter(Boolean).join('');
   return bloklar ? '<div class="viz-kucuk">'+bloklar+'</div>' : '';
 }
@@ -3753,14 +3808,14 @@ function rapRenderPlatToplam(){
   // Grafik katmanı: bileşim (pay) → karşılaştırma (büyüklük) → tablo (kesin sayı).
   // Tablo hem kesin değeri hem "tablo görünümü" erişilebilirlik şartını karşılıyor;
   // açık temadaki kontrast uyarısının gerektirdiği rahatlama da bu.
-  const bilesim = rapVizBilesim(keys, by, 'followers');
+  const bilesim = rapVizBilesim(rapProfilToplamlar(), RAP_VIZ_OLCUT);
   const kucuk   = rapVizKucuk(keys, by, [['followers','Takipçi'],['views','İzlenme'],['likes','Beğeni']]);
 
   el.innerHTML = `<div class="viz" style="border:1px solid var(--brd);border-radius:8px;padding:11px 13px;background:var(--sur2)">
     <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:4px">
       📊 Platform Toplamları <span style="letter-spacing:0;text-transform:none">— tüm hesaplar birlikte</span></div>
     ${bilesim ? `<div style="margin:10px 0 2px">
-      <div style="font-size:11px;color:var(--mt);margin-bottom:6px">Takipçi payı — hangi platform kitlenin ne kadarını taşıyor</div>
+      <div style="font-size:11px;color:var(--mt);margin-bottom:6px">${esc(RAP_VIZ_OLCUT_AD[RAP_VIZ_OLCUT]||'')} payı — hangi <b>profil</b> toplamın ne kadarını taşıyor <span style="color:var(--acc)">(alttaki başlıklara tıklayarak ölçütü değiştir)</span></div>
       ${bilesim}</div>` : ''}
     ${kucuk}
     <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin:16px 0 2px;
@@ -8600,6 +8655,7 @@ document.addEventListener('DOMContentLoaded', function() {
       platCiftKontrol,esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
       ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,
+      rapVizOlcut,rapProfilToplamlar,rapVizBilesim,rapRenderPlatToplam,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
