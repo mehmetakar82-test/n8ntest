@@ -2333,7 +2333,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-20';
+const PANEL_YAPI = 'y2026.08.03-1';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4834,7 +4834,7 @@ async function khKaynakAra(){
       n++; yaz('Eşleştiriliyor ('+n+'/'+hedef.length+')…');
       if (!k){ yok++; return; }
       if (await pdVideoErisilebilir(k.url, 8000)){
-        r._video = k.url; r._profilSheet = r._profilSheet || KH.u; bulundu++;
+        r._video = k.url; bulundu++;
       } else olu++;
     }, 4);
     kapsamaHataCiz();
@@ -5435,7 +5435,6 @@ function kapsamaHataCiz(){
     if (r._video === undefined){
       const s = ydFindSource(r.baslik, '', u, '');
       r._video = (s && s.video) || '';
-      r._profilSheet = (s && s.profil) || u;
       r._caption = (s && s.caption) || '';
       r._clipId = (s && s.clipId) || '';        // ölü linki OpusClip'ten tazelemek için
     }
@@ -5550,7 +5549,10 @@ async function khTazele(kayitlar, ilerle){
 async function kapsamaHataGonder(i){
   const liste = KAPSAMA_HATA[KH.u+'|'+KH.p] || [];
   const r = liste[i]; if (!r || r._gonderildi || !r._video) return;
-  const yolla = () => ydTopluGonder({ _profil: r._profilSheet || KH.u, _video: r._video,
+  // Yükleme kimliği KH.u: hata bu profilde oluştu. Sheet eşleşmesinin
+  // profili kullanılMAZ — başlık benzerliği başka profilin satırını
+  // seçebiliyor ve short yanlış hesaba yükleniyordu (yaşandı: General-3).
+  const yolla = () => ydTopluGonder({ _profil: KH.u, _video: r._video,
                                       _caption: r._caption, plat: PD_PLAT_KEY[KH.p] || KH.p, title: r.baslik });
   let s = await yolla();
   // Kaynak ölüyse kullanıcıyı aynı hataya ikinci kez bastırma: OpusClip'ten
@@ -5569,9 +5571,6 @@ async function kapsamaHataGonder(i){
   }
   if (s.ok){
     r._gonderildi = true;
-    // Kayıt kimliği KH.u/KH.p — yükleme için kullanılan profil (r._profilSheet)
-    // Sheet'ten gelir ve FARKLI olabilir. Kapsama sayımı Upload-Post
-    // kimliğiyle tutulmalı, yoksa hücre düşmez (yaşandı: General-3).
     gndIsaretle(KH.u, KH.p, r.baslik);
     kapsamaSayimDus(KH.u, KH.p);
     toast('✓ Kuyruğa alındı','ok');
@@ -5613,11 +5612,11 @@ async function kapsamaHataTumu(){
   }
   let ok=0, hata=0; const hatalar=[];
   await upSirali(hedef, async r => {
-    const s = await ydTopluGonder({ _profil: r._profilSheet || KH.u, _video: r._video,
+    const s = await ydTopluGonder({ _profil: KH.u, _video: r._video,
                                     _caption: r._caption, plat: PD_PLAT_KEY[KH.p] || KH.p, title: r.baslik });
     if (s.ok){
       ok++; r._gonderildi = true;
-      gndIsaretle(KH.u, KH.p, r.baslik);          // kayıt kimliği: Upload-Post profili
+      gndIsaretle(KH.u, KH.p, r.baslik);
       kapsamaSayimDus(KH.u, KH.p);
     } else { hata++; if (hatalar.length<3) hatalar.push(s.mesaj||s.sebep); }
     if (btn) btn.textContent = '⏳ '+(ok+hata)+'/'+hedef.length;
@@ -10655,9 +10654,12 @@ function ydFindSource(title, thumb, profile, caption){
     if (score > bestScore){ bestScore = score; best = r; }
   }
   if (!best || bestScore < 60) return null;
+  // Dönen alanlar yalnız KAYNAK MALZEMESİ (mp4/caption/clip-id). Satırın
+  // 'profil' kolonu bilerek dönülMÜYOR: başlık benzerliği başka profilin
+  // satırını seçebilir — yükleme kimliği daima çağıranın elindeki hata
+  // kaydından gelmeli (yaşandı: General-3'ün shortu başka profile gitti).
   return {
     video:  ydRowUrl(best),
-    profil: String(best['profil']||best['Profil']||profile||'').trim(),
     caption:best['safe-description'] || best['safeDescription'] || best['description'] || '',
     tarih:  best['created-at'] || best['createdAt'] || best['tarih'] || best['Tarih'] || '',
     clipId: String(best['clip-id'] || best['clipId'] || '').trim()
@@ -10720,7 +10722,7 @@ async function ydFetchItems(){
   items.forEach(it => {
     if (it.status === 'failed'){
       const src = ydFindSource(it.title, it.thumb, it.profile, it.caption);
-      if (src){ it._video = src.video; it._profil = src.profil || it.profile; it._caption = src.caption || it.caption; }
+      if (src){ it._video = src.video; it._caption = src.caption || it.caption; }
     }
   });
   items.sort((a,b)=>{ const ta=Date.parse(a.time)||0, tb=Date.parse(b.time)||0; return tb-ta; });
@@ -10977,13 +10979,13 @@ async function ydRetry(idx){
   if (it.reqId || it.jobId) return ydNativeRetry(it, idx);
   // 2) Yedek: kaynak mp4 ile yeniden gönder
   if (it._video){
-    await ydDoRetry({ profil: it._profil||it.profile, platform: ydPlatApi(it.plat), video: it._video, title: it.title, description: it._caption||it.caption }, idx);
+    await ydDoRetry({ profil: it.profile, platform: ydPlatApi(it.plat), video: it._video, title: it.title, description: it._caption||it.caption }, idx);
   } else {
     // Son bir şans: sheet verisi sonradan gelmiş olabilir → tekrar eşleştir
     await ydEnsureShorts();
     const late = ydFindSource(it.title, it.thumb, it.profile, it.caption);
     if (late && late.video){
-      it._video = late.video; it._profil = late.profil || it.profile; it._caption = late.caption || it.caption;
+      it._video = late.video; it._caption = late.caption || it.caption;
       return ydRetry(idx);
     }
     YD.retry = { idx };
@@ -11112,7 +11114,7 @@ async function ydTopluKuyruk(){
   hedef.forEach(it => {
     if (it._video) return;
     const s = ydFindSource(it.title, it.thumb, it.profile, it.caption);
-    if (s && s.video){ it._video = s.video; it._profil = s.profil || it.profile; it._caption = s.caption || it.caption; }
+    if (s && s.video){ it._video = s.video; it._caption = s.caption || it.caption; }
   });
   const gonderilebilir = hedef.filter(i => i._video);
   const kaynaksiz = hedef.length - gonderilebilir.length;
@@ -11193,12 +11195,8 @@ async function ydDoRetry(payload, idx){
     if (ok){
       // Yayın Durumu'ndan gönderim de Kapsama ekranına yansısın — eskiden
       // Kapsama'nın bundan hiç haberi olmuyor, short orada ✕ kalıyordu.
-      // Kimlik YD kaydının KENDİ profili olmalı: payload.profil Sheet'ten
-      // gelmiş olabilir ve Upload-Post profilinden farklı olabilir.
-      const _yd = YD.items[idx];
-      const _kp = (_yd && _yd.profile) || payload.profil;
-      gndIsaretle(_kp, payload.platform, payload.title);
-      kapsamaSayimDus(_kp, payload.platform);
+      gndIsaretle(payload.profil, payload.platform, payload.title);
+      kapsamaSayimDus(payload.profil, payload.platform);
       ckEkle(payload.profil, payload.platform, payload.title);
       toast('✓ Yeniden gönderildi — '+(payload.profil||'')+' ['+payload.platform+']','ok');
       addLog('ok','uploadpost','Retry OK: '+payload.profil+' ['+payload.platform+']');
