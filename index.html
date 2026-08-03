@@ -2396,7 +2396,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-22';
+const PANEL_YAPI = 'y2026.08.03-23';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -5712,7 +5712,9 @@ async function ciftTara(){
     };
     const kayit = (u,p,b) => {
       const k = anahtar(u,p,b); if (!k) return null;
-      if (!M.has(k)) M.set(k, { u, p, baslik:b, yayin:[], plan:0, kuyruk:0, isler:[] });
+      // k kayda YAZILIR: yoksayma listesi bu anahtarla tutuluyor, aynı
+      // kayıt sonraki taramalarda da aynı anahtarla bulunsun diye.
+      if (!M.has(k)) M.set(k, { k, u, p, baslik:b, yayin:[], plan:0, kuyruk:0, isler:[] });
       return M.get(k);
     };
     // Bekleyen işin kimliği — kuyruktan SİLEBİLMEK için. jid ile teklenir:
@@ -5777,11 +5779,17 @@ async function ciftTara(){
       else if (jidler.size >= 2 || r.plan >= 2 || r.kuyruk >= 2) ciftPlan.push(r);
     });
     const sirala = l => l.sort((a,b) => (a.u+a.p).localeCompare(b.u+b.p));
+    // Yoksayılanlar BURADA elenir — hem listeden hem OTOMATİK TEMİZLİKTEN
+    // düşsünler diye. (ciftOtoCalis da CIFT_SON'u okuyor.)
+    const yok = ciftYoksayKume();
+    let gizli = 0;
+    const ele = l => { const kalan = l.filter(r => !yok.has(r.k)); gizli += l.length - kalan.length; return kalan; };
     CIFT_SON.kayit = (onb.kayitlar||[]).length;
     CIFT_SON.kirpik = !!onb.kirpik;
-    CIFT_SON.ciftYayin = sirala(ciftYayin);
-    CIFT_SON.tekrarRisk = sirala(tekrarRisk);
-    CIFT_SON.ciftPlan = sirala(ciftPlan);
+    CIFT_SON.ciftYayin = sirala(ele(ciftYayin));
+    CIFT_SON.tekrarRisk = sirala(ele(tekrarRisk));
+    CIFT_SON.ciftPlan = sirala(ele(ciftPlan));
+    CIFT_SON.gizli = gizli;
     return CIFT_SON;
   }
 }
@@ -5803,7 +5811,14 @@ async function platCiftKontrol(){
 }
 
 // Son taramanın sonuçları — silme sonrası TARAMASIZ yeniden çizim için
-const CIFT_SON = { kayit:0, kirpik:false, ciftYayin:[], tekrarRisk:[], ciftPlan:[] };
+const CIFT_SON = { kayit:0, kirpik:false, ciftYayin:[], tekrarRisk:[], ciftPlan:[],
+                   gizli:0, gizliGoster:false, gizliListe:[] };
+
+function ciftListe(tip){
+  return tip === 'plan' ? CIFT_SON.ciftPlan
+       : tip === 'yayin' ? CIFT_SON.ciftYayin
+       : CIFT_SON.tekrarRisk;
+}
 
 // Bir kaydın SİLİNEBİLİR bekleyen işleri. 'plan' tipinde en erken tarihli
 // kopya KALIR (isler zamana göre sıralı). Çok platformlu işler ve kimliksiz
@@ -5830,17 +5845,23 @@ function ciftCiz(){
         + (tip==='plan' ? 'fazlayı sil ('+kalan.length+')' : 'kuyruktan sil')+'</button>';
       else eylem = ' <span style="color:#f5a623;font-size:10.5px" title="İş kimliği yok ya da iş birden çok platforma bağlı — silmek diğer platformdaki gönderiyi de iptal ederdi; Upload-Post panelinden elle kaldır">elle kaldır</span>';
     }
+    // 🚫 = raporlamadan kaldır. Özellikle "iki kez yayınlanmış" için tek
+    // eylem: panel yayınlanmış gönderiyi silemiyor, kayıt aksi hâlde her
+    // taramada yeniden çıkardı.
+    const yoksay = r._silindi ? ''
+      : ' <button class="btn bsm" style="padding:0 6px;font-size:10.5px" title="Bu kaydı çift kontrolünden kaldır — listede bir daha çıkmaz. Hiçbir gönderi silinmez, sonradan geri alınabilir." onclick="ciftYoksay(\''+tip+'\','+i+')">🚫</button>';
     return '<div style="font-size:11.5px;padding:2px 0;border-bottom:1px solid var(--brd);word-break:break-word'+(r._silindi?';opacity:.65':'')+'">'
       + '<b>'+esc(r.u)+'</b> · '+(PL[r.p]||r.p)+' · '+esc(r.baslik)
-      + ' <span style="color:'+renk+'">('+detay+')</span>'+eylem+'</div>';
+      + ' <span style="color:'+renk+'">('+detay+')</span>'+eylem+yoksay+'</div>';
   };
   const bolum = (baslik, renk, liste, tip, detayFn, aciklama, toplamSil) => {
     if (!liste.length) return '';
     const toplu = toplamSil
       ? ' <button class="btn bsm" style="padding:0 7px;font-size:10.5px;margin-left:8px" onclick="ciftSilTumu(\''+tip+'\')">🗑 tümünü sil ('+toplamSil+')</button>'
       : '';
+    const topluYoksay = ' <button class="btn bsm" style="padding:0 7px;font-size:10.5px;margin-left:6px" title="Bu bölümdeki kayıtların hepsini çift kontrolünden kaldır — hiçbir gönderi silinmez" onclick="ciftYoksayTumu(\''+tip+'\')">🚫 tümünü kaldır ('+liste.length+')</button>';
     return '<div style="margin-top:10px">'
-      + '<div style="font-size:12.5px;font-weight:700;color:'+renk+'">'+baslik+' — '+liste.length+toplu+'</div>'
+      + '<div style="font-size:12.5px;font-weight:700;color:'+renk+'">'+baslik+' — '+liste.length+toplu+topluYoksay+'</div>'
       + '<div style="font-size:11px;color:var(--mt);margin:2px 0 4px">'+aciklama+'</div>'
       + liste.slice(0,40).map((r,i) => satir(r, i, tip, detayFn(r), renk)).join('')
       + (liste.length>40 ? '<div style="font-size:11px;color:var(--mt);padding:2px 0">… ve '+(liste.length-40)+' tane daha</div>' : '')
@@ -5848,13 +5869,40 @@ function ciftCiz(){
   };
   const riskSil = tekrarRisk.reduce((a,r) => a + ciftHedefler(r,'risk').length, 0);
   const planSil = ciftPlan.reduce((a,r) => a + ciftHedefler(r,'plan').length, 0);
+  // Yoksayılanlar bloğu. gizliListe dizinle kullanılıyor (onclick'e serbest
+  // metin gömmemek için) — burada doldurulur, ciftYoksayGeriAl okur.
+  const gizliN = ciftYoksaySay();
+  let gizliBlok = '';
+  if (gizliN){
+    const o = ciftYoksayOku();
+    CIFT_SON.gizliListe = Object.keys(o).sort((a,b) => (o[b].t||0) - (o[a].t||0));
+    gizliBlok = '<div style="margin-top:12px;border-top:1px solid var(--brd);padding-top:7px;font-size:11px;color:var(--mt)">'
+      + '🚫 <b style="color:var(--tx)">'+gizliN+'</b> kayıt çift kontrolünden kaldırılmış — listelenmiyor, otomatik temizlik de dokunmuyor. '
+      + '<button class="btn bsm" style="padding:0 7px;font-size:10.5px" onclick="ciftYoksayGoster()">'+(CIFT_SON.gizliGoster?'gizle':'göster')+'</button> '
+      + '<button class="btn bsm" style="padding:0 7px;font-size:10.5px" onclick="ciftYoksayTemizle()">hepsini geri al</button>';
+    if (CIFT_SON.gizliGoster){
+      gizliBlok += '<div style="margin-top:5px">'
+        + CIFT_SON.gizliListe.slice(0,60).map((k,i) => {
+            const v = o[k] || {};
+            return '<div style="padding:2px 0;border-bottom:1px solid var(--brd);word-break:break-word;color:var(--tx)">'
+              + '<b>'+esc(v.u||'?')+'</b> · '+(PL[v.p]||v.p||'?')+' · '+esc(v.baslik||k)
+              + ' <span style="color:var(--mt)">(kaldırıldı: '+gun(v.t)+')</span>'
+              + ' <button class="btn bsm" style="padding:0 6px;font-size:10.5px" onclick="ciftYoksayGeriAl('+i+')">↩ geri al</button></div>';
+          }).join('')
+        + (CIFT_SON.gizliListe.length>60 ? '<div style="padding:2px 0">… ve '+(CIFT_SON.gizliListe.length-60)+' tane daha</div>' : '')
+        + '</div>';
+    }
+    gizliBlok += '</div>';
+  } else CIFT_SON.gizliListe = [];
   kutu.innerHTML = '<div class="card">'
     + '<div class="ct">🔁 Çift Kontrolü <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— '
     + CIFT_SON.kayit+' geçmiş kaydı'+(CIFT_SON.kirpik?' (pencere doldu: daha eski kayıtlar taranamadı)':'')+' + plan + kuyruğun ilk 50 yuvası</span>'
     + '<button class="btn bsm" style="float:right" onclick="document.getElementById(\'plat-cift\').innerHTML=\'\'">✕</button></div>'
     + (top === 0
-        ? '<div style="font-size:12.5px;color:var(--ok)">✓ Çift kayıt bulunamadı — taranan pencerede hiçbir short aynı hesaba iki kez gitmemiş, kuyrukta da çift kopya yok</div>'
-        : '<div style="font-size:12.5px;color:var(--tx)">'+top+' çift kayıt bulundu</div>')
+        ? '<div style="font-size:12.5px;color:var(--ok)">✓ Çift kayıt bulunamadı — taranan pencerede hiçbir short aynı hesaba iki kez gitmemiş, kuyrukta da çift kopya yok'
+          + (gizliN ? '<span style="color:var(--mt)"> ('+gizliN+' kayıt yoksayılıyor)</span>' : '')+'</div>'
+        : '<div style="font-size:12.5px;color:var(--tx)">'+top+' çift kayıt bulundu'
+          + (gizliN ? '<span style="color:var(--mt)"> · '+gizliN+' kayıt yoksayılıyor</span>' : '')+'</div>')
     + bolum('⚠ Yayınlanmış + hâlâ kuyrukta bekliyor', '#f5a623', tekrarRisk, 'risk',
         r => r.yayin.length+'× yayınlandı · '+(r.plan+r.kuyruk)+' kopya bekliyor',
         'Sırası gelince İKİNCİ kez yayınlanır. 🗑 kuyruktaki kopyayı Upload-Post\'tan siler; yayınlanmış olan olduğu gibi kalır.', riskSil)
@@ -5864,6 +5912,7 @@ function ciftCiz(){
     + bolum('⏰ Kuyrukta çift kopya', '#00b8d4', ciftPlan, 'plan',
         r => kopyaSay(r)+' kopya',
         '🗑 en erken tarihli kopyayı bırakır, fazlasını Upload-Post kuyruğundan siler.', planSil)
+    + gizliBlok
     + '</div>';
 }
 
@@ -5887,7 +5936,7 @@ async function ciftIsleriSil(paketler, tip){
 }
 
 async function ciftSil(tip, i){
-  const liste = tip === 'plan' ? CIFT_SON.ciftPlan : CIFT_SON.tekrarRisk;
+  const liste = ciftListe(tip);
   const r = liste[i]; if (!r) return;
   const hedef = ciftHedefler(r, tip);
   if (!hedef.length) return;
@@ -5902,7 +5951,7 @@ async function ciftSil(tip, i){
 }
 
 async function ciftSilTumu(tip){
-  const liste = tip === 'plan' ? CIFT_SON.ciftPlan : CIFT_SON.tekrarRisk;
+  const liste = ciftListe(tip);
   const paketler = liste.map(r => ({ r, hedef: ciftHedefler(r, tip) })).filter(p => p.hedef.length);
   const toplam = paketler.reduce((a,p) => a + p.hedef.length, 0);
   if (!toplam) return;
@@ -5913,6 +5962,104 @@ async function ciftSilTumu(tip){
   ciftCiz();
   toast((hata?'✕ ':'✓ ')+ok+' kopya kuyruktan silindi'+(hata?' · '+hata+' silinemedi — '+sonHata:''), hata?'err':'ok', 7000);
   addLog(hata?'warn':'ok','uploadpost','Çift silme (toplu '+tip+'): '+ok+' silindi'+(hata?' · '+hata+' hata':''));
+}
+
+// ── YOKSAYILAN ÇİFTLER ─────────────────────────────────────────────────
+// Bazı çiftler DÜZELTİLEMEZ: "iki kez yayınlanmış" kayıtlarda panel
+// yayınlanmış gönderiyi silemiyor, dolayısıyla o kayıt her taramada
+// yeniden çıkıyor ve gerçek/yeni çiftleri gölgeliyordu.
+// Yoksayma yalnızca RAPORLAMAYI etkiler: hiçbir gönderi silinmez,
+// kuyruğa/yayına dokunulmaz — kayıt sadece listelenmez. Otomatik temizlik
+// de yoksayılana dokunmaz (ciftTara elemeyi CIFT_SON'a yazmadan yapıyor).
+// Anahtar ciftTara'nın anahtarıyla AYNI (profil|platform|normalize başlık),
+// böylece kayıt sonraki taramalarda da tanınır.
+const CIFT_YOKSAY_ANAHTAR = 'op_cift_yoksay';
+const CIFT_YOKSAY_OMUR = 180*24*3600*1000;    // 180 gün sonra kendiliğinden düşer
+
+function ciftYoksayOku(){
+  let o = null;
+  try { o = JSON.parse(localStorage.getItem(CIFT_YOKSAY_ANAHTAR) || '{}'); } catch(e){ o = null; }
+  return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+}
+function ciftYoksayYaz(o){
+  const sinir = Date.now() - CIFT_YOKSAY_OMUR;
+  const temiz = {};
+  Object.keys(o).forEach(k => { const v = o[k]; if (v && typeof v === 'object' && v.t > sinir) temiz[k] = v; });
+  try { localStorage.setItem(CIFT_YOKSAY_ANAHTAR, JSON.stringify(temiz)); } catch(e){}
+  return temiz;
+}
+function ciftYoksayKume(){ return new Set(Object.keys(ciftYoksayOku())); }
+function ciftYoksaySay(){ return Object.keys(ciftYoksayOku()).length; }
+function ciftYoksayEkle(kayitlar){
+  const o = ciftYoksayOku(); const t = Date.now(); let n = 0;
+  kayitlar.forEach(r => {
+    if (!r || !r.k || o[r.k]) return;
+    o[r.k] = { t, u:r.u, p:r.p, baslik:String(r.baslik||'').slice(0,120) };
+    n++;
+  });
+  ciftYoksayYaz(o);
+  return n;
+}
+
+// Tek kayıt. 'yayin' dışındaki tiplerde kuyrukta bekleyen kopya varsa
+// UYARILIR: yoksaymak onu SİLMEZ, sırası gelince ikinci kez yayınlanır.
+function ciftYoksay(tip, i){
+  const liste = ciftListe(tip);
+  const r = liste[i]; if (!r || !r.k) return;
+  const bekleyen = tip === 'yayin' ? 0 : ciftHedefler(r, tip).length;
+  if (bekleyen && !confirm('Bu kayıt çift kontrolünden kaldırılacak.\n\nDİKKAT: kuyrukta bekleyen '
+      + bekleyen + ' kopya SİLİNMEZ — sırası gelince yayınlanır.\n\n'
+      + r.u + ' · ' + r.p + '\n' + r.baslik + '\n\nDevam edilsin mi?')) return;
+  ciftYoksayEkle([r]);
+  liste.splice(i, 1);
+  CIFT_SON.gizli = (CIFT_SON.gizli||0) + 1;
+  ciftCiz();
+  toast('🚫 Kayıt çift kontrolünden kaldırıldı — bir daha listelenmeyecek', 'info', 4500);
+  addLog('info','uploadpost','Çift yoksayıldı: '+r.u+' '+r.p+' · '+String(r.baslik||'').slice(0,60));
+}
+
+function ciftYoksayTumu(tip){
+  const liste = ciftListe(tip);
+  if (!liste.length) return;
+  const bekleyen = tip === 'yayin' ? 0 : liste.reduce((a,r) => a + ciftHedefler(r, tip).length, 0);
+  if (!confirm(liste.length + ' kayıt çift kontrolünden kaldırılacak — bir daha listelenmeyecekler.'
+      + (bekleyen ? '\n\nDİKKAT: bu kayıtların kuyrukta bekleyen ' + bekleyen
+                    + ' kopyası SİLİNMEZ — sırası gelince yayınlanacaklar.' : '')
+      + '\n\nİstersen sonra "hepsini geri al" ile listeye döndürebilirsin.\n\nDevam edilsin mi?')) return;
+  const n = ciftYoksayEkle(liste);
+  CIFT_SON.gizli = (CIFT_SON.gizli||0) + n;
+  liste.length = 0;
+  ciftCiz();
+  toast('🚫 ' + n + ' kayıt çift kontrolünden kaldırıldı', 'info', 5000);
+  addLog('info','uploadpost','Çift yoksayıldı (toplu '+tip+'): '+n+' kayıt');
+}
+
+function ciftYoksayGoster(){
+  CIFT_SON.gizliGoster = !CIFT_SON.gizliGoster;
+  ciftCiz();
+}
+
+// Dizinle çalışır: anahtar metni serbest başlık içeriyor, onclick
+// niteliğine gömmek kırılgan olurdu. gizliListe ciftCiz'de doldurulur.
+function ciftYoksayGeriAl(i){
+  const k = (CIFT_SON.gizliListe||[])[i]; if (!k) return;
+  const o = ciftYoksayOku(); if (!o[k]) return;
+  delete o[k];
+  ciftYoksayYaz(o);
+  CIFT_SON.gizli = Math.max(0, (CIFT_SON.gizli||0) - 1);
+  ciftCiz();
+  toast('✓ Geri alındı — 🔁 Çift Kontrolü ile yeniden tarayınca listeye döner', 'ok', 5000);
+}
+
+function ciftYoksayTemizle(){
+  const n = ciftYoksaySay(); if (!n) return;
+  if (!confirm(n + ' yoksayılan kayıt geri getirilecek — bir sonraki taramada yeniden listelenecekler.\n\nDevam edilsin mi?')) return;
+  try { localStorage.removeItem(CIFT_YOKSAY_ANAHTAR); } catch(e){}
+  CIFT_SON.gizli = 0;
+  CIFT_SON.gizliGoster = false;
+  ciftCiz();
+  toast('✓ ' + n + ' kayıt geri alındı — 🔁 Çift Kontrolü ile yeniden tara', 'ok', 5500);
+  addLog('info','uploadpost','Yoksayılan çiftler geri alındı: '+n+' kayıt');
 }
 
 // ── OTOMATİK ÇİFT TEMİZLİĞİ (saatte bir) ───────────────────────────────
