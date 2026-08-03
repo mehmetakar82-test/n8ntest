@@ -2348,7 +2348,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-15';
+const PANEL_YAPI = 'y2026.08.03-16';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4124,17 +4124,113 @@ async function rapHareketDenetimi(){
 // Son denetim — "gitmeyen short'ları listele" açılır kapanırken yeniden
 // tarama yapılmasın diye saklanır.
 const RAP_HAREKET_SON = {};
-function rapHareketListe(kat, i){
+// Eksik short'ların kaynak mp4'ünü short-kaydetme tablosundan çöz (bir kez).
+async function hrkKaynakCoz(k){
+  if (k._kaynak) return k._kaynak;
+  await ydEnsureShorts();
+  k._kaynak = k.eksik.map(t=>{
+    const s = ydFindSource(t, '', k.u, '');
+    return { title:t, video:(s&&s.video)||'', caption:(s&&s.caption)||'', clipId:(s&&s.clipId)||'' };
+  });
+  return k._kaynak;
+}
+
+// Gönderim: Kapsama pop-up'ıyla AYNI yol — ydTopluGonder çift korumasını
+// ve add_to_queue'yu zaten uyguluyor. Kaynak ölüyse OpusClip'ten taze link
+// çekilip BİR KEZ yeniden denenir.
+async function hrkTekGonder(k, it){
+  if (!it.video) return { ok:false, mesaj:'kaynak yok' };
+  const yolla = () => ydTopluGonder({ _profil:k.u, _video:it.video, _caption:it.caption,
+                                      plat:PD_PLAT_KEY[k.p] || k.p, title:it.title });
+  let s = await yolla();
+  if (!s.ok && khErisimHatasi(s) && it.clipId && !it._tazeDenendi){
+    it._tazeDenendi = true;
+    try {
+      const harita = await pdTazeLinkler([it.clipId]);
+      const yeni = harita.get(String(it.clipId));
+      if (yeni){ it.video = yeni; s = await yolla(); }
+      else s = { ok:false, mesaj:'kaynak mp4 indirilemiyor, OpusClip\'te de yok' };
+    } catch(e){ s = { ok:false, mesaj:'taze link alınamadı: '+e.message }; }
+  }
+  return s;
+}
+
+function hrkSatirCiz(kat, i, j, it){
+  const esc = esc0;
+  // Çift koruması eleyeni "kuyruğa alındı" diye göstermek yanlış olur:
+  // gönderilmedi, zaten vardı. Ayrı etiket.
+  const durum = it._cift ? '<span style="color:var(--mt);font-size:10.5px;white-space:nowrap" title="Bu short bu hesapta zaten yayınlanmış ya da kuyrukta — çift önlendi">· zaten var</span>'
+    : it._ok ? '<span style="color:var(--ok);font-size:10.5px;white-space:nowrap">✓ kuyruğa alındı</span>'
+    : it._hata ? '<span style="color:var(--er);font-size:10.5px;white-space:nowrap" title="'+esc(it._hata)+'">✕ '+esc(String(it._hata).slice(0,28))+'</span>'
+    : !it.video ? '<span style="color:#f5a623;font-size:10.5px;white-space:nowrap" title="short-kaydetme tablosunda bu başlıkla eşleşen mp4 bulunamadı">kaynak yok</span>'
+    : '<button class="btn bsm" style="padding:0 6px;font-size:10.5px;white-space:nowrap" onclick="hrkGonder(\''+kat+'\','+i+','+j+')">↻ Gönder</button>';
+  return '<div id="hrks-'+kat+'-'+i+'-'+j+'" style="display:flex;gap:6px;align-items:flex-start;justify-content:space-between;'
+    + 'font-size:11px;padding:2px 0;border-bottom:1px solid var(--brd)'+(it._ok?';opacity:.6':'')+'">'
+    + '<span style="color:var(--mt);word-break:break-word'+(it._ok?';text-decoration:line-through':'')+'">'+esc(it.title)+'</span>'
+    + durum + '</div>';
+}
+
+function hrkListeCiz(kat, i){
+  const k = (RAP_HAREKET_SON[kat] || [])[i];
+  const el = document.getElementById('hrk-'+kat+'-'+i); if (!el || !k || !k._kaynak) return;
+  const kalan = k._kaynak.filter(x=>x.video && !x._ok).length;
+  const kaynaksiz = k._kaynak.filter(x=>!x.video).length;
+  el.innerHTML = '<div style="margin:3px 0 5px 10px;border-left:2px solid var(--brd);padding-left:8px">'
+    + (kalan ? '<button class="btn bp bsm" id="hrk-toplu-'+kat+'-'+i+'" style="padding:1px 8px;font-size:10.5px;margin-bottom:4px"'
+        + ' onclick="hrkGonderTumu(\''+kat+'\','+i+')">↻ '+kalan+' short\'u kuyruğa al</button>'
+        + (kaynaksiz ? '<span style="font-size:10.5px;color:#f5a623;margin-left:6px">'+kaynaksiz+' kaydın kaynağı yok, atlanır</span>' : '')
+      : '<div style="font-size:10.5px;color:var(--mt);margin-bottom:4px">Gönderilebilecek short kalmadı</div>')
+    + '<div style="max-height:200px;overflow-y:auto">'
+    + k._kaynak.slice(0,60).map((it,j)=>hrkSatirCiz(kat,i,j,it)).join('')
+    + (k._kaynak.length>60 ? '<div style="font-size:10.5px;color:var(--mt)">… ve '+(k._kaynak.length-60)+' tane daha</div>' : '')
+    + '</div></div>';
+}
+
+async function hrkGonder(kat, i, j){
+  const k = (RAP_HAREKET_SON[kat]||[])[i]; if (!k || !k._kaynak) return;
+  const it = k._kaynak[j]; if (!it || it._ok) return;
+  const s = await hrkTekGonder(k, it);
+  if (s.ok){ it._ok = true; it._hata = ''; toast('✓ Kuyruğa alındı','ok'); }
+  else if (s.sebep === 'cift'){ it._ok = true; it._cift = true; it._hata = ''; toast('· Zaten var — çift önlendi','warn',5000); }
+  else { it._hata = s.mesaj || s.sebep || 'gönderilemedi'; toast('✕ '+it._hata,'err',6000); }
+  hrkListeCiz(kat, i);
+}
+
+async function hrkGonderTumu(kat, i){
+  const k = (RAP_HAREKET_SON[kat]||[])[i]; if (!k || !k._kaynak) return;
+  const hedef = k._kaynak.filter(x=>x.video && !x._ok);
+  if (!hedef.length) return;
+  const PA = { instagram:'Instagram', youtube:'YouTube', tiktok:'TikTok', facebook:'Facebook', x:'X' };
+  if (!confirm(hedef.length+' short, '+k.u+' profilinin '+(PA[k.p]||k.p)+' KUYRUĞUNA eklenecek.\n\n'
+    + 'Hepsi aynı anda yayınlanmaz — sıradaki boş yuvalara dağıtılır.\n'
+    + 'Zaten yayınlanmış ya da kuyrukta olanlar çift korumasıyla elenir.\n\nDevam edilsin mi?')) return;
+  const btn = document.getElementById('hrk-toplu-'+kat+'-'+i);
+  if (btn) btn.disabled = true;
+  let ok=0, cift=0, hata=0; const hatalar=[];
+  await upSirali(hedef, async it => {
+    const s = await hrkTekGonder(k, it);
+    if (s.ok){ ok++; it._ok = true; it._hata=''; }
+    else if (s.sebep === 'cift'){ cift++; it._ok = true; it._cift = true; it._hata=''; }
+    else { hata++; it._hata = s.mesaj || s.sebep || 'gönderilemedi'; if (hatalar.length<3) hatalar.push(it._hata); }
+    if (btn) btn.textContent = '⏳ '+(ok+cift+hata)+'/'+hedef.length;
+  }, 2);
+  hrkListeCiz(kat, i);
+  const ozet = ok+' kuyruğa alındı'+(cift?' · '+cift+' çift önlendi':'')+(hata?' · '+hata+' başarısız':'');
+  toast((ok?'✓ ':(cift?'⚠ ':'✕ '))+k.u+' · '+(PA[k.p]||k.p)+': '+ozet+(hatalar.length?' — '+hatalar[0]:''), ok?'ok':(cift?'warn':'err'), 8000);
+  addLog(hata?'warn':'ok','uploadpost','Hareket denetimi gönderim ('+k.u+' '+k.p+'): '+ozet);
+}
+
+async function rapHareketListe(kat, i){
   const liste = RAP_HAREKET_SON[kat]; if (!liste) return;
   const k = liste[i]; if (!k) return;
   const el = document.getElementById('hrk-'+kat+'-'+i); if (!el) return;
   if (el.innerHTML){ el.innerHTML = ''; return; }          // ikinci tık kapatır
-  const esc = esc0;
-  el.innerHTML = '<div style="max-height:180px;overflow-y:auto;margin:3px 0 5px 10px;'
-    + 'border-left:2px solid var(--brd);padding-left:8px">'
-    + k.eksik.slice(0,60).map(t=>'<div style="font-size:11px;color:var(--mt);padding:1px 0;word-break:break-word">'+esc(t)+'</div>').join('')
-    + (k.eksik.length>60 ? '<div style="font-size:11px;color:var(--mt)">… ve '+(k.eksik.length-60)+' tane daha</div>' : '')
-    + '</div>';
+  el.innerHTML = '<div style="font-size:10.5px;color:var(--mt);margin-left:10px">⏳ kaynak videolar eşleştiriliyor…</div>';
+  try { await hrkKaynakCoz(k); } catch(e){
+    el.innerHTML = '<div style="font-size:10.5px;color:var(--er);margin-left:10px">Kaynak tablosu okunamadı: '+esc0(e.message||'')+'</div>';
+    return;
+  }
+  hrkListeCiz(kat, i);
 }
 
 function rapHareketCiz(s){
@@ -4189,7 +4285,7 @@ function rapHareketCiz(s){
     + bolum('kullanilmiyor', '· Hiç yayın gitmemiş', 'var(--mt)', s.kullanilmiyor,
         'Upload-Post\'ta bu hesap için NE başarılı NE başarısız kayıt var — yani akış bu hesaba hiç göndermeyi denememiş. '
         + 'Sebebi genelde ikisinden biri: gönderim sırasında platform seçimi bu hesabı dışarıda bırakmış ya da hesap o gönderimlerden SONRA bağlanmış. '
-        + 'Aşağıdaki düğme, aynı profilin başka platformuna gidip buraya gitmeyen short\'ları listeler; kuyruğa almak için Platformlar → ⚖ Eşitle.',
+        + '<b>listele</b> düğmesi buraya gitmeyen short\'ları açar; oradan tek tek ya da toplu <b>kuyruğa alabilirsin</b>.',
         (k,i) => sat(ad(k)+eksikEk('kullanilmiyor',i,k)))
     + (s.gecmisVar ? '' : '<div style="font-size:11px;color:var(--mt);margin-top:8px">'
         + '"7 gündür sabit" ölçümü için günlük anlık görüntü birikmesi gerekiyor — bu hafta rapor oluşturdukça devreye girer.</div>')
@@ -8983,7 +9079,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
       ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
-      rapHareketDenetimi,rapHareketCiz,rapHareketListe,
+      rapHareketDenetimi,rapHareketCiz,rapHareketListe,hrkGonder,hrkGonderTumu,hrkListeCiz,hrkKaynakCoz,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
