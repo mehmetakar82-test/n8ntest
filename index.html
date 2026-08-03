@@ -2348,7 +2348,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-14';
+const PANEL_YAPI = 'y2026.08.03-15';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -3962,7 +3962,14 @@ function rapRenderLiveCard(u, data, err){
       + (hiz ? '⏳ Upload-Post hız sınırı — <b>↻ Raporu Oluştur</b>\'a tekrar bas, bu profil yeniden denenecek.'
              : '✕ Metrik alınamadı: '+esc(String(err).slice(0,80))) + '</div>';
   } else if (!Object.keys(norm).length){
-    inner=`<div style="font-size:11.5px;color:var(--mt)">Bu profil için metrik dönmedi — platform henüz veri üretmemiş olabilir (yeni hesap) ya da analitik izni yok.</div>`;
+    // Upload-Post hız sınırı altında 200 + BOŞ gövde dönebiliyor (ölçüldü).
+    // Bu turda 429 görüldüyse "yeni hesap / izin yok" demek BİLİNMEYEN bir
+    // sebebi iddia etmek olur — hangi durumda olduğumuzu söyle, uydurma.
+    const hizYakin = (Date.now() - UP_SON_429) < 120000;
+    inner = hizYakin
+      ? `<div style="font-size:11.5px;color:var(--wn)">⏳ Boş yanıt geldi ve bu tur <b>hız sınırına takıldı</b> — `
+        + `sebep büyük olasılıkla sınır, hesap değil. <b>↻ Raporu Oluştur</b>'a tekrar bas.</div>`
+      : `<div style="font-size:11.5px;color:var(--mt)">Bu profil için metrik dönmedi — platform henüz veri üretmemiş olabilir (yeni hesap) ya da analitik izni yok.</div>`;
   } else {
     // Sabit sıra: Instagram → YouTube → TikTok → X (profilden profile değişmesin)
     inner=rapPlatSirala(Object.keys(norm)).map(pk=>{
@@ -3988,15 +3995,30 @@ function rapRenderLiveCard(u, data, err){
 // Eskiden hata da '' olarak ÖNBELLEĞE yazılıyordu: hız sınırına takılan
 // profil o oturum boyunca "Facebook sayfası yok" sayılıyordu. Hata artık
 // önbelleğe girmez, böylece sonraki denemede yeniden sorulur.
+// Sayfa kimlikleri değişmez, ama her rapor turunda 15 profil için yeniden
+// soruluyordu — analitik istekleriyle birlikte istek sayısını İKİYE
+// katlıyor ve hız sınırını besliyordu. Bulunan kimlikler kalıcı olarak
+// saklanır. BULUNAMADI ('') kalıcı YAZILMAZ: sonradan Sayfa bağlanırsa
+// panel bunu bir daha hiç görmezdi.
+const RAP_FB_ANAHTAR = 'op_fb_sayfa';
 const RAP_FB_SAYFA = {};   // profil -> page_id ('' = bulunamadı)
+try { Object.assign(RAP_FB_SAYFA, JSON.parse(localStorage.getItem(RAP_FB_ANAHTAR)||'{}')||{}); } catch(e){}
 async function rapFbSayfaId(u){
   if (u in RAP_FB_SAYFA) return RAP_FB_SAYFA[u];
   try {
     const { data } = await upFetchRetry('/uploadposts/facebook/pages?profile='+encodeURIComponent(u));
     const pages = (data && (data.pages || data.data)) || [];
     // Şemada alan adı 'id' (page_id yok) — belgelenen ad önce denenir
-    RAP_FB_SAYFA[u] = (pages[0] && String(pages[0].id || pages[0].page_id || '')) || '';
-    return RAP_FB_SAYFA[u];
+    const pid = (pages[0] && String(pages[0].id || pages[0].page_id || '')) || '';
+    RAP_FB_SAYFA[u] = pid;
+    if (pid){
+      try {
+        const kalici = JSON.parse(localStorage.getItem(RAP_FB_ANAHTAR)||'{}') || {};
+        kalici[u] = pid;
+        localStorage.setItem(RAP_FB_ANAHTAR, JSON.stringify(kalici));
+      } catch(e){}
+    }
+    return pid;
   } catch(e){ console.warn('[RAP] fb sayfa '+u+':', e.message); return null; }
 }
 
@@ -6601,6 +6623,7 @@ function platCloseModal() { const m = document.getElementById('plat-modal'); if 
 // 3 worker sınıra çarpıp birbirinden habersiz hemen tekrar deniyor,
 // sınır sürekli tazeleniyordu (12/15 profil "hız sınırına takıldı").
 let UP_KAPI_KADAR = 0;                 // bu ana kadar tüm çağrılar bekler
+let UP_SON_429 = 0;                    // en son ne zaman hız sınırı görüldü
 function upKapiKalan(){ return Math.max(0, UP_KAPI_KADAR - Date.now()); }
 async function upKapiBekle(){
   let k = upKapiKalan();
@@ -6608,6 +6631,7 @@ async function upKapiBekle(){
 }
 // Retry-After saniye cinsindendir; yoksa artan bir varsayılan kullanılır.
 function upKapiKapat(sn, deneme){
+  UP_SON_429 = Date.now();
   // Üst sınır bilerek düşük: kapı ORTAK olduğu için uzun kapanış tüm
   // profilleri birden bekletir. 15 profillik raporda 60 sn'lik bir kapanış
   // tek bir takılan istek yüzünden turu dakikalarca uzatırdı.
