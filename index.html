@@ -1425,6 +1425,11 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <button class="btn bg bsm" id="plat-kapsama-btn" onclick="platKapsama()" title="Profil × platform matrisi: her bağlı hesabın yayınlanmış / başarısız / planlı sayıları. Hiç kaydı olmayan hesaplar kırmızı HİÇ ile işaretlenir — 'bu hesaba hiç video gitmemiş' sorusunun cevabı">📋 Kapsama Denetimi</button>
     <button class="btn bg bsm" id="plat-cift-btn" onclick="platCiftKontrol()" title="Aynı short aynı hesaba iki kez mi gitmiş? Yayınlanmış + planlı + kuyruk kayıtları başlık bazında karşılaştırılır; iki kez yayınlananlar, yayınlandığı hâlde hâlâ kuyrukta bekleyenler ve kuyruktaki çift kopyalar listelenir">🔁 Çift Kontrolü</button>
     <button class="btn bg bsm" id="plat-temizle-btn" onclick="upTemizleBasliklar()" title="Upload-Post kuyruğunda BEKLEYEN zamanlanmış gönderilerin açıklamalarından 'İstediğin Başlık' / 'Your Title Here' yer tutucularını toplu kaldırır">🧹 Açıklamaları Temizle</button>
+    <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--mt);cursor:pointer"
+           title="Saatte bir çift kontrolü çalışır ve kuyruktaki çift kopyaları siler: her short'un EN ERKEN kopyası kalır, yayınlanmış gönderilere dokunulmaz, birden çok platforma bağlı işler otomatik silinmez. Panel AÇIKKEN çalışır — kapalıyken temizlik yapılmaz.">
+      <input type="checkbox" id="plat-cift-oto" onchange="ciftOtoDegisti()" style="width:auto;margin:0"> ⏱ saatte bir otomatik temizle
+      <span id="plat-cift-oto-durum" style="color:var(--acc)"></span>
+    </label>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-ozet" style="font-size:12px;color:var(--tx);align-self:center"></span>
     <span id="plat-ozet2" style="font-size:12px;color:var(--mt);align-self:center"></span>
@@ -2340,7 +2345,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-6';
+const PANEL_YAPI = 'y2026.08.03-7';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -5044,13 +5049,11 @@ async function platDoldurGonder(){
 //   3) kuyruk/planda 2+ kopya
 // Başlık anahtarı kdAnahtar ile aynı mantık (normalize + 60 karakter) —
 // Upload-Post başlığı 95'e kesebildiği için.
-async function platCiftKontrol(){
-  const btn = document.getElementById('plat-cift-btn');
-  const kutu = document.getElementById('plat-cift'); if (!kutu) return;
-  if (!S.cfg.blot && !getN8N()){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
-  if (btn) btn.disabled = true;
-  kutu.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Geçmiş + plan + kuyruk, çift kayıt için taranıyor…'});
-  try {
+// Tarama ile ÇİZİM ayrı: otomatik temizlik de aynı sınıflandırmayı
+// kullanmalı, yoksa elle görülen ile otomatik silinen ayrışır.
+// CIFT_SON'u doldurur ve döndürür; DOM'a dokunmaz.
+async function ciftTara(){
+  {
     const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook',
                  x:'x', twitter:'x', threads:'threads', linkedin:'linkedin', pinterest:'pinterest', bluesky:'bluesky' };
     const M = new Map();
@@ -5130,9 +5133,21 @@ async function platCiftKontrol(){
     CIFT_SON.ciftYayin = sirala(ciftYayin);
     CIFT_SON.tekrarRisk = sirala(tekrarRisk);
     CIFT_SON.ciftPlan = sirala(ciftPlan);
+    return CIFT_SON;
+  }
+}
+
+async function platCiftKontrol(){
+  const btn = document.getElementById('plat-cift-btn');
+  const kutu = document.getElementById('plat-cift'); if (!kutu) return;
+  if (!S.cfg.blot && !getN8N()){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
+  if (btn) btn.disabled = true;
+  kutu.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Geçmiş + plan + kuyruk, çift kayıt için taranıyor…'});
+  try {
+    const s = await ciftTara();
     ciftCiz();
-    const top = ciftYayin.length + tekrarRisk.length + ciftPlan.length;
-    addLog(top?'warn':'ok','uploadpost','Çift kontrolü: '+top+' çift ('+ciftYayin.length+' yayın, '+tekrarRisk.length+' tekrar riski, '+ciftPlan.length+' kuyruk)');
+    const top = s.ciftYayin.length + s.tekrarRisk.length + s.ciftPlan.length;
+    addLog(top?'warn':'ok','uploadpost','Çift kontrolü: '+top+' çift ('+s.ciftYayin.length+' yayın, '+s.tekrarRisk.length+' tekrar riski, '+s.ciftPlan.length+' kuyruk)');
   } catch(e){
     kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Çift kontrolü başarısız: '+histHataMetni(e)});
   } finally { if (btn) btn.disabled = false; }
@@ -5249,6 +5264,112 @@ async function ciftSilTumu(tip){
   ciftCiz();
   toast((hata?'✕ ':'✓ ')+ok+' kopya kuyruktan silindi'+(hata?' · '+hata+' silinemedi — '+sonHata:''), hata?'err':'ok', 7000);
   addLog(hata?'warn':'ok','uploadpost','Çift silme (toplu '+tip+'): '+ok+' silindi'+(hata?' · '+hata+' hata':''));
+}
+
+// ── OTOMATİK ÇİFT TEMİZLİĞİ (saatte bir) ───────────────────────────────
+// Elle basılan 🗑 düğmeleriyle AYNI mantığı kullanır (ciftTara +
+// ciftHedefler + ciftIsleriSil): çok platformlu ve kimliksiz işlere
+// dokunulmaz, kuyruk çiftlerinde EN ERKEN kopya kalır, yayınlanmış
+// gönderi hiç silinmez. Yalnız KUYRUK kaydı silinir.
+// SINIR: panel bir tarayıcı sayfası — bu döngü yalnızca panel AÇIKKEN
+// çalışır. Panel kapalıyken temizlik yapılmaz.
+const CIFT_OTO_ANAHTAR = 'op_cift_oto';
+const CIFT_OTO_ARALIK  = 3600000;     // 1 saat
+const CIFT_OTO_TAVAN   = 25;          // tek turda azami silme — kaçak koruması
+let CIFT_OTO_ZAMANLAYICI = null;
+let CIFT_OTO_CALISIYOR = false;
+
+function ciftOtoAcik(){ try { return localStorage.getItem(CIFT_OTO_ANAHTAR) === '1'; } catch(e){ return false; } }
+function ciftOtoSon(){ try { return parseInt(localStorage.getItem(CIFT_OTO_ANAHTAR+'_t'), 10) || 0; } catch(e){ return 0; } }
+function ciftOtoSonuc(){ try { return localStorage.getItem(CIFT_OTO_ANAHTAR+'_s') || ''; } catch(e){ return ''; } }
+
+function ciftOtoDurumYaz(){
+  const el = document.getElementById('plat-cift-oto-durum'); if (!el) return;
+  if (!ciftOtoAcik()){ el.textContent = ''; return; }
+  const t = ciftOtoSon();
+  const sonuc = ciftOtoSonuc();
+  el.innerHTML = t
+    ? 'son: ' + new Date(t).toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'})
+      + (sonuc ? ' · ' + esc0(sonuc) : '')
+    : 'ilk tur birazdan';
+}
+
+function ciftOtoDegisti(){
+  const kutu = document.getElementById('plat-cift-oto');
+  const acik = !!(kutu && kutu.checked);
+  try { localStorage.setItem(CIFT_OTO_ANAHTAR, acik ? '1' : '0'); } catch(e){}
+  ciftOtoKur();
+  toast(acik ? '⏱ Otomatik çift temizliği açık — saatte bir kuyruktaki çift kopyalar silinecek'
+             : 'Otomatik çift temizliği kapatıldı', acik ? 'ok' : 'info', 5000);
+  addLog('info','uploadpost','Otomatik çift temizliği: '+(acik?'AÇIK':'kapalı'));
+}
+
+function ciftOtoKur(){
+  if (CIFT_OTO_ZAMANLAYICI){ clearInterval(CIFT_OTO_ZAMANLAYICI); CIFT_OTO_ZAMANLAYICI = null; }
+  const kutu = document.getElementById('plat-cift-oto');
+  if (kutu) kutu.checked = ciftOtoAcik();
+  ciftOtoDurumYaz();
+  if (!ciftOtoAcik()) return;
+  // Dakikada bir BAKILIR, saatte bir ÇALIŞIR: son çalışma zamanı
+  // localStorage'da; panel kapanıp açılınca sayaç sıfırlanmasın.
+  CIFT_OTO_ZAMANLAYICI = setInterval(ciftOtoTik, 60000);
+  ciftOtoTik();
+}
+
+async function ciftOtoTik(){
+  if (!ciftOtoAcik() || CIFT_OTO_CALISIYOR) return;
+  if (Date.now() - ciftOtoSon() < CIFT_OTO_ARALIK){ ciftOtoDurumYaz(); return; }
+  await ciftOtoCalis();
+}
+
+async function ciftOtoCalis(){
+  if (CIFT_OTO_CALISIYOR) return null;
+  if (!S.cfg.blot && !getN8N()) return null;          // yapılandırma yok — sessiz geç
+  CIFT_OTO_CALISIYOR = true;
+  let ozet = '';
+  try {
+    await ciftTara();
+    let butce = CIFT_OTO_TAVAN, ok = 0, hata = 0, sonHata = '';
+    // Önce "yayınlanmış ama hâlâ kuyrukta" (ikinci yayını önler), sonra
+    // kuyruktaki fazla kopyalar.
+    for (const tip of ['risk','plan']){
+      const liste = tip === 'risk' ? CIFT_SON.tekrarRisk : CIFT_SON.ciftPlan;
+      const paketler = [];
+      for (const r of liste){
+        if (butce <= 0) break;
+        const hedef = ciftHedefler(r, tip).slice(0, butce);
+        if (!hedef.length) continue;
+        butce -= hedef.length;
+        paketler.push({ r, hedef });
+      }
+      if (!paketler.length) continue;
+      const s = await ciftIsleriSil(paketler, tip);
+      ok += s.ok; hata += s.hata; if (s.sonHata) sonHata = s.sonHata;
+    }
+    ozet = ok ? (ok + ' kopya silindi') : 'çift yok';
+    if (hata) ozet += ' · ' + hata + ' silinemedi';
+    try {
+      localStorage.setItem(CIFT_OTO_ANAHTAR+'_t', String(Date.now()));
+      localStorage.setItem(CIFT_OTO_ANAHTAR+'_s', ozet);
+    } catch(e){}
+    // Kart açıksa tazelensin; kapalıysa DOM'a dokunmaz
+    if (document.getElementById('plat-cift') && document.getElementById('plat-cift').innerHTML) ciftCiz();
+    if (ok || hata){
+      addLog(hata?'warn':'ok','uploadpost','Otomatik çift temizliği: '+ozet+(sonHata?' | '+sonHata:''));
+      toast((hata?'⚠ ':'✓ ')+'Otomatik çift temizliği: '+ozet, hata?'warn':'ok', 6000);
+    }
+    return { ok, hata };
+  } catch(e){
+    console.error('[CIFT-OTO]', e);
+    addLog('err','uploadpost','Otomatik çift temizliği başarısız: '+(e.message||'bilinmeyen'));
+    // Hata turu da "çalıştı" sayılır ki her dakika yeniden denenmesin
+    try { localStorage.setItem(CIFT_OTO_ANAHTAR+'_t', String(Date.now()));
+          localStorage.setItem(CIFT_OTO_ANAHTAR+'_s', 'hata: '+(e.message||'bilinmeyen').slice(0,40)); } catch(x){}
+    return null;
+  } finally {
+    CIFT_OTO_CALISIYOR = false;
+    ciftOtoDurumYaz();
+  }
 }
 
 // Kuyruktan silme matristeki ⏰ sayısını yerinde azaltır
@@ -8435,6 +8556,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // her istek 1 çalıştırma sayılıyor — 5 dk'lık yoklama panel açıkken
     // günde ~288 çalıştırma yakıyordu (kota şikayeti üzerine uzatıldı).
     setInterval(()=>{ try{ notifCheck(false); }catch(e){} }, 15*60*1000);
+    // Otomatik çift temizliği — açıksa saatlik döngüyü kurar. Sayfa
+    // görünürlüğünden bağımsız çalışsın diye açılışta bir kez kurulur.
+    setTimeout(()=>{ try{ ciftOtoKur(); }catch(e){ console.warn('[boot] ciftOtoKur:', e.message); } }, 2500);
     // Tüm global fonksiyonları window'a bağla
     const globals = [go,showTab,goUretim,renderUretimTabs,trTabCount,refreshDash,sendSingle,sendBulkURLs,sendSearch,
       loadDriveSheet,sendDriveURLs,clearSentURLs,
@@ -8475,6 +8599,7 @@ document.addEventListener('DOMContentLoaded', function() {
       khKaynakAra,pdKlipDizini,pdBaslikEslesme,
       platCiftKontrol,esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
+      ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
