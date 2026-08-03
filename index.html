@@ -1404,7 +1404,10 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
 
   <!-- CANLI SOSYAL METRİKLER -->
   <div class="card">
-    <div class="ct">📊 Canlı Sosyal Metrikler <span id="rap-live-status" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div class="ct">📊 Canlı Sosyal Metrikler <span id="rap-live-status" style="letter-spacing:0;text-transform:none;font-weight:400"></span>
+      <button class="btn bg bsm" id="rap-hareket-btn" style="float:right" onclick="rapHareketDenetimi()"
+        title="Hareketsiz hesapları bulur: yayın gitmiş ama izlenme/etkileşim yoksa SORUN, hiç yayın gitmemişse yalnızca kullanılmıyor demektir — ikisi ayrı ayrı raporlanır">🩺 Hareket Denetimi</button></div>
+    <div id="rap-hareket" style="margin-bottom:10px"></div>
     <div id="rap-live" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px"><div style="color:var(--mt);font-size:12px;grid-column:1/-1;text-align:center;padding:10px">Rapor oluşturulunca profil başına canlı çekilir</div></div>
   </div>
 
@@ -2345,7 +2348,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-12';
+const PANEL_YAPI = 'y2026.08.03-13';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -3453,8 +3456,25 @@ function rapSnapYaz(tot){
       plat[pk] = {}; RAP_PLAT_ALAN.forEach(([a])=>{ plat[pk][a] = Math.round(by[pk][a]||0); });
     });
   } catch(e) {}
+  // HESAP BAZLI anlık görüntü: "bu hesap 7 gündür sabit mi?" sorusu ancak
+  // profil×platform kırılımı saklanırsa cevaplanabilir — platform toplamı
+  // tek bir hesabın donduğunu gizler.
+  const hesap = {};
+  try {
+    Object.keys(RAP.analytics||{}).forEach(u=>{
+      const d = RAP.analytics[u] || {};
+      Object.keys(d).forEach(pk=>{
+        const m = d[pk]; if (!m || typeof m !== 'object') return;
+        hesap[u+'|'+pk] = {
+          followers: Math.round(parseFloat(m.followers)||0),
+          views:     Math.round(parseFloat(m.views!=null?m.views:m.impressions)||0),
+          likes:     Math.round(parseFloat(m.likes)||0)
+        };
+      });
+    });
+  } catch(e) {}
   s[gun] = { followers:Math.round(tot.followers||0), views:Math.round(tot.views||0),
-             likes:Math.round(tot.likes||0), reach:Math.round(tot.reach||0), plat };
+             likes:Math.round(tot.likes||0), reach:Math.round(tot.reach||0), plat, hesap };
   const esik = Date.now() - 400*864e5;
   Object.keys(s).forEach(k=>{ if((Date.parse(k)||0) < esik) delete s[k]; });
   try { localStorage.setItem('op_rap_snap', JSON.stringify(s)); } catch(e){}
@@ -3978,6 +3998,137 @@ async function rapFbSayfaId(u){
     RAP_FB_SAYFA[u] = (pages[0] && String(pages[0].id || pages[0].page_id || '')) || '';
     return RAP_FB_SAYFA[u];
   } catch(e){ console.warn('[RAP] fb sayfa '+u+':', e.message); return null; }
+}
+
+// ── HAREKET DENETİMİ ───────────────────────────────────────────────────
+// "Hiç hareket olmayan hesapta sorun var mı?" sorusunun cevabı TEK bir
+// sayıdan çıkmaz: sıfır izlenme, hesaba hiç yayın gitmediyse NORMAL,
+// yayın gittiyse SORUNDUR. Bu yüzden üç kaynak kesiştirilir:
+//   1) bağlı hesaplar  (Upload-Post profilleri)
+//   2) yayın geçmişi   (kaç başarılı / kaç başarısız gönderim)
+//   3) canlı analitik  (izlenme/takipçi/etkileşim)
+const RAP_HAREKET_NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok',
+  facebook:'facebook', x:'x', twitter:'x', threads:'threads', linkedin:'linkedin',
+  pinterest:'pinterest', bluesky:'bluesky' };
+
+async function rapHareketDenetimi(){
+  const kutu = document.getElementById('rap-hareket'); if (!kutu) return;
+  const btn = document.getElementById('rap-hareket-btn');
+  if (!S.cfg.blot && !getN8N()){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
+  if (!Object.keys(RAP.analytics||{}).length){
+    kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Önce ↻ Raporu Oluştur ile canlı metrikleri çek — denetim onları kullanıyor'});
+    return;
+  }
+  if (btn) btn.disabled = true;
+  kutu.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Yayın geçmişi ile canlı metrikler karşılaştırılıyor…'});
+  try {
+    // 1) Bağlı hesaplar
+    const raw = S.uploadPostAccounts || await phFetchAccounts();
+    const profs = (raw && Array.isArray(raw.profiles)) ? raw.profiles : [];
+    // 2) Yayın geçmişi — paylaşılan önbellek
+    const onb = await histCek(KAPSAMA_SAYFA);
+    const gec = {};   // "profil|plat" -> {ok, hata, sonHata}
+    (onb.kayitlar||[]).forEach(x=>{
+      const u = String(x.profile_username||x.user||'');
+      const p = RAP_HAREKET_NP[String(x.platform||'').toLowerCase()];
+      if (!u || !p) return;
+      const k = u+'|'+p;
+      if (!gec[k]) gec[k] = { ok:0, hata:0, sonHata:'' };
+      if (x.success === false || x.error_message){ gec[k].hata++; if (x.error_message) gec[k].sonHata = String(x.error_message); }
+      else gec[k].ok++;
+    });
+    // 3) Sınıflandır
+    const sorun = [], hepHata = [], kullanilmiyor = [], metrikYok = [], durgun = [], saglikli = [];
+    const eski7 = rapSnapGecmis(7);
+    profs.forEach(pr=>{
+      const u = pr.username; if (!u) return;
+      const sa = pr.social_accounts || pr.socialAccounts || {};
+      Object.keys(sa).forEach(ham=>{
+        const v = sa[ham]; const a = Array.isArray(v)?v[0]:v;
+        if (!(a && (a.username||a.id||a.display_name||a.name))) return;   // bağlı değil
+        const p = RAP_HAREKET_NP[String(ham).toLowerCase()]; if (!p) return;
+        const g = gec[u+'|'+p] || { ok:0, hata:0, sonHata:'' };
+        const m = (RAP.analytics[u]||{})[p];
+        const kayit = { u, p, ok:g.ok, hata:g.hata, sonHata:g.sonHata, m };
+        if (!m || typeof m !== 'object'){
+          // Analitik hiç dönmedi. Yayın varsa bu bir eksiklik, yoksa sadece boş hesap.
+          (g.ok ? metrikYok : kullanilmiyor).push(kayit);
+          return;
+        }
+        const izlenme = parseFloat(m.views != null ? m.views : m.impressions) || 0;
+        kayit.izlenme = izlenme;
+        kayit.takipci = parseFloat(m.followers)||0;
+        if (g.ok === 0){
+          // Hiç başarılı yayın yok → hareketsizlik BEKLENEN. Ama denendi de
+          // hep başarısız olduysa sebebi odur, ayrı gösterilir.
+          (g.hata > 0 ? hepHata : kullanilmiyor).push(kayit);
+        } else if (izlenme === 0){
+          sorun.push(kayit);                       // yayın var, izlenme yok
+        } else {
+          // Hareket var mı? 7 gün önceki anlık görüntüyle karşılaştır.
+          const es = eski7 && eski7.hesap && eski7.hesap[u+'|'+p];
+          if (es && es.views === Math.round(izlenme) && es.followers === Math.round(kayit.takipci)){
+            kayit.sabitGun = 7; durgun.push(kayit);
+          } else saglikli.push(kayit);
+        }
+      });
+    });
+    rapHareketCiz({ sorun, hepHata, durgun, metrikYok, kullanilmiyor, saglikli,
+                    gecmisVar: !!(eski7 && eski7.hesap), kayit:(onb.kayitlar||[]).length, kirpik:onb.kirpik });
+    addLog(sorun.length?'warn':'ok','sistem','Hareket denetimi: '+sorun.length+' sorunlu, '+hepHata.length+' hep başarısız, '
+      +durgun.length+' durgun, '+kullanilmiyor.length+' kullanılmıyor');
+  } catch(e){
+    console.error('[HAREKET]', e);
+    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Denetim başarısız: '+histHataMetni(e)});
+  } finally { if (btn) btn.disabled = false; }
+}
+
+function rapHareketCiz(s){
+  const kutu = document.getElementById('rap-hareket'); if (!kutu) return;
+  const esc = esc0;
+  const PA = { instagram:'Instagram', youtube:'YouTube', tiktok:'TikTok', facebook:'Facebook',
+               x:'X', threads:'Threads', linkedin:'LinkedIn', pinterest:'Pinterest', bluesky:'Bluesky' };
+  const ad = k => esc(k.u)+' · '+(PA[k.p]||k.p);
+  const bolum = (baslik, renk, liste, aciklama, satirFn) => {
+    if (!liste.length) return '';
+    return '<div style="margin-top:10px">'
+      + '<div style="font-size:12.5px;font-weight:700;color:'+renk+'">'+baslik+' — '+liste.length+'</div>'
+      + '<div style="font-size:11px;color:var(--mt);margin:2px 0 4px">'+aciklama+'</div>'
+      + liste.slice(0,30).map(satirFn).join('')
+      + (liste.length>30 ? '<div style="font-size:11px;color:var(--mt)">… ve '+(liste.length-30)+' tane daha</div>' : '')
+      + '</div>';
+  };
+  const sat = (icerik) => '<div style="font-size:11.5px;padding:2px 0;border-bottom:1px solid var(--brd);word-break:break-word">'+icerik+'</div>';
+  const toplamSorun = s.sorun.length + s.hepHata.length + s.metrikYok.length;
+  kutu.innerHTML = '<div style="border:1px solid var(--brd);border-radius:8px;padding:11px 13px;background:var(--sur2)">'
+    + '<div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:4px">'
+    + '🩺 Hareket Denetimi <span style="letter-spacing:0;text-transform:none">— '+s.kayit+' yayın kaydı'
+    + (s.kirpik?' (pencere doldu)':'')+' × canlı metrikler</span></div>'
+    + (toplamSorun === 0
+        ? '<div style="font-size:12.5px;color:var(--ok)">✓ Yayın gitmiş hiçbir hesapta ölçüm eksikliği yok</div>'
+        : '<div style="font-size:12.5px;color:var(--tx)">'+toplamSorun+' hesapta incelenecek durum var</div>')
+    + bolum('✕ Yayın var ama izlenme sıfır', 'var(--er)', s.sorun,
+        'Bu hesaplara short GİTTİ ama platform sıfır izlenme bildiriyor. Gerçek bir tutarsızlık: yayın silinmiş, gizli/taslak kalmış ya da analitik izni eksik olabilir.',
+        k => sat('<b>'+ad(k)+'</b> — '+k.ok+' başarılı yayın · <span style="color:var(--er)">izlenme 0</span>'
+              + (k.takipci?' · takipçi '+ytkFmt(k.takipci):'')))
+    + bolum('⚠ Denendi ama hepsi başarısız', '#f5a623', s.hepHata,
+        'Hareketsizliğin sebebi belli: bu hesaba hiçbir gönderim geçmedi.',
+        k => sat('<b>'+ad(k)+'</b> — '+k.hata+' başarısız gönderim'
+              + (k.sonHata ? '<div style="color:var(--er);font-size:11px">'+esc(hataCevir(k.sonHata).baslik)
+                 + ' <span style="color:var(--mt)">— '+esc(hataCevir(k.sonHata).cozum)+'</span></div>' : '')))
+    + bolum('⏸ Yayın var ama analitik dönmedi', '#00b8d4', s.metrikYok,
+        'Gönderim yapılmış; Upload-Post bu hesap için metrik döndürmüyor. Analitik izni eksik olabilir — hesabı yeniden bağlarken izinleri onayla.',
+        k => sat('<b>'+ad(k)+'</b> — '+k.ok+' başarılı yayın · metrik yok'))
+    + bolum('⏱ 7 gündür sabit', 'var(--mt)', s.durgun,
+        'Sayılar bir haftadır hiç değişmemiş. Yeni yayın gitmiyorsa normal olabilir.',
+        k => sat('<b>'+ad(k)+'</b> — izlenme '+ytkFmt(k.izlenme)+' · takipçi '+ytkFmt(k.takipci)))
+    + bolum('· Hiç yayın gitmemiş (sorun değil)', 'var(--mt)', s.kullanilmiyor,
+        'Bu hesaplara hiç short gönderilmemiş, dolayısıyla hareketsizlik beklenen durum.',
+        k => sat(ad(k)))
+    + (s.gecmisVar ? '' : '<div style="font-size:11px;color:var(--mt);margin-top:8px">'
+        + '"7 gündür sabit" ölçümü için günlük anlık görüntü birikmesi gerekiyor — bu hafta rapor oluşturdukça devreye girer.</div>')
+    + '<div style="font-size:11px;color:var(--mt);margin-top:8px">Sağlıklı: <b>'+s.saglikli.length+'</b> hesapta yayın da hareket de var.</div>'
+    + '</div>';
 }
 
 async function rapLoadAnalytics(profs){
@@ -8764,6 +8915,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
       ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
+      rapHareketDenetimi,rapHareketCiz,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
@@ -10862,6 +11014,14 @@ const YD_PLATMAP   = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb',
 // Dönüş: {baslik, cozum, ciddiyet:'kritik'|'gecici'|'icerik', ham}
 // Sıra önemli: en spesifik kalıp üstte.
 const HATA_KURALLARI = [
+  // Facebook Sayfa hatası EN ÜSTTE: mesajın sonundaki belge bağlantısı
+  // "…common-errors#configuration-permissions" içerdiği için aşağıdaki
+  // izin kuralına takılıp "Yayınlama izni yok" diye YANLIŞ sınıflanıyordu
+  // (kullanıcının 22 "izin yok" hatasının kaynağı buydu). Çözümü de
+  // farklı: izin değil, bağlantıda Sayfa seçilmemiş.
+  [/no facebook pages? found|personal profiles is not supported|select a facebook page/i,
+    'Facebook Sayfası seçili değil',
+    'Facebook Reels yalnız SAYFALARA yayınlanabiliyor, kişisel profile değil. Upload-Post’ta bu profilin Facebook bağlantısını bir Sayfa seçerek yeniden kur. (n8n tarafındaki boş page_id hatası y2026.08.03-12 ile düzeltildi — workflow’u içe aktarmayı unutma.)', 'kritik'],
   [/session (has )?expired|reconnect your|token (is )?expired|invalid[_ ]?token|reauth|please reconnect/i,
     'Hesap bağlantısının süresi dolmuş', 'Bu profilin ilgili sosyal medya hesabını Upload-Post’ta yeniden bağla (app.upload-post.com → Manage Users). Sonra tekrar gönder.', 'kritik'],
   [/access token|oauth|permission|not authorized|unauthorized|forbidden|403/i,
@@ -10876,8 +11036,11 @@ const HATA_KURALLARI = [
     'Video formatı/çözünürlüğü uygun değil', 'Video kodeği veya en-boy oranı platformca desteklenmiyor. Farklı bir kaynak/klip dene.', 'icerik'],
   [/file (size|too large)|exceeds.*size|too big/i,
     'Dosya boyutu çok büyük', 'Video dosyası platform sınırını aşıyor. Daha küçük/kısa bir klip kullan.', 'icerik'],
-  [/(couldn.?t|could not|failed to|unable to) (download|fetch|access).*(video|media|url)|url.*(unreachable|not found|404)|media.*not.*accessible/i,
-    'Kaynak video indirilemedi', 'Videonun mp4 bağlantısı geçersiz/erişilemez. Kaynağın hâlâ yayında olduğunu kontrol et.', 'icerik'],
+  // "Video URL is not accessible" bu hesapta en sık görülen hatalardan biri
+  // ama eski desen onu yakalamıyordu (media/couldn't gibi kelimeler yok).
+  [/(couldn.?t|could not|failed to|unable to) (download|fetch|access).*(video|media|url)|url.*(unreachable|not found|404)|(media|video|url).*(is )?not.*accessible|inaccessible/i,
+    'Kaynak video indirilemedi',
+    'mp4 bağlantısı artık erişilemiyor. Kapsama pop-up’ında “OpusClip’ten taze link çek” ile yenilenebilir; klip OpusClip’te yoksa o short geri getirilemez.', 'icerik'],
   [/page (id|not)|no page|select.*page|target.*missing|board.*required|location.*required/i,
     'Yayın hedefi seçili değil (Sayfa/Board/Konum)', 'Facebook Sayfası, Pinterest board’u veya Google konumu gibi hedefi Upload-Post’ta seç.', 'kritik'],
   [/timeout|timed out|took too long|524|gateway/i,
@@ -10890,8 +11053,12 @@ const HATA_KURALLARI = [
 function hataCevir(ham){
   const s = String(ham||'').trim();
   if (!s) return { baslik:'Bilinmeyen hata', cozum:'Ayrıntı gelmedi. Yeniden denemeyi dene; sürerse loglara bak.', ciddiyet:'gecici', ham:s };
+  // Sınıflandırma metnin ANLAMINA bakmalı, içindeki bağlantıya değil:
+  // "Learn more: …#configuration-permissions" gibi bir URL, hatayı yanlış
+  // kurala düşürebiliyor (yaşandı: Facebook Sayfa hatası "izin yok" oldu).
+  const eslesecek = s.replace(/https?:\/\/\S+/gi, ' ');
   for (const [re, baslik, cozum, ciddiyet] of HATA_KURALLARI)
-    if (re.test(s)) return { baslik, cozum, ciddiyet, ham:s };
+    if (re.test(eslesecek)) return { baslik, cozum, ciddiyet, ham:s };
   return { baslik:'Yayın başarısız', cozum:'Platform bu gönderimi kabul etmedi. Yeniden dene; sürerse hesabı yeniden bağlamayı dene.', ciddiyet:'gecici', ham:s };
 }
 const HATA_IKON = { kritik:'🔴', gecici:'🟡', icerik:'🟠' };
