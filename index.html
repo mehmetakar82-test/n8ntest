@@ -2333,7 +2333,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-19';
+const PANEL_YAPI = 'y2026.08.02-20';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4221,6 +4221,78 @@ function gndCozuldu(profil, platform, baslik, hataZamani){
   return t != null && t >= (hataZamani || 0);
 }
 
+// ── ÇİFT KORUMASI — kuyruğa almadan önce "zaten var mı?" ───────────────
+// Panelden yapılan HER kuyruk gönderimi (Kapsama pop-up, Eşitle, Hesabı
+// Doldur, Yayın Durumu) göndermeden önce burada sınanır: aynı profil +
+// platform + başlık zaten BAŞARIYLA yayınlanmışsa ya da planda/kuyruktaysa
+// ikinci kopya GÖNDERİLMEZ. Başarısız yayınlar engellemez — yeniden
+// gönderim meşru. Kontrol kendisi çökerse gönderim engellenmez (koruma
+// yardımcıdır, kapı bekçisi değil); bu yüzden tüm hataları yutar.
+const CK_TTL = 120000;
+const CK_ONB = { t:0, kume:null };
+const CK_KUYRUK = new Map();          // profil -> { t, kume }
+const CK_NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook',
+                x:'x', twitter:'x', threads:'threads', linkedin:'linkedin', pinterest:'pinterest', bluesky:'bluesky' };
+function ckAnahtar(profil, platform, baslik){
+  const n = ydNorm(baslik).slice(0, 60);      // Upload-Post başlığı kesebiliyor
+  if (!profil || !platform || !n || n.length < 6) return '';
+  const p = String(platform).trim().toLowerCase();
+  return String(profil).trim()+'|'+(CK_NP[p]||p)+'|'+n;
+}
+async function ckKume(){
+  if (CK_ONB.kume && Date.now()-CK_ONB.t < CK_TTL) return CK_ONB.kume;
+  const kume = new Set();
+  try {
+    const onb = await histCek(KAPSAMA_SAYFA);
+    (onb.kayitlar||[]).forEach(x => {
+      if (x.success === false || x.error_message) return;
+      const k = ckAnahtar(x.profile_username||x.user, x.platform, x.post_title||x.title||x.post_caption);
+      if (k) kume.add(k);
+    });
+  } catch(e){ console.warn('[CK] history:', e.message); }
+  try {
+    const { data } = await upFetchRetry('/uploadposts/schedule');
+    const s = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
+    s.forEach(x => (x.platforms || (x.platform ? [x.platform] : [])).forEach(z => {
+      const k = ckAnahtar(x.profile_username, z, x.title||x.post_title);
+      if (k) kume.add(k);
+    }));
+  } catch(e){ console.warn('[CK] schedule:', e.message); }
+  CK_ONB.t = Date.now(); CK_ONB.kume = kume;
+  return kume;
+}
+async function ckKuyrukKume(profil){
+  const c = CK_KUYRUK.get(profil);
+  if (c && Date.now()-c.t < CK_TTL) return c.kume;
+  const kume = new Set();
+  try {
+    const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(profil)+'&count=50');
+    (data.slots||[]).forEach(sl => {
+      const sp = sl.scheduled_post; if (!sp) return;
+      (sp.platforms||[]).forEach(z => { const k = ckAnahtar(profil, z, sp.title); if (k) kume.add(k); });
+    });
+  } catch(e){ console.warn('[CK] kuyruk:', e.message); }
+  CK_KUYRUK.set(profil, { t:Date.now(), kume });
+  return kume;
+}
+// Bu oturumda başarıyla gönderilenler — AYRI kümede tutulur ki önbellek
+// tazelense de kaybolmasın (kuyruğa yeni giren iş API'de hemen görünmeyebilir)
+const CK_OTURUM = new Set();
+async function ckCiftMi(profil, platform, baslik){
+  try {
+    const k = ckAnahtar(profil, platform, baslik);
+    if (!k) return false;                      // ayırt edilemeyen başlık — engelleme
+    if (CK_OTURUM.has(k)) return true;
+    if ((await ckKume()).has(k)) return true;
+    return (await ckKuyrukKume(profil)).has(k);
+  } catch(e){ console.warn('[CK]', e.message); return false; }
+}
+// Başarılı gönderim anında kayda geçer — aynı oturumda ikinci kopyayı da önler
+function ckEkle(profil, platform, baslik){
+  const k = ckAnahtar(profil, platform, baslik);
+  if (k) CK_OTURUM.add(k);
+}
+
 const KAPSAMA_SAYFA = 10;   // history taraması: 10×100 = 1000 kayıt
 const KAPSAMA_HATA = {};    // "profil|platform" -> ÇÖZÜLMEMİŞ hata kayıtları (pop-up için)
 // Matris yeniden çizilebilsin diye son tarama saklanır: gönderim sonrası
@@ -4973,8 +5045,17 @@ async function platCiftKontrol(){
     };
     const kayit = (u,p,b) => {
       const k = anahtar(u,p,b); if (!k) return null;
-      if (!M.has(k)) M.set(k, { u, p, baslik:b, yayin:[], plan:0, kuyruk:0 });
+      if (!M.has(k)) M.set(k, { u, p, baslik:b, yayin:[], plan:0, kuyruk:0, isler:[] });
       return M.get(k);
+    };
+    // Bekleyen işin kimliği — kuyruktan SİLEBİLMEK için. jid ile teklenir:
+    // /schedule ile queue/preview aynı işi ikisi birden listeleyebilir.
+    // coklu=true → iş birden çok platforma bağlı; silmek diğer platformdaki
+    // gönderiyi de iptal ederdi, o yüzden otomatik silinmez.
+    const isEkle = (r, jid, coklu, t) => {
+      jid = String(jid || '');
+      if (jid && r.isler.some(x => x.jid === jid)) return;
+      r.isler.push({ jid, coklu: !!coklu, t: String(t || '') });
     };
     // 1) Başarılı yayınlar (paylaşılan geçmiş önbelleği)
     const onb = await histCek(KAPSAMA_SAYFA);
@@ -4992,9 +5073,10 @@ async function platCiftKontrol(){
       const { data } = await upFetchRetry('/uploadposts/schedule');
       const s = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
       s.forEach(x => {
-        (x.platforms || (x.platform ? [x.platform] : [])).forEach(z => {
+        const pl = x.platforms || (x.platform ? [x.platform] : []);
+        pl.forEach(z => {
           const r = kayit(String(x.profile_username||''), NP[String(z).toLowerCase()], String(x.title||x.post_title||''));
-          if (r) r.plan++;
+          if (r){ r.plan++; isEkle(r, x.job_id || x.id, pl.length > 1, x.scheduled_date); }
         });
       });
     } catch(e){ console.warn('[CIFT] schedule:', e.message); }
@@ -5006,57 +5088,161 @@ async function platCiftKontrol(){
         const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(u)+'&count=50');
         (data.slots||[]).forEach(sl => {
           const sp = sl.scheduled_post; if (!sp) return;
-          (sp.platforms||[]).forEach(z => { const r = kayit(u, NP[String(z).toLowerCase()], String(sp.title||'')); if (r) r.kuyruk++; });
+          (sp.platforms||[]).forEach(z => {
+            const r = kayit(u, NP[String(z).toLowerCase()], String(sp.title||''));
+            if (r){ r.kuyruk++; isEkle(r, sp.job_id || sp.id, (sp.platforms||[]).length > 1, sl.datetime_utc); }
+          });
         });
       } catch(e){ console.warn('[CIFT] queue '+u+':', e.message); }
     }, 4);
     // Sınıflandır. NOT: /schedule ile queue/preview AYNI gönderiyi ikisi
-    // birden listeleyebilir — bu yüzden "kuyrukta çift" hükmü kaynaklar
-    // ARASI toplamla değil, AYNI kaynak içindeki tekrarla verilir (plan>=2
-    // veya kuyruk>=2). Yoksa her kuyruk kaydı sahte "çift" olurdu.
+    // birden listeleyebilir — işler jid ile teklendiği için "kuyrukta çift"
+    // hükmü FARKLI jid sayısıyla verilir; jid yoksa aynı kaynak içindeki
+    // tekrara bakılır (plan>=2 veya kuyruk>=2). Yoksa her kuyruk kaydı
+    // sahte "çift" olurdu.
+    M.forEach(r => r.isler.sort((a,b) => a.t.localeCompare(b.t)));   // en erken önce
     const ciftYayin = [], tekrarRisk = [], ciftPlan = [];
     M.forEach(r => {
       const bekleyen = r.plan + r.kuyruk;
+      const jidler = new Set(r.isler.filter(x => x.jid).map(x => x.jid));
       if (r.yayin.length >= 2) ciftYayin.push(r);
       else if (r.yayin.length >= 1 && bekleyen >= 1) tekrarRisk.push(r);
-      else if (r.plan >= 2 || r.kuyruk >= 2) ciftPlan.push(r);
+      else if (jidler.size >= 2 || r.plan >= 2 || r.kuyruk >= 2) ciftPlan.push(r);
     });
+    const sirala = l => l.sort((a,b) => (a.u+a.p).localeCompare(b.u+b.p));
+    CIFT_SON.kayit = (onb.kayitlar||[]).length;
+    CIFT_SON.kirpik = !!onb.kirpik;
+    CIFT_SON.ciftYayin = sirala(ciftYayin);
+    CIFT_SON.tekrarRisk = sirala(tekrarRisk);
+    CIFT_SON.ciftPlan = sirala(ciftPlan);
+    ciftCiz();
     const top = ciftYayin.length + tekrarRisk.length + ciftPlan.length;
-    const esc = esc0;
-    const PL = { instagram:'IG', youtube:'YT', tiktok:'TT', facebook:'FB', x:'X' };
-    const gun = t => t ? new Date(t).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}) : '?';
-    const bolum = (baslik, renk, liste, detayFn, aciklama) => {
-      if (!liste.length) return '';
-      liste.sort((a,b) => (a.u+a.p).localeCompare(b.u+b.p));
-      return '<div style="margin-top:10px">'
-        + '<div style="font-size:12.5px;font-weight:700;color:'+renk+'">'+baslik+' — '+liste.length+'</div>'
-        + '<div style="font-size:11px;color:var(--mt);margin:2px 0 4px">'+aciklama+'</div>'
-        + liste.slice(0,40).map(r => '<div style="font-size:11.5px;padding:2px 0;border-bottom:1px solid var(--brd);word-break:break-word">'
-            + '<b>'+esc(r.u)+'</b> · '+(PL[r.p]||r.p)+' · '+esc(r.baslik)+' <span style="color:'+renk+'">('+detayFn(r)+')</span></div>').join('')
-        + (liste.length>40 ? '<div style="font-size:11px;color:var(--mt);padding:2px 0">… ve '+(liste.length-40)+' tane daha</div>' : '')
-        + '</div>';
-    };
-    kutu.innerHTML = '<div class="card">'
-      + '<div class="ct">🔁 Çift Kontrolü <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— '
-      + (onb.kayitlar||[]).length+' geçmiş kaydı'+(onb.kirpik?' (pencere doldu: daha eski kayıtlar taranamadı)':'')+' + plan + kuyruğun ilk 50 yuvası</span>'
-      + '<button class="btn bsm" style="float:right" onclick="document.getElementById(\'plat-cift\').innerHTML=\'\'">✕</button></div>'
-      + (top === 0
-          ? '<div style="font-size:12.5px;color:var(--ok)">✓ Çift kayıt bulunamadı — taranan pencerede hiçbir short aynı hesaba iki kez gitmemiş, kuyrukta da çift kopya yok</div>'
-          : '<div style="font-size:12.5px;color:var(--tx)">'+top+' çift kayıt bulundu</div>')
-      + bolum('⚠ Yayınlanmış + hâlâ kuyrukta bekliyor', '#f5a623', tekrarRisk,
-          r => r.yayin.length+'× yayınlandı · '+(r.plan+r.kuyruk)+' kopya bekliyor',
-          'Sırası gelince İKİNCİ kez yayınlanır. Kopyayı Upload-Post panelindeki kuyruktan kaldır — panel yanlış kopyayı silmemek için silme yapmaz, yalnız raporlar.')
-      + bolum('✕ İki kez yayınlanmış', 'var(--er)', ciftYayin,
-          r => r.yayin.map(gun).join(' ve '),
-          'Geçmişte aynı hesaba iki kez gitmiş. Gerekirse kopyalardan biri platformdan elle silinebilir.')
-      + bolum('⏰ Kuyrukta çift kopya', '#00b8d4', ciftPlan,
-          r => Math.max(r.plan, r.kuyruk)+' kopya',
-          'Aynı short kuyruğa birden çok kez eklenmiş — fazlası Upload-Post panelinden kaldırılmalı.')
-      + '</div>';
     addLog(top?'warn':'ok','uploadpost','Çift kontrolü: '+top+' çift ('+ciftYayin.length+' yayın, '+tekrarRisk.length+' tekrar riski, '+ciftPlan.length+' kuyruk)');
   } catch(e){
     kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Çift kontrolü başarısız: '+histHataMetni(e)});
   } finally { if (btn) btn.disabled = false; }
+}
+
+// Son taramanın sonuçları — silme sonrası TARAMASIZ yeniden çizim için
+const CIFT_SON = { kayit:0, kirpik:false, ciftYayin:[], tekrarRisk:[], ciftPlan:[] };
+
+// Bir kaydın SİLİNEBİLİR bekleyen işleri. 'plan' tipinde en erken tarihli
+// kopya KALIR (isler zamana göre sıralı). Çok platformlu işler ve kimliksiz
+// işler elenir — silmek diğer platformdaki gönderiyi de iptal ederdi.
+function ciftHedefler(r, tip){
+  const liste = tip === 'plan' ? r.isler.slice(1) : r.isler.slice();
+  return liste.filter(x => x.jid && !x.coklu && !x._s);
+}
+
+function ciftCiz(){
+  const kutu = document.getElementById('plat-cift'); if (!kutu) return;
+  const esc = esc0;
+  const PL = { instagram:'IG', youtube:'YT', tiktok:'TT', facebook:'FB', x:'X' };
+  const gun = t => t ? new Date(t).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}) : '?';
+  const { ciftYayin, tekrarRisk, ciftPlan } = CIFT_SON;
+  const top = ciftYayin.length + tekrarRisk.length + ciftPlan.length;
+  const kopyaSay = r => Math.max(new Set(r.isler.filter(x=>x.jid).map(x=>x.jid)).size, r.plan, r.kuyruk);
+  const satir = (r, i, tip, detay, renk) => {
+    let eylem = '';
+    if (tip !== 'yayin'){
+      const kalan = ciftHedefler(r, tip);
+      if (r._silindi) eylem = ' <span style="color:var(--ok);white-space:nowrap;font-size:10.5px">✓ '+r._silindi+' kopya silindi</span>';
+      else if (kalan.length) eylem = ' <button class="btn bsm" style="padding:0 7px;font-size:10.5px" onclick="ciftSil(\''+tip+'\','+i+')">🗑 '
+        + (tip==='plan' ? 'fazlayı sil ('+kalan.length+')' : 'kuyruktan sil')+'</button>';
+      else eylem = ' <span style="color:#f5a623;font-size:10.5px" title="İş kimliği yok ya da iş birden çok platforma bağlı — silmek diğer platformdaki gönderiyi de iptal ederdi; Upload-Post panelinden elle kaldır">elle kaldır</span>';
+    }
+    return '<div style="font-size:11.5px;padding:2px 0;border-bottom:1px solid var(--brd);word-break:break-word'+(r._silindi?';opacity:.65':'')+'">'
+      + '<b>'+esc(r.u)+'</b> · '+(PL[r.p]||r.p)+' · '+esc(r.baslik)
+      + ' <span style="color:'+renk+'">('+detay+')</span>'+eylem+'</div>';
+  };
+  const bolum = (baslik, renk, liste, tip, detayFn, aciklama, toplamSil) => {
+    if (!liste.length) return '';
+    const toplu = toplamSil
+      ? ' <button class="btn bsm" style="padding:0 7px;font-size:10.5px;margin-left:8px" onclick="ciftSilTumu(\''+tip+'\')">🗑 tümünü sil ('+toplamSil+')</button>'
+      : '';
+    return '<div style="margin-top:10px">'
+      + '<div style="font-size:12.5px;font-weight:700;color:'+renk+'">'+baslik+' — '+liste.length+toplu+'</div>'
+      + '<div style="font-size:11px;color:var(--mt);margin:2px 0 4px">'+aciklama+'</div>'
+      + liste.slice(0,40).map((r,i) => satir(r, i, tip, detayFn(r), renk)).join('')
+      + (liste.length>40 ? '<div style="font-size:11px;color:var(--mt);padding:2px 0">… ve '+(liste.length-40)+' tane daha</div>' : '')
+      + '</div>';
+  };
+  const riskSil = tekrarRisk.reduce((a,r) => a + ciftHedefler(r,'risk').length, 0);
+  const planSil = ciftPlan.reduce((a,r) => a + ciftHedefler(r,'plan').length, 0);
+  kutu.innerHTML = '<div class="card">'
+    + '<div class="ct">🔁 Çift Kontrolü <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— '
+    + CIFT_SON.kayit+' geçmiş kaydı'+(CIFT_SON.kirpik?' (pencere doldu: daha eski kayıtlar taranamadı)':'')+' + plan + kuyruğun ilk 50 yuvası</span>'
+    + '<button class="btn bsm" style="float:right" onclick="document.getElementById(\'plat-cift\').innerHTML=\'\'">✕</button></div>'
+    + (top === 0
+        ? '<div style="font-size:12.5px;color:var(--ok)">✓ Çift kayıt bulunamadı — taranan pencerede hiçbir short aynı hesaba iki kez gitmemiş, kuyrukta da çift kopya yok</div>'
+        : '<div style="font-size:12.5px;color:var(--tx)">'+top+' çift kayıt bulundu</div>')
+    + bolum('⚠ Yayınlanmış + hâlâ kuyrukta bekliyor', '#f5a623', tekrarRisk, 'risk',
+        r => r.yayin.length+'× yayınlandı · '+(r.plan+r.kuyruk)+' kopya bekliyor',
+        'Sırası gelince İKİNCİ kez yayınlanır. 🗑 kuyruktaki kopyayı Upload-Post\'tan siler; yayınlanmış olan olduğu gibi kalır.', riskSil)
+    + bolum('✕ İki kez yayınlanmış', 'var(--er)', ciftYayin, 'yayin',
+        r => r.yayin.map(gun).join(' ve '),
+        'Geçmişte aynı hesaba iki kez gitmiş. Panel yayınlanmış gönderiyi silemez — gerekirse kopyalardan biri platformdan elle silinebilir.', 0)
+    + bolum('⏰ Kuyrukta çift kopya', '#00b8d4', ciftPlan, 'plan',
+        r => kopyaSay(r)+' kopya',
+        '🗑 en erken tarihli kopyayı bırakır, fazlasını Upload-Post kuyruğundan siler.', planSil)
+    + '</div>';
+}
+
+// Ortak silici: DELETE /uploadposts/schedule/{job_id}. Sıralı gider —
+// upFetchRetry 429'da bekler. Silinen iş _s ile işaretlenir ki kısmi
+// başarıda tekrar denenmesin; silinebilir iş kalmayınca satır ✓ olur.
+async function ciftIsleriSil(paketler, tip){
+  let ok = 0, hata = 0, sonHata = '';
+  for (const { r, hedef } of paketler){
+    for (const x of hedef){
+      try {
+        await upFetchRetry('/uploadposts/schedule/'+encodeURIComponent(x.jid), { method:'DELETE' });
+        x._s = true; ok++;
+        r._sildi = (r._sildi || 0) + 1;
+        kapsamaPlanDus(r.u, r.p);
+      } catch(e){ hata++; sonHata = e.message; console.warn('[CIFT] sil '+x.jid+':', e.message); }
+    }
+    if (r._sildi && !ciftHedefler(r, tip).length) r._silindi = r._sildi;
+  }
+  return { ok, hata, sonHata };
+}
+
+async function ciftSil(tip, i){
+  const liste = tip === 'plan' ? CIFT_SON.ciftPlan : CIFT_SON.tekrarRisk;
+  const r = liste[i]; if (!r) return;
+  const hedef = ciftHedefler(r, tip);
+  if (!hedef.length) return;
+  if (!confirm((tip === 'plan'
+      ? 'Bu short\'un fazla '+hedef.length+' kopyası kuyruktan SİLİNECEK (en erken tarihli kalır).'
+      : 'Bu short zaten yayınlanmış — kuyruktaki '+hedef.length+' kopya SİLİNECEK.')
+      + '\n\n'+r.u+' · '+r.p+'\n'+r.baslik+'\n\nDevam edilsin mi?')) return;
+  const { ok, hata, sonHata } = await ciftIsleriSil([{ r, hedef }], tip);
+  ciftCiz();
+  toast((hata?'✕ ':'✓ ')+ok+' kopya kuyruktan silindi'+(hata?' · '+hata+' silinemedi — '+sonHata:''), hata?'err':'ok', 6000);
+  addLog(hata?'warn':'ok','uploadpost','Çift silme ('+r.u+' '+r.p+'): '+ok+' silindi'+(hata?' · '+hata+' hata':''));
+}
+
+async function ciftSilTumu(tip){
+  const liste = tip === 'plan' ? CIFT_SON.ciftPlan : CIFT_SON.tekrarRisk;
+  const paketler = liste.map(r => ({ r, hedef: ciftHedefler(r, tip) })).filter(p => p.hedef.length);
+  const toplam = paketler.reduce((a,p) => a + p.hedef.length, 0);
+  if (!toplam) return;
+  if (!confirm(toplam+' kopya Upload-Post kuyruğundan SİLİNECEK'
+      + (tip === 'plan' ? ' (her short\'un en erken tarihli kopyası kalır)' : ' (yayınlanmış olanlar olduğu gibi kalır)')
+      + '.\n\nDevam edilsin mi?')) return;
+  const { ok, hata, sonHata } = await ciftIsleriSil(paketler, tip);
+  ciftCiz();
+  toast((hata?'✕ ':'✓ ')+ok+' kopya kuyruktan silindi'+(hata?' · '+hata+' silinemedi — '+sonHata:''), hata?'err':'ok', 7000);
+  addLog(hata?'warn':'ok','uploadpost','Çift silme (toplu '+tip+'): '+ok+' silindi'+(hata?' · '+hata+' hata':''));
+}
+
+// Kuyruktan silme matristeki ⏰ sayısını yerinde azaltır
+function kapsamaPlanDus(profil, platform){
+  const K = KAPSAMA_SON.K; if (!K) return;
+  const c = (K[profil]||{})[platform];
+  if (!c || !c.plan) return;
+  c.plan--;
+  kapsamaMatrisCiz();
 }
 
 // ── EŞİTLE ─────────────────────────────────────────────────────────────
@@ -8214,6 +8400,7 @@ document.addEventListener('DOMContentLoaded', function() {
       gndIsaretle,gndCozuldu,gndAnahtar,kapsamaMatrisCiz,kapsamaSayimDus,
       khKaynakAra,pdKlipDizini,pdBaslikEslesme,
       platCiftKontrol,esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
+      ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
@@ -10766,9 +10953,10 @@ async function ydNativeRetry(it, idx){
       msg = ok ? '' : 'n8n Active mi / yeniden-gonder webhook var mı?';
     }
     if (ok){
-      // Bu da hatayı çözer — Kapsama sayımı bunu da bilmeli
+      // Bu da hatayı çözer — Kapsama sayımı ve çift koruması bunu da bilmeli
       gndIsaretle(it.profile, ydPlatApi(it.plat), it.title);
       kapsamaSayimDus(it.profile, ydPlatApi(it.plat));
+      ckEkle(it.profile, ydPlatApi(it.plat), it.title);
       toast('✓ Yeniden kuyruğa alındı — '+(it.profile||'')+' ['+it.plat+']','ok');
       addLog('ok','uploadpost','Native retry OK: '+(it.reqId||it.jobId));
       it.status='retried'; it.error=(it.error?it.error+' · ':'')+'↻ Upload-Post yeniden denedi';
@@ -10876,6 +11064,10 @@ async function ydTopluGonder(it){
   const platform = ydPlatApi(it.plat);
   if (!video)  return { ok:false, sebep:'kaynak-yok' };
   if (!profil) return { ok:false, sebep:'profil-yok' };
+  // ÇİFT KORUMASI: aynı short bu hesapta zaten yayınlanmış ya da
+  // planda/kuyruktaysa ikinci kopya gönderilmez
+  if (await ckCiftMi(profil, platform, it.title))
+    return { ok:false, sebep:'cift', mesaj:'Çift önlendi — bu short bu hesapta zaten yayınlanmış ya da kuyrukta' };
   try {
     if (S.cfg.blot){
       const fd = new FormData();
@@ -10893,14 +11085,15 @@ async function ydTopluGonder(it){
         ytEtiketler(aciklama || it.title, profilKategori(profil)).forEach(t => fd.append('tags[]', t));
       }
       const u = await upYukle(fd);                 // 429'da bekleyip yeniden dener
-      if (u.ok) return { ok:true };
+      if (u.ok){ ckEkle(profil, platform, it.title); return { ok:true }; }
       return { ok:false, sebep:'api', mesaj: u.mesaj };
     }
     const base = getN8N();
     if (!base) return { ok:false, sebep:'yapilandirma', mesaj:'API Key veya n8n URL yok' };
     const res = await faf(base+'/webhook/yeniden-gonder', {
       profil, platform, video, title: it.title, description: it._caption||it.caption||'', kuyruk:true });
-    return (res && res.ok === true) ? { ok:true } : { ok:false, sebep:'n8n', mesaj:'webhook yanıt vermedi' };
+    if (res && res.ok === true){ ckEkle(profil, platform, it.title); return { ok:true }; }
+    return { ok:false, sebep:'n8n', mesaj:'webhook yanıt vermedi' };
   } catch(e){ return { ok:false, sebep:'istisna', mesaj:e.message }; }
 }
 
@@ -10961,6 +11154,10 @@ async function ydTopluKuyruk(){
 
 async function ydDoRetry(payload, idx){
   if (!payload.video) return toast('Kaynak video yok','err');
+  // ÇİFT KORUMASI — tek tık yolunda kullanıcıya sorulur: bilerek ikinci
+  // kopya isteme ihtimali var (ör. video platformdan silinmişse)
+  if (await ckCiftMi(payload.profil, payload.platform, payload.title)
+      && !confirm('Bu short bu hesapta zaten yayınlanmış ya da kuyrukta görünüyor.\n\nYine de gönderilsin mi? (İkinci kopya oluşur)')) return;
   toast('↻ Yeniden gönderiliyor: '+(payload.profil||'')+' ['+payload.platform+']','info');
   addLog('info','uploadpost','Retry: '+payload.profil+' ['+payload.platform+'] '+payload.title);
   try {
@@ -11002,6 +11199,7 @@ async function ydDoRetry(payload, idx){
       const _kp = (_yd && _yd.profile) || payload.profil;
       gndIsaretle(_kp, payload.platform, payload.title);
       kapsamaSayimDus(_kp, payload.platform);
+      ckEkle(payload.profil, payload.platform, payload.title);
       toast('✓ Yeniden gönderildi — '+(payload.profil||'')+' ['+payload.platform+']','ok');
       addLog('ok','uploadpost','Retry OK: '+payload.profil+' ['+payload.platform+']');
       const it = YD.items[idx]; if (it){ it.status='retried'; it.error=(it.error?it.error+' · ':'')+'↻ yeniden gönderildi'; }
