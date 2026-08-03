@@ -1596,6 +1596,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <button id="tak-v-gun" class="btn bg bsm" onclick="takView('gun')">Gün</button>
     </div>
     <button class="btn bp bsm" onclick="loadTakvim()">↻ Yenile</button>
+    <button class="btn bg bsm" onclick="oneAlAc()" title="Seçtiğin planlı short'ları kuyruğun EN BAŞINA alır. Tarih yuvaları aynen korunur — yayın ritmi değişmez, yalnız hangi short'un hangi yuvada olduğu değişir; kalanlar sırayı koruyarak geriye kayar.">⏫ Öne Al</button>
     <span id="tak-ozet" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:wrap">
       <span style="font-size:12px;color:var(--mt);align-self:center">Platform:</span>
@@ -1791,6 +1792,34 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
 </div>
 
 <!-- GÜN DETAY MODALI -->
+<!-- ÖNE AL: planlı short'ları kuyruğun başına taşı (tarih yuvaları sabit, sahipleri değişir) -->
+<div id="oneal-modal" style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)oneAlKapat()">
+  <div style="width:min(700px,calc(94vw / var(--pz)));max-height:86vh;display:flex;flex-direction:column;background:var(--sur2);border:1px solid var(--acc);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.6)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--brd)">
+      <div style="font-family:var(--fh);font-size:14px;font-weight:700;color:var(--tx)">⏫ Öne Al — planlı short'ları başa taşı</div>
+      <button class="btn bg bsm" onclick="oneAlKapat()">✕ Kapat</button>
+    </div>
+    <div style="padding:12px 18px 0">
+      <div style="font-size:12px;color:var(--mt);line-height:1.55;margin-bottom:10px">
+        Seçtiğin short'lar kuyruğun <b>en başına</b> alınır; kalanlar sırayı koruyarak geriye kayar.
+        Tarih yuvaları <b>aynen korunur</b> — yayın ritmi değişmez, yalnız hangi short'un hangi yuvada olduğu değişir.
+        Sıralama <b>platform içinde</b> yapılır: IG gönderisi YouTube yuvasına oturtulmaz.
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <select id="oneal-profil" onchange="oneAlYukle()" style="width:auto;flex:0 0 auto;max-width:200px"></select>
+        <input id="oneal-ara" type="text" placeholder="başlıkta ara… (örn. videonun adı)" oninput="oneAlCiz()" style="flex:1;min-width:160px;margin:0"/>
+        <button class="btn bg bsm" onclick="oneAlFiltreSec(true)" title="Arama filtresine uyan tüm satırları seç — bir videonun 10 short'unu tek tıkla seçmek için başlıkta ortak kelimeyi ara">filtredekileri seç</button>
+        <button class="btn bg bsm" onclick="oneAlFiltreSec(false)">temizle</button>
+      </div>
+    </div>
+    <div id="oneal-liste" style="padding:0 18px;overflow-y:auto;flex:1"></div>
+    <div style="padding:10px 18px;border-top:1px solid var(--brd)">
+      <button class="btn bp bsm" id="oneal-btn" onclick="oneAlUygula()" disabled>⏫ Başa Al</button>
+      <span id="oneal-durum" style="font-size:12px;color:var(--mt);margin-left:10px"></span>
+    </div>
+  </div>
+</div>
+
 <div id="tak-day-modal" onclick="if(event.target===this)closeDayModal()" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;padding:40px 16px 40px;overflow-y:auto">
   <div style="background:var(--sur);border:1px solid var(--brd);border-radius:14px;width:min(780px,calc(98vw / var(--pz)));position:relative;box-shadow:var(--shadow-lg)">
 
@@ -2367,7 +2396,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-19';
+const PANEL_YAPI = 'y2026.08.03-20';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -9157,6 +9186,7 @@ document.addEventListener('DOMContentLoaded', function() {
       scanSheet,sendSheetURLs,filterTbl,exportCSV,loadReports,loadPlatforms,
       saveSettings,updateWHs,copyText,renderLogs,
       clearLogs,exportLogs,loadTakvim,takPrev,takNext,takFilter,openDayModal,takEslesir,takBilinmeyenUyari,
+      oneAlAc,oneAlKapat,oneAlYukle,oneAlCiz,oneAlSec,oneAlFiltreSec,oneAlHesapla,oneAlUygula,
       closeDayModal,showTakTip,hideTakTip,dmFilter,dmToggleSort,
       searchYTChannel,ytkSelectAll,ytkClearAll,ytkSendSelected,ytkAddToSheet,
       ytkPickChannel,ytkLoadMore,ytkLoadAll,renderYTKVideos,
@@ -9963,6 +9993,144 @@ function takBilinmeyenUyari(){
   el.innerHTML = gizli + ' planlı kayıt hangi platforma gideceğini bildirmiyor, bu yüzden platform '
     + 'filtresinde görünmüyor — <b style="cursor:pointer;text-decoration:underline" onclick="takFilter(\'sch\')">⏰ Planlı</b>'
     + ' ya da <b style="cursor:pointer;text-decoration:underline" onclick="takFilter(\'all\')">Tümü</b> ile görebilirsin.';
+}
+
+// ── ÖNE AL ─────────────────────────────────────────────────────────────
+// "Önemli videonun short'ları kuyruğun başına geçsin." Mekanizma: tarih
+// KÜMESİ aynen korunur, yalnız hangi gönderinin hangi tarihte olduğu
+// değişir. PATCH /uploadposts/schedule/{job_id} scheduled_date alanını
+// güncellemeye izin veriyor (şemadan doğrulandı: "Update the scheduled
+// date, title, or caption"). Böylece yayın ritmi bozulmaz, çift oluşmaz,
+// hiçbir şey silinmez — kuyruk bir permütasyona uğrar, o kadar.
+// Sıralama PLATFORM İÇİNDE yapılır: IG gönderisi YouTube yuvasına
+// oturtulmaz, yoksa platformların günlük tempoları birbirine karışırdı.
+const ONEAL = { kayitlar:[], secim:new Set(), tarihsiz:0 };
+function oneAlKapat(){ const m = document.getElementById('oneal-modal'); if (m) m.style.display = 'none'; }
+
+async function oneAlAc(){
+  if (!S.cfg.blot && !getN8N()){ toast('Upload-Post API Key gerekli (Ayarlar)','warn'); return; }
+  document.getElementById('oneal-modal').style.display = 'flex';
+  const sel = document.getElementById('oneal-profil');
+  try {
+    const raw = S.uploadPostAccounts || await phFetchAccounts();
+    const adlar = ((raw && raw.profiles) || []).map(p=>p.username).filter(Boolean).sort();
+    const onceki = sel.value;
+    sel.innerHTML = adlar.map(a=>'<option value="'+esc0(a)+'">'+esc0(a)+'</option>').join('');
+    if (adlar.indexOf(onceki) >= 0) sel.value = onceki;
+  } catch(e){ console.warn('[ONEAL] profiller:', e.message); }
+  await oneAlYukle();
+}
+
+async function oneAlYukle(){
+  const kutu = document.getElementById('oneal-liste'); if (!kutu) return;
+  const profil = (document.getElementById('oneal-profil')||{}).value || '';
+  ONEAL.kayitlar = []; ONEAL.secim.clear(); ONEAL.tarihsiz = 0;
+  setEl('oneal-durum','');
+  kutu.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Bekleyen gönderiler okunuyor…'});
+  try {
+    const { data } = await upFetchRetry('/uploadposts/schedule');
+    const liste = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
+    let tarihsiz = 0;
+    ONEAL.kayitlar = liste
+      .filter(x => String(x.profile_username||'') === profil)
+      .map(x => {
+        const t = Date.parse(x.scheduled_date||x.scheduledDate||'') || 0;
+        if (!t) tarihsiz++;
+        return { jid:String(x.job_id||''), t, baslik:String(x.title||x.post_title||'(başlıksız)'),
+                 plat:(Array.isArray(x.platforms)&&x.platforms.length ? x.platforms.join('+') : String(x.platform||'')) || 'platformsuz' };
+      })
+      .filter(k => k.jid && k.t)          // kimliksiz/tarihsiz sıralamaya giremez
+      .sort((a,b) => a.t - b.t);
+    ONEAL.tarihsiz = tarihsiz;
+    oneAlCiz();
+  } catch(e){
+    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Okunamadı: '+histHataMetni(e)});
+  }
+}
+
+function oneAlEsle(k){
+  const q = ydNorm((document.getElementById('oneal-ara')||{}).value||'');
+  return !q || ydNorm(k.baslik).includes(q);
+}
+function oneAlCiz(){
+  const kutu = document.getElementById('oneal-liste'); if (!kutu) return;
+  const esc = esc0;
+  const btn = document.getElementById('oneal-btn');
+  if (!ONEAL.kayitlar.length){
+    kutu.innerHTML = durumHTML('bos',{kompakt:true, alt:'Bu profilin tarihli bekleyen gönderisi yok'
+      + (ONEAL.tarihsiz ? ' ('+ONEAL.tarihsiz+' kayıt tarihsiz)' : '')});
+    if (btn){ btn.disabled = true; btn.textContent = '⏫ Başa Al'; }
+    return;
+  }
+  const gorunen = ONEAL.kayitlar.filter(oneAlEsle);
+  kutu.innerHTML =
+    '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">'+ONEAL.kayitlar.length+' bekleyen gönderi · '
+    + gorunen.length+' görünüyor · <b style="color:var(--acc)">'+ONEAL.secim.size+' seçili</b>'
+    + (ONEAL.tarihsiz ? ' · '+ONEAL.tarihsiz+' kayıt tarihsiz (sıralamaya giremez)' : '')+'</div>'
+    + gorunen.slice(0,300).map(k=>{
+        const s = ONEAL.secim.has(k.jid);
+        return '<label style="display:flex;gap:8px;align-items:flex-start;padding:3px 0;border-bottom:1px solid var(--brd);cursor:pointer;font-size:11.5px">'
+          + '<input type="checkbox" '+(s?'checked':'')+' onchange="oneAlSec(\''+esc(k.jid).replace(/'/g,"\\'")+'\',this.checked)" style="width:auto;margin:2px 0 0">'
+          + '<span style="flex-shrink:0;color:var(--mt);font-variant-numeric:tabular-nums">'
+          +   new Date(k.t).toLocaleString('tr',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span>'
+          + '<span class="badge bi" style="flex-shrink:0;font-size:10px">'+esc(k.plat)+'</span>'
+          + '<span style="color:'+(s?'var(--tx)':'var(--mt)')+';word-break:break-word">'+esc(k.baslik)+'</span></label>';
+      }).join('')
+    + (gorunen.length>300 ? '<div style="font-size:11px;color:var(--mt);padding:4px 0">… ve '+(gorunen.length-300)+' tane daha (aramayla daralt)</div>' : '');
+  if (btn){
+    btn.disabled = !ONEAL.secim.size;
+    btn.textContent = ONEAL.secim.size ? '⏫ '+ONEAL.secim.size+' short\'u başa al' : '⏫ Başa Al';
+  }
+}
+function oneAlSec(jid, v){ if (v) ONEAL.secim.add(jid); else ONEAL.secim.delete(jid); oneAlCiz(); }
+function oneAlFiltreSec(v){
+  ONEAL.kayitlar.filter(oneAlEsle).forEach(k=>{ if (v) ONEAL.secim.add(k.jid); else ONEAL.secim.delete(k.jid); });
+  oneAlCiz();
+}
+
+// Yeni dağılım: her platform grubunda tarih LİSTESİ sabit; seçililer
+// (kendi aralarındaki sırayla) en erken tarihleri alır, kalanlar (kendi
+// sıralarıyla) devamını. Yalnız tarihi DEĞİŞENLER döner — gereksiz PATCH yok.
+function oneAlHesapla(){
+  const gruplar = {};
+  ONEAL.kayitlar.forEach(k => (gruplar[k.plat] = gruplar[k.plat] || []).push(k));
+  const degisen = [];
+  Object.values(gruplar).forEach(g=>{
+    const tarihler = g.map(k=>k.t);            // artan — kayıtlar sıralı geldi
+    const yeni = g.filter(k=>ONEAL.secim.has(k.jid)).concat(g.filter(k=>!ONEAL.secim.has(k.jid)));
+    yeni.forEach((k,i)=>{ if (k.t !== tarihler[i]) degisen.push({ k, yeniT: tarihler[i] }); });
+  });
+  return degisen;
+}
+
+async function oneAlUygula(){
+  if (!ONEAL.secim.size) return;
+  const degisen = oneAlHesapla();
+  if (!degisen.length){ toast('Seçilenler zaten en başta — değişiklik gerekmiyor','info',4000); return; }
+  if (!confirm(ONEAL.secim.size+' short kuyruğun BAŞINA alınacak.\n\n'
+    + 'Bunun için '+degisen.length+' gönderinin tarihi güncellenecek — tarih yuvaları aynı kalır, '
+    + 'yalnız sahipleri değişir; hiçbir gönderi silinmez ya da çiftlenmez.\n'
+    + 'Her güncelleme bir API isteği: yaklaşık '+Math.max(1, Math.ceil(degisen.length*0.4))+' sn sürer.\n\nDevam edilsin mi?')) return;
+  const btn = document.getElementById('oneal-btn');
+  btn.disabled = true;
+  let ok=0, hata=0, sonHata='';
+  for (const d of degisen){
+    try {
+      await upFetchRetry('/uploadposts/schedule/'+encodeURIComponent(d.k.jid),
+        { method:'PATCH', body:{ scheduled_date: new Date(d.yeniT).toISOString() } });
+      d.k.t = d.yeniT; ok++;
+    } catch(e){ hata++; sonHata = e.message || '?'; console.warn('[ONEAL] '+d.k.jid+':', e.message); }
+    btn.textContent = '⏳ '+(ok+hata)+'/'+degisen.length;
+    setEl('oneal-durum', ok+' güncellendi'+(hata?' · '+hata+' hata':''));
+    await new Promise(r=>setTimeout(r,180));    // hız sınırına nefes payı
+  }
+  const ozet = ok+' gönderi güncellendi'+(hata?' · '+hata+' başarısız'+(sonHata?' — '+sonHata:'') : '');
+  toast((hata?'⚠ ':'✓ ')+'Öne al: '+ozet, hata?'warn':'ok', 8000);
+  addLog(hata?'warn':'ok','uploadpost','Öne al ('+((document.getElementById('oneal-profil')||{}).value||'')+'): '+ozet);
+  // KISMİ HATA OLASILIĞI: bazı tarihler değişti, bazıları değişmedi.
+  // Ezber değil gerçek durum gösterilsin — liste sunucudan yeniden okunur.
+  await oneAlYukle();
+  setEl('oneal-durum', ozet + (hata ? ' · liste tazelendi, gerekirse yeniden seç ve tekrar dene' : ''));
 }
 
 function renderTakvim() {
