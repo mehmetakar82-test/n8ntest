@@ -1581,6 +1581,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <span class="badge bgr" id="tak-f-all" onclick="takFilter('all')" style="cursor:pointer">Tümü</span>
     </div>
   </div>
+  <div id="tak-bilinmeyen" style="display:none;font-size:11.5px;color:#f5a623;margin-bottom:8px"></div>
   <div id="tak-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px">
     <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">PTZ</div>
     <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">SAL</div>
@@ -2339,7 +2340,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-5';
+const PANEL_YAPI = 'y2026.08.03-6';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -8439,7 +8440,7 @@ document.addEventListener('DOMContentLoaded', function() {
       loadDriveSheet,sendDriveURLs,clearSentURLs,
       scanSheet,sendSheetURLs,filterTbl,exportCSV,loadReports,loadPlatforms,
       saveSettings,updateWHs,copyText,renderLogs,
-      clearLogs,exportLogs,loadTakvim,takPrev,takNext,takFilter,openDayModal,
+      clearLogs,exportLogs,loadTakvim,takPrev,takNext,takFilter,openDayModal,takEslesir,takBilinmeyenUyari,
       closeDayModal,showTakTip,hideTakTip,dmFilter,dmToggleSort,
       searchYTChannel,ytkSelectAll,ytkClearAll,ytkSendSelected,ytkAddToSheet,
       ytkPickChannel,ytkLoadMore,ytkLoadAll,renderYTKVideos,
@@ -9073,6 +9074,13 @@ async function loadTakvim() {
   const items = [];
   const platMap = {instagram:'ig',youtube:'yt',tiktok:'tt',facebook:'fb',x:'x',twitter:'x',threads:'ig',linkedin:'fb'};
   const seenJobs = new Set();
+  // Planlı kayıtlar tek bir sahte anahtarla ('sch') ekleniyordu; platform
+  // filtresi it.plat ile eşleştiği için FB/X seçilince planlı short'ların
+  // HİÇBİRİ görünmüyordu (kullanıcı fark etti: FB'de 36 planlı var ama
+  // takvimde yok). Gerçek platformlar ayrıca 'plats' olarak taşınıyor.
+  const platsCoz = arr => Array.from(new Set((arr||[])
+    .map(z => platMap[String(z||'').toLowerCase()])
+    .filter(Boolean)));
 
   // 1) Tarihli zamanlanmış işler (yanıt anahtarı: scheduled_posts)
   try {
@@ -9083,7 +9091,8 @@ async function loadTakvim() {
       if (!time) return;
       if (s.job_id) seenJobs.add(s.job_id);
       const title = s.title || s.post_title || '(başlıksız)';
-      items.push({ time, plat:'sch', status:'plan', profile:s.profile_username||'', title, caption:'', thumb:s.preview_url||'', jobId:s.job_id||'', platforms:[], r: {
+      const sPlats = s.platforms || (s.platform ? [s.platform] : []);
+      items.push({ time, plat:'sch', status:'plan', profile:s.profile_username||'', title, caption:'', thumb:s.preview_url||'', jobId:s.job_id||'', platforms:sPlats, plats:platsCoz(sPlats), r: {
         title, 'preview-url': s.preview_url || '', description: '',
         'platform-status': 'Planlı ⏰ ' + (s.profile_username || ''), kategori: s.post_type || ''
       }});
@@ -9144,7 +9153,7 @@ async function loadTakvim() {
           if (sp.job_id && seenJobs.has(sp.job_id)) return;
           if (sp.job_id) seenJobs.add(sp.job_id);
           const title = sp.title || '(başlıksız)';
-          items.push({ time:sl.datetime_utc, plat:'sch', status:'plan', profile:p, title, caption:'', thumb:'', jobId:sp.job_id||'', platforms:sp.platforms||[], r: {
+          items.push({ time:sl.datetime_utc, plat:'sch', status:'plan', profile:p, title, caption:'', thumb:'', jobId:sp.job_id||'', platforms:sp.platforms||[], plats:platsCoz(sp.platforms), r: {
             title, 'preview-url':'', description:(sp.platforms||[]).join(', '),
             'platform-status':'Kuyruk ⏳ ' + p, kategori:'queue'
           }});
@@ -9209,9 +9218,35 @@ function takView(v) {
 
 const TAK_AYLAR = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const TAK_GUNLER = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
-function takFiltered(){ return (TAK.items||[]).filter(it => TAK.filter==='all' || TAK.filter===it.plat); }
+// Tek eşleşme kuralı — ay/hafta/gün görünümleri AYNI kuralı kullansın.
+// Planlı kayıtların plat'ı 'sch'tir; gerçek platformları plats[] içinde.
+// Bu yüzden FB filtresi hem yayınlanmış FB kayıtlarını hem de FB'ye
+// gidecek planlı/kuyruktaki kayıtları göstermeli.
+function takEslesir(it){
+  const f = TAK.filter;
+  if (f === 'all' || f === it.plat) return true;
+  return !!(it.plats && it.plats.indexOf(f) >= 0);
+}
+function takFiltered(){ return (TAK.items||[]).filter(takEslesir); }
+
+// Bazı planlı kayıtlar hangi platforma gideceğini bildirmiyor (Upload-Post
+// /schedule yanıtında platform alanı olmayabilir). Bunlar platform
+// filtresinde görünemez — sessizce kaybolmasınlar diye sayısı yazılır.
+function takBilinmeyenUyari(){
+  const el = document.getElementById('tak-bilinmeyen'); if (!el) return;
+  const f = TAK.filter;
+  const gizli = (f === 'all' || f === 'sch')
+    ? 0
+    : (TAK.items||[]).filter(it => it.plat === 'sch' && !(it.plats && it.plats.length)).length;
+  if (!gizli){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = gizli + ' planlı kayıt hangi platforma gideceğini bildirmiyor, bu yüzden platform '
+    + 'filtresinde görünmüyor — <b style="cursor:pointer;text-decoration:underline" onclick="takFilter(\'sch\')">⏰ Planlı</b>'
+    + ' ya da <b style="cursor:pointer;text-decoration:underline" onclick="takFilter(\'all\')">Tümü</b> ile görebilirsin.';
+}
 
 function renderTakvim() {
+  takBilinmeyenUyari();               // üç görünümde de geçerli
   if (TAK.view === 'hafta') return renderTakHafta();
   if (TAK.view === 'gun')   return renderTakGun();
   renderTakAy();
@@ -9254,7 +9289,7 @@ function renderTakAy() {
 
   // Upload-Post API'den gelen normalize edilmiş item'lar (schedule + history)
   (TAK.items || []).forEach(it => {
-    if (TAK.filter === 'all' || TAK.filter === it.plat) addItem(it.time, it);
+    if (takEslesir(it)) addItem(it.time, it);
   });
 
   // byDay'i TAK'a kaydet — modal erişimi için
