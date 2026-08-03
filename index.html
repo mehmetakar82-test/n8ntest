@@ -2396,7 +2396,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-20';
+const PANEL_YAPI = 'y2026.08.03-21';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -2775,6 +2775,7 @@ async function sendSingle() {
   showRes('sv-res', direkt ? '✓ Direkt yayın başlatıldı ['+selCat+']' : '✓ n8n\'e gonderildi ['+selCat+']','ok');
   recordSend(url, selCat);
   addLog('ok','webhook',(direkt?'Direkt yayın':'Video gonderildi')+' ['+selCat+']');
+  await oncelikIsaretle('sv-cats', url.slice(0,60));
 }
 
 async function sendBulkURLs() {
@@ -2810,6 +2811,7 @@ async function sendBulkURLs() {
   }
   setEl('bv-st','✓ '+urls.length+' URL × '+selCats.length+' kategori gonderildi');
   addLog('ok','webhook','Toplu tamamlandi ['+selCats.join(',')+']:'+urls.length);
+  await oncelikIsaretle('bv-cats', urls.length+' video (toplu)');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3080,6 +3082,7 @@ function renderCatChips(id) {
   renderLangToggle(id);
   updateLangVisibility(id);
   renderPlatToggle(id);
+  renderOncelikToggle(id);
   // chip'ler yeniden cizildi -> stok isaretlerini geri koy (veri yoksa sessiz gecer)
   try{ stokChipIsaretle(); }catch(e){}
 }
@@ -3152,6 +3155,60 @@ function renderPlatToggle(id) {
   anchor.insertAdjacentElement('afterend', div);
 }
 function platChipToggle(el) { el.classList.toggle('sel'); }
+
+// ── ÖNE AL ANAHTARI (gönderim formlarında) ─────────────────────────────
+// Gönderim anında short'lar HENÜZ YOK — OpusClip onları dakikalar sonra
+// üretiyor ve n8n kuyruğa ekliyor. Bu yüzden "başa al" gönderirken
+// UYGULANAMAZ, ancak İŞARETLENEBİLİR: anahtar açıkken kuyruğun o anki
+// iş kimlikleri bir anlık görüntüye alınır. Short'lar sonradan kuyruğa
+// girince Takvim → ⏫ Öne Al onları "yeni" diye tanıyıp hazır seçili
+// getirir; tek tık kalır.
+// Otomatik uygulanMIYOR: aradan başka videoların short'ları da girmiş
+// olabilir, sıralamayı onaysız değiştirmek yanlış short'u başa alabilir.
+function renderOncelikToggle(id){
+  const catsEl = document.getElementById(id);
+  if (!catsEl || document.getElementById(id+'-oncelik')) return;
+  const div = document.createElement('div');
+  div.id = id+'-oncelik';
+  div.style.marginTop = '6px';
+  div.innerHTML = '<div class="cat-chips" style="margin:0">'
+    + '<span class="cat-chip" data-oncelik="1" onclick="oncelikChipToggle(this)" '
+    + 'title="Bu videonun short\'ları kuyruğun BAŞINA alınsın. Short\'lar üretilene kadar bekler; '
+    + 'hazır olunca Takvim → ⏫ Öne Al ekranında seçili gelir, onaylayınca başa geçer.">⏫ Öne al</span>'
+    + '</div>';
+  const anchor = document.getElementById(id+'-plat') || document.getElementById(id+'-lang') || catsEl;
+  anchor.insertAdjacentElement('afterend', div);
+}
+function oncelikChipToggle(el){ el.classList.toggle('sel'); }
+function getSelOncelik(containerId){
+  return !!document.querySelector('#'+containerId+'-oncelik .cat-chip.sel');
+}
+
+// Anlık görüntü: şu an kuyrukta olan iş kimlikleri. Sonradan görünen her
+// kimlik "bu gönderimden sonra üretilmiş" demektir.
+const ONCELIK_ANAHTAR = 'op_oncelik_bekleyen';
+function oncelikOku(){
+  try { return JSON.parse(localStorage.getItem(ONCELIK_ANAHTAR)||'null'); } catch(e){ return null; }
+}
+function oncelikTemizle(){ try { localStorage.removeItem(ONCELIK_ANAHTAR); } catch(e){} }
+async function oncelikIsaretle(containerId, etiket){
+  if (!getSelOncelik(containerId)) return;
+  if (!S.cfg.blot && !getN8N()){ toast('Öne alma işaretlenemedi — Upload-Post API Key gerekli','warn',5000); return; }
+  try {
+    const { data } = await upFetchRetry('/uploadposts/schedule');
+    const liste = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
+    const jidler = liste.map(x=>String(x.job_id||'')).filter(Boolean);
+    // Önceki işaret varsa KORUNUR: en eski anlık görüntü referans alınmalı,
+    // yoksa arka arkaya iki öncelikli gönderimde ilkinin short'ları "yeni"
+    // sayılmaz olurdu.
+    const eski = oncelikOku();
+    if (!eski) localStorage.setItem(ONCELIK_ANAHTAR, JSON.stringify({ t:Date.now(), jidler, etiket:String(etiket||'') }));
+    toast('⏫ Öne alma işaretlendi — short\'lar üretilince Takvim → ⏫ Öne Al\'da seçili gelecek','ok',7000);
+    addLog('info','uploadpost','Öne alma işareti: '+(etiket||'')+' ('+jidler.length+' mevcut iş)');
+  } catch(e){
+    toast('Öne alma işaretlenemedi: '+(e.message||''),'warn',6000);
+  }
+}
 
 // Seçili platform anahtarlarını döndürür; hiçbiri seçili değilse hepsini
 // döndürür (hiçbir yere yayınlamamak yerine, kaza sonucu tümü kapatılmışsa)
@@ -9186,7 +9243,8 @@ document.addEventListener('DOMContentLoaded', function() {
       scanSheet,sendSheetURLs,filterTbl,exportCSV,loadReports,loadPlatforms,
       saveSettings,updateWHs,copyText,renderLogs,
       clearLogs,exportLogs,loadTakvim,takPrev,takNext,takFilter,openDayModal,takEslesir,takBilinmeyenUyari,
-      oneAlAc,oneAlKapat,oneAlYukle,oneAlCiz,oneAlSec,oneAlFiltreSec,oneAlHesapla,oneAlUygula,
+      oneAlAc,oneAlKapat,oneAlYukle,oneAlCiz,oneAlSec,oneAlFiltreSec,oneAlHesapla,oneAlUygula,oneAlIsaretiUnut,
+      renderOncelikToggle,oncelikChipToggle,getSelOncelik,oncelikIsaretle,oncelikOku,oncelikTemizle,
       closeDayModal,showTakTip,hideTakTip,dmFilter,dmToggleSort,
       searchYTChannel,ytkSelectAll,ytkClearAll,ytkSendSelected,ytkAddToSheet,
       ytkPickChannel,ytkLoadMore,ytkLoadAll,renderYTKVideos,
@@ -10042,6 +10100,18 @@ async function oneAlYukle(){
       .filter(k => k.jid && k.t)          // kimliksiz/tarihsiz sıralamaya giremez
       .sort((a,b) => a.t - b.t);
     ONEAL.tarihsiz = tarihsiz;
+    // Gönderim sırasında "⏫ Öne al" işaretlenmişse: o andan SONRA kuyruğa
+    // giren işler bu videonun short'larıdır. Hazır seçili gelirler ama
+    // OTOMATİK UYGULANMAZ — araya başka videoların short'ları da girmiş
+    // olabilir, onaysız sıralama yanlış short'u başa alabilir.
+    const isaret = oncelikOku();
+    ONEAL.yeni = 0;
+    if (isaret && Array.isArray(isaret.jidler)){
+      const eski = new Set(isaret.jidler);
+      ONEAL.kayitlar.forEach(k=>{ if (!eski.has(k.jid)){ k.yeni = true; ONEAL.secim.add(k.jid); ONEAL.yeni++; } });
+      ONEAL.isaretEtiket = isaret.etiket || '';
+      ONEAL.isaretZaman = isaret.t || 0;
+    }
     oneAlCiz();
   } catch(e){
     kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Okunamadı: '+histHataMetni(e)});
@@ -10063,8 +10133,16 @@ function oneAlCiz(){
     return;
   }
   const gorunen = ONEAL.kayitlar.filter(oneAlEsle);
-  kutu.innerHTML =
-    '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">'+ONEAL.kayitlar.length+' bekleyen gönderi · '
+  const bant = ONEAL.yeni
+    ? '<div style="background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.35);border-radius:6px;'
+      + 'padding:8px 11px;margin-bottom:8px;font-size:11.5px;line-height:1.55;color:var(--tx)">'
+      + '<b>⏫ Öne alma işareti bulundu</b>'+(ONEAL.isaretEtiket ? ' — '+esc(ONEAL.isaretEtiket) : '')
+      + '<div style="color:var(--mt)">İşaretten sonra kuyruğa giren <b>'+ONEAL.yeni+' gönderi</b> seçili geldi. '
+      + 'Doğru short\'lar mı, listeden bak; değilse işareti kaldırıp elle seç. '
+      + '<b style="cursor:pointer;text-decoration:underline" onclick="oneAlIsaretiUnut()">işareti temizle</b></div></div>'
+    : '';
+  kutu.innerHTML = bant
+    + '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">'+ONEAL.kayitlar.length+' bekleyen gönderi · '
     + gorunen.length+' görünüyor · <b style="color:var(--acc)">'+ONEAL.secim.size+' seçili</b>'
     + (ONEAL.tarihsiz ? ' · '+ONEAL.tarihsiz+' kayıt tarihsiz (sıralamaya giremez)' : '')+'</div>'
     + gorunen.slice(0,300).map(k=>{
@@ -10074,6 +10152,7 @@ function oneAlCiz(){
           + '<span style="flex-shrink:0;color:var(--mt);font-variant-numeric:tabular-nums">'
           +   new Date(k.t).toLocaleString('tr',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+'</span>'
           + '<span class="badge bi" style="flex-shrink:0;font-size:10px">'+esc(k.plat)+'</span>'
+          + (k.yeni ? '<span class="badge bs2" style="flex-shrink:0;font-size:10px" title="Öne alma işaretinden SONRA kuyruğa girdi">yeni</span>' : '')
           + '<span style="color:'+(s?'var(--tx)':'var(--mt)')+';word-break:break-word">'+esc(k.baslik)+'</span></label>';
       }).join('')
     + (gorunen.length>300 ? '<div style="font-size:11px;color:var(--mt);padding:4px 0">… ve '+(gorunen.length-300)+' tane daha (aramayla daralt)</div>' : '');
@@ -10083,6 +10162,15 @@ function oneAlCiz(){
   }
 }
 function oneAlSec(jid, v){ if (v) ONEAL.secim.add(jid); else ONEAL.secim.delete(jid); oneAlCiz(); }
+// İşareti at: yanlış yakalamışsa kullanıcı elle seçmek isteyebilir
+function oneAlIsaretiUnut(){
+  oncelikTemizle();
+  ONEAL.yeni = 0; ONEAL.isaretEtiket = '';
+  ONEAL.kayitlar.forEach(k=>{ delete k.yeni; });
+  ONEAL.secim.clear();
+  oneAlCiz();
+  toast('Öne alma işareti temizlendi — seçim sende','info',4000);
+}
 function oneAlFiltreSec(v){
   ONEAL.kayitlar.filter(oneAlEsle).forEach(k=>{ if (v) ONEAL.secim.add(k.jid); else ONEAL.secim.delete(k.jid); });
   oneAlCiz();
@@ -10125,6 +10213,9 @@ async function oneAlUygula(){
     await new Promise(r=>setTimeout(r,180));    // hız sınırına nefes payı
   }
   const ozet = ok+' gönderi güncellendi'+(hata?' · '+hata+' başarısız'+(sonHata?' — '+sonHata:'') : '');
+  // İş bitti: işaret tüketildi. Hata varsa da temizlenir — aksi hâlde bir
+  // sonraki açılışta aynı gönderiler yeniden "yeni" diye seçili gelirdi.
+  if (ONEAL.yeni) oncelikTemizle();
   toast((hata?'⚠ ':'✓ ')+'Öne al: '+ozet, hata?'warn':'ok', 8000);
   addLog(hata?'warn':'ok','uploadpost','Öne al ('+((document.getElementById('oneal-profil')||{}).value||'')+'): '+ozet);
   // KISMİ HATA OLASILIĞI: bazı tarihler değişti, bazıları değişmedi.
@@ -12436,7 +12527,7 @@ function initRadar(){
   if(chips && !chips.dataset.ready){
     chips.innerHTML=Object.entries(getCats()).map(([k,c])=>'<span class="cat-chip'+(k==='genel'?' sel':'')+'" data-cat="'+k+'" onclick="catChipToggle(this,\'rd-cats\')">'+c.label+'</span>').join('');
     chips.dataset.ready='1';
-    try{ renderLangToggle('rd-cats'); updateLangVisibility('rd-cats'); }catch(e){}
+    try{ renderLangToggle('rd-cats'); updateLangVisibility('rd-cats'); renderOncelikToggle('rd-cats'); }catch(e){}
   }
   try{ rdHaftaTara(false); }catch(e){}
   try{ const c=rdKatOnbellekOku(); if(c){ RD.kat=c.veri; rdRenderKat();
@@ -13142,6 +13233,7 @@ async function rdSendSelected(){
   const ek = bekleyen ? ' — n8n işliyor (OpusClip klip üretimi birkaç dakika sürer)' : '';
   showRes('rd-res',(sent===sel.length?'✓ ':'')+sent+'/'+sel.length+' video işleme alındı ['+sonCats.join(', ')+']'+ek, sent?'ok':'err');
   if(sent) toast('✓ '+sent+' video işleme alındı'+(bekleyen?' (n8n işliyor)':''),'ok');
+  if(sent) await oncelikIsaretle('rd-cats', sent+' trend video');
   renderRadar();
 }
 window.initRadar=initRadar; window.loadRadar=loadRadar; window.rdKatSec=rdKatSec; window.rdKatSatiri=rdKatSatiri; window.rdKategoriTara=rdKategoriTara; window.rdRenderKat=rdRenderKat; window.rdToggle=rdToggle; window.rdSendSelected=rdSendSelected; window.rdOpenChannel=rdOpenChannel;
