@@ -1492,6 +1492,9 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div id="es-govde" style="padding:14px 18px;overflow-y:auto"></div>
     <div id="es-alt" style="padding:10px 18px;border-top:1px solid var(--brd);display:none">
       <button class="btn bp bsm" id="es-gonder-btn" onclick="esitleGonder()">⚖ Kuyruğa Al</button>
+      <label style="font-size:11.5px;color:var(--mt);margin-left:10px">platform başına en fazla
+        <input id="es-limit" type="number" min="1" step="1" placeholder="hepsi"
+               style="width:70px;padding:1px 5px;font-size:11.5px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;color:var(--tx)"></label>
       <span id="es-durum" style="font-size:12px;color:var(--mt);margin-left:10px"></span>
       <div style="font-size:11.5px;color:var(--mt);margin-top:6px">
         Eksikler <b>kuyruğa</b> eklenir — hepsi aynı anda yayınlanmaz, her profilin kendi yayın ritmine dağılır.
@@ -2333,7 +2336,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-1';
+const PANEL_YAPI = 'y2026.08.03-2';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4520,7 +4523,7 @@ function platDoldurKapat(){ const m=document.getElementById('plat-doldur-modal')
 // İKİ platformu TEK geçişte toplar. Eskiden kaynak ve hedef için ayrı ayrı
 // (üstelik paralel) çağrılıyordu: aynı geçmiş iki kez çekiliyor, Kapsama
 // Denetimi de üçüncü kez isteyince Upload-Post HTTP 429 veriyordu.
-async function pdBasliklar(profil, platlar){
+async function pdBasliklar(profil, platlar, sayfa){
   const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook', x:'x', twitter:'x' };
   const norm = t => String(t||'').trim().toLowerCase().replace(/\s+/g,' ');
   const out = {};
@@ -4531,7 +4534,7 @@ async function pdBasliklar(profil, platlar){
     out[p].mevcut.add(n);
     if (yayindaMi) out[p].yayinlanan.set(n, b);
   };
-  const onb = await histCek(KAPSAMA_SAYFA);          // paylaşılan önbellek
+  const onb = await histCek(sayfa || KAPSAMA_SAYFA);  // paylaşılan önbellek
   (onb.kayitlar || []).forEach(x => {
     if (String(x.profile_username||x.user||'') !== profil) return;
     const p = NP[String(x.platform||'').toLowerCase()];
@@ -4791,7 +4794,9 @@ async function pdKlipDizini(ilerle){
     kl.forEach(k => {
       const url = k.uriForExport || k.exportUrl || k.url || '';
       const baslik = String(k.title || k.headline || '');
-      if (url && baslik) liste.push({ baslik, url, n: ydNorm(baslik) });
+      // createdAt de alınır: pencere koruması başlıkla bulunanlara da uygulanabilsin
+      if (url && baslik) liste.push({ baslik, url, n: ydNorm(baslik),
+                                      tarih: String(k.createdAt || k.created_at || ''), clipId: String(k.id || k.clipId || '') });
     });
     n++;
     if (ilerle) ilerle('OpusClip taranıyor ('+n+'/'+hedefler.length+') · '+liste.length+' klip…');
@@ -5253,6 +5258,10 @@ function kapsamaPlanDus(profil, platform){
 // bir short "bu platformda yok" görünebilir ama aslında pencere dışında
 // yayınlanmıştır. Onu göndermek ÇİFT yayın olurdu — bu yüzden pencere
 // başlangıcından eski short'lar "belirsiz" sayılır ve GÖNDERİLMEZ.
+// Eşitleme geçmişi 10 sayfayla sınırlıydı; 15 profile bölünen 1000 kayıt
+// her profilin eskisini görünmez yapıyordu. histCek son sayfaya varınca
+// kendiliğinden durur — bu tavan yalnız sonsuz döngüye karşı.
+const ES_SAYFA = 60;                 // 6000 kayda kadar
 const ESITLE = { profil:'', aday:[] };
 function esitleKapat(){ const m = document.getElementById('esitle-modal'); if (m) m.style.display = 'none'; }
 
@@ -5270,9 +5279,15 @@ async function esitleAc(profil){
       return;
     }
     await ydEnsureShorts();
-    const ikili = await pdBasliklar(profil, platlar);      // tüm platformlar TEK geçişte
-    // Pencere başlangıcı: geçmiş penceresi doluysa görünen en eski kayıt
-    const onb = await histCek(KAPSAMA_SAYFA);
+    // DERİN GEÇMİŞ: 10 sayfalık pencere (1000 kayıt) 15 profile bölününce
+    // her profilin eskisi görünmez oluyordu; "pencere dışı" yüzünden hiçbir
+    // short gönderilemiyordu. Burada pencere BİTENE kadar okunur (histCek
+    // son sayfaya varınca kendi durur), böylece koruma çoğu zaman hiç
+    // devreye girmez. Sonuç paylaşılan önbelleğe yazılır.
+    govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Tam yayın geçmişi okunuyor (birkaç saniye)…'});
+    const onb = await histCek(ES_SAYFA);
+    const ikili = await pdBasliklar(profil, platlar, ES_SAYFA);   // tüm platformlar TEK geçişte
+    // Pencere başlangıcı: geçmiş HÂLÂ kırpıksa görünen en eski kayıt
     let pencereBasi = 0;
     if (onb.kirpik){
       (onb.kayitlar || []).forEach(x => {
@@ -5285,25 +5300,45 @@ async function esitleAc(profil){
     platlar.forEach(p => ikili[p].yayinlanan.forEach((ham, n) => { if (!hedef.has(n)) hedef.set(n, ham); }));
     const ozet = {};
     platlar.forEach(p => ozet[p] = { eksik:0, kaynaksiz:0, belirsiz:0, olu:0, gonder:0 });
-    const kaynakOnb = new Map();
-    let aday = [];
+    // 1. geçiş: Sheet'ten kaynak çöz, eksikleri topla
+    const kaynakOnb = new Map(), eksikHarita = new Map();
     hedef.forEach((ham, n) => {
       const eksikPlat = platlar.filter(p => !ikili[p].mevcut.has(n));
       if (!eksikPlat.length) return;
-      if (!kaynakOnb.has(n)) kaynakOnb.set(n, ydFindSource(ham, '', profil, ''));
+      eksikHarita.set(n, { ham, platlar:eksikPlat });
+      kaynakOnb.set(n, ydFindSource(ham, '', profil, ''));
+    });
+    // 2. geçiş: Sheet'te eşleşmeyenleri OpusClip başlıklarıyla ara —
+    // "kaynak yok" tek başına en büyük engeldi (platform başına 30-50 kayıt).
+    const kayipAd = [];
+    eksikHarita.forEach((v, n) => { const s = kaynakOnb.get(n); if (!s || !s.video) kayipAd.push(n); });
+    let dizinHatasi = '';
+    if (kayipAd.length){
+      try {
+        const dizin = await pdKlipDizini(m => { govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:m}); });
+        kayipAd.forEach(n => {
+          const k = pdBaslikEslesme(dizin, eksikHarita.get(n).ham);
+          if (k) kaynakOnb.set(n, { video:k.url, caption:'', clipId:k.clipId||'', tarih:k.tarih||'' });
+        });
+      } catch(e){ dizinHatasi = e.message || 'OpusClip taranamadı'; console.warn('[ES] dizin:', dizinHatasi); }
+    }
+    // 3. geçiş: adayları kur
+    let aday = [];
+    eksikHarita.forEach((v, n) => {
       const s = kaynakOnb.get(n);
-      eksikPlat.forEach(p => {
+      v.platlar.forEach(p => {
         ozet[p].eksik++;
         if (!s || !s.video){ ozet[p].kaynaksiz++; return; }
         const st = Date.parse(s.tarih||'') || 0;
         // Pencere koruması: tarih pencereden eski YA DA bilinmiyorsa çift riski
         if (pencereBasi && (!st || st < pencereBasi)){ ozet[p].belirsiz++; return; }
         aday.push({ _profil:profil, _video:s.video, _caption:s.caption||'', _clipId:s.clipId||'',
-                    plat:PD_PLAT_KEY[p], platform:p, title:ham });
+                    plat:PD_PLAT_KEY[p], platform:p, title:v.ham });
       });
     });
     // Erişilebilirlik: aynı video birden çok platforma gidebilir — TEK sına.
     // Ölü çıkanlar clip-id ile OpusClip'ten tazelenmeye çalışılır.
+    let tazeHatasi = '';
     if (aday.length){
       const urlDurum = new Map();
       aday.forEach(a => { if (!urlDurum.has(a._video)) urlDurum.set(a._video, null); });
@@ -5321,7 +5356,8 @@ async function esitleAc(profil){
         let harita = new Map();
         if (idler.length){
           try { harita = await pdTazeLinkler(idler, m => { govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:m}); }); }
-          catch(e){ console.warn('[ES] tazeleme:', e.message); }
+          // Sessizce yutulursa "30 kaynağı indirilemedi" sebepsiz görünür
+          catch(e){ tazeHatasi = e.message || 'tazeleme başarısız'; console.warn('[ES] tazeleme:', tazeHatasi); }
         }
         const tazeDurum = new Map();
         for (const url of new Set(harita.values()))
@@ -5362,13 +5398,27 @@ async function esitleAc(profil){
           ).join('')
         + '</div>'
       : '';
-    const uyari = platlar.some(p => ozet[p].belirsiz)
-      ? '<div style="font-size:11.5px;color:#f5a623;margin-top:8px">Geçmiş penceresi dolu: pencereden eski short\'ların '
-        + 'hangi platformda yayınlandığı bilinemiyor — çift yayın riski yüzünden onlar gönderilmez.</div>'
+    // Engel kalırsa SEBEBİ yazılır — "0 gönderilecek" tek başına ne
+    // yapılacağını söylemiyordu (yaşandı: beş platform da sıfır çıktı).
+    const uyarilar = [];
+    if (platlar.some(p => ozet[p].belirsiz))
+      uyarilar.push('<b>Pencere dışı:</b> geçmiş '+(onb.kayitlar||[]).length+' kayıtta bile dolmadı; '
+        + 'pencereden eski short\'ların hangi platformda yayınlandığı bilinemiyor — çift yayın riski yüzünden gönderilmez.');
+    if (platlar.some(p => ozet[p].kaynaksiz))
+      uyarilar.push('<b>Kaynak yok:</b> bu short\'lar short-kaydetme tablosunda eşleşmedi'
+        + (dizinHatasi ? ' ve OpusClip\'te aranamadı ('+esc0(dizinHatasi)+')' : ' ve OpusClip klip başlıklarında da bulunamadı')+'.');
+    if (platlar.some(p => ozet[p].olu))
+      uyarilar.push('<b>İndirilemedi:</b> kaynak mp4 artık erişilemiyor'
+        + (tazeHatasi ? ' ve taze link alınamadı ('+esc0(tazeHatasi)+')' : ' ve OpusClip\'te taze link de bulunamadı')+'.');
+    const uyari = uyarilar.length
+      ? '<div style="font-size:11.5px;color:#f5a623;margin-top:8px;line-height:1.6">'
+        + uyarilar.map(u => '<div>'+u+'</div>').join('') + '</div>'
       : '';
     govde.innerHTML =
       '<div style="background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:10px 14px">'
       + '<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:6px">Hedef küme: '+hedef.size+' short (herhangi bir platformda var olan)</div>'
+      + '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">'+(onb.kayitlar||[]).length+' geçmiş kaydı okundu'
+      + (onb.kirpik ? ' — <span style="color:#f5a623">pencere hâlâ dolu</span>' : ' — <span style="color:var(--ok)">tam geçmiş</span>')+'</div>'
       + sat + uyari + '</div>' + listeHtml;
     if (aday.length){
       document.getElementById('es-alt').style.display = '';
@@ -5382,29 +5432,44 @@ async function esitleAc(profil){
 }
 
 async function esitleGonder(){
-  const aday = ESITLE.aday || [];
-  if (!aday.length) return;
+  const tumu = ESITLE.aday || [];
+  if (!tumu.length) return;
   const btn = document.getElementById('es-gonder-btn');
+  // Platform başına sınır: yüzlerce short'u tek seferde kuyruğa basmak
+  // aylarca sürecek bir kuyruk demek — kullanıcı parça parça ilerleyebilsin.
+  const limit = parseInt((document.getElementById('es-limit')||{}).value, 10);
+  let aday = tumu;
+  if (limit > 0){
+    const say = {};
+    aday = tumu.filter(a => (say[a.platform] = (say[a.platform]||0)+1) <= limit);
+  }
+  if (!aday.length) return;
   const sayim = {};
   aday.forEach(a => sayim[a.platform] = (sayim[a.platform]||0)+1);
   const dokum = Object.entries(sayim).map(([p,n]) => PD_AD[p]+': '+n).join(', ');
-  if (!confirm(aday.length+' short, '+ESITLE.profil+' profilinin eksik platform kuyruklarına eklenecek ('+dokum+').\n\n'
-      + 'Hepsi aynı anda yayınlanmaz — her platformun sıradaki boş yuvalarına dağıtılır.\n\nDevam edilsin mi?')) return;
+  if (!confirm(aday.length+' short, '+ESITLE.profil+' profilinin eksik platform kuyruklarına eklenecek ('+dokum+').'
+      + (aday.length < tumu.length ? '\n\n('+tumu.length+' adaydan sınır uygulanarak seçildi.)' : '')
+      + '\n\nHepsi aynı anda yayınlanmaz — her platformun sıradaki boş yuvalarına dağıtılır.'
+      + '\nZaten yayınlanmış ya da kuyrukta olanlar çift korumasıyla ayrıca elenir.\n\nDevam edilsin mi?')) return;
   btn.disabled = true;
-  let ok=0, hata=0; const hatalar=[];
+  // Çift koruması tarafından elenenler HATA DEĞİL — ayrı sayılır, yoksa
+  // "başarısız" sütunu korumanın çalışmasını arıza gibi gösterir.
+  let ok=0, hata=0, cift=0; const hatalar=[];
   await upSirali(aday, async it => {
     const s = await ydTopluGonder(it);
     if (s.ok){ ok++; it._ok = true; kapsamaPlanArtir(ESITLE.profil, it.platform); }
+    else if (s.sebep === 'cift'){ cift++; it._ok = true; }   // zaten var → listeden düşsün
     else { hata++; if (hatalar.length<4) hatalar.push(PD_AD[it.platform]+': '+(s.mesaj||s.sebep)); }
-    btn.textContent = '⏳ '+(ok+hata)+'/'+aday.length;
+    btn.textContent = '⏳ '+(ok+hata+cift)+'/'+aday.length;
   }, 2);
   btn.disabled = false;
-  const ozet = ok+' kuyruğa alındı'+(hata?' · '+hata+' başarısız':'');
+  const ozet = ok+' kuyruğa alındı'+(cift?' · '+cift+' çift önlendi':'')+(hata?' · '+hata+' başarısız':'');
   setEl('es-durum', ozet + (hatalar.length ? ' — '+hatalar[0] : ''));
-  toast((ok?'✓ ':'✕ ')+ESITLE.profil+' eşitleme: '+ozet, ok?'ok':'err', 7000);
+  toast((ok?'✓ ':(cift?'⚠ ':'✕ '))+ESITLE.profil+' eşitleme: '+ozet, ok?'ok':(cift?'warn':'err'), 7000);
   addLog(hata?'warn':'ok','uploadpost','Eşitle ('+ESITLE.profil+'): '+ozet+(hatalar.length?' | '+hatalar.join(' | '):''));
-  // Gönderilenler düşer — ikinci tık aynıları göndermesin; kalanlar denenebilir
-  ESITLE.aday = aday.filter(a => !a._ok);
+  // Gönderilen/elenen düşer. TÜMÜ üzerinden süzülür: sınır uygulandıysa
+  // sıraya girmeyen adaylar listede KALMALI (aday alt kümeydi).
+  ESITLE.aday = tumu.filter(a => !a._ok);
   if (!ESITLE.aday.length) document.getElementById('es-alt').style.display = 'none';
   else btn.textContent = '⚖ '+ESITLE.aday.length+' short\'u kuyruğa al';
 }
