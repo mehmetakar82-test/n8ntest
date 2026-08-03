@@ -1445,13 +1445,8 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms(true)" title="Önbelleği atlar, Upload-Post'tan taze veri çeker">↻ Yenile</button>
     <button class="btn bg bsm" id="plat-kapsama-btn" onclick="platKapsama()" title="Profil × platform matrisi: her bağlı hesabın yayınlanmış / başarısız / planlı sayıları. Hiç kaydı olmayan hesaplar kırmızı HİÇ ile işaretlenir — 'bu hesaba hiç video gitmemiş' sorusunun cevabı">📋 Kapsama Denetimi</button>
-    <button class="btn bg bsm" id="plat-cift-btn" onclick="platCiftKontrol()" title="Aynı short aynı hesaba iki kez mi gitmiş? Yayınlanmış + planlı + kuyruk kayıtları başlık bazında karşılaştırılır; iki kez yayınlananlar, yayınlandığı hâlde hâlâ kuyrukta bekleyenler ve kuyruktaki çift kopyalar listelenir">🔁 Çift Kontrolü</button>
-    <button class="btn bg bsm" id="plat-temizle-btn" onclick="upTemizleBasliklar()" title="Upload-Post kuyruğunda BEKLEYEN zamanlanmış gönderilerin açıklamalarından 'İstediğin Başlık' / 'Your Title Here' yer tutucularını toplu kaldırır">🧹 Açıklamaları Temizle</button>
-    <label style="display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--mt);cursor:pointer"
-           title="Saatte bir çift kontrolü çalışır ve kuyruktaki çift kopyaları siler: her short'un EN ERKEN kopyası kalır, yayınlanmış gönderilere dokunulmaz, birden çok platforma bağlı işler otomatik silinmez. Panel AÇIKKEN çalışır — kapalıyken temizlik yapılmaz.">
-      <input type="checkbox" id="plat-cift-oto" onchange="ciftOtoDegisti()" style="width:auto;margin:0"> ⏱ saatte bir otomatik temizle
-      <span id="plat-cift-oto-durum" style="color:var(--acc)"></span>
-    </label>
+    <span id="plat-cift-oto-durum" style="font-size:11.5px;color:var(--mt);align-self:center"
+          title="Çift kontrolü saatte bir kendiliğinden çalışır: kuyruktaki çift kopyalar silinir (her short'un EN ERKEN kopyası kalır), yayınlanmış gönderilere dokunulmaz, birden çok platforma bağlı işler otomatik silinmez. Çift bulunursa liste aşağıda kendiliğinden açılır. Panel AÇIKKEN çalışır — kapalıyken temizlik yapılmaz."></span>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-ozet" style="font-size:12px;color:var(--tx);align-self:center"></span>
     <span id="plat-ozet2" style="font-size:12px;color:var(--mt);align-self:center"></span>
@@ -2396,7 +2391,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-23';
+const PANEL_YAPI = 'y2026.08.04-01';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -5794,22 +5789,6 @@ async function ciftTara(){
   }
 }
 
-async function platCiftKontrol(){
-  const btn = document.getElementById('plat-cift-btn');
-  const kutu = document.getElementById('plat-cift'); if (!kutu) return;
-  if (!S.cfg.blot && !getN8N()){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
-  if (btn) btn.disabled = true;
-  kutu.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Geçmiş + plan + kuyruk, çift kayıt için taranıyor…'});
-  try {
-    const s = await ciftTara();
-    ciftCiz();
-    const top = s.ciftYayin.length + s.tekrarRisk.length + s.ciftPlan.length;
-    addLog(top?'warn':'ok','uploadpost','Çift kontrolü: '+top+' çift ('+s.ciftYayin.length+' yayın, '+s.tekrarRisk.length+' tekrar riski, '+s.ciftPlan.length+' kuyruk)');
-  } catch(e){
-    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Çift kontrolü başarısız: '+histHataMetni(e)});
-  } finally { if (btn) btn.disabled = false; }
-}
-
 // Son taramanın sonuçları — silme sonrası TARAMASIZ yeniden çizim için
 const CIFT_SON = { kayit:0, kirpik:false, ciftYayin:[], tekrarRisk:[], ciftPlan:[],
                    gizli:0, gizliGoster:false, gizliListe:[] };
@@ -6062,11 +6041,15 @@ function ciftYoksayTemizle(){
   addLog('info','uploadpost','Yoksayılan çiftler geri alındı: '+n+' kayıt');
 }
 
-// ── OTOMATİK ÇİFT TEMİZLİĞİ (saatte bir) ───────────────────────────────
+// ── ÇİFT KONTROLÜ (saatte bir, kendiliğinden) ──────────────────────────
 // Elle basılan 🗑 düğmeleriyle AYNI mantığı kullanır (ciftTara +
 // ciftHedefler + ciftIsleriSil): çok platformlu ve kimliksiz işlere
 // dokunulmaz, kuyruk çiftlerinde EN ERKEN kopya kalır, yayınlanmış
 // gönderi hiç silinmez. Yalnız KUYRUK kaydı silinir.
+// AÇMA/KAPAMA YOK — kullanıcı isteğiyle hep açık: "🔁 Çift Kontrolü"
+// düğmesi ve "saatte bir otomatik temizle" onay kutusu kaldırıldı.
+// Elle tetikleyecek düğme kalmadığı için TARAMA da bu turun içinde:
+// çift bulunursa liste KENDİLİĞİNDEN açılır, tek gösterge de durum satırı.
 // SINIR: panel bir tarayıcı sayfası — bu döngü yalnızca panel AÇIKKEN
 // çalışır. Panel kapalıyken temizlik yapılmaz.
 const CIFT_OTO_ANAHTAR = 'op_cift_oto';
@@ -6075,37 +6058,23 @@ const CIFT_OTO_TAVAN   = 25;          // tek turda azami silme — kaçak koruma
 let CIFT_OTO_ZAMANLAYICI = null;
 let CIFT_OTO_CALISIYOR = false;
 
-function ciftOtoAcik(){ try { return localStorage.getItem(CIFT_OTO_ANAHTAR) === '1'; } catch(e){ return false; } }
 function ciftOtoSon(){ try { return parseInt(localStorage.getItem(CIFT_OTO_ANAHTAR+'_t'), 10) || 0; } catch(e){ return 0; } }
 function ciftOtoSonuc(){ try { return localStorage.getItem(CIFT_OTO_ANAHTAR+'_s') || ''; } catch(e){ return ''; } }
 
 function ciftOtoDurumYaz(){
   const el = document.getElementById('plat-cift-oto-durum'); if (!el) return;
-  if (!ciftOtoAcik()){ el.textContent = ''; return; }
-  const t = ciftOtoSon();
-  const sonuc = ciftOtoSonuc();
-  el.innerHTML = t
-    ? 'son: ' + new Date(t).toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'})
-      + (sonuc ? ' · ' + esc0(sonuc) : '')
-    : 'ilk tur birazdan';
-}
-
-function ciftOtoDegisti(){
-  const kutu = document.getElementById('plat-cift-oto');
-  const acik = !!(kutu && kutu.checked);
-  try { localStorage.setItem(CIFT_OTO_ANAHTAR, acik ? '1' : '0'); } catch(e){}
-  ciftOtoKur();
-  toast(acik ? '⏱ Otomatik çift temizliği açık — saatte bir kuyruktaki çift kopyalar silinecek'
-             : 'Otomatik çift temizliği kapatıldı', acik ? 'ok' : 'info', 5000);
-  addLog('info','uploadpost','Otomatik çift temizliği: '+(acik?'AÇIK':'kapalı'));
+  const t = ciftOtoSon(), sonuc = ciftOtoSonuc();
+  // textContent — sonuç metni hata mesajı taşıyabiliyor, HTML'e gömülmesin
+  el.textContent = '🔁 Çift kontrolü: saatte bir · '
+    + (CIFT_OTO_CALISIYOR ? 'taranıyor…'
+       : t ? ('son ' + new Date(t).toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'})
+              + (sonuc ? ' · ' + sonuc : ''))
+           : 'ilk tur birazdan');
 }
 
 function ciftOtoKur(){
   if (CIFT_OTO_ZAMANLAYICI){ clearInterval(CIFT_OTO_ZAMANLAYICI); CIFT_OTO_ZAMANLAYICI = null; }
-  const kutu = document.getElementById('plat-cift-oto');
-  if (kutu) kutu.checked = ciftOtoAcik();
   ciftOtoDurumYaz();
-  if (!ciftOtoAcik()) return;
   // Dakikada bir BAKILIR, saatte bir ÇALIŞIR: son çalışma zamanı
   // localStorage'da; panel kapanıp açılınca sayaç sıfırlanmasın.
   CIFT_OTO_ZAMANLAYICI = setInterval(ciftOtoTik, 60000);
@@ -6113,7 +6082,15 @@ function ciftOtoKur(){
 }
 
 async function ciftOtoTik(){
-  if (!ciftOtoAcik() || CIFT_OTO_CALISIYOR) return;
+  if (CIFT_OTO_CALISIYOR) return;
+  // Yapılandırma yoksa turu HİÇ başlatma: ciftOtoCalis zaman damgası
+  // yazmadan döndüğü için aksi hâlde dakika başı boşuna denenirdi.
+  // Durum satırı sebebi söylesin — kapalı mı, bozuk mu belli olsun.
+  if (!S.cfg.blot && !getN8N()){
+    const el = document.getElementById('plat-cift-oto-durum');
+    if (el) el.textContent = '🔁 Çift kontrolü: Upload-Post API Key gerekli (Ayarlar)';
+    return;
+  }
   if (Date.now() - ciftOtoSon() < CIFT_OTO_ARALIK){ ciftOtoDurumYaz(); return; }
   await ciftOtoCalis();
 }
@@ -6142,22 +6119,39 @@ async function ciftOtoCalis(){
       const s = await ciftIsleriSil(paketler, tip);
       ok += s.ok; hata += s.hata; if (s.sonHata) sonHata = s.sonHata;
     }
-    ozet = ok ? (ok + ' kopya silindi') : 'çift yok';
-    if (hata) ozet += ' · ' + hata + ' silinemedi';
+    // Temizlikten SONRA elde kalan çiftler: yayınlanmışlar (silinemez),
+    // çok platformlu / kimliksiz işler ve silinemeyenler. Kullanıcının
+    // elle bakması gereken tek şey bunlar — bu turda ÇÖZÜLENLER (_silindi)
+    // sayılmaz, yoksa "3 kopya silindi · 4 çift listede" gibi kendiyle
+    // çelişen bir özet çıkardı.
+    const bakim = r => !r._silindi;
+    const kalan = CIFT_SON.ciftYayin.filter(bakim).length
+                + CIFT_SON.tekrarRisk.filter(bakim).length
+                + CIFT_SON.ciftPlan.filter(bakim).length;
+    const par = [];
+    if (ok) par.push(ok + ' kopya silindi');
+    if (hata) par.push(hata + ' silinemedi');
+    if (kalan) par.push(kalan + ' çift listede');
+    ozet = par.length ? par.join(' · ') : 'çift yok';
     try {
       localStorage.setItem(CIFT_OTO_ANAHTAR+'_t', String(Date.now()));
       localStorage.setItem(CIFT_OTO_ANAHTAR+'_s', ozet);
     } catch(e){}
-    // Kart açıksa tazelensin; kapalıysa DOM'a dokunmaz
-    if (document.getElementById('plat-cift') && document.getElementById('plat-cift').innerHTML) ciftCiz();
+    // Elle açacak düğme kalmadığı için kart KENDİ açılır: elde çift varsa
+    // çizilir. Kart zaten açıksa çift kalmasa da tazelenir (yoksa ekranda
+    // az önce temizlenmiş liste asılı kalırdı).
+    const kutu = document.getElementById('plat-cift');
+    if (kutu && (kalan || kutu.innerHTML)) ciftCiz();
     if (ok || hata){
-      addLog(hata?'warn':'ok','uploadpost','Otomatik çift temizliği: '+ozet+(sonHata?' | '+sonHata:''));
-      toast((hata?'⚠ ':'✓ ')+'Otomatik çift temizliği: '+ozet, hata?'warn':'ok', 6000);
+      addLog(hata?'warn':'ok','uploadpost','Çift kontrolü: '+ozet+(sonHata?' | '+sonHata:''));
+      toast((hata?'⚠ ':'✓ ')+'Çift kontrolü: '+ozet, hata?'warn':'ok', 6000);
+    } else {
+      addLog(kalan?'warn':'ok','uploadpost','Çift kontrolü: '+ozet);
     }
-    return { ok, hata };
+    return { ok, hata, kalan };
   } catch(e){
     console.error('[CIFT-OTO]', e);
-    addLog('err','uploadpost','Otomatik çift temizliği başarısız: '+(e.message||'bilinmeyen'));
+    addLog('err','uploadpost','Çift kontrolü başarısız: '+(e.message||'bilinmeyen'));
     // Hata turu da "çalıştı" sayılır ki her dakika yeniden denenmesin
     try { localStorage.setItem(CIFT_OTO_ANAHTAR+'_t', String(Date.now()));
           localStorage.setItem(CIFT_OTO_ANAHTAR+'_s', 'hata: '+(e.message||'bilinmeyen').slice(0,40)); } catch(x){}
@@ -7247,82 +7241,6 @@ async function ytkTestApi(){
     toast('✕ İstek atılamadı: ' + e.message,'err',7000);
   }
 }
-
-// ── Zamanlanmış açıklamalardan yer tutucu başlıkları toplu temizle ──
-// Kaynak düzeltmesi (Code in JavaScript3'te SABIT_BASLIK boşaltıldı) YALNIZ yeni
-// short'ları etkiler; Upload-Post kuyruğunda BEKLEYEN eski gönderiler hâlâ
-// "İstediğin Başlık" / "Your Title Here" içerebilir. Bu araç onları
-// PATCH /uploadposts/schedule/{job_id} ile toplu düzeltir.
-const UP_YER_TUTUCU = /İstediğin Başlık|İstediğiniz Başlık|Your Title Here/gi;
-function upBaslikTemizle(s) {
-  if (s == null) return s;
-  return String(s).replace(UP_YER_TUTUCU, '')
-    .replace(/[ \t]{2,}/g, ' ')          // çift boşlukları tekle
-    .replace(/ +([.,!?;:])/g, '$1')       // noktalama öncesi boşluğu kaldır
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-async function upTemizleBasliklar() {
-  const btn = document.getElementById('plat-temizle-btn');
-  if (!S.cfg.blot) { toast('Upload-Post API Key gerekli (Ayarlar → Upload-Post API Key)','warn'); return; }
-  if (btn) btn.disabled = true;
-  toast('⏳ Zamanlanmış gönderiler taranıyor…','info');
-  let sched = [];
-  try {
-    const { data } = await upFetch('/uploadposts/schedule');
-    sched = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||data.jobs||data.data||data.results||data.posts||[]);
-  } catch(e) { toast('✕ Zamanlanmış liste alınamadı: '+e.message,'err'); if(btn) btn.disabled=false; return; }
-
-  // Yer tutucu içeren gönderileri bul (title + caption alanlarında)
-  const hedefler = [];
-  (sched||[]).forEach(p => {
-    const jid = p.job_id || p.jobId || p.id;
-    if (!jid) return;
-    const body = {};
-    ['title','caption'].forEach(alan => {
-      const eski = p[alan];
-      if (eski && UP_YER_TUTUCU.test(eski)) {
-        UP_YER_TUTUCU.lastIndex = 0;               // global regex — test sonrası sıfırla
-        const yeni = upBaslikTemizle(eski);
-        if (yeni !== eski) body[alan] = yeni;
-      }
-      UP_YER_TUTUCU.lastIndex = 0;
-    });
-    if (Object.keys(body).length) {
-      const eskiOrnek = (p.title || p.caption || '').slice(0,60);
-      const yeniOrnek = (body.title!=null?body.title:(body.caption!=null?body.caption:'')).slice(0,60);
-      hedefler.push({ jid, body, eskiOrnek, yeniOrnek, profil: p.profile_username||p.profile||'' });
-    }
-  });
-
-  if (!hedefler.length) {
-    toast('✓ Temizlenecek gönderi yok — zamanlanmışların hepsi temiz','ok');
-    if (btn) btn.disabled = false; return;
-  }
-  const ornek = hedefler[0];
-  if (!confirm(hedefler.length + ' zamanlanmış gönderinin açıklamasından yer tutucu başlık kaldırılacak.\n\n'
-      + 'Örnek (' + (ornek.profil||'profil') + '):\n'
-      + 'ÖNCE:  ' + ornek.eskiOrnek + '\n'
-      + 'SONRA: ' + ornek.yeniOrnek + '\n\n'
-      + 'Bu işlem Upload-Post\'taki zamanlanmış gönderileri kalıcı olarak günceller. Devam edilsin mi?')) {
-    if (btn) btn.disabled = false; return;
-  }
-
-  let ok=0, fail=0; const hatalar=[];
-  for (let i=0; i<hedefler.length; i++) {
-    const h = hedefler[i];
-    if (btn) btn.textContent = '⏳ Temizleniyor '+(i+1)+'/'+hedefler.length;
-    try {
-      await upFetch('/uploadposts/schedule/'+encodeURIComponent(h.jid), { method:'PATCH', body:h.body });
-      ok++;
-    } catch(e) { fail++; if(hatalar.length<3) hatalar.push(e.message); console.warn('[Temizle]', h.jid, e.message); }
-    await new Promise(r=>setTimeout(r, 400));   // hız sınırı koruması
-  }
-  if (btn) { btn.disabled=false; btn.textContent='🧹 Açıklamaları Temizle'; }
-  addLog(fail?'warn':'ok','uploadpost', 'Yer tutucu temizliği: '+ok+' güncellendi, '+fail+' başarısız');
-  toast('✓ '+ok+' gönderi temizlendi' + (fail? (' · '+fail+' başarısız ('+hatalar[0]+')') : ''), fail?'warn':'ok', fail?9000:5000);
-}
-window.upTemizleBasliklar = upTemizleBasliklar;
 
 // Analytics endpoint: /analytics/{profile}?platforms=instagram,youtube,...
 async function platLoadAnalytics(profileUsername, platformKey, containerId) {
@@ -9458,9 +9376,10 @@ document.addEventListener('DOMContentLoaded', function() {
       khErisimHatasi,khYapilandirmaHatasi,khYapilandirmaUyarisi,khTazele,
       gndIsaretle,gndCozuldu,gndAnahtar,kapsamaMatrisCiz,kapsamaYenidenGonderildi,
       khKaynakAra,pdKlipDizini,pdBaslikEslesme,
-      platCiftKontrol,esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
+      esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
-      ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,kuyrukDoluMu,
+      ciftTara,ciftOtoKur,ciftOtoCalis,ciftOtoTik,kuyrukDoluMu,
+      ciftYoksay,ciftYoksayTumu,ciftYoksayGoster,ciftYoksayGeriAl,ciftYoksayTemizle,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
       rapHareketDenetimi,rapHareketCiz,rapHareketListe,hrkGonder,hrkGonderTumu,hrkListeCiz,hrkKaynakCoz,
       nabizCiz,dashTumunuYenile,kuyrukDerinlik,kuyrukCiz,
