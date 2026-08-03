@@ -711,19 +711,19 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     </div>
   </div>
 
-  <!-- 3) NE KADAR YETER — kuyruk derinliği (elle tetiklenir: profil başına
-       Upload-Post sorgusu gerekiyor, açılışta otomatik çekmek hız sınırını
-       zorlardı) -->
+  <!-- 3) NE KADAR YETER — kuyruk derinliği. Dashboard açılınca KENDİ yüklenir:
+       kaynak /uploadposts/schedule olduğu için tek istek (eskiden profil
+       başına ayrı sorgu atıyordu, "elle tetikle" gerekçesi oydu). -->
   <div class="card" id="kuyruk-card" style="margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div class="ct" style="margin:0">📦 Kuyruk Derinliği</div>
       <div style="display:flex;gap:8px;align-items:center">
         <span id="kuyruk-durum" style="font-size:12px;color:var(--mt)"></span>
-        <button class="btn bg bsm" id="kuyruk-btn" onclick="kuyrukDerinlik()" title="Her profilin kuyruğundaki dolu yuvaları okur ve içeriğin ne zamana kadar yettiğini gösterir. Profil başına bir Upload-Post sorgusu yapar — bu yüzden otomatik değil.">🔍 Hesapla</button>
+        <button class="btn bg bsm" id="kuyruk-btn" onclick="kuyrukDerinlik(true)" title="Her profilin kuyruğunda bekleyen gönderileri okur ve içeriğin ne zamana kadar yettiğini gösterir. Dashboard açılınca kendiliğinden çalışır; bu düğme önbelleği atlayıp taze veri çeker.">↻ Yenile</button>
       </div>
     </div>
     <div style="font-size:11px;color:var(--mt);margin:4px 0 10px">Kuyruk kaç gün sonra tükeniyor — biterse yayın sessizce durur, hiçbir hata da vermez.</div>
-    <div id="kuyruk-list"><div style="color:var(--mt);font-size:13px;padding:8px">Hesapla'ya bas</div></div>
+    <div id="kuyruk-list"></div>
   </div>
 
 </div>
@@ -2284,7 +2284,7 @@ function go(id, el) {
     try{ stokChipIsaretle(); stokTazele(); }catch(e){}
   }
   const h = {
-    dashboard: ()=>{ refreshDash(); loadActionCenter(); },
+    dashboard: ()=>{ refreshDash(); loadActionCenter(); kuyrukDerinlik(); },
     loglar:     ()=>{ renderLogs(); refreshBadges(); },
     gecmis:     initGecmis,
     platformlar: loadPlatforms,
@@ -2376,7 +2376,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-02';
+const PANEL_YAPI = 'y2026.08.04-03';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -2586,6 +2586,9 @@ function nabizSure(saat){
 async function dashTumunuYenile(){
   try { await refreshDash(); } catch(e){ console.warn('[DASH] refreshDash:', e.message); }
   try { await loadActionCenter(); } catch(e){ console.warn('[DASH] aksiyon:', e.message); }
+  // Kuyruk Derinliği artık kendi yükleniyor; "Tümünü Yenile" ise tazelik
+  // damgasını yok sayıp taze veri çekmeli, yoksa üç karttan biri bayat kalır.
+  try { await kuyrukDerinlik(true); } catch(e){ console.warn('[DASH] kuyruk:', e.message); }
 }
 
 // ── KUYRUK DERİNLİĞİ ───────────────────────────────────────────────────
@@ -2597,10 +2600,18 @@ async function dashTumunuYenile(){
 // değil, PENCERENİN SONUYDU ve "sistem 10 günlük planlıyor" gibi okunuyordu.
 // /uploadposts/schedule ise bekleyen TÜM gönderileri profil adı ve tarihiyle
 // veriyor, üstelik TEK çağrıda (15 istek yerine 1 — hız sınırına da iyi geldi).
-async function kuyrukDerinlik(){
+// Dashboard her açıldığında çağrılıyor. Sekmeler arasında gidip gelmek
+// her seferinde istek atmasın diye SON BAŞARILI okuma damgalanır; damga
+// tazeyse ekrandaki sonuç olduğu gibi bırakılır. zorla=true (↻ Yenile,
+// Tümünü Yenile) damgayı yok sayar.
+let KUYRUK_SON_T = 0;
+const KUYRUK_TAZE = 5*60000;
+
+async function kuyrukDerinlik(zorla){
   const el = document.getElementById('kuyruk-list'); if (!el) return;
   const btn = document.getElementById('kuyruk-btn');
   const stEl = document.getElementById('kuyruk-durum');
+  if (!zorla && KUYRUK_SON_T && Date.now() - KUYRUK_SON_T < KUYRUK_TAZE) return;
   if (!S.cfg.blot && !getN8N()){ el.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
   if (btn) btn.disabled = true;
   el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Bekleyen gönderiler okunuyor…'});
@@ -2623,6 +2634,7 @@ async function kuyrukDerinlik(){
       return { u, dolu:b.adet, son:b.son, tarihsiz:b.tarihsiz };
     });
     kuyrukCiz(satir);
+    KUYRUK_SON_T = Date.now();          // yalnız BAŞARIDA damgala
     if (stEl && !satir.length) stEl.textContent = '';
   } catch(e){
     el.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kuyruk okunamadı: '+histHataMetni(e)});
@@ -9309,6 +9321,9 @@ document.addEventListener('DOMContentLoaded', function() {
       try { refreshDash(); }catch(e){ console.warn('[boot] refreshDash:', e.message); }
       try { loadActionCenter(); }catch(e){ console.warn('[boot] loadActionCenter:', e.message); }
     }, 250);
+    // Kuyruk Derinliği biraz geriden: profil listesini kullanıyor ve açılışta
+    // üç isteği aynı anda atmak Upload-Post'un hız sınırını zorluyordu.
+    setTimeout(()=>{ try{ kuyrukDerinlik(); }catch(e){ console.warn('[boot] kuyrukDerinlik:', e.message); } }, 900);
     setInterval(()=>{ try{ dmgCiz(); }catch(e){} }, 30000);           // tazelik damgalarını canlı tut
     try{ alertSadelestir(); }catch(e){ console.warn('[boot] alertSadelestir:', e.message); }
     try{ pzUygula(pzOku()); }catch(e){ console.warn('[boot] pzUygula:', e.message); }   // ölçek chip'ini işaretle
