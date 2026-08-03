@@ -2345,7 +2345,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-9';
+const PANEL_YAPI = 'y2026.08.03-10';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -3682,18 +3682,23 @@ function rapVizOlcut(a){
   rapRenderPlatToplam();          // veriyi yeniden çekmez, elde olanı çizer
 }
 
-// PROFİL bazlı toplam: RAP.analytics[profil][platform] → profil başına tek
-// sayı. Bileşim çubuğu artık "hangi PROFİL kitlenin ne kadarını taşıyor"
-// sorusunu cevaplıyor; platform kırılımı zaten alttaki üç sütunda.
-function rapProfilToplamlar(){
+// KATEGORİ bazlı toplam: RAP.analytics[profil][platform] → kategori başına
+// tek sayı (profiller kendi kategorilerinde toplanır). Bileşim çubuğu
+// "hangi KATEGORİ kitlenin ne kadarını taşıyor" sorusunu cevaplıyor;
+// platform kırılımı zaten alttaki üç sütunda.
+// Kategorisiz profiller "Kategorisiz" altında toplanır — sessizce
+// düşürülürse toplam tutmaz.
+function rapKategoriToplamlar(){
   const by = {};
   Object.keys(RAP.analytics||{}).forEach(u=>{
     const d = RAP.analytics[u] || {};
+    const kat = katLabel(profilKategori(u)) || 'Kategorisiz';
     Object.keys(d).forEach(pk=>{
       const m = d[pk];
       if (!m || typeof m !== 'object') return;
-      if (!by[u]){ by[u] = {}; RAP_PLAT_ALAN.forEach(([a])=>by[u][a]=0); }
-      const b = by[u];
+      if (!by[kat]){ by[kat] = { profiller:new Set() }; RAP_PLAT_ALAN.forEach(([a])=>by[kat][a]=0); }
+      const b = by[kat];
+      b.profiller.add(u);
       b.followers += parseFloat(m.followers)||0;
       b.views     += parseFloat(m.views!=null?m.views:m.impressions)||0;
       b.reach     += parseFloat(m.reach)||0;
@@ -3708,21 +3713,26 @@ function rapProfilToplamlar(){
 
 // Yatay %100 yığılmış bileşim çubuğu — "payım nerede" sorusu.
 // Doğrudan etiket YALNIZ sığdığında (≥%9) basılır; kırpma yapılmaz.
-// Segment sırası = efsane sırası (büyükten küçüğe): renk hangi profile ait,
-// bakışta anlaşılsın. 8'den sonrası tek "Diğer" segmentinde toplanır —
-// 15 profil ayrı ayrı çizilse hem renkler tekrarlanır hem şerit okunmaz.
+// Segment sırası = efsane sırası (büyükten küçüğe): renk hangi kategoriye
+// ait, bakışta anlaşılsın. 8'den sonrası tek segmentte toplanır.
+// İpucunda kategoriye hangi profillerin girdiği yazar.
 const RAP_VIZ_ILK = 8;
-function rapVizBilesim(byProfil, alan){
+function rapVizBilesim(byKat, alan){
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-  const adlar = Object.keys(byProfil).filter(u => (byProfil[u][alan]||0) > 0)
-    .sort((a,b) => byProfil[b][alan] - byProfil[a][alan]);
-  const top = adlar.reduce((s,u)=>s+(byProfil[u][alan]||0), 0);
+  const adlar = Object.keys(byKat).filter(k => (byKat[k][alan]||0) > 0)
+    .sort((a,b) => byKat[b][alan] - byKat[a][alan]);
+  const top = adlar.reduce((s,k)=>s+(byKat[k][alan]||0), 0);
   if (!top) return '';
+  const profAd = k => {
+    const p = byKat[k] && byKat[k].profiller;
+    return (p && p.size) ? Array.from(p).sort().join(', ') : '';
+  };
+  const ipucuMetni = k => { const p = profAd(k); return k + (p ? ' ('+p+')' : ''); };
   const ilk = adlar.slice(0, RAP_VIZ_ILK);
   const kalan = adlar.slice(RAP_VIZ_ILK);
-  const kalanTop = kalan.reduce((s,u)=>s+byProfil[u][alan], 0);
-  const dilim = ilk.map((u,i)=>({ ad:u, v:byProfil[u][alan], renk:'var(--s'+(i+1)+')', ipucu:u }));
-  if (kalanTop > 0) dilim.push({ ad:kalan.length+' profil daha', v:kalanTop, renk:'var(--s9)',
+  const kalanTop = kalan.reduce((s,k)=>s+byKat[k][alan], 0);
+  const dilim = ilk.map((k,i)=>({ ad:k, v:byKat[k][alan], renk:'var(--s'+(i+1)+')', ipucu:ipucuMetni(k) }));
+  if (kalanTop > 0) dilim.push({ ad:kalan.length+' kategori daha', v:kalanTop, renk:'var(--s9)',
                                  ipucu:kalan.join(', ') });
   const parca = dilim.map(d=>{
     const pay = d.v/top*100;
@@ -3808,14 +3818,14 @@ function rapRenderPlatToplam(){
   // Grafik katmanı: bileşim (pay) → karşılaştırma (büyüklük) → tablo (kesin sayı).
   // Tablo hem kesin değeri hem "tablo görünümü" erişilebilirlik şartını karşılıyor;
   // açık temadaki kontrast uyarısının gerektirdiği rahatlama da bu.
-  const bilesim = rapVizBilesim(rapProfilToplamlar(), RAP_VIZ_OLCUT);
+  const bilesim = rapVizBilesim(rapKategoriToplamlar(), RAP_VIZ_OLCUT);
   const kucuk   = rapVizKucuk(keys, by, [['followers','Takipçi'],['views','İzlenme'],['likes','Beğeni']]);
 
   el.innerHTML = `<div class="viz" style="border:1px solid var(--brd);border-radius:8px;padding:11px 13px;background:var(--sur2)">
     <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:4px">
       📊 Platform Toplamları <span style="letter-spacing:0;text-transform:none">— tüm hesaplar birlikte</span></div>
     ${bilesim ? `<div style="margin:10px 0 2px">
-      <div style="font-size:11px;color:var(--mt);margin-bottom:6px">${esc(RAP_VIZ_OLCUT_AD[RAP_VIZ_OLCUT]||'')} payı — hangi <b>profil</b> toplamın ne kadarını taşıyor <span style="color:var(--acc)">(alttaki başlıklara tıklayarak ölçütü değiştir)</span></div>
+      <div style="font-size:11px;color:var(--mt);margin-bottom:6px">${esc(RAP_VIZ_OLCUT_AD[RAP_VIZ_OLCUT]||'')} payı — hangi <b>kategori</b> toplamın ne kadarını taşıyor <span style="color:var(--acc)">(alttaki başlıklara tıklayarak ölçütü değiştir)</span></div>
       ${bilesim}</div>` : ''}
     ${kucuk}
     <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin:16px 0 2px;
@@ -8711,7 +8721,7 @@ document.addEventListener('DOMContentLoaded', function() {
       platCiftKontrol,esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
       ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,
-      rapVizOlcut,rapProfilToplamlar,rapVizBilesim,rapRenderPlatToplam,
+      rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
