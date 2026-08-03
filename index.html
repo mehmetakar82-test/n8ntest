@@ -1423,6 +1423,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms(true)" title="Önbelleği atlar, Upload-Post'tan taze veri çeker">↻ Yenile</button>
     <button class="btn bg bsm" id="plat-kapsama-btn" onclick="platKapsama()" title="Profil × platform matrisi: her bağlı hesabın yayınlanmış / başarısız / planlı sayıları. Hiç kaydı olmayan hesaplar kırmızı HİÇ ile işaretlenir — 'bu hesaba hiç video gitmemiş' sorusunun cevabı">📋 Kapsama Denetimi</button>
+    <button class="btn bg bsm" id="plat-cift-btn" onclick="platCiftKontrol()" title="Aynı short aynı hesaba iki kez mi gitmiş? Yayınlanmış + planlı + kuyruk kayıtları başlık bazında karşılaştırılır; iki kez yayınlananlar, yayınlandığı hâlde hâlâ kuyrukta bekleyenler ve kuyruktaki çift kopyalar listelenir">🔁 Çift Kontrolü</button>
     <button class="btn bg bsm" id="plat-temizle-btn" onclick="upTemizleBasliklar()" title="Upload-Post kuyruğunda BEKLEYEN zamanlanmış gönderilerin açıklamalarından 'İstediğin Başlık' / 'Your Title Here' yer tutucularını toplu kaldırır">🧹 Açıklamaları Temizle</button>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-ozet" style="font-size:12px;color:var(--tx);align-self:center"></span>
@@ -1430,6 +1431,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
   <div id="plat-kapsama" style="margin-bottom:12px"></div>
+  <div id="plat-cift" style="margin-bottom:12px"></div>
   <div id="pl-grid" class="g3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
     <div style="color:var(--mt);font-size:13px;padding:16px;text-align:center;grid-column:1/-1">Yenile'ye bas veya Ayarlar → API Key gir</div>
   </div>
@@ -1475,6 +1477,25 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <div id="kh-alt-eylem" style="margin-bottom:6px"></div>
       <div style="font-size:11.5px;color:var(--mt)">
         Gönderimler <b>kuyruğa</b> eklenir — hepsi aynı anda yayınlanmaz. Yeniden gönderilip yayınlanmış hatalar bu listede <b>yer almaz</b>.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EŞİTLE: profilin tüm platformlarını aynı short kümesine getir -->
+<div id="esitle-modal" style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)esitleKapat()">
+  <div style="width:min(680px,calc(94vw / var(--pz)));max-height:84vh;display:flex;flex-direction:column;background:var(--sur2);border:1px solid var(--acc);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.6)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--brd)">
+      <div style="font-family:var(--fh);font-size:14px;font-weight:700;color:var(--tx)" id="es-baslik">⚖ Eşitle</div>
+      <button class="btn bg bsm" onclick="esitleKapat()">✕ Kapat</button>
+    </div>
+    <div id="es-govde" style="padding:14px 18px;overflow-y:auto"></div>
+    <div id="es-alt" style="padding:10px 18px;border-top:1px solid var(--brd);display:none">
+      <button class="btn bp bsm" id="es-gonder-btn" onclick="esitleGonder()">⚖ Kuyruğa Al</button>
+      <span id="es-durum" style="font-size:12px;color:var(--mt);margin-left:10px"></span>
+      <div style="font-size:11.5px;color:var(--mt);margin-top:6px">
+        Eksikler <b>kuyruğa</b> eklenir — hepsi aynı anda yayınlanmaz, her profilin kendi yayın ritmine dağılır.
+        Zaten var olanlar ve çift riski taşıyanlar gönderilmez.
       </div>
     </div>
   </div>
@@ -2312,7 +2333,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-18';
+const PANEL_YAPI = 'y2026.08.02-19';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4329,7 +4350,10 @@ function kapsamaMatrisCiz(){
           + (c.plan ? '<span style="color:#00b8d4" title="planlı/kuyrukta">⏰'+c.plan+'</span>' : '')
           + '</td>';
       }).join('');
-      return '<tr><td style="white-space:nowrap"><b>'+esc(u)+'</b></td>'+tds+'</tr>';
+      return '<tr><td style="white-space:nowrap"><b>'+esc(u)+'</b> '
+        + '<button class="btn bsm" style="padding:0 6px;font-size:10.5px;margin-left:4px" '
+        + 'onclick="esitleAc(\''+esc(u).replace(/'/g,"\\'")+'\')" '
+        + 'title="Bu profilin tüm platformlarını aynı short kümesine getir — herhangi bir platformda olup diğerlerinde eksik olan short\'lar kuyruğa eklenir">⚖ Eşitle</button></td>'+tds+'</tr>';
     }).join('');
     const ozet = sifirlar.length
       ? '<div style="font-size:12.5px;color:var(--er);margin-bottom:8px"><b>🛑 '+sifirlar.length+' hesapta HİÇ kayıt yok:</b> '
@@ -4356,6 +4380,15 @@ function kapsamaSayimDus(profil, platform){
   if (!c || !c.fail) return;
   c.fail--; c.cozuldu = (c.cozuldu||0) + 1;
   KAPSAMA_SON.cozulenTop++;
+  kapsamaMatrisCiz();
+}
+
+// Eşitle kuyruğa yeni gönderim ekleyince ⏰ sayısı yerinde artar —
+// tarama tekrarlanmaz (429'a girmemek için).
+function kapsamaPlanArtir(profil, platform){
+  const K = KAPSAMA_SON.K; if (!K || !K[profil]) return;
+  const c = K[profil][platform] || (K[profil][platform] = {pub:0,fail:0,plan:0,cozuldu:0});
+  c.plan++;
   kapsamaMatrisCiz();
 }
 
@@ -4915,6 +4948,279 @@ async function platDoldurGonder(){
     +(hatalar.length?' | '+hatalar.join(' | '):''));
   // Liste boşaltılır: düğmeye ikinci kez basınca aynı short'lar tekrar gitmesin
   if (ok){ PLAT_DOLDUR.aday = []; document.getElementById('pd-alt').style.display = 'none'; }
+}
+
+// ── ÇİFT KONTROLÜ ──────────────────────────────────────────────────────
+// Aynı short (profil + platform + başlık) birden çok kez mi var? Üç tip:
+//   1) 2+ kez YAYINLANMIŞ (geçmişte iki başarılı kayıt)
+//   2) yayınlanmış AMA hâlâ kuyruk/planda → sırası gelince İKİNCİ kez çıkar
+//   3) kuyruk/planda 2+ kopya
+// Başlık anahtarı kdAnahtar ile aynı mantık (normalize + 60 karakter) —
+// Upload-Post başlığı 95'e kesebildiği için.
+async function platCiftKontrol(){
+  const btn = document.getElementById('plat-cift-btn');
+  const kutu = document.getElementById('plat-cift'); if (!kutu) return;
+  if (!S.cfg.blot && !getN8N()){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
+  if (btn) btn.disabled = true;
+  kutu.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Geçmiş + plan + kuyruk, çift kayıt için taranıyor…'});
+  try {
+    const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook',
+                 x:'x', twitter:'x', threads:'threads', linkedin:'linkedin', pinterest:'pinterest', bluesky:'bluesky' };
+    const M = new Map();
+    const anahtar = (u,p,b) => {
+      const n = ydNorm(b).slice(0,60);
+      return (!u || !p || !n || n.length < 6) ? '' : u+'|'+p+'|'+n;
+    };
+    const kayit = (u,p,b) => {
+      const k = anahtar(u,p,b); if (!k) return null;
+      if (!M.has(k)) M.set(k, { u, p, baslik:b, yayin:[], plan:0, kuyruk:0 });
+      return M.get(k);
+    };
+    // 1) Başarılı yayınlar (paylaşılan geçmiş önbelleği)
+    const onb = await histCek(KAPSAMA_SAYFA);
+    (onb.kayitlar || []).forEach(x => {
+      if (x.success === false || x.error_message) return;
+      const u = x.profile_username || x.user || '';
+      const p = NP[String(x.platform||'').toLowerCase()]; if (!u || !p) return;
+      const r = kayit(u, p, String(x.post_title || x.title || x.post_caption || '')); if (!r) return;
+      const t = Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0;
+      if (t && r.yayin.indexOf(t) >= 0) return;   // aynı kaydın sayfalar arası tekrarı — çift DEĞİL
+      r.yayin.push(t);
+    });
+    // 2) Tarihli planlar
+    try {
+      const { data } = await upFetchRetry('/uploadposts/schedule');
+      const s = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
+      s.forEach(x => {
+        (x.platforms || (x.platform ? [x.platform] : [])).forEach(z => {
+          const r = kayit(String(x.profile_username||''), NP[String(z).toLowerCase()], String(x.title||x.post_title||''));
+          if (r) r.plan++;
+        });
+      });
+    } catch(e){ console.warn('[CIFT] schedule:', e.message); }
+    // 3) Kuyruk yuvaları
+    const raw = S.uploadPostAccounts || await phFetchAccounts();
+    const profs = (raw && Array.isArray(raw.profiles)) ? raw.profiles : [];
+    await upSirali(profs.map(p=>p.username).filter(Boolean), async u => {
+      try {
+        const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(u)+'&count=50');
+        (data.slots||[]).forEach(sl => {
+          const sp = sl.scheduled_post; if (!sp) return;
+          (sp.platforms||[]).forEach(z => { const r = kayit(u, NP[String(z).toLowerCase()], String(sp.title||'')); if (r) r.kuyruk++; });
+        });
+      } catch(e){ console.warn('[CIFT] queue '+u+':', e.message); }
+    }, 4);
+    // Sınıflandır. NOT: /schedule ile queue/preview AYNI gönderiyi ikisi
+    // birden listeleyebilir — bu yüzden "kuyrukta çift" hükmü kaynaklar
+    // ARASI toplamla değil, AYNI kaynak içindeki tekrarla verilir (plan>=2
+    // veya kuyruk>=2). Yoksa her kuyruk kaydı sahte "çift" olurdu.
+    const ciftYayin = [], tekrarRisk = [], ciftPlan = [];
+    M.forEach(r => {
+      const bekleyen = r.plan + r.kuyruk;
+      if (r.yayin.length >= 2) ciftYayin.push(r);
+      else if (r.yayin.length >= 1 && bekleyen >= 1) tekrarRisk.push(r);
+      else if (r.plan >= 2 || r.kuyruk >= 2) ciftPlan.push(r);
+    });
+    const top = ciftYayin.length + tekrarRisk.length + ciftPlan.length;
+    const esc = esc0;
+    const PL = { instagram:'IG', youtube:'YT', tiktok:'TT', facebook:'FB', x:'X' };
+    const gun = t => t ? new Date(t).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}) : '?';
+    const bolum = (baslik, renk, liste, detayFn, aciklama) => {
+      if (!liste.length) return '';
+      liste.sort((a,b) => (a.u+a.p).localeCompare(b.u+b.p));
+      return '<div style="margin-top:10px">'
+        + '<div style="font-size:12.5px;font-weight:700;color:'+renk+'">'+baslik+' — '+liste.length+'</div>'
+        + '<div style="font-size:11px;color:var(--mt);margin:2px 0 4px">'+aciklama+'</div>'
+        + liste.slice(0,40).map(r => '<div style="font-size:11.5px;padding:2px 0;border-bottom:1px solid var(--brd);word-break:break-word">'
+            + '<b>'+esc(r.u)+'</b> · '+(PL[r.p]||r.p)+' · '+esc(r.baslik)+' <span style="color:'+renk+'">('+detayFn(r)+')</span></div>').join('')
+        + (liste.length>40 ? '<div style="font-size:11px;color:var(--mt);padding:2px 0">… ve '+(liste.length-40)+' tane daha</div>' : '')
+        + '</div>';
+    };
+    kutu.innerHTML = '<div class="card">'
+      + '<div class="ct">🔁 Çift Kontrolü <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— '
+      + (onb.kayitlar||[]).length+' geçmiş kaydı'+(onb.kirpik?' (pencere doldu: daha eski kayıtlar taranamadı)':'')+' + plan + kuyruğun ilk 50 yuvası</span>'
+      + '<button class="btn bsm" style="float:right" onclick="document.getElementById(\'plat-cift\').innerHTML=\'\'">✕</button></div>'
+      + (top === 0
+          ? '<div style="font-size:12.5px;color:var(--ok)">✓ Çift kayıt bulunamadı — taranan pencerede hiçbir short aynı hesaba iki kez gitmemiş, kuyrukta da çift kopya yok</div>'
+          : '<div style="font-size:12.5px;color:var(--tx)">'+top+' çift kayıt bulundu</div>')
+      + bolum('⚠ Yayınlanmış + hâlâ kuyrukta bekliyor', '#f5a623', tekrarRisk,
+          r => r.yayin.length+'× yayınlandı · '+(r.plan+r.kuyruk)+' kopya bekliyor',
+          'Sırası gelince İKİNCİ kez yayınlanır. Kopyayı Upload-Post panelindeki kuyruktan kaldır — panel yanlış kopyayı silmemek için silme yapmaz, yalnız raporlar.')
+      + bolum('✕ İki kez yayınlanmış', 'var(--er)', ciftYayin,
+          r => r.yayin.map(gun).join(' ve '),
+          'Geçmişte aynı hesaba iki kez gitmiş. Gerekirse kopyalardan biri platformdan elle silinebilir.')
+      + bolum('⏰ Kuyrukta çift kopya', '#00b8d4', ciftPlan,
+          r => Math.max(r.plan, r.kuyruk)+' kopya',
+          'Aynı short kuyruğa birden çok kez eklenmiş — fazlası Upload-Post panelinden kaldırılmalı.')
+      + '</div>';
+    addLog(top?'warn':'ok','uploadpost','Çift kontrolü: '+top+' çift ('+ciftYayin.length+' yayın, '+tekrarRisk.length+' tekrar riski, '+ciftPlan.length+' kuyruk)');
+  } catch(e){
+    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Çift kontrolü başarısız: '+histHataMetni(e)});
+  } finally { if (btn) btn.disabled = false; }
+}
+
+// ── EŞİTLE ─────────────────────────────────────────────────────────────
+// Bir profilin TÜM bağlı platformlarını aynı short kümesine getirir:
+// herhangi bir platformda yayınlanmış/planlı olan her short, eksik olduğu
+// platformların KUYRUĞUNA eklenir.
+// Kritik koruma: geçmiş penceresi DOLUYSA (1000 kayıt), pencereden eski
+// bir short "bu platformda yok" görünebilir ama aslında pencere dışında
+// yayınlanmıştır. Onu göndermek ÇİFT yayın olurdu — bu yüzden pencere
+// başlangıcından eski short'lar "belirsiz" sayılır ve GÖNDERİLMEZ.
+const ESITLE = { profil:'', aday:[] };
+function esitleKapat(){ const m = document.getElementById('esitle-modal'); if (m) m.style.display = 'none'; }
+
+async function esitleAc(profil){
+  const govde = document.getElementById('es-govde');
+  ESITLE.profil = profil; ESITLE.aday = [];
+  document.getElementById('es-alt').style.display = 'none';
+  setEl('es-baslik', '⚖ Eşitle — ' + profil);
+  document.getElementById('esitle-modal').style.display = 'flex';
+  govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Profilin tüm platformları taranıyor…'});
+  try {
+    const platlar = pdBagliPlatformlar(profil);
+    if (platlar.length < 2){
+      govde.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Eşitleme için en az iki bağlı platform gerekiyor (şu an '+platlar.length+')'});
+      return;
+    }
+    await ydEnsureShorts();
+    const ikili = await pdBasliklar(profil, platlar);      // tüm platformlar TEK geçişte
+    // Pencere başlangıcı: geçmiş penceresi doluysa görünen en eski kayıt
+    const onb = await histCek(KAPSAMA_SAYFA);
+    let pencereBasi = 0;
+    if (onb.kirpik){
+      (onb.kayitlar || []).forEach(x => {
+        const t = Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0;
+        if (t && (!pencereBasi || t < pencereBasi)) pencereBasi = t;
+      });
+    }
+    // Hedef küme: HERHANGİ bir platformda var olan her short
+    const hedef = new Map();
+    platlar.forEach(p => ikili[p].yayinlanan.forEach((ham, n) => { if (!hedef.has(n)) hedef.set(n, ham); }));
+    const ozet = {};
+    platlar.forEach(p => ozet[p] = { eksik:0, kaynaksiz:0, belirsiz:0, olu:0, gonder:0 });
+    const kaynakOnb = new Map();
+    let aday = [];
+    hedef.forEach((ham, n) => {
+      const eksikPlat = platlar.filter(p => !ikili[p].mevcut.has(n));
+      if (!eksikPlat.length) return;
+      if (!kaynakOnb.has(n)) kaynakOnb.set(n, ydFindSource(ham, '', profil, ''));
+      const s = kaynakOnb.get(n);
+      eksikPlat.forEach(p => {
+        ozet[p].eksik++;
+        if (!s || !s.video){ ozet[p].kaynaksiz++; return; }
+        const st = Date.parse(s.tarih||'') || 0;
+        // Pencere koruması: tarih pencereden eski YA DA bilinmiyorsa çift riski
+        if (pencereBasi && (!st || st < pencereBasi)){ ozet[p].belirsiz++; return; }
+        aday.push({ _profil:profil, _video:s.video, _caption:s.caption||'', _clipId:s.clipId||'',
+                    plat:PD_PLAT_KEY[p], platform:p, title:ham });
+      });
+    });
+    // Erişilebilirlik: aynı video birden çok platforma gidebilir — TEK sına.
+    // Ölü çıkanlar clip-id ile OpusClip'ten tazelenmeye çalışılır.
+    if (aday.length){
+      const urlDurum = new Map();
+      aday.forEach(a => { if (!urlDurum.has(a._video)) urlDurum.set(a._video, null); });
+      const urller = Array.from(urlDurum.keys());
+      let n = 0;
+      const sonuc = await upSirali(urller, async u => {
+        const ok = await pdVideoErisilebilir(u, 8000);
+        n++; govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Kaynaklar sınanıyor ('+n+'/'+urller.length+')…'});
+        return ok;
+      }, 6);
+      urller.forEach((u,i) => urlDurum.set(u, sonuc[i] === true));
+      const oluAday = aday.filter(a => !urlDurum.get(a._video));
+      if (oluAday.length){
+        const idler = Array.from(new Set(oluAday.map(a => a._clipId).filter(Boolean)));
+        let harita = new Map();
+        if (idler.length){
+          try { harita = await pdTazeLinkler(idler, m => { govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:m}); }); }
+          catch(e){ console.warn('[ES] tazeleme:', e.message); }
+        }
+        const tazeDurum = new Map();
+        for (const url of new Set(harita.values()))
+          tazeDurum.set(url, await pdVideoErisilebilir(url, 8000));
+        aday.forEach(a => {
+          if (urlDurum.get(a._video)) return;
+          const yeni = a._clipId ? harita.get(String(a._clipId)) : null;
+          if (yeni && tazeDurum.get(yeni)){ a._video = yeni; urlDurum.set(yeni, true); }
+        });
+      }
+      const kalan = [];
+      aday.forEach(a => { if (urlDurum.get(a._video)) kalan.push(a); else ozet[a.platform].olu++; });
+      aday = kalan;
+    }
+    aday.forEach(a => ozet[a.platform].gonder++);
+    ESITLE.aday = aday;
+    // Özet + liste
+    const esc = esc0;
+    const sat = platlar.map(p => {
+      const o = ozet[p];
+      const parca = [];
+      if (o.gonder)    parca.push('<b style="color:var(--ok)">'+o.gonder+' gönderilecek</b>');
+      if (o.kaynaksiz) parca.push(o.kaynaksiz+' kaynak yok');
+      if (o.belirsiz)  parca.push(o.belirsiz+' pencere dışı');
+      if (o.olu)       parca.push(o.olu+' kaynağı indirilemedi');
+      return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--brd);font-size:12.5px">'
+        + '<div style="color:var(--tx)">'+PD_IKON[p]+' '+PD_AD[p]+' <span style="color:var(--mt)">('+ikili[p].mevcut.size+' mevcut)</span></div>'
+        + '<div style="color:var(--mt);text-align:right">'+(o.eksik ? parca.join(' · ') : '<span style="color:var(--ok)">eşit ✓</span>')+'</div></div>';
+    }).join('');
+    const grup = {};
+    aday.forEach(a => (grup[a.platform] = grup[a.platform] || []).push(a.title));
+    const listeHtml = aday.length
+      ? '<div style="max-height:200px;overflow-y:auto;margin-top:10px">'
+        + Object.entries(grup).map(([p, ts]) =>
+            '<div style="font-size:11.5px;color:var(--tx);font-weight:700;margin-top:6px">'+PD_IKON[p]+' '+PD_AD[p]+' — '+ts.length+'</div>'
+            + ts.slice(0,15).map(t => '<div style="font-size:11px;color:var(--mt);padding:1px 0 1px 14px;word-break:break-word">'+esc(t)+'</div>').join('')
+            + (ts.length>15 ? '<div style="font-size:11px;color:var(--mt);padding-left:14px">… ve '+(ts.length-15)+' tane daha</div>' : '')
+          ).join('')
+        + '</div>'
+      : '';
+    const uyari = platlar.some(p => ozet[p].belirsiz)
+      ? '<div style="font-size:11.5px;color:#f5a623;margin-top:8px">Geçmiş penceresi dolu: pencereden eski short\'ların '
+        + 'hangi platformda yayınlandığı bilinemiyor — çift yayın riski yüzünden onlar gönderilmez.</div>'
+      : '';
+    govde.innerHTML =
+      '<div style="background:var(--bg);border:1px solid var(--brd);border-radius:6px;padding:10px 14px">'
+      + '<div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:6px">Hedef küme: '+hedef.size+' short (herhangi bir platformda var olan)</div>'
+      + sat + uyari + '</div>' + listeHtml;
+    if (aday.length){
+      document.getElementById('es-alt').style.display = '';
+      document.getElementById('es-gonder-btn').textContent = '⚖ '+aday.length+' short\'u kuyruğa al';
+      setEl('es-durum','');
+    }
+  } catch(e){
+    console.error('[ES]', e);
+    govde.innerHTML = durumHTML('hata',{kompakt:true, alt:'Tarama başarısız: '+histHataMetni(e)});
+  }
+}
+
+async function esitleGonder(){
+  const aday = ESITLE.aday || [];
+  if (!aday.length) return;
+  const btn = document.getElementById('es-gonder-btn');
+  const sayim = {};
+  aday.forEach(a => sayim[a.platform] = (sayim[a.platform]||0)+1);
+  const dokum = Object.entries(sayim).map(([p,n]) => PD_AD[p]+': '+n).join(', ');
+  if (!confirm(aday.length+' short, '+ESITLE.profil+' profilinin eksik platform kuyruklarına eklenecek ('+dokum+').\n\n'
+      + 'Hepsi aynı anda yayınlanmaz — her platformun sıradaki boş yuvalarına dağıtılır.\n\nDevam edilsin mi?')) return;
+  btn.disabled = true;
+  let ok=0, hata=0; const hatalar=[];
+  await upSirali(aday, async it => {
+    const s = await ydTopluGonder(it);
+    if (s.ok){ ok++; it._ok = true; kapsamaPlanArtir(ESITLE.profil, it.platform); }
+    else { hata++; if (hatalar.length<4) hatalar.push(PD_AD[it.platform]+': '+(s.mesaj||s.sebep)); }
+    btn.textContent = '⏳ '+(ok+hata)+'/'+aday.length;
+  }, 2);
+  btn.disabled = false;
+  const ozet = ok+' kuyruğa alındı'+(hata?' · '+hata+' başarısız':'');
+  setEl('es-durum', ozet + (hatalar.length ? ' — '+hatalar[0] : ''));
+  toast((ok?'✓ ':'✕ ')+ESITLE.profil+' eşitleme: '+ozet, ok?'ok':'err', 7000);
+  addLog(hata?'warn':'ok','uploadpost','Eşitle ('+ESITLE.profil+'): '+ozet+(hatalar.length?' | '+hatalar.join(' | '):''));
+  // Gönderilenler düşer — ikinci tık aynıları göndermesin; kalanlar denenebilir
+  ESITLE.aday = aday.filter(a => !a._ok);
+  if (!ESITLE.aday.length) document.getElementById('es-alt').style.display = 'none';
+  else btn.textContent = '⚖ '+ESITLE.aday.length+' short\'u kuyruğa al';
 }
 
 // Kapsama tablosunda ✕ sayısına tıklanınca: o hesabın ÇÖZÜLMEMİŞ
@@ -7907,6 +8213,7 @@ document.addEventListener('DOMContentLoaded', function() {
       khErisimHatasi,khYapilandirmaHatasi,khYapilandirmaUyarisi,khTazele,
       gndIsaretle,gndCozuldu,gndAnahtar,kapsamaMatrisCiz,kapsamaSayimDus,
       khKaynakAra,pdKlipDizini,pdBaslikEslesme,
+      platCiftKontrol,esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
