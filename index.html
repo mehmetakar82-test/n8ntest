@@ -2367,7 +2367,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-18';
+const PANEL_YAPI = 'y2026.08.03-19';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -2581,40 +2581,41 @@ async function dashTumunuYenile(){
 }
 
 // ── KUYRUK DERİNLİĞİ ───────────────────────────────────────────────────
-// "Kuyruk ne zaman tükenir?" Tahmin YOK: queue/preview dolu yuvaların
-// GERÇEK tarihlerini veriyor, en son dolu yuvanın tarihi runway'in sonudur.
-// Kuyruk biterse yayın sessizce durur — hiçbir hata da vermez, bu yüzden
-// hiçbir uyarı kutusu kırmızıya dönmez.
+// "Kuyruk ne zaman tükenir?" Tahmin YOK: bekleyen gönderilerin GERÇEK
+// tarihleri okunur, en ileri tarih runway'in sonudur.
+// KAYNAK SEÇİMİ (ilk sürümde yanlıştı): queue/preview kullanılıyordu ama
+// o ucun `count` parametresinin AZAMİSİ 50. 15 profilin hepsi 50 yuvayı
+// da dolu döndürünce ekranda hepsi "10 gün" yazıyordu — bu gerçek derinlik
+// değil, PENCERENİN SONUYDU ve "sistem 10 günlük planlıyor" gibi okunuyordu.
+// /uploadposts/schedule ise bekleyen TÜM gönderileri profil adı ve tarihiyle
+// veriyor, üstelik TEK çağrıda (15 istek yerine 1 — hız sınırına da iyi geldi).
 async function kuyrukDerinlik(){
   const el = document.getElementById('kuyruk-list'); if (!el) return;
   const btn = document.getElementById('kuyruk-btn');
   const stEl = document.getElementById('kuyruk-durum');
   if (!S.cfg.blot && !getN8N()){ el.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
   if (btn) btn.disabled = true;
-  el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Profillerin kuyruk yuvaları okunuyor…'});
+  el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Bekleyen gönderiler okunuyor…'});
   try {
     const raw = S.uploadPostAccounts || await phFetchAccounts();
     const profs = ((raw && raw.profiles) || []).map(p=>p.username).filter(Boolean);
     if (!profs.length){ el.innerHTML = durumHTML('bos',{kompakt:true, alt:'Profil bulunamadı — Platformlar → Yenile'}); return; }
-    const satir = [];
-    let n = 0;
-    await upSirali(profs, async u => {
-      try {
-        const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(u)+'&count=50');
-        const slots = data.slots || [];
-        const dolu = slots.filter(s=>s.scheduled_post);
-        // Son DOLU yuvanın tarihi = içerik o ana kadar yetiyor
-        let son = 0;
-        dolu.forEach(s=>{ const t = Date.parse(s.datetime_utc||'')||0; if (t>son) son = t; });
-        // Yuvaların tamamı doluysa runway daha uzun olabilir (pencere 50 yuva)
-        satir.push({ u, dolu:dolu.length, toplam:slots.length, son,
-                     kirpik: slots.length>0 && dolu.length === slots.length });
-      } catch(e){ satir.push({ u, hata:e.message||'okunamadı' }); }
-      n++;
-      if (stEl) stEl.textContent = n+'/'+profs.length;
-      await new Promise(r=>setTimeout(r,220));      // hız sınırına nefes payı
-    }, 2);
+    const { data } = await upFetchRetry('/uploadposts/schedule');
+    const liste = Array.isArray(data) ? data : (data.scheduled_posts || data.scheduled || []);
+    const by = {};
+    liste.forEach(x=>{
+      const u = String(x.profile_username||'').trim(); if (!u) return;
+      const t = Date.parse(x.scheduled_date || x.scheduledDate || x.scheduled_at || x.date || '') || 0;
+      if (!by[u]) by[u] = { adet:0, son:0, tarihsiz:0 };
+      by[u].adet++;
+      if (t){ if (t > by[u].son) by[u].son = t; } else by[u].tarihsiz++;
+    });
+    const satir = profs.map(u=>{
+      const b = by[u] || { adet:0, son:0, tarihsiz:0 };
+      return { u, dolu:b.adet, son:b.son, tarihsiz:b.tarihsiz };
+    });
     kuyrukCiz(satir);
+    if (stEl && !satir.length) stEl.textContent = '';
   } catch(e){
     el.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kuyruk okunamadı: '+histHataMetni(e)});
   } finally { if (btn) btn.disabled = false; }
@@ -2625,9 +2626,12 @@ function kuyrukCiz(satir){
   const stEl = document.getElementById('kuyruk-durum');
   const esc = esc0;
   const gunFark = t => t ? Math.max(0, Math.round((t-Date.now())/864e5)) : 0;
-  // Boş ve az kalan önce: dashboard'da önemli olan tükenmek üzere olan
+  // Sıra = aciliyet: BOŞ olanlar en üstte, sonra tarihi en yakın olanlar,
+  // tarihi bilinmeyenler onların ardından, okunamayanlar en sonda.
+  const oncelik = s => s.hata ? 3 : (!s.dolu ? 0 : (!s.son ? 2 : 1));
   satir.sort((a,b)=>{
-    if (a.hata) return 1; if (b.hata) return -1;
+    const fa = oncelik(a), fb = oncelik(b);
+    if (fa !== fb) return fa - fb;
     return (a.son||0) - (b.son||0);
   });
   const bos = satir.filter(s=>!s.hata && !s.dolu).length;
@@ -2642,10 +2646,11 @@ function kuyrukCiz(satir){
           + '<div style="font-size:11px;color:var(--er)">okunamadı: '+esc(String(s.hata).slice(0,40))+'</div></div>';
         const g = gunFark(s.son);
         const col = !s.dolu ? 'var(--er)' : (g < 2 ? 'var(--wn)' : 'var(--ok)');
-        const deger = !s.dolu ? 'BOŞ' : (g === 0 ? 'bugün biter' : g+' gün');
+        const deger = !s.dolu ? 'BOŞ' : (!s.son ? 'tarih yok' : (g === 0 ? 'bugün biter' : g+' gün'));
         const alt = !s.dolu ? 'kuyrukta hiç gönderi yok'
-          : s.dolu+' gönderi'+(s.kirpik ? ' (ilk 50 yuvanın hepsi dolu — daha uzun olabilir)' : '')
-            + (s.son ? ' · son: '+new Date(s.son).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}) : '');
+          : s.dolu+' gönderi'
+            + (s.son ? ' · son: '+new Date(s.son).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}) : '')
+            + (s.tarihsiz ? ' · '+s.tarihsiz+' tanesinde tarih bilgisi yok' : '');
         return '<div style="border:1px solid var(--brd);border-left:3px solid '+col+';border-radius:6px;padding:8px 10px;background:var(--sur)">'
           + '<div style="font-size:12px;color:var(--tx);font-weight:600">'+esc(s.u)+'</div>'
           + '<div style="font-size:16px;font-weight:800;color:'+col+';font-family:var(--fh);line-height:1.3">'+deger+'</div>'
@@ -2653,7 +2658,8 @@ function kuyrukCiz(satir){
       }).join('')
     + '</div>'
     + (hatali ? '<div style="font-size:11px;color:var(--mt);margin-top:8px">'+hatali+' profil okunamadı — hız sınırı olabilir, tekrar dene.</div>' : '')
-    + '<div style="font-size:11px;color:var(--mt);margin-top:8px">Süre, kuyruktaki <b>son dolu yuvanın tarihinden</b> hesaplanır — tahmin değil, Upload-Post\'un verdiği takvim.</div>';
+    + '<div style="font-size:11px;color:var(--mt);margin-top:8px">Süre, bekleyen gönderilerin <b>en ileri tarihinden</b> hesaplanır — tahmin değil, '
+    + 'Upload-Post\'un verdiği takvim. Kaynak: <code>/uploadposts/schedule</code> (tüm bekleyenler, pencere sınırı yok).</div>';
 }
 
 async function nabizCiz(){
