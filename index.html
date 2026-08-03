@@ -2312,7 +2312,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-14';
+const PANEL_YAPI = 'y2026.08.02-15';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -10345,6 +10345,40 @@ async function ydRetryConfirm(){
 // 30 başarısız kayıtta 30 video aynı anda düşer. add_to_queue ise her birini
 // sıradaki boş kuyruk yuvasına koyar, yani profilin kendi yayın ritmi korunur.
 // API çağrıları da ayrıca kısıtlanır (eşzamanlı 2) — 429 yememek için.
+// Upload-Post'un /upload ucu 429 ("Too many requests") verebiliyor ve
+// gönderim eskiden bunu doğrudan hata olarak yansıtıyordu — hiç beklemeden.
+// Yayın Durumu'ndan gönderimin çalışıp Platformlar'dan çalışmamasının sebebi
+// buydu: aynı uç, farklı istek yükü. Platformlar sayfası açılırken kendi
+// taramalarını (geçmiş, kuyruk, kapsama) yapıp hız bütçesini tüketiyor,
+// ardından gelen yükleme sınıra çarpıyor.
+// Artık 429'da bekleyip yeniden denenir; sunucu Retry-After verirse ona uyulur.
+async function upYukle(fd, deneme){
+  deneme = deneme || 5;                 // 1.5+3+6+12 ≈ 22 sn sabır
+  let son = { ok:false, mesaj:'bilinmeyen hata' };
+  for (let i = 0; i < deneme; i++){
+    let r, j;
+    try {
+      r = await fetch('https://api.upload-post.com/api/upload',
+                      { method:'POST', body:fd, headers:{'Authorization':'Apikey '+S.cfg.blot} });
+      j = await r.json().catch(()=>({}));
+    } catch(e){ return { ok:false, mesaj:e.message }; }      // ağ hatası — tekrarlama
+    if (r.ok && j.success !== false) return { ok:true, veri:j };
+    const mesaj = j.message || j.error || ('HTTP ' + r.status);
+    son = { ok:false, mesaj, kod:r.status };
+    const hizSiniri = r.status === 429 || /too many requests|slow down|rate limit/i.test(mesaj);
+    if (!hizSiniri) return son;                              // başka hata — beklemenin anlamı yok
+    if (i === deneme - 1){
+      son.mesaj = 'Upload-Post hız sınırı ('+deneme+' deneme). Sayfanın kendi taramaları '
+                + 'bütçeyi tüketmiş olabilir — 1-2 dakika bekleyip tekrar dene.';
+      return son;
+    }
+    const ra = parseInt((r.headers && r.headers.get && r.headers.get('retry-after')) || '', 10);
+    const bekle = Math.min(ra > 0 ? ra*1000 : 1500 * Math.pow(2, i), 20000);
+    await new Promise(res => setTimeout(res, bekle));
+  }
+  return son;
+}
+
 async function ydTopluGonder(it){
   const profil = it._profil || it.profile;
   const video  = it._video;
@@ -10367,10 +10401,9 @@ async function ydTopluGonder(it){
         fd.append('categoryId', ytKategoriId(profilKategori(profil)));
         ytEtiketler(aciklama || it.title, profilKategori(profil)).forEach(t => fd.append('tags[]', t));
       }
-      const r = await fetch('https://api.upload-post.com/api/upload',{ method:'POST', body:fd, headers:{'Authorization':'Apikey '+S.cfg.blot} });
-      const j = await r.json().catch(()=>({}));
-      if (r.ok && j.success !== false) return { ok:true };
-      return { ok:false, sebep:'api', mesaj: j.message||j.error||('HTTP '+r.status) };
+      const u = await upYukle(fd);                 // 429'da bekleyip yeniden dener
+      if (u.ok) return { ok:true };
+      return { ok:false, sebep:'api', mesaj: u.mesaj };
     }
     const base = getN8N();
     if (!base) return { ok:false, sebep:'yapilandirma', mesaj:'API Key veya n8n URL yok' };
@@ -10460,9 +10493,8 @@ async function ydDoRetry(payload, idx){
         ytEtiketler(payload.description || payload.title, profilKategori(payload.profil))
           .forEach(t => fd.append('tags[]', t));
       }
-      const r = await fetch('https://api.upload-post.com/api/upload',{ method:'POST', body:fd, headers:{'Authorization':'Apikey '+S.cfg.blot} });
-      const j = await r.json().catch(()=>({}));
-      ok = r.ok && j.success !== false; msg = j.message||j.error||('HTTP '+r.status);
+      const u = await upYukle(fd);                 // 429'da bekleyip yeniden dener
+      ok = u.ok; msg = u.mesaj;
     } else {
       const base = getN8N();
       const res  = await faf(base+'/webhook/yeniden-gonder', payload);
