@@ -1718,7 +1718,10 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <span class="cat-chip" data-sayfa="10" onclick="ydDerinlik(10)">1.000</span>
       <span class="cat-chip" data-sayfa="25" onclick="ydDerinlik(25)">2.500</span>
     </div>
-    <select id="yd-toplu-plat" style="font-size:12px;padding:4px 6px;background:var(--bg);border:1px solid var(--brd);color:var(--tx);border-radius:4px;width:auto;flex:0 0 auto;max-width:160px" title="Hangi platformun başarısızları kuyruğa alınsın">
+    <select id="yd-profil" onchange="ydKapsamDegisti()" style="font-size:12px;padding:4px 6px;background:var(--bg);border:1px solid var(--brd);color:var(--tx);border-radius:4px;width:auto;flex:0 0 auto;max-width:190px" title="Yalnız bu profilin kayıtlarını göster — sayaçlar, neden dağılımı ve 'Başarısızları Kuyruğa Al' da bu seçime uyar">
+      <option value="">tüm profiller</option>
+    </select>
+    <select id="yd-toplu-plat" onchange="ydKapsamDegisti()" style="font-size:12px;padding:4px 6px;background:var(--bg);border:1px solid var(--brd);color:var(--tx);border-radius:4px;width:auto;flex:0 0 auto;max-width:160px" title="Yalnız bu platformun kayıtlarını göster — sayaçlar ve toplu kuyruğa alma da bu seçime uyar">
       <option value="">tüm platformlar</option>
       <option value="fb">ⓕ Facebook</option>
       <option value="ig">📸 Instagram</option>
@@ -2336,7 +2339,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-4';
+const PANEL_YAPI = 'y2026.08.03-5';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -10856,6 +10859,7 @@ async function loadYayinDurumu(){
   if (stEl) stEl.textContent = '';
   const items = await ydFetchItems();
   YD.items = items;
+  ydProfilDoldur();          // profil seçeneklerini bu yüklemeden kur (seçim korunur)
   ydUpdateCounts();
   if (stEl) stEl.textContent = YD.kapsam || (items.length ? (items.length+' gönderim') : '');
   // Pencere doldu = daha eski kayıtlar var ama çekilmedi. Bunu söylemezsek
@@ -10886,24 +10890,29 @@ function ydDerinlikCiz(){
 }
 
 function ydUpdateCounts(){
-  const pub  = YD.items.filter(i=>i.status==='published').length;
+  // Kartlar SEÇİLİ KAPSAMI gösterir (profil/platform), liste de aynı
+  // kapsamı kullanır — ikisi çelişmesin.
+  const kap  = ydKapsam();
+  const pub  = kap.filter(i=>i.status==='published').length;
   // Çözülmüş hatalar sayılmaz: yoksa rozet ve "başarı oranı" düzelmiş
   // gönderimleri hâlâ hata sayıyordu.
-  const fail = YD.items.filter(i=>i.status==='failed' && !i._cozuldu).length;
-  const sch  = YD.items.filter(i=>i.status==='scheduled').length;
+  const fail = kap.filter(i=>i.status==='failed' && !i._cozuldu).length;
+  const sch  = kap.filter(i=>i.status==='scheduled').length;
   const total= pub+fail;
   setEl('yd-c-pub', pub);
   setEl('yd-c-fail', fail);
   setEl('yd-c-rate', total ? Math.round(pub/total*100)+'%' : '–');
   setEl('yd-c-sch', sch);
-  ydSetFailBadge(fail);
+  // Kenar çubuğu rozeti GLOBAL kalmalı: filtreye göre daralırsa "hata yok"
+  // sanılır. Bu yüzden tüm kayıtlardan hesaplanır.
+  ydSetFailBadge(YD.items.filter(i=>i.status==='failed' && !i._cozuldu).length);
   ydFailOzet();
 }
 
 // Başarısızların NEDEN dağılımı — tek bakışta "13 hatanın çoğu şu yüzden"
 function ydFailOzet(){
   const box=document.getElementById('yd-fail-ozet'); if(!box) return;
-  const fails=YD.items.filter(i=>i.status==='failed'&&i.error&&!i._cozuldu);
+  const fails=ydKapsam().filter(i=>i.status==='failed'&&i.error&&!i._cozuldu);
   if(!fails.length){ box.style.display='none'; return; }
   const grup={};
   fails.forEach(i=>{ const h=hataCevir(i.error); if(!grup[h.baslik]) grup[h.baslik]={n:0,ciddiyet:h.ciddiyet,cozum:h.cozum}; grup[h.baslik].n++; });
@@ -10911,7 +10920,8 @@ function ydFailOzet(){
   const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   box.style.display='block';
   box.innerHTML='<div style="background:var(--sur2);border:1px solid rgba(248,113,113,.35);border-radius:8px;padding:11px 13px">'
-    +'<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:8px">'+fails.length+' başarısız gönderim — neden dağılımı</div>'
+    +'<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mt);margin-bottom:8px">'+fails.length+' başarısız gönderim — neden dağılımı'
+      +(ydKapsamVar()?' <span style="text-transform:none;letter-spacing:0;color:var(--acc)">(seçili filtrede)</span>':'')+'</div>'
     +sirali.map(([baslik,d])=>'<div style="display:flex;align-items:flex-start;gap:9px;padding:5px 0;border-top:1px solid var(--brd)">'
       +'<span style="flex-shrink:0;font-size:13px;font-weight:800;color:var(--er);min-width:24px;text-align:right;font-variant-numeric:tabular-nums">'+d.n+'</span>'
       +'<div style="flex:1;min-width:0"><div style="font-size:12.5px;color:var(--tx);font-weight:600">'+(HATA_IKON[d.ciddiyet]||'⚠')+' '+esc(baslik)+'</div>'
@@ -10989,8 +10999,40 @@ function renderYayinDurumu(){
 }
 
 // Filtre + "çözülmüş gizle" uygulanmış liste — sayfalama bunun üzerinden sayar
+// ── KAPSAM: profil + platform ──────────────────────────────────────────
+// Durum rozetlerinden (Tümü/Başarısız/…) BAĞIMSIZ bir süzgeç. Liste,
+// sayaç kartları, neden dağılımı ve toplu kuyruğa alma AYNI kapsamı
+// kullanır — yoksa "113 başarısız" yazarken listede 5 kayıt görünür ve
+// hangisine güvenileceği belirsiz kalır.
+function ydKapsam(){
+  const pr = (document.getElementById('yd-profil')||{}).value || '';
+  const pl = (document.getElementById('yd-toplu-plat')||{}).value || '';
+  let l = YD.items;
+  if (pr) l = l.filter(i => String(i.profile||'') === pr);
+  if (pl) l = l.filter(i => i.plat === pl);
+  return l;
+}
+function ydKapsamVar(){
+  return !!((document.getElementById('yd-profil')||{}).value || (document.getElementById('yd-toplu-plat')||{}).value);
+}
+// Profil listesi yüklenen kayıtlardan kurulur; seçim korunur.
+function ydProfilDoldur(){
+  const sel = document.getElementById('yd-profil'); if (!sel) return;
+  const onceki = sel.value;
+  const adlar = Array.from(new Set(YD.items.map(i => String(i.profile||'').trim()).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="">tüm profiller</option>'
+    + adlar.map(a => '<option value="'+esc0(a)+'">'+esc0(a)+'</option>').join('');
+  // Seçili profil bu yüklemede yoksa "tüm profiller"e döner
+  sel.value = adlar.indexOf(onceki) >= 0 ? onceki : '';
+}
+function ydKapsamDegisti(){
+  ydUpdateCounts();
+  sayfaDurum('yd-list').no = 1;       // filtre değişince 1. sayfaya dön
+  renderYayinDurumu();
+}
+
 function ydFiltreliListe(){
-  let list = YD.items;
+  let list = ydKapsam();
   if (YD.filter !== 'all') list = list.filter(i => i.status === YD.filter);
   if (!YD.cozulenGoster) list = list.filter(i => !i._cozuldu);
   return list;
@@ -11203,12 +11245,14 @@ async function ydTopluGonder(it){
 async function ydTopluKuyruk(){
   const btn = document.getElementById('yd-toplu-btn');
   const platSec = (document.getElementById('yd-toplu-plat')||{}).value || '';
-  // Yalnız BAŞARISIZ kayıtlar; çözülmüş işaretliler dışarıda
-  let hedef = YD.items.filter(i => i.status === 'failed' && !i._cozuldu);
-  if (platSec) hedef = hedef.filter(i => i.plat === platSec);
+  const profSec = (document.getElementById('yd-profil')||{}).value || '';
+  // Ekranda görünen kapsamla AYNI: profil + platform süzgeci uygulanır,
+  // yalnız BAŞARISIZ kayıtlar alınır (çözülmüş işaretliler dışarıda).
+  const hedef = ydKapsam().filter(i => i.status === 'failed' && !i._cozuldu);
   // YD_PLAT_LABEL içinde <img> var; confirm/toast düz metin istiyor
   const platAd = platSec ? ({ig:'Instagram',yt:'YouTube',tt:'TikTok',fb:'Facebook',x:'X'}[platSec]||platSec) : 'tüm platformlar';
-  if (!hedef.length) return toast('Kuyruğa alınacak başarısız gönderim yok ('+platAd+')','warn');
+  const kapsamAd = (profSec || 'tüm profiller') + ' · ' + platAd;
+  if (!hedef.length) return toast('Kuyruğa alınacak başarısız gönderim yok ('+kapsamAd+')','warn');
 
   // Kaynak videoları çöz — eşleşmeyen varsa kullanıcı baştan bilsin
   await ydEnsureShorts();
@@ -11222,7 +11266,7 @@ async function ydTopluKuyruk(){
   if (!gonderilebilir.length)
     return toast('Hiçbirinin kaynak videosu bulunamadı — tek tek "Yeniden Gönder" ile mp4 URL girebilirsin','err',6000);
 
-  if (!confirm(gonderilebilir.length+' başarısız gönderim ('+platAd+') profilin KUYRUĞUNA eklenecek.\n\n'
+  if (!confirm(gonderilebilir.length+' başarısız gönderim ('+kapsamAd+') profilin KUYRUĞUNA eklenecek.\n\n'
       + 'Hepsi aynı anda yayınlanmaz — Upload-Post her birini sıradaki boş yuvaya koyar, '
       + 'yani mevcut yayın ritmin bozulmaz.\n'
       + (kaynaksiz ? '\n⚠ '+kaynaksiz+' kaydın kaynak videosu bulunamadı, onlar atlanacak.\n' : '')
@@ -11315,6 +11359,7 @@ async function ydDoRetry(payload, idx){
 window.loadYayinDurumu=loadYayinDurumu;
 window.ydFilter=ydFilter; window.ydRetry=ydRetry; window.ydRetryClose=ydRetryClose; window.ydRetryConfirm=ydRetryConfirm; window.ydRetryPick=ydRetryPick;
 window.ydCozulenGoster=ydCozulenGoster; window.ydCozulenleriIsaretle=ydCozulenleriIsaretle; window.ydAnahtar=ydAnahtar;
+window.ydKapsam=ydKapsam; window.ydKapsamVar=ydKapsamVar; window.ydKapsamDegisti=ydKapsamDegisti; window.ydProfilDoldur=ydProfilDoldur;
 window.ydDerinlik=ydDerinlik; window.ydDerinlikCiz=ydDerinlikCiz;
 window.ydTopluKuyruk=ydTopluKuyruk; window.ydTopluGonder=ydTopluGonder;
 window.kuyrukDenetimi=kuyrukDenetimi; window.kdCsv=kdCsv; window.kdAnahtar=kdAnahtar; window.kdCiz=kdCiz;
