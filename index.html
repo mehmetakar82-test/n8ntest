@@ -726,21 +726,6 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div id="kuyruk-list"><div style="color:var(--mt);font-size:13px;padding:8px">Hesapla'ya bas</div></div>
   </div>
 
-  <!-- 4) DAĞILIM -->
-  <div class="card" style="margin-bottom:14px">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div class="ct" style="margin:0">📊 Profil Başına Short</div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <span id="pl-status" style="font-size:12px;color:var(--mt)"></span>
-        <span id="pl-dmg" class="dmg"></span>
-        <button class="btn bg bsm" onclick="seedProfileLoad()" title="Mevcut Sheet short sayılarını n8n'e 'yük' olarak yaz — geride kalan profiller öncelik alıp dengelenir">⚖ Dengele</button>
-        <button class="btn bg bsm" onclick="loadProfileLoad()">↻ Yenile</button>
-      </div>
-    </div>
-    <div style="font-size:11px;color:var(--mt);margin:4px 0 10px">Aynı kategorideki profiller <b>short bazında orantılı</b> ilerler (en az short almış profile öncelik). Mevcut dengesizliği kapatmak için <b>⚖ Dengele</b>'ye bas: Sheet sayıları n8n'e yük olarak yazılır, sonraki short'lar geride kalanlara gider.</div>
-    <div id="pl-profilsiz" class="alert aw" style="display:none;margin:0 0 10px;font-size:12px"></div>
-    <div id="pl-list"><div style="color:var(--mt);font-size:13px;text-align:center;padding:12px">Yenile'ye tıklayın</div></div>
-  </div>
 </div>
 
 <!-- VIDEO GÖNDER -->
@@ -2391,7 +2376,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-01';
+const PANEL_YAPI = 'y2026.08.04-02';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -2544,7 +2529,7 @@ async function refreshDash() {
   if (lastEl) { lastEl.classList.remove('dmg','bayat'); lastEl.textContent = '⏳ güncelleniyor…'; delete DMG['dash-last']; }
   // NOT: Dört sayaç kutusu ve "Son İşlemler" tablosu Dashboard'dan
   // kaldırıldı (kullanıcı isteği). Sheet verisi yine okunuyor — Aksiyon
-  // Merkezi, Profil Başına Short ve Üretim Nabzı onu kullanıyor.
+  // Merkezi ve Üretim Nabzı onu kullanıyor.
   const nb = document.getElementById('nabiz-list');
   if (nb) nb.innerHTML = iskeletHTML(3,'satir');
   // Kurulum ipucu yalnız gerçekten eksikken görünsün (kalıcı bant yerine)
@@ -2578,7 +2563,6 @@ async function refreshDash() {
 
   if (lastEl) dmgYaz('dash-last');
   addLog('ok','sistem','Dashboard guncellendi');
-  try { loadProfileLoad(); } catch(e) {}   // profil başına short dağılımını da güncelle
   try { nabizCiz(); } catch(e){ console.warn('[NABIZ]', e.message); }
 }
 
@@ -9324,7 +9308,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(()=>{
       try { refreshDash(); }catch(e){ console.warn('[boot] refreshDash:', e.message); }
       try { loadActionCenter(); }catch(e){ console.warn('[boot] loadActionCenter:', e.message); }
-      // loadProfileLoad'ı refreshDash zaten sonunda çağırıyor
     }, 250);
     setInterval(()=>{ try{ dmgCiz(); }catch(e){} }, 30000);           // tazelik damgalarını canlı tut
     try{ alertSadelestir(); }catch(e){ console.warn('[boot] alertSadelestir:', e.message); }
@@ -11182,7 +11165,7 @@ const STOK_ESIK_VARSAYILAN = 50;
 // son: profil başına EN GEÇ planlanmış tarih (ms) — "kuyruk ne zamana kadar
 // yetiyor" sorusunun cevabı. Upload-Post 1 yıla kadar planlamaya izin verir
 // (scheduled_date "within 1 year"), yani ufuk API sınırı değil KUYRUK DERİNLİĞİ.
-const STOK = { data:null, t:0, yukleniyor:false, son:null };
+const STOK = { data:null, t:0, yukleniyor:false };
 function stokEsik(){
   const n = parseInt((S.cfg||{}).stokEsik);
   return (isNaN(n) || n < 0) ? STOK_ESIK_VARSAYILAN : n;
@@ -11192,15 +11175,11 @@ async function stokVeri(zorla){
   if (!zorla && STOK.data && Date.now()-STOK.t < 5*60000) return STOK.data;
   if (STOK.yukleniyor) return STOK.data;
   STOK.yukleniyor = true;
-  const son = {};
   const say = arr => {
     const by = {};
     (arr||[]).forEach(s=>{
       const p=String(s.profile_username||s.profile||s.user||'').trim(); if(!p) return;
       by[p]=(by[p]||0)+1;
-      // En geç planlanan tarih — kuyruğun o profilde nereye kadar uzandığı
-      const t = Date.parse(s.scheduled_date||s.scheduledDate||s.scheduled_at||s.date||'')||0;
-      if (t && t > (son[p]||0)) son[p] = t;
     });
     return by;
   };
@@ -11217,7 +11196,7 @@ async function stokVeri(zorla){
       try{ const d = await n8nGetCached('/webhook/panel-data'); if (d && !d._bos) by = say(d.scheduled||[]); }
       catch(e){ console.warn('[Stok] panel-data alınamadı:', e.message); }
     }
-    if (by && Object.keys(by).length){ STOK.data = by; STOK.t = Date.now(); STOK.son = son; }
+    if (by && Object.keys(by).length){ STOK.data = by; STOK.t = Date.now(); }
   }catch(e){ console.warn('[Stok]', e.message); }
   STOK.yukleniyor = false;
   return STOK.data;
@@ -11505,130 +11484,6 @@ function gcClearAll() {
   S.sentLog={}; localStorage.setItem('op_sent_log','{}'); S.sentURLs=new Set(); localStorage.setItem('op_sent','[]');
   initGecmis(); toast('Geçmiş temizlendi','ok');
 }
-// ── KUYRUK ÖMRÜ ────────────────────────────────────────────────────────
-// "Kuyruk ne zamana kadar dolu?" — Upload-Post 1 yıla kadar planlamaya
-// izin veriyor (scheduled_date "within 1 year"), yani ufuk bir API sınırı
-// DEĞİL: kuyruğa ne kadar içerik koyduğunla belirleniyor. Bittiği tarihi
-// yazmazsak "21 Ağustos'tan sonra hiç yok" bir kısıt gibi okunuyor.
-function kuyrukOmru(profil){
-  const t = (STOK.son || {})[profil] || 0;
-  if (!t) return null;
-  const gun = Math.round((t - Date.now()) / 864e5);
-  return { t, gun, tarih: new Date(t).toLocaleDateString('tr',{day:'2-digit',month:'short'}) };
-}
-function kuyrukEtiketi(profil){
-  const k = kuyrukOmru(profil);
-  if (!k) return '';
-  // 7 günün altına inince sarı, 3 günün altına inince kırmızı
-  const renk = k.gun < 3 ? 'var(--er)' : k.gun < 7 ? 'var(--wn)' : 'var(--mt)';
-  return ` · <span style="color:${renk}" title="Bu profilin kuyruğundaki en geç planlanmış gönderim. Upload-Post 1 yıla kadar izin veriyor — bu tarih kuyruk derinliğin, API sınırı değil.">→ ${k.tarih} (${k.gun} gün)</span>`;
-}
-
-// PROFİL BAŞINA SHORT — hangi Upload-Post profiline kaç short atandı
-async function loadProfileLoad() {
-  const listEl=document.getElementById('pl-list'), st=document.getElementById('pl-status');
-  if(!listEl) return;
-  n8nCacheClear('/webhook/panel-data');
-  if(st) st.textContent='⏳ yükleniyor…';
-  setEl('pl-dmg','');
-  listEl.innerHTML = iskeletHTML(4,'satir');   // P8: "Yenile'ye tıklayın" yerine iskelet
-  // 1) short-kaydetme profil dağılımı (dashboard yüklüyse cache, değilse çek)
-  let shorts=(S.sheetData&&S.sheetData.shorts)||[];
-  if(!shorts.length){
-    const n8n=getN8N();
-    if(n8n){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } }
-    if(!shorts.length){ const sid=S.cfg.sheet||''; if(sid||S.cfg.shkey){ try{ shorts=parseSheet(await sheetsGet(sid,'Sheet1!A:Z')); }catch(e){} } }
-  }
-  const byP={};
-  const pickProfil=r=>String(r['profil']||r['Profil']||r['profile']||'').trim();
-  const isPending=r=>{ const s=String(r['platform-status']||r['durum']||'').toLowerCase(); return s.includes('bekli')||s==='' ; };
-  shorts.forEach(r=>{ const p=pickProfil(r); if(!p) return; if(!byP[p]) byP[p]={total:0,pending:0}; byP[p].total++; if(isPending(r)) byP[p].pending++; });
-  // 2) Upload-Post'ta zamanlanmış (varsa) — profile_username başına
-  // Zamanlanmış sayıları stok katmanıyla ORTAK (tek kaynak, 5 dk önbellek)
-  const upBy=(await stokVeri(true))||{};
-  stokChipIsaretle();
-  // render
-  const profs=[...new Set([...Object.keys(byP),...Object.keys(upBy)])];
-  if(!profs.length){
-    // P8: yapılandırma eksik mi, gerçekten boş mu — ikisi ayrı mesaj
-    const yapilandirildi = !!(getN8N() || (S.cfg.shkey && S.cfg.sheet));
-    const bant = document.getElementById('dash-kurulum');
-    listEl.innerHTML = yapilandirildi
-      ? durumHTML('bos',{alt:'Hiçbir profile short atanmamış. short-kaydetme sayfasındaki \'profil\' kolonu okunur — üretim başlayınca dağılım burada görünür.'})
-      : durumHTML('kurulum',{kompakt: !!(bant && bant.style.display !== 'none'),
-                             alt:'Sheet ID / n8n URL girilmemiş — profil dağılımı okunamıyor.'});
-    if(st) st.textContent=''; setEl('pl-dmg',''); return;
-  }
-  // #3 profil hesap sağlığı (Upload-Post /users) — her profile durum noktası
-  let health={}; try { health=phCompute(await phFetchAccounts(), new Set(profs)); } catch(e){ console.warn('[ProfilSaglik]', e.message); }
-  const rows=profs.map(p=>({p, total:(byP[p]&&byP[p].total)||0, pending:(byP[p]&&byP[p].pending)||0, sched:upBy[p]||0}));
-  rows.sort((a,b)=>(b.total+b.sched)-(a.total+a.sched));
-  const max=Math.max(1,...rows.map(r=>Math.max(r.total,r.sched)));
-  listEl.innerHTML=rows.map(r=>{
-    const h=health[r.p]||null; const hm=h?(PH_META[h.status]||PH_META.live):null;
-    const dot=hm?`<span title="${(hm.txt||'Bağlı').replace(/"/g,'')}" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${hm.dot};margin-right:5px;vertical-align:middle"></span>`:'';
-    const warn=(hm&&hm.txt)?` <span style="color:${hm.dot};font-size:11px">${hm.txt}</span>`:'';
-    // Profilin ait olduğu kategori (KATEGORI_PROFIL_POOL'dan)
-    const _kat=profilKategori(r.p);
-    const katChip=_kat
-      ? ` <span style="font-size:10px;color:var(--acc3);background:rgba(167,139,250,.13);padding:1px 7px;border-radius:8px;vertical-align:middle;font-family:var(--ft)" title="Bu profil '${katLabel(_kat).replace(/'/g,'')}' kategorisinin havuzunda — bu kategorideki short'lar buraya dağıtılır">${katLabel(_kat)}</span>`
-      : ` <span style="font-size:10px;color:var(--wn);vertical-align:middle" title="Hiçbir kategori havuzunda değil — otomatik üretilen short'lardan pay almaz">⚠ kategorisiz</span>`;
-    return `<div style="margin-bottom:8px">
-    <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:3px">
-      <span style="color:var(--tx);font-family:var(--fm)">${dot}${r.p}${katChip}${warn}</span>
-      <span style="color:var(--mt)"><b style="color:var(--acc)">${r.total}</b> short${r.sched?` · ⏰ ${r.sched} zamanlı`:''}${kuyrukEtiketi(r.p)}</span>
-    </div>
-    <div class="prog"><div class="pf" style="background:var(--acc);width:${Math.round(Math.max(r.total,r.sched)/max*100)}%"></div></div>
-  </div>`;}).join('');
-  const tShort=rows.reduce((s,r)=>s+r.total,0), tSched=rows.reduce((s,r)=>s+r.sched,0);
-  const badN=Object.values(health).filter(h=>h.status!=='live').length;
-  // Genel kuyruk ömrü: en erken biten profil kritik olandır
-  const omurler = rows.map(r=>kuyrukOmru(r.p)).filter(Boolean);
-  let omurMetni = '';
-  if (omurler.length){
-    const enErken = omurler.reduce((a,b)=>a.t<b.t?a:b);
-    const enGec   = omurler.reduce((a,b)=>a.t>b.t?a:b);
-    omurMetni = ` · kuyruk ${enErken.tarih}'e kadar (${enErken.gun} gün)`
-      + (enGec.t !== enErken.t ? ` · en uzun ${enGec.tarih}` : '');
-  }
-  if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}${omurMetni}${badN?` · ⚠ ${badN} sağlık sorunu`:''}`;
-  dmgYaz('pl-dmg');
-
-  // NOT: Buradaki "zamanlı" sayısı eskiden Dashboard'daki ZAMANLANMIŞ
-  // kutusuna da yazılıyordu; o kutu kaldırıldı, yazma da kaldırıldı.
-
-  // Profil toplamı ile Sheet toplamı neden farklı olabilir: 'profil' kolonu
-  // boş olan short satırları hiçbir profile sayılamaz. Farkı gizlemek yerine yaz.
-  const tumShort = ((S.sheetData&&S.sheetData.shorts)||[]).length;
-  const profilsiz = Math.max(0, tumShort - tShort);
-  const uyari = document.getElementById('pl-profilsiz');
-  if (uyari) {
-    uyari.innerHTML = profilsiz
-      ? `⚠ ${profilsiz.toLocaleString('tr')} short kaydında <b>profil</b> kolonu boş — bu satırlar aşağıdaki dağılıma girmiyor, `
-        + `bu yüzden tablodaki toplam <b>${tumShort.toLocaleString('tr')}</b> ile buradaki <b>${tShort.toLocaleString('tr')}</b> farklı.`
-      : '';
-    uyari.style.display = profilsiz ? 'flex' : 'none';
-  }
-}
-window.loadProfileLoad=loadProfileLoad;
-// Mevcut Sheet short sayılarını n8n staticData.profilLoad'a "yük" olarak yaz →
-// en-az-yüklü profil seçimi geride kalan profilleri yakalatıp dengeler.
-async function seedProfileLoad() {
-  const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
-  let shorts=(S.sheetData&&S.sheetData.shorts)||[];
-  if(!shorts.length){ const n8n=getN8N(); if(n8n){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos){ shorts=d.shorts||[]; S.sheetData={shorts,urls:d.urls||[]}; } } }
-  if(!shorts.length) return toast('Short verisi yok — önce Dashboard\'ı yenile','warn');
-  const load={};
-  shorts.forEach(r=>{ const p=String(r['profil']||r['Profil']||r['profile']||'').trim(); if(p) load[p]=(load[p]||0)+1; });
-  const nP=Object.keys(load).length;
-  if(!nP) return toast('short-kaydetme\'de \'profil\' kolonu bulunamadı','warn');
-  if(!confirm(nP+' profilin mevcut short sayısı n8n\'e "yük" olarak yazılacak.\n\nBundan sonra üretilen short\'lar en az short almış profillere öncelik verilerek dağıtılır (aynı kategoride orantılı ilerleme).\n\nDevam edilsin mi?')) return;
-  const res=await faf(base+'/webhook/profil-yuk-seed',{load});
-  if(res&&res.ok===true){ toast('✓ Profil yükleri dengelendi ('+nP+' profil) — sonraki short\'lar geride kalanlara gidecek','ok'); }
-  else toast('✕ Gönderilemedi — n8n Active mi / profil-yuk-seed webhook\'u var mı?','err');
-}
-window.seedProfileLoad=seedProfileLoad;
-
 // ═══════════════════════════════════════════════════════════
 // YAYIN DURUMU — teslimat sonucu (yayınlandı/başarısız + permalink) + hedefli retry
 //  #1  Upload-Post /history → her gönderimin platform bazlı GERÇEK sonucu
