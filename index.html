@@ -2348,7 +2348,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-13';
+const PANEL_YAPI = 'y2026.08.03-14';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4027,15 +4027,25 @@ async function rapHareketDenetimi(){
     const profs = (raw && Array.isArray(raw.profiles)) ? raw.profiles : [];
     // 2) Yayın geçmişi — paylaşılan önbellek
     const onb = await histCek(KAPSAMA_SAYFA);
-    const gec = {};   // "profil|plat" -> {ok, hata, sonHata}
+    const gec = {};   // "profil|plat" -> {ok, hata, sonHata, basliklar}
+    const profBaslik = {};   // profil -> Map(normalize -> ham başlık)  [BAŞARIYLA yayınlananlar]
     (onb.kayitlar||[]).forEach(x=>{
       const u = String(x.profile_username||x.user||'');
       const p = RAP_HAREKET_NP[String(x.platform||'').toLowerCase()];
       if (!u || !p) return;
       const k = u+'|'+p;
-      if (!gec[k]) gec[k] = { ok:0, hata:0, sonHata:'' };
+      if (!gec[k]) gec[k] = { ok:0, hata:0, sonHata:'', basliklar:new Set() };
+      const ham = String(x.post_title || x.title || x.post_caption || '');
+      const n = ydNorm(ham).slice(0,60);
       if (x.success === false || x.error_message){ gec[k].hata++; if (x.error_message) gec[k].sonHata = String(x.error_message); }
-      else gec[k].ok++;
+      else {
+        gec[k].ok++;
+        if (n && n.length >= 6){
+          gec[k].basliklar.add(n);
+          if (!profBaslik[u]) profBaslik[u] = new Map();
+          if (!profBaslik[u].has(n)) profBaslik[u].set(n, ham);
+        }
+      }
     });
     // 3) Sınıflandır
     const sorun = [], hepHata = [], kullanilmiyor = [], metrikYok = [], durgun = [], saglikli = [];
@@ -4047,9 +4057,15 @@ async function rapHareketDenetimi(){
         const v = sa[ham]; const a = Array.isArray(v)?v[0]:v;
         if (!(a && (a.username||a.id||a.display_name||a.name))) return;   // bağlı değil
         const p = RAP_HAREKET_NP[String(ham).toLowerCase()]; if (!p) return;
-        const g = gec[u+'|'+p] || { ok:0, hata:0, sonHata:'' };
+        const g = gec[u+'|'+p] || { ok:0, hata:0, sonHata:'', basliklar:new Set() };
         const m = (RAP.analytics[u]||{})[p];
-        const kayit = { u, p, ok:g.ok, hata:g.hata, sonHata:g.sonHata, m };
+        // "Gitmeyen yayınlar hangileri?" — aynı profilin BAŞKA platformunda
+        // yayınlanmış ama burada olmayan short'lar. Tam liste değil, taranan
+        // pencere kadar; kırpıksa arayüz bunu söylüyor.
+        const tumu = profBaslik[u] || new Map();
+        const eksik = [];
+        tumu.forEach((ham, n) => { if (!g.basliklar.has(n)) eksik.push(ham); });
+        const kayit = { u, p, ok:g.ok, hata:g.hata, sonHata:g.sonHata, m, eksik };
         if (!m || typeof m !== 'object'){
           // Analitik hiç dönmedi. Yayın varsa bu bir eksiklik, yoksa sadece boş hesap.
           (g.ok ? metrikYok : kullanilmiyor).push(kayit);
@@ -4083,18 +4099,43 @@ async function rapHareketDenetimi(){
   } finally { if (btn) btn.disabled = false; }
 }
 
+// Son denetim — "gitmeyen short'ları listele" açılır kapanırken yeniden
+// tarama yapılmasın diye saklanır.
+const RAP_HAREKET_SON = {};
+function rapHareketListe(kat, i){
+  const liste = RAP_HAREKET_SON[kat]; if (!liste) return;
+  const k = liste[i]; if (!k) return;
+  const el = document.getElementById('hrk-'+kat+'-'+i); if (!el) return;
+  if (el.innerHTML){ el.innerHTML = ''; return; }          // ikinci tık kapatır
+  const esc = esc0;
+  el.innerHTML = '<div style="max-height:180px;overflow-y:auto;margin:3px 0 5px 10px;'
+    + 'border-left:2px solid var(--brd);padding-left:8px">'
+    + k.eksik.slice(0,60).map(t=>'<div style="font-size:11px;color:var(--mt);padding:1px 0;word-break:break-word">'+esc(t)+'</div>').join('')
+    + (k.eksik.length>60 ? '<div style="font-size:11px;color:var(--mt)">… ve '+(k.eksik.length-60)+' tane daha</div>' : '')
+    + '</div>';
+}
+
 function rapHareketCiz(s){
   const kutu = document.getElementById('rap-hareket'); if (!kutu) return;
   const esc = esc0;
   const PA = { instagram:'Instagram', youtube:'YouTube', tiktok:'TikTok', facebook:'Facebook',
                x:'X', threads:'Threads', linkedin:'LinkedIn', pinterest:'Pinterest', bluesky:'Bluesky' };
   const ad = k => esc(k.u)+' · '+(PA[k.p]||k.p);
-  const bolum = (baslik, renk, liste, aciklama, satirFn) => {
+  // "Bu hesaba gitmemiş short" sayısı + istenirse listesi
+  const eksikEk = (kat, i, k) => {
+    if (!k.eksik || !k.eksik.length) return '';
+    return ' <button class="btn bsm" style="padding:0 6px;font-size:10.5px" onclick="rapHareketListe(\''+kat+'\','+i+')"'
+      + ' title="Aynı profilin başka platformunda yayınlanmış ama bu hesaba hiç gitmemiş short\'lar">'
+      + k.eksik.length+' short gitmemiş — listele</button>'
+      + '<div id="hrk-'+kat+'-'+i+'"></div>';
+  };
+  const bolum = (kat, baslik, renk, liste, aciklama, satirFn) => {
+    RAP_HAREKET_SON[kat] = liste;
     if (!liste.length) return '';
     return '<div style="margin-top:10px">'
       + '<div style="font-size:12.5px;font-weight:700;color:'+renk+'">'+baslik+' — '+liste.length+'</div>'
       + '<div style="font-size:11px;color:var(--mt);margin:2px 0 4px">'+aciklama+'</div>'
-      + liste.slice(0,30).map(satirFn).join('')
+      + liste.slice(0,30).map((k,i)=>satirFn(k,i)).join('')
       + (liste.length>30 ? '<div style="font-size:11px;color:var(--mt)">… ve '+(liste.length-30)+' tane daha</div>' : '')
       + '</div>';
   };
@@ -4107,24 +4148,27 @@ function rapHareketCiz(s){
     + (toplamSorun === 0
         ? '<div style="font-size:12.5px;color:var(--ok)">✓ Yayın gitmiş hiçbir hesapta ölçüm eksikliği yok</div>'
         : '<div style="font-size:12.5px;color:var(--tx)">'+toplamSorun+' hesapta incelenecek durum var</div>')
-    + bolum('✕ Yayın var ama izlenme sıfır', 'var(--er)', s.sorun,
+    + bolum('sorun', '✕ Yayın var ama izlenme sıfır', 'var(--er)', s.sorun,
         'Bu hesaplara short GİTTİ ama platform sıfır izlenme bildiriyor. Gerçek bir tutarsızlık: yayın silinmiş, gizli/taslak kalmış ya da analitik izni eksik olabilir.',
-        k => sat('<b>'+ad(k)+'</b> — '+k.ok+' başarılı yayın · <span style="color:var(--er)">izlenme 0</span>'
-              + (k.takipci?' · takipçi '+ytkFmt(k.takipci):'')))
-    + bolum('⚠ Denendi ama hepsi başarısız', '#f5a623', s.hepHata,
+        (k,i) => sat('<b>'+ad(k)+'</b> — '+k.ok+' başarılı yayın · <span style="color:var(--er)">izlenme 0</span>'
+              + (k.takipci?' · takipçi '+ytkFmt(k.takipci):'') + eksikEk('sorun',i,k)))
+    + bolum('hepHata', '⚠ Denendi ama hepsi başarısız', '#f5a623', s.hepHata,
         'Hareketsizliğin sebebi belli: bu hesaba hiçbir gönderim geçmedi.',
-        k => sat('<b>'+ad(k)+'</b> — '+k.hata+' başarısız gönderim'
+        (k,i) => sat('<b>'+ad(k)+'</b> — '+k.hata+' başarısız gönderim'
               + (k.sonHata ? '<div style="color:var(--er);font-size:11px">'+esc(hataCevir(k.sonHata).baslik)
-                 + ' <span style="color:var(--mt)">— '+esc(hataCevir(k.sonHata).cozum)+'</span></div>' : '')))
-    + bolum('⏸ Yayın var ama analitik dönmedi', '#00b8d4', s.metrikYok,
+                 + ' <span style="color:var(--mt)">— '+esc(hataCevir(k.sonHata).cozum)+'</span></div>' : '')
+              + eksikEk('hepHata',i,k)))
+    + bolum('metrikYok', '⏸ Yayın var ama analitik dönmedi', '#00b8d4', s.metrikYok,
         'Gönderim yapılmış; Upload-Post bu hesap için metrik döndürmüyor. Analitik izni eksik olabilir — hesabı yeniden bağlarken izinleri onayla.',
-        k => sat('<b>'+ad(k)+'</b> — '+k.ok+' başarılı yayın · metrik yok'))
-    + bolum('⏱ 7 gündür sabit', 'var(--mt)', s.durgun,
+        (k,i) => sat('<b>'+ad(k)+'</b> — '+k.ok+' başarılı yayın · metrik yok'+eksikEk('metrikYok',i,k)))
+    + bolum('durgun', '⏱ 7 gündür sabit', 'var(--mt)', s.durgun,
         'Sayılar bir haftadır hiç değişmemiş. Yeni yayın gitmiyorsa normal olabilir.',
-        k => sat('<b>'+ad(k)+'</b> — izlenme '+ytkFmt(k.izlenme)+' · takipçi '+ytkFmt(k.takipci)))
-    + bolum('· Hiç yayın gitmemiş (sorun değil)', 'var(--mt)', s.kullanilmiyor,
-        'Bu hesaplara hiç short gönderilmemiş, dolayısıyla hareketsizlik beklenen durum.',
-        k => sat(ad(k)))
+        (k,i) => sat('<b>'+ad(k)+'</b> — izlenme '+ytkFmt(k.izlenme)+' · takipçi '+ytkFmt(k.takipci)+eksikEk('durgun',i,k)))
+    + bolum('kullanilmiyor', '· Hiç yayın gitmemiş', 'var(--mt)', s.kullanilmiyor,
+        'Upload-Post\'ta bu hesap için NE başarılı NE başarısız kayıt var — yani akış bu hesaba hiç göndermeyi denememiş. '
+        + 'Sebebi genelde ikisinden biri: gönderim sırasında platform seçimi bu hesabı dışarıda bırakmış ya da hesap o gönderimlerden SONRA bağlanmış. '
+        + 'Aşağıdaki düğme, aynı profilin başka platformuna gidip buraya gitmeyen short\'ları listeler; kuyruğa almak için Platformlar → ⚖ Eşitle.',
+        (k,i) => sat(ad(k)+eksikEk('kullanilmiyor',i,k)))
     + (s.gecmisVar ? '' : '<div style="font-size:11px;color:var(--mt);margin-top:8px">'
         + '"7 gündür sabit" ölçümü için günlük anlık görüntü birikmesi gerekiyor — bu hafta rapor oluşturdukça devreye girer.</div>')
     + '<div style="font-size:11px;color:var(--mt);margin-top:8px">Sağlıklı: <b>'+s.saglikli.length+'</b> hesapta yayın da hareket de var.</div>'
@@ -8915,7 +8959,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
       ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
-      rapHareketDenetimi,rapHareketCiz,
+      rapHareketDenetimi,rapHareketCiz,rapHareketListe,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
