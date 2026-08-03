@@ -687,14 +687,21 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <button class="btn bp bsm" onclick="refreshDash()">↻ Yenile</button>
     <span id="dash-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
   </div>
-  <div class="sg">
-    <div class="sc c1"><div class="sl">İşlenen URL</div><div class="sv" id="d-url">—</div><div class="ss">URL-Takip sayfası</div></div>
-    <div class="sc c2"><div class="sl">Üretilen Short</div><div class="sv" id="d-short">—</div><div class="ss">Short Kaydet</div></div>
-    <div class="sc c3"><div class="sl">Zamanlanmış</div><div class="sv" id="d-sched">—</div><div class="ss">Upload-Post scheduled</div></div>
-    <div class="sc c4"><div class="sl">İşlemde</div><div class="sv" id="d-proc">—</div><div class="ss">Aktif kuyruk</div></div>
+  <!-- ÜRETİM NABZI — "sistem hâlâ çalışıyor mu?" -->
+  <!-- Aksiyon Merkezi HATALARI gösterir; buradaki soru farklı: hata yokken
+       de üretim durmuş olabilir (n8n kapalı, kota bitmiş, akış hiç
+       tetiklenmemiş). SESSİZ durma en tehlikeli arıza — hiçbir kutu
+       kırmızıya dönmez, sadece hiçbir şey olmaz. -->
+  <div class="card" id="nabiz-card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div class="ct" style="margin:0">⏱ Üretim Nabzı</div>
+      <span id="nabiz-durum" style="font-size:12px;color:var(--mt)"></span>
+    </div>
+    <div style="font-size:11px;color:var(--mt);margin:4px 0 10px">Son üretim ve son yayın ne kadar zaman önce oldu — akış sessizce durduysa buradan görünür.</div>
+    <div id="nabiz-list" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px">
+      <div style="color:var(--mt);font-size:13px;padding:8px">Yenile'ye bas</div>
+    </div>
   </div>
-  <!-- Sayılar birbirini tutmuyorsa sessiz kalma: nereye bakılacağını söyle -->
-  <div id="dash-tutarsiz" class="alert aw" style="display:none;margin-bottom:14px;font-size:12px"></div>
   <!-- YENİ: Profil başına short dağılımı -->
   <div class="card" style="margin-bottom:14px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -709,18 +716,6 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div style="font-size:11px;color:var(--mt);margin:4px 0 10px">Aynı kategorideki profiller <b>short bazında orantılı</b> ilerler (en az short almış profile öncelik). Mevcut dengesizliği kapatmak için <b>⚖ Dengele</b>'ye bas: Sheet sayıları n8n'e yük olarak yazılır, sonraki short'lar geride kalanlara gider.</div>
     <div id="pl-profilsiz" class="alert aw" style="display:none;margin:0 0 10px;font-size:12px"></div>
     <div id="pl-list"><div style="color:var(--mt);font-size:13px;text-align:center;padding:12px">Yenile'ye tıklayın</div></div>
-  </div>
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div class="ct" style="margin:0">Son İşlemler</div>
-      <div style="display:flex;gap:10px;align-items:center"><span style="font-size:12px;color:var(--mt)" id="dash-src">Kaynak: —</span><span onclick="goUretim('urltakip','kuyruk')" style="font-size:12px;color:var(--acc);cursor:pointer">Tümü → URL Takip</span></div>
-    </div>
-    <div class="tw">
-      <table>
-        <thead><tr><th>URL</th><th>Kaynak</th><th>Short</th><th>Durum</th><th>Tarih</th></tr></thead>
-        <tbody id="dash-tbody"><tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">Ayarlar'dan Sheets API Key ve Sheet ID girin</td></tr></tbody>
-      </table>
-    </div>
   </div>
 </div>
 
@@ -2348,7 +2343,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.03-16';
+const PANEL_YAPI = 'y2026.08.03-17';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -2499,13 +2494,11 @@ async function refreshDash() {
   n8nCacheClear();
   const lastEl = document.getElementById('dash-last');
   if (lastEl) { lastEl.classList.remove('dmg','bayat'); lastEl.textContent = '⏳ güncelleniyor…'; delete DMG['dash-last']; }
-  // P8: "—" yerine iskelet — verinin geleceği belli olur, düzen sıçraması olmaz
-  ['d-url','d-short','d-sched','d-proc'].forEach(id=>{
-    const el = document.getElementById(id);
-    if (el && !el.querySelector('.isk')) el.innerHTML = '<span class="isk" style="display:inline-block;width:62px;height:20px"></span>';
-  });
-  const tb0 = document.getElementById('dash-tbody');
-  if (tb0) tb0.innerHTML = '<tr><td colspan="5" style="padding:12px">'+iskeletHTML(3,'satir')+'</td></tr>';
+  // NOT: Dört sayaç kutusu ve "Son İşlemler" tablosu Dashboard'dan
+  // kaldırıldı (kullanıcı isteği). Sheet verisi yine okunuyor — Aksiyon
+  // Merkezi, Profil Başına Short ve Üretim Nabzı onu kullanıyor.
+  const nb = document.getElementById('nabiz-list');
+  if (nb) nb.innerHTML = iskeletHTML(3,'satir');
   // Kurulum ipucu yalnız gerçekten eksikken görünsün (kalıcı bant yerine)
   const ipucu = document.getElementById('dash-kurulum');
   if (ipucu) ipucu.style.display = (getN8N() || (S.cfg.shkey && S.cfg.sheet)) ? 'none' : 'flex';
@@ -2533,66 +2526,73 @@ async function refreshDash() {
 
   S.sheetData = {shorts, urls};
 
-  // "Islemde" / "İşlemde" / "işlemde" / "ISLEMDE" varyantlarını yakala
-  const isProc = r => {
-    const d = String(r['durum']||'').toLowerCase().replace(/i̇/g,'i').replace(/ı/g,'i').replace(/ş/g,'s');
-    return d.includes('islem') || d.includes('bekli') || d.includes('progress') || d.includes('pending');
-  };
-  const procCount = urls.filter(isProc).length;
-  setEl('d-url',   urls.length ? urls.length.toLocaleString('tr') : (S.sentURLs.size || 0));
-  setEl('d-short', shorts.length.toLocaleString('tr'));
-  setEl('d-proc',  procCount.toLocaleString('tr'));
-  // ZAMANLANMIŞ: n8n'in panel-data'sındaki 'scheduled' yalnızca GEÇİCİ değer.
-  // O dizi n8n'deki 'Panel Upload-Post Zamanlanmış' düğümünden gelir ve düğüm
-  // neverError:true ile kurulu — çağrı başarısız olursa sessizce boş döner ve
-  // kutu 0 gösterir. Oysa panel Upload-Post'u ZATEN kendi çekiyor (stokVeri).
-  // Kesin sayı, aşağıdaki loadProfileLoad sonunda bu kutunun üzerine yazılır;
-  // böylece "0 zamanlanmış" ile "1772 zamanlı" aynı ekranda çelişemez.
-  setEl('d-sched', Array.isArray(sched) ? sched.length.toLocaleString('tr') : 0);
 
-
-  const tbody = document.getElementById('dash-tbody');
-  if (tbody) {
-    if (urls.length) {
-      tbody.innerHTML = urls.slice(0,5).map(r=>'<tr>'+
-        '<td class="uc" title="'+(r['youtube-url']||'')+'">'+(r['youtube-url']||'-').slice(0,40)+'...</td>'+
-        '<td><span class="badge bi">'+(r['kaynak']||'-')+'</span></td>'+
-        '<td>'+(r['uretilen-short-sayisi']||'-')+'</td>'+
-        '<td><span class="badge '+(r['durum']==='Islemde'?'bw2':'bs2')+'">'+(r['durum']||'-')+'</span></td>'+
-        '<td>'+(r['istek-tarihi']||'-').slice(0,16)+'</td>'+
-        '</tr>').join('');
-    } else {
-      // P8: yapılandırma eksikliği ile boş sonuç artık ayrı görünüyor
-      const yapilandirildi = !!(S.cfg.shkey || getN8N());
-      const bant = document.getElementById('dash-kurulum');
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:4px">' + (yapilandirildi
-        ? durumHTML('bos', {alt:'Sheet\'te henüz işlenmiş URL kaydı yok. Video gönderdikçe burada listelenir.',
-                            btn:{fn:"goUretim('video','uretim')", ad:'▶ Video Gönder'}, btnTip:'bg'})
-        : durumHTML('kurulum', {kompakt: !!(bant && bant.style.display !== 'none'),
-                                alt:'Google Sheets API Key / Sheet ID girilmemiş.'}))
-        + '</td></tr>';
-    }
-  }
-
-  // ── TUTARLILIK KONTROLÜ ─────────────────────────────────────────────
-  // "1 işlenen URL" ile "2.130 üretilen short" aynı anda doğru olamaz: her
-  // short bir URL'den üretilir. Böyle bir durumda URL-Takip tarafı eksik
-  // okunuyor demektir — sayıya bakıp yanlış sonuç çıkarmak yerine uyar.
-  const tut = document.getElementById('dash-tutarsiz');
-  if (tut) {
-    const mesaj = [];
-    if (shorts.length > 50 && urls.length < shorts.length/20)
-      mesaj.push(`<b>İşlenen URL (${urls.length}) ile Üretilen Short (${shorts.length.toLocaleString('tr')}) bağdaşmıyor.</b> `
-        + `Her short bir URL'den üretildiğine göre <b>URL-Takip</b> sayfası eksik okunuyor. `
-        + `n8n'deki <code>Panel Veri Birleştir</code> düğümü yalnızca <code>youtube-url</code> kolonu DOLU olan satırları sayar — `
-        + `sayfadaki başlık hücresinin tam olarak <code>youtube-url</code> yazdığını doğrula.`);
-    tut.innerHTML = mesaj.length ? ('<span>⚠</span><div>'+mesaj.join('<br><br>')+'</div>') : '';
-    tut.style.display = mesaj.length ? 'flex' : 'none';
-  }
 
   if (lastEl) dmgYaz('dash-last');
   addLog('ok','sistem','Dashboard guncellendi');
   try { loadProfileLoad(); } catch(e) {}   // profil başına short dağılımını da güncelle
+  try { nabizCiz(); } catch(e){ console.warn('[NABIZ]', e.message); }
+}
+
+// ── ÜRETİM NABZI ───────────────────────────────────────────────────────
+// Aksiyon Merkezi "ne bozuldu"yu gösterir; bu kart "hâlâ çalışıyor mu"yu.
+// Sessiz durma (n8n kapalı, kota bitmiş, akış tetiklenmemiş) hiçbir kutuyu
+// kırmızıya çevirmez — sadece hiçbir şey olmaz. Bu yüzden SON olayların
+// üzerinden geçen SÜRE ölçülür.
+// Veri kaynakları zaten elde: Sheet (üretim) + paylaşılan geçmiş önbelleği
+// (yayın). Yeni API yükü getirmez; geçmiş önbellekte yoksa o kutu "—" olur.
+function nabizSaatFark(t){ return t ? Math.floor((Date.now()-t)/3600000) : null; }
+function nabizSure(saat){
+  if (saat == null) return '—';
+  if (saat < 1) return 'az önce';
+  if (saat < 48) return saat + ' saat önce';
+  return Math.floor(saat/24) + ' gün önce';
+}
+async function nabizCiz(){
+  const el = document.getElementById('nabiz-list'); if (!el) return;
+  const stEl = document.getElementById('nabiz-durum');
+  const shorts = (S.sheetData && S.sheetData.shorts) || (S._panelCache && S._panelCache.shorts) || [];
+  // 1) Son üretim — short-kaydetme tablosundaki en yeni created-at
+  let sonUretim = 0, bugunUretim = 0;
+  const gunBasi = new Date(); gunBasi.setHours(0,0,0,0);
+  shorts.forEach(r=>{
+    const t = Date.parse(r['created-at'] || r['createdAt'] || r['tarih'] || '') || 0;
+    if (!t) return;
+    if (t > sonUretim) sonUretim = t;
+    if (t >= gunBasi.getTime()) bugunUretim++;
+  });
+  // 2) Son yayın — paylaşılan geçmiş önbelleği; YOKSA yeni istek ATILMAZ
+  let sonYayin = 0, bugunYayin = 0, veriYok = true;
+  if (HIST_ONB.kayitlar){
+    veriYok = false;
+    HIST_ONB.kayitlar.forEach(x=>{
+      if (x.success === false || x.error_message) return;
+      const t = Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0;
+      if (!t) return;
+      if (t > sonYayin) sonYayin = t;
+      if (t >= gunBasi.getTime()) bugunYayin++;
+    });
+  }
+  const uSaat = nabizSaatFark(sonUretim), ySaat = nabizSaatFark(sonYayin);
+  // 24 saatten uzun sessizlik uyarı, 72 saat kritik
+  const renk = s => s == null ? 'var(--mt)' : (s >= 72 ? 'var(--er)' : (s >= 24 ? 'var(--wn)' : 'var(--ok)'));
+  const kutu = (ikon, baslik, deger, alt, col) =>
+    '<div style="border:1px solid var(--brd);border-left:3px solid '+col+';border-radius:6px;padding:10px 12px;background:var(--sur)">'
+    + '<div style="font-size:12px;color:var(--mt);display:flex;align-items:center;gap:6px">'+ikon+' '+baslik+'</div>'
+    + '<div style="font-size:17px;font-weight:800;color:'+col+';font-family:var(--fh);line-height:1.25">'+deger+'</div>'
+    + '<div style="font-size:11px;color:var(--mt)">'+alt+'</div></div>';
+  el.innerHTML =
+      kutu('🎬','Son short üretimi', nabizSure(uSaat),
+           shorts.length ? ('bugün '+bugunUretim+' üretildi') : 'Sheet okunamadı', renk(uSaat))
+    + kutu('📤','Son başarılı yayın', veriYok ? '—' : nabizSure(ySaat),
+           veriYok ? 'Yayın Durumu ya da Platformlar açılınca dolar' : ('bugün '+bugunYayin+' yayınlandı'), veriYok ? 'var(--mt)' : renk(ySaat))
+    + kutu('📦','Üretilen short (toplam)', shorts.length ? shorts.length.toLocaleString('tr') : '—',
+           'short-kaydetme tablosu', 'var(--acc)');
+  if (stEl){
+    const en = [uSaat, ySaat].filter(x=>x!=null);
+    stEl.textContent = !en.length ? 'veri yok'
+      : (Math.max.apply(null,en) >= 24 ? '⚠ akış duraklamış olabilir' : 'akış çalışıyor ✓');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -9080,6 +9080,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ciftTara,ciftOtoDegisti,ciftOtoKur,ciftOtoCalis,ciftOtoTik,ciftOtoAcik,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
       rapHareketDenetimi,rapHareketCiz,rapHareketListe,hrkGonder,hrkGonderTumu,hrkListeCiz,hrkKaynakCoz,
+      nabizCiz,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
@@ -11120,22 +11121,18 @@ async function loadProfileLoad() {
   if(st) st.textContent=`${profs.length} profil · ${tShort} short${tSched?` · ${tSched} zamanlı`:''}${omurMetni}${badN?` · ⚠ ${badN} sağlık sorunu`:''}`;
   dmgYaz('pl-dmg');
 
-  // ── Dashboard kutularını AYNI kaynakla hizala ────────────────────────
-  // ZAMANLANMIŞ kutusu n8n panel-data'sındaki 'scheduled' dizisini gösteriyordu;
-  // o düğüm sessizce boş dönebildiği için kutu 0 derken hemen altında
-  // "1772 zamanlı" yazabiliyordu. Artık ikisi de Upload-Post'tan gelen
-  // aynı sayı (stokVeri). Upload-Post okunamadıysa kutuya dokunulmuyor.
-  if (Object.keys(upBy).length) setEl('d-sched', tSched.toLocaleString('tr'));
+  // NOT: Buradaki "zamanlı" sayısı eskiden Dashboard'daki ZAMANLANMIŞ
+  // kutusuna da yazılıyordu; o kutu kaldırıldı, yazma da kaldırıldı.
 
-  // ÜRETİLEN SHORT ile buradaki toplam neden farklı olabilir: 'profil' kolonu
+  // Profil toplamı ile Sheet toplamı neden farklı olabilir: 'profil' kolonu
   // boş olan short satırları hiçbir profile sayılamaz. Farkı gizlemek yerine yaz.
   const tumShort = ((S.sheetData&&S.sheetData.shorts)||[]).length;
   const profilsiz = Math.max(0, tumShort - tShort);
   const uyari = document.getElementById('pl-profilsiz');
   if (uyari) {
     uyari.innerHTML = profilsiz
-      ? `⚠ ${profilsiz.toLocaleString('tr')} short kaydında <b>profil</b> kolonu boş — bu satırlar yukarıdaki dağılıma girmiyor, `
-        + `bu yüzden <b>Üretilen Short (${tumShort.toLocaleString('tr')})</b> ile buradaki <b>${tShort.toLocaleString('tr')}</b> farklı.`
+      ? `⚠ ${profilsiz.toLocaleString('tr')} short kaydında <b>profil</b> kolonu boş — bu satırlar aşağıdaki dağılıma girmiyor, `
+        + `bu yüzden tablodaki toplam <b>${tumShort.toLocaleString('tr')}</b> ile buradaki <b>${tShort.toLocaleString('tr')}</b> farklı.`
       : '';
     uyari.style.display = profilsiz ? 'flex' : 'none';
   }
