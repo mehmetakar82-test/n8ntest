@@ -2312,7 +2312,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.02-15';
+const PANEL_YAPI = 'y2026.08.02-16';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4166,8 +4166,45 @@ function histHataMetni(e){
     : ((e && e.message) || 'bilinmeyen hata');
 }
 
+// ── YENİDEN GÖNDERİLENLER — ekranlar arası ortak hafıza ────────────────
+// Kuyruğa alınan short HENÜZ yayınlanmadığı için Upload-Post geçmişinde
+// yalnız eski "başarısız" kaydı görünür. Bu yüzden Kapsama tablosu onu ✕
+// saymaya devam ediyordu, pop-up ise "kuyruğa alındı" diyordu — iki ekran
+// çelişiyordu (yaşandı). Üstelik Yayın Durumu'ndan yapılan gönderimden
+// Kapsama'nın hiç haberi olmuyordu.
+// Artık başarılı yeniden gönderim NEREDEN yapılırsa yapılsın buraya
+// yazılır ve her iki ekran da aynı kaydı okur. localStorage'da tutulur ki
+// sayfa yenilenince kaybolmasın.
+// Ölçüt sonBasari ile AYNI: yalnız gönderim ZAMANINDAN ÖNCEKİ hatalar
+// düşülür — gönderimden sonra gelen YENİ bir hata yine görünür.
+const GND_ANAHTAR = 'op_yeniden_gonderildi';
+let GONDERILDI = {};
+try { GONDERILDI = JSON.parse(localStorage.getItem(GND_ANAHTAR) || '{}') || {}; } catch(e){ GONDERILDI = {}; }
+function gndAnahtar(profil, platform, baslik){
+  const t = String(baslik||'').trim().toLowerCase().replace(/\s+/g,' ');
+  if (!t || t.length < 6) return '';                    // ayırt edici değil
+  return String(profil||'').trim()+'|'+String(platform||'').trim().toLowerCase()+'|'+t;
+}
+function gndIsaretle(profil, platform, baslik){
+  const k = gndAnahtar(profil, platform, baslik);
+  if (!k) return;
+  GONDERILDI[k] = Date.now();
+  const sinir = Date.now() - 30*86400000;               // 30 günden eskisini at
+  Object.keys(GONDERILDI).forEach(x => { if (!(GONDERILDI[x] > sinir)) delete GONDERILDI[x]; });
+  try { localStorage.setItem(GND_ANAHTAR, JSON.stringify(GONDERILDI)); } catch(e){}
+}
+function gndCozuldu(profil, platform, baslik, hataZamani){
+  const k = gndAnahtar(profil, platform, baslik);
+  if (!k) return false;
+  const t = GONDERILDI[k];
+  return t != null && t >= (hataZamani || 0);
+}
+
 const KAPSAMA_SAYFA = 10;   // history taraması: 10×100 = 1000 kayıt
 const KAPSAMA_HATA = {};    // "profil|platform" -> ÇÖZÜLMEMİŞ hata kayıtları (pop-up için)
+// Matris yeniden çizilebilsin diye son tarama saklanır: gönderim sonrası
+// sayıyı güncellemek için taramayı TEKRARLAMAK gerekmesin (429 riski).
+const KAPSAMA_SON = { K:null, profs:null, kayit:0, kirpik:false, cozulenTop:0 };
 async function platKapsama(){
   const btn = document.getElementById('plat-kapsama-btn');
   const kutu = document.getElementById('plat-kapsama'); if (!kutu) return;
@@ -4220,6 +4257,10 @@ async function platKapsama(){
       if (r.ok){ c.pub++; return; }
       const k = kAnahtar(r);
       if (k && sonBasari[k] != null && sonBasari[k] >= r.t){ c.cozuldu++; cozulenTop++; return; }
+      // Bu oturumda (ya da önceki oturumlarda) yeniden gönderilmiş mi?
+      // Kuyruğa alınan short henüz yayınlanmadığı için geçmişte hâlâ
+      // yalnız hata kaydı var — ✕ saymaya devam etmek yanıltıcı olur.
+      if (gndCozuldu(r.u, r.p, r.baslik, r.t)){ c.cozuldu++; cozulenTop++; return; }
       c.fail++;
       (KAPSAMA_HATA[r.u+'|'+r.p] = KAPSAMA_HATA[r.u+'|'+r.p] || []).push(r);
     });
@@ -4245,7 +4286,24 @@ async function platKapsama(){
       } catch(e){ console.warn('[KAPSAMA] queue '+u+':', e.message); }
     }, 4);
 
-    // 4) Matris
+    // 4) Matris — çizim ayrı fonksiyonda; gönderim sonrası TARAMA
+    //    TEKRARLANMADAN yeniden çizilebilsin diye (429'a girmemek için).
+    KAPSAMA_SON.K = K; KAPSAMA_SON.profs = profs;
+    KAPSAMA_SON.kayit = kayit; KAPSAMA_SON.kirpik = kirpik; KAPSAMA_SON.cozulenTop = cozulenTop;
+    kapsamaMatrisCiz();
+    addLog('ok','uploadpost','Kapsama: '+kayit+' kayıt tarandı');
+  } catch(e){
+    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kapsama denetimi başarısız: '+histHataMetni(e)});
+  } finally { if (btn) btn.disabled = false; }
+}
+
+// Son taramanın sayılarıyla matrisi çizer. Veriyi kendisi çekmez.
+function kapsamaMatrisCiz(){
+  const kutu = document.getElementById('plat-kapsama');
+  const K = KAPSAMA_SON.K, profs = KAPSAMA_SON.profs;
+  if (!kutu || !K || !profs) return;
+  const kayit = KAPSAMA_SON.kayit, kirpik = KAPSAMA_SON.kirpik, cozulenTop = KAPSAMA_SON.cozulenTop;
+  {
     const esc = s=>String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const PLATS = [['instagram','📸 IG'],['youtube','▶ YT'],['tiktok','♪ TT'],['facebook','ⓕ FB'],['x','𝕏 X']];
     const sifirlar = [];
@@ -4267,7 +4325,7 @@ async function platKapsama(){
           + (c.fail ? '<span style="color:var(--er);cursor:pointer;text-decoration:underline dotted"'
                       + ' onclick="event.stopPropagation();kapsamaHataAc(\''+esc(u).replace(/'/g,"\\'")+'\',\''+p+'\')"'
                       + ' title="Çözülmemiş '+c.fail+' hata — listeyi görmek için tıkla">✕'+c.fail+'</span> ' : '')
-          + (c.cozuldu ? '<span style="color:var(--mt)" title="'+c.cozuldu+' hata yeniden gönderilip yayınlandı — sayıma dahil değil">↻'+c.cozuldu+'</span> ' : '')
+          + (c.cozuldu ? '<span style="color:var(--mt)" title="'+c.cozuldu+' hata yeniden gönderildi (yayınlandı ya da kuyrukta) — sayıma dahil değil">↻'+c.cozuldu+'</span> ' : '')
           + (c.plan ? '<span style="color:#00b8d4" title="planlı/kuyrukta">⏰'+c.plan+'</span>' : '')
           + '</td>';
       }).join('');
@@ -4280,17 +4338,25 @@ async function platKapsama(){
       : '<div style="font-size:12.5px;color:var(--ok);margin-bottom:8px">✓ Bağlı her hesapta en az bir kayıt var</div>';
     kutu.innerHTML = '<div class="card">'
       + '<div class="ct">📋 Kapsama Denetimi <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— '+kayit+' geçmiş kaydı'+(kirpik?' (pencere doldu: daha eski kayıtlar taranamadı — "HİÇ" bu pencere içindir)':'')+' + plan + kuyruk'
-      + (cozulenTop?' · <b style="color:var(--ok)">'+cozulenTop+' hata yeniden gönderilip çözülmüş, sayımdan düşürüldü (↻)</b>':'')
+      + (cozulenTop?' · <b style="color:var(--ok)">'+cozulenTop+' hata yeniden gönderildi (yayınlandı ya da kuyrukta), sayımdan düşürüldü (↻)</b>':'')
       + ' · <b>✕ sayısına tıkla</b> → başarısız short listesi</span>'
       + '<button class="btn bsm" style="float:right" onclick="document.getElementById(\'plat-kapsama\').innerHTML=\'\'">✕</button></div>'
       + ozet
       + '<div style="overflow-x:auto"><style>#plat-kapsama td,#plat-kapsama th{padding:3px 8px;border-bottom:1px solid var(--brd)}#plat-kapsama tbody tr:hover{background:var(--sur2)}</style>'
       + '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="color:var(--mt);font-size:11px"><tr><th style="text-align:left">Profil</th>'
       + PLATS.map(([,l])=>'<th>'+l+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
-    addLog(sifirlar.length?'warn':'ok','uploadpost','Kapsama: '+kayit+' kayıt tarandı, '+sifirlar.length+' hesapta hiç kayıt yok');
-  } catch(e){
-    kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kapsama denetimi başarısız: '+histHataMetni(e)});
-  } finally { if (btn) btn.disabled = false; }
+  }
+}
+
+// Bir hata yeniden gönderildiğinde matristeki sayıyı yerinde düzeltir:
+// ✕ bir azalır, ↻ bir artar. Tarama TEKRARLANMAZ (429'a girmemek için).
+function kapsamaSayimDus(profil, platform){
+  const K = KAPSAMA_SON.K; if (!K) return;
+  const c = (K[profil]||{})[platform];
+  if (!c || !c.fail) return;
+  c.fail--; c.cozuldu = (c.cozuldu||0) + 1;
+  KAPSAMA_SON.cozulenTop++;
+  kapsamaMatrisCiz();
 }
 
 // ── HESABI DOLDUR ──────────────────────────────────────────────────────
@@ -4796,6 +4862,9 @@ function kapsamaHataCiz(){
       r._clipId = (s && s.clipId) || '';        // ölü linki OpusClip'ten tazelemek için
     }
   });
+  // Başka ekrandan (Yayın Durumu) gönderilmiş olabilir — ortak hafızaya bak,
+  // yoksa pop-up "çözülmemiş" derken tablo "gönderildi" der, çelişirler.
+  liste.forEach(r => { if (!r._gonderildi && gndCozuldu(u, p, r.baslik, r.t)) r._gonderildi = true; });
   const kalan = liste.filter(r => !r._gonderildi);
   const gonderilebilir = kalan.filter(r => r._video);
   setEl('kh-baslik', u + ' · ' + (KH_PL[p]||p) + ' — ' + kalan.length + ' çözülmemiş hata');
@@ -7726,6 +7795,7 @@ document.addEventListener('DOMContentLoaded', function() {
       platDoldurAc,platDoldurKapat,platDoldurTara,platDoldurGonder,pdBagliPlatformlar,platDoldurYineDe,
       pdOrgKimlik,pdKaynakTanisi,platDoldurTazele,pdTazeLinkler,pdProjeKimligi,
       khErisimHatasi,khYapilandirmaHatasi,khYapilandirmaUyarisi,khTazele,
+      gndIsaretle,gndCozuldu,gndAnahtar,kapsamaMatrisCiz,kapsamaSayimDus,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
       cerLogoSec,cerOnizle,cerKota,cerTest,cerGhTest,cerGhKaydet,cerAyarGonder,cerGenelToggle,cerProfilToggle];
@@ -10402,14 +10472,24 @@ async function ydTopluGonder(it){
         ytEtiketler(aciklama || it.title, profilKategori(profil)).forEach(t => fd.append('tags[]', t));
       }
       const u = await upYukle(fd);                 // 429'da bekleyip yeniden dener
-      if (u.ok) return { ok:true };
+      if (u.ok){
+        // Kapsama ekranı da bilsin: kuyruğa alınan short artık ✕ sayılmasın
+        gndIsaretle(profil, platform, it.title);
+        kapsamaSayimDus(profil, platform);
+        return { ok:true };
+      }
       return { ok:false, sebep:'api', mesaj: u.mesaj };
     }
     const base = getN8N();
     if (!base) return { ok:false, sebep:'yapilandirma', mesaj:'API Key veya n8n URL yok' };
     const res = await faf(base+'/webhook/yeniden-gonder', {
       profil, platform, video, title: it.title, description: it._caption||it.caption||'', kuyruk:true });
-    return (res && res.ok === true) ? { ok:true } : { ok:false, sebep:'n8n', mesaj:'webhook yanıt vermedi' };
+    if (res && res.ok === true){
+      gndIsaretle(profil, platform, it.title);
+      kapsamaSayimDus(profil, platform);
+      return { ok:true };
+    }
+    return { ok:false, sebep:'n8n', mesaj:'webhook yanıt vermedi' };
   } catch(e){ return { ok:false, sebep:'istisna', mesaj:e.message }; }
 }
 
@@ -10501,6 +10581,10 @@ async function ydDoRetry(payload, idx){
       ok = res && res.ok === true; msg = ok?'':'n8n Active mi / yeniden-gonder webhook\'u var mı?';
     }
     if (ok){
+      // Yayın Durumu'ndan gönderim de Kapsama ekranına yansısın — eskiden
+      // Kapsama'nın bundan hiç haberi olmuyor, short orada ✕ kalıyordu.
+      gndIsaretle(payload.profil, payload.platform, payload.title);
+      kapsamaSayimDus(payload.profil, payload.platform);
       toast('✓ Yeniden gönderildi — '+(payload.profil||'')+' ['+payload.platform+']','ok');
       addLog('ok','uploadpost','Retry OK: '+payload.profil+' ['+payload.platform+']');
       const it = YD.items[idx]; if (it){ it.status='retried'; it.error=(it.error?it.error+' · ':'')+'↻ yeniden gönderildi'; }
