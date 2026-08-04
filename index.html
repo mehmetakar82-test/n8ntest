@@ -2051,7 +2051,14 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div class="ct">GitHub Yayınlama</div>
         <div style="font-size:12px;color:var(--mt);margin-bottom:8px">Banner PNG'leri ffmpeg'in çekebilmesi için public repo'da barınır. Token yalnız bu tarayıcıda saklanır, panele gömülmez.</div>
         <div class="fg"><label>Repo</label><input id="cer-gh-repo" type="text" placeholder="kullanici/repo" onchange="cerGhKaydet()"/></div>
-        <div class="fg"><label>Personal Access Token</label><input id="cer-gh-pat" type="password" placeholder="ghp_..." onchange="cerGhKaydet()"/></div>
+        <div class="fg"><label>Personal Access Token</label><input id="cer-gh-pat" type="password" placeholder="github_pat_..." onchange="cerGhKaydet()"/>
+          <div style="font-size:11px;color:var(--mt);margin-top:3px">
+            <b style="color:var(--wn)">Fine-grained token kullan</b> (<code>github_pat_</code> ile başlar).
+            Klasik token (<code>ghp_</code>) <b>tüm</b> depolarına tam erişim verir; panelin ihtiyacı olan tek şey
+            bu repoda <b>Contents: Read and write</b>. GitHub → Settings → Developer settings →
+            Personal access tokens → <b>Fine-grained tokens</b> → Repository access: <i>Only select repositories</i>.
+          </div>
+        </div>
         <button class="btn bsm" onclick="cerGhTest()">Bağlantıyı Sına</button>
         <span id="cer-gh-durum" style="font-size:12px;margin-left:8px"></span>
       </div>
@@ -2421,7 +2428,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-24';
+const PANEL_YAPI = 'y2026.08.04-25';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -10270,8 +10277,14 @@ async function initCerceve(){
 }
 
 function cerGhKaydet(){
+  // Klasik token (ghp_) hesabın TÜM depolarına tam okuma/yazma verir; panelin
+  // ihtiyacı yalnız bu repoda Contents:RW. Panel herkese açık bir adreste
+  // barındığı için token localStorage'da duruyor — yetkiyi daraltmak önemli.
+  const _p = ((document.getElementById('cer-gh-pat')||{}).value||'').trim();
+  if (/^ghp_/.test(_p)) toast('Klasik token — hesabındaki TÜM depolara erişim veriyor. '
+    + 'Fine-grained token (github_pat_) ile tek repoya indir.', 'warn', 8000);
   CER.ghRepo = ((document.getElementById('cer-gh-repo')||{}).value||CER.ghRepo).trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/$/,'');
-  CER.ghPat  = ((document.getElementById('cer-gh-pat')||{}).value||'').trim();
+  CER.ghPat  = _p;
   cerYaz();
 }
 function cerGenelToggle(){
