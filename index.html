@@ -632,7 +632,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div class="ni" onclick="go('radar',this)"><span class="ic">📡</span>Trend Radar &amp; Onay<span class="ni-badge acc" id="badge-tr"></span></div>
     <div class="ni" onclick="go('opusclip',this)"><span class="ic">◈</span>OpusClip Galeri</div>
     <div class="ns">Kaynaklar</div>
-    <div class="ni" onclick="go('drive',this)"><span class="ic">◉</span>Google Drive &amp; Sheets</div>
+    <div class="ni" onclick="go('drive',this)"><span class="ic">▤</span>Google Sheets</div>
     <div class="ns">Takip</div>
     <div class="ni" onclick="go('kuyruk',this)"><span class="ic">≡</span>Üretim Takibi</div>
     <div class="ns">Analiz</div>
@@ -1224,8 +1224,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
 
 <!-- GOOGLE DRIVE -->
 <div id="page-drive" class="page">
-  <div class="ph"><div class="pt">Google Drive</div><div class="ps">Drive sheet'inden URL listesi al ve gönder</div></div>
-  <div class="utab-bar" data-group="kaynak" data-utab="drive"></div>
+  <div class="ph"><div class="pt">Google Sheets</div><div class="ps">Sheet'teki URL listesini oku ve gönder</div></div>
   <div class="alert aw" style="margin-bottom:12px"><span>⚠</span><span>Tekrar koruma aktif — işlenmiş URL'ler listede gösterilir ve tekrar gönderilmez.</span></div>
   <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>film</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
   <div class="g2">
@@ -1236,6 +1235,17 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <div class="fg"><label>Kategori Sütunu <span style="color:var(--mt)">(opsiyonel — sheet'te varsa)</span></label><input id="dr-cat-col" type="text" value="Kategori" placeholder="Kategori"/></div>
       <div class="fg"><label>Açıklama Notu Sütunu <span style="color:var(--mt)">(opsiyonel — her URL için farklı not)</span></label><input id="dr-not-col" type="text" value="Aciklama Notu" placeholder="Aciklama Notu"/></div>
       <div class="fg"><label>Varsayılan Kategori <span style="color:var(--mt)">(sütun boşsa kullanılır)</span></label><div class="cat-chips" id="dr-cats"></div></div>
+      <!-- Bekleme modu eski "Google Sheets" sayfasından taşındı. VARSAYILAN
+           "bekleme yok": bu sayfanın önceki davranışı buydu, sürpriz olmasın.
+           Uzun listelerde n8n'i tıkamamak için araya bekleme koyulabilir. -->
+      <div class="fg"><label>Gönderimler Arası Bekleme</label>
+        <select id="dr-mode" onchange="document.getElementById('dr-delay-wrap').style.display=this.value==='time'?'block':'none'">
+          <option value="none">Bekleme yok (arka arkaya)</option>
+          <option value="status">Durum bekle (n8n işlesin — 3 dk)</option>
+          <option value="time">Süre bekle (dakika)</option>
+        </select>
+      </div>
+      <div class="fg" id="dr-delay-wrap" style="display:none"><label>Bekleme (dakika)</label><input id="dr-delay" type="number" value="30" min="1"/></div>
       <div style="display:flex;gap:8px">
         <button class="btn bp bsm" onclick="loadDriveSheet()">⊞ Sheet'i Tara</button>
         <button class="btn bs bsm" onclick="sendDriveURLs()">▶ Gönder</button>
@@ -1244,6 +1254,10 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <div id="dr-res" class="res"></div>
       <div style="margin-top:8px;font-size:12px;color:var(--mt)">
         İşlenmiş: <b id="dr-sent-cnt">0</b> URL | Yeni: <b id="dr-new-cnt">0</b> URL
+      </div>
+      <div id="dr-prog" style="display:none;margin-top:6px">
+        <div id="dr-cur" style="font-size:12px;color:var(--mt);margin-bottom:4px"></div>
+        <div class="prog"><div class="pf" id="dr-pbar" style="background:var(--acc);width:0%"></div></div>
       </div>
     </div>
     <div>
@@ -1254,49 +1268,6 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <div class="card">
         <div class="ct">İşlenmiş URL'ler (Tekrar Koruma)</div>
         <div class="url-list" id="dr-sent-list"><div style="padding:10px;color:var(--mt);font-size:12px;text-align:center">Henüz işlenmiş URL yok</div></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- GOOGLE SHEETS -->
-<div id="page-sheets" class="page">
-  <div class="ph"><div class="pt">Google Sheets</div><div class="ps">Sheet'teki URL'leri oku ve gönder</div></div>
-  <div class="utab-bar" data-group="kaynak" data-utab="sheets"></div>
-  <div class="alert aw" style="margin-bottom:12px"><span>⚠</span><span>Tarama ve gönderme ayrı — önce tara, kontrol et, sonra gönder.</span></div>
-  <div class="alert ai" style="margin-bottom:12px"><span>ℹ</span><span>Sheet'e <b>Kategori</b> sütunu ekleyebilirsin. Her satıra <code>film</code>, <code>eglence</code>, <code>bilim</code>, <code>vlog</code> veya <code>komedi</code> yaz. Boş satırlar <b>genel</b> olarak işlenir. Ya da aşağıdan tek kategori seç.</span></div>
-  <div class="g2">
-    <div class="card">
-      <div class="ct">Bağlantı</div>
-      <div class="fg"><label>Sheets URL veya ID</label><input id="sh-id" type="text" placeholder="https://docs.google.com/spreadsheets/d/..."/></div>
-      <div class="fg"><label>URL Sütunu</label><input id="sh-col" type="text" value="Youtube Linki"/></div>
-      <div class="fg"><label>Kategori Sütunu <span style="color:var(--mt)">(opsiyonel — sheet'te varsa)</span></label><input id="sh-cat-col" type="text" value="Kategori" placeholder="Kategori"/></div>
-      <div class="fg"><label>Açıklama Notu Sütunu <span style="color:var(--mt)">(opsiyonel — her URL için farklı not)</span></label><input id="sh-not-col" type="text" value="Aciklama Notu" placeholder="Aciklama Notu"/></div>
-      <div class="fg"><label>Varsayılan Kategori <span style="color:var(--mt)">(sütun boşsa kullanılır)</span></label><div class="cat-chips" id="sh-cats"></div></div>
-      <div class="fg"><label>Bekleme Modu</label>
-        <select id="sh-mode" onchange="document.getElementById('sh-delay-wrap').style.display=this.value==='time'?'block':'none'">
-          <option value="status">Durum Bekle (n8n)</option>
-          <option value="time">Süre Bekle (dakika)</option>
-        </select>
-      </div>
-      <div class="fg" id="sh-delay-wrap" style="display:none"><label>Bekleme (dakika)</label><input id="sh-delay" type="number" value="30" min="1"/></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn bg bsm" onclick="scanSheet()">⊙ Tara</button>
-        <button class="btn bp bsm" onclick="sendSheetURLs()">▶ Gönder</button>
-      </div>
-      <div id="sh-res" class="res"></div>
-      <div style="margin-top:6px;font-size:12px;color:var(--mt)">
-        Toplam: <b id="sh-total">0</b> | Yeni: <b id="sh-new">0</b> | Atlandı: <b id="sh-skip">0</b>
-      </div>
-      <div id="sh-prog" style="display:none;margin-top:6px">
-        <div id="sh-cur" style="font-size:12px;color:var(--mt);margin-bottom:4px"></div>
-        <div class="prog"><div class="pf" id="sh-pbar" style="background:var(--acc);width:0%"></div></div>
-      </div>
-    </div>
-    <div>
-      <div class="card">
-        <div class="ct">Taranan URL'ler</div>
-        <div class="url-list" id="sh-url-list"><div style="padding:10px;color:var(--mt);font-size:12px;text-align:center">Tara'ya tıklayın</div></div>
       </div>
     </div>
   </div>
@@ -2091,7 +2062,6 @@ const S = {
   logs:       JSON.parse(localStorage.getItem('op_logs')||'[]'),
   sentURLs:   new Set(JSON.parse(localStorage.getItem('op_sent')||'[]')),
   driveURLs:  [],
-  sheetURLs:  [],
   sheetData:  {shorts:[],urls:[]},
   _panelCache:null,
   logTimer:   null,
@@ -2344,10 +2314,6 @@ const UTAB_GROUPS = {
     { id:'yayin',   icon:'📡', label:'Yayın Tekrarları' },
     { id:'parcala', icon:'✂',  label:'Video Parçala' }
   ],
-  kaynak: [
-    { id:'drive',  icon:'◉', label:'Google Drive' },
-    { id:'sheets', icon:'▤', label:'Google Sheets' }
-  ],
   trend: [
     { id:'radar',     icon:'📡', label:'Keşif Radarı' },
     { id:'trendonay', icon:'🔥', label:'Onay Kuyruğu' }
@@ -2363,7 +2329,7 @@ const UTAB_GROUPS = {
     { id:'gecmis',      icon:'🕘', label:'Gönderim Geçmişi' }
   ]
 };
-const UTAB_ANCHOR = { uretim:'video', kaynak:'drive', trend:'radar', takip:'kuyruk', durum:'yayindurumu' }; // kenar çubuğundaki hub öğesinin id'si
+const UTAB_ANCHOR = { uretim:'video', trend:'radar', takip:'kuyruk', durum:'yayindurumu' }; // kenar çubuğundaki hub öğesinin id'si
 function renderUretimTabs(){
   document.querySelectorAll('.utab-bar').forEach(bar=>{
     const group  = bar.getAttribute('data-group') || 'uretim';
@@ -2394,7 +2360,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-14';
+const PANEL_YAPI = 'y2026.08.04-15';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
@@ -3127,7 +3093,6 @@ function renderCatGrid() {
   renderCatChips('sv-cats');
   renderCatChips('bv-cats');
   renderCatChips('dr-cats');
-  renderCatChips('sh-cats');
   renderCatChips('ya-cats');
   renderCatChips('ytk-cats');
   renderCatChips('str-cats');
@@ -3375,11 +3340,19 @@ async function sendDriveURLs() {
   const base=getN8N();
   if(!base)return showRes('dr-res','n8n URL girin','warn');
   showRes('dr-res','⏳ '+newU.length+' URL gonderiliyor...','info');
+  const mod = (document.getElementById('dr-mode')||{}).value || 'none';
+  const bekleme = mod === 'time'
+    ? (parseInt((document.getElementById('dr-delay')||{}).value||30)||30)*60*1000
+    : (mod === 'status' ? 3*60*1000 : 0);
+  setStyle('dr-prog','display', newU.length>1 ? 'block' : 'none');
   let ok=0, hata=0, belirsiz=0, ilkHata='';
-  for(const r of newU){
+  for(let i=0;i<newU.length;i++){
+    const r = newU[i];
     const url=r.url||r;
     const kat=(r.kategori&&r.kategori.trim())||defCat;
     const path=CAT_WH[kat]||'/webhook/video-gonder';
+    setEl('dr-cur',(i+1)+'/'+newU.length+' ['+kat+']: '+String(url).slice(0,40));
+    setStyle('dr-pbar','width',((i+1)/newU.length*100)+'%');
     // Açıklama notu, satır objesinin KENDİ anahtarından okunur. Eskiden
     // r['Aciklama Notu'] deneniyordu ama bu objeler {url, kategori,
     // aciklama_notu} olarak kuruluyor → değer HER ZAMAN boş gidiyordu,
@@ -3394,7 +3367,12 @@ async function sendDriveURLs() {
       hata++; if (!ilkHata) ilkHata = s.mesaj;
       addLog('err','drive','Drive gonderilemedi ['+kat+']: '+url.slice(0,50)+' — '+s.mesaj);
     }
+    if (bekleme && i < newU.length-1){
+      setEl('dr-cur',(i+1)+'/'+newU.length+' gönderildi — '+Math.round(bekleme/60000)+' dk bekleniyor…');
+      await sleep(bekleme);
+    }
   }
+  setEl('dr-cur','✓ Tamamlandı');
   saveSent(); renderSentURLs();
   // Özet ÖNCE yazılır: loadDriveSheet aynı kutuya (dr-res) yazdığı için
   // eskiden başarı mesajı anında eziliyordu ve kullanıcı onay göremiyordu.
@@ -3419,57 +3397,6 @@ function clearSentURLs() {
   saveSent(); renderSentURLs();
   setEl('dr-sent-cnt','0');
   addLog('ok','drive','Gonderim gecmisi temizlendi (isaretler + tekrar uyarisi)');
-}
-
-// ═══════════════════════════════════════════════════════════
-// GOOGLE SHEETS
-// ═══════════════════════════════════════════════════════════
-async function scanSheet() {
-  const v=(document.getElementById('sh-id')||{}).value||'';
-  const sid=v.match(/\/d\/([a-zA-Z0-9_-]+)/)?.[1]||v;
-  const col=(document.getElementById('sh-col')||{}).value||'Youtube Linki';
-  const catCol=(document.getElementById('sh-cat-col')||{}).value||'Kategori';
-  showRes('sh-res','⏳ Taranıyor...','info');
-  const vals=await sheetsGet(sid,'Sheet1!A:Z');
-  if(!vals)return showRes('sh-res','Tablo okunamadi','err');
-  const rows=parseSheet(vals);
-  const notColVal=(document.getElementById('sh-not-col')||{}).value||'Aciklama Notu';
-  const allRows=rows.map(r=>({url:r[col],kategori:r[catCol]||'',aciklama_notu:r[notColVal]||''})).filter(r=>r.url);
-  const allU=allRows.map(r=>r.url);
-  const newRows=allRows.filter(r=>!S.sentURLs.has(r.url));
-  S.sheetURLs=newRows; // {url, kategori} objesi olarak sakla
-  setEl('sh-total',allRows.length); setEl('sh-new',newRows.length); setEl('sh-skip',allRows.length-newRows.length);
-  const listEl=document.getElementById('sh-url-list');
-  if(listEl)listEl.innerHTML=allRows.map(r=>'<div class="url-item '+(S.sentURLs.has(r.url)?'done':'')+'"><span class="url-text">'+r.url+'</span><span class="badge bi" style="margin-left:4px">'+(r.kategori||'genel')+'</span><span class="badge '+(S.sentURLs.has(r.url)?'bgr':'bi')+'">'+(S.sentURLs.has(r.url)?'Atlandi':'Yeni')+'</span></div>').join('');
-  showRes('sh-res','✓ '+newRows.length+' yeni URL','ok');
-}
-
-async function sendSheetURLs() {
-  if(!S.sheetURLs||!S.sheetURLs.length)return showRes('sh-res','Once Tara\'ya tiklayin','warn');
-  // Varsayılan kategori
-  const selChips=[...document.querySelectorAll('#sh-cats .cat-chip.sel')];
-  const defCat=selChips.length?selChips[0].dataset.cat:'genel';
-  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  const base=getN8N();
-  const mode=(document.getElementById('sh-mode')||{}).value||'time';
-  const delay=parseInt((document.getElementById('sh-delay')||{}).value||30)*60*1000;
-  if(!base)return showRes('sh-res','n8n URL girin','warn');
-  setStyle('sh-prog','display','block');
-  for(let i=0;i<S.sheetURLs.length;i++){
-    const row=S.sheetURLs[i];
-    const url=row.url||row;
-    const kat=(row.kategori&&row.kategori.trim())||defCat;
-    const path=CAT_WH[kat]||'/webhook/video-gonder';
-    setEl('sh-cur',(i+1)+'/'+S.sheetURLs.length+' ['+kat+']: '+url.slice(0,40));
-    setStyle('sh-pbar','width',((i+1)/S.sheetURLs.length*100)+'%');
-    const shNotCol = (document.getElementById('sh-not-col')||{}).value||'Aciklama Notu';
-    const shAciklama = ((row[shNotCol]||'').trim());
-    await faf(base+path,{'Youtube linki':url,channelTitle:await ytKanalAdi(url),kaynak:'sheets',kategori:kat,dil:getSelLang('sh-cats'),platformlar:getSelPlatforms('sh-cats'),aciklama_notu:shAciklama});
-    recordSend(url, kat);
-    if(i<S.sheetURLs.length-1) await sleep(mode==='time'?delay:3*60*1000);
-  }
-  setEl('sh-cur','✓ Tamamlandi');
-  showRes('sh-res','✓ '+S.sheetURLs.length+' URL gonderildi','ok');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -9830,7 +9757,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Tüm global fonksiyonları window'a bağla
     const globals = [go,showTab,goUretim,renderUretimTabs,trTabCount,refreshDash,sendSingle,sendBulkURLs,sendSearch,
       loadDriveSheet,sendDriveURLs,clearSentURLs,
-      scanSheet,sendSheetURLs,filterTbl,exportCSV,loadReports,loadPlatforms,
+      filterTbl,exportCSV,loadReports,loadPlatforms,
       saveSettings,updateWHs,copyText,renderLogs,
       clearLogs,exportLogs,loadTakvim,takPrev,takNext,takFilter,openDayModal,takEslesir,takBilinmeyenUyari,
       oneAlAc,oneAlKapat,oneAlYukle,oneAlCiz,oneAlSec,oneAlFiltreSec,oneAlHesapla,oneAlUygula,oneAlIsaretiUnut,
