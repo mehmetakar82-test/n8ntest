@@ -1441,13 +1441,15 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   </div>
   <div id="plat-kapsama" style="margin-bottom:12px"></div>
   <div id="plat-cift" style="margin-bottom:12px"></div>
+  <!-- Bu iki kap SAYFANIN İÇİNDE kalmalı: .page{display:none} yalnız .page
+       sınıfına etki ediyor, dışarıda bırakılırlarsa bir kez açıldıktan sonra
+       diğer sayfalarda da ekranda kalıyorlardı. -->
+  <div id="plat-sifirla" style="margin-bottom:12px"></div>
+  <div id="plat-kaynak" style="margin-bottom:12px"></div>
   <div id="pl-grid" class="g3" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
     <div style="color:var(--mt);font-size:13px;padding:16px;text-align:center;grid-column:1/-1">Yenile'ye bas veya Ayarlar → API Key gir</div>
   </div>
 </div>
-
-<div id="plat-sifirla" style="margin-bottom:14px"></div>
-<div id="plat-kaynak" style="margin-bottom:14px"></div>
 
 <!-- HESABI DOLDUR: bir platformun short'larını başka platforma kuyrukla -->
 <div id="plat-doldur-modal" style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)platDoldurKapat()">
@@ -2381,7 +2383,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-08';
+const PANEL_YAPI = 'y2026.08.04-09';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -2487,11 +2489,24 @@ async function ytKanalAdi(url){
   }catch(e){ return ''; }
 }
 
+// _panelCache İKİ ayrı şey taşıyor: n8n panel-data'dan gelen SHEET verisi
+// (shorts/urls) ve Upload-Post hesap listesi (accounts). phFetchAccounts
+// yalnız accounts yazdığında obje truthy oluyor ama shorts/urls YOK — sheet
+// okuyucuları bunu "veri geldi" sanıp Sheets API'ye hiç gitmiyordu. Sonuç:
+// Platformlar sayfası önce açıldıysa Üretim Takibi / Short Listesi / URL Takip
+// / Arşiv, geçerli Sheet ID olmasına rağmen boş kalıyordu.
+// Bu yüzden "önbellek var mı?" değil, "önbellekte SHEET verisi var mı?" sorulur.
+function panelSheetOnb(){
+  const c = S._panelCache;
+  return (c && (Array.isArray(c.shorts) || Array.isArray(c.urls))) ? c : null;
+}
+
 async function sheetsGet(sheetId, range) {
-  if (S._panelCache) {
+  const onb = panelSheetOnb();
+  if (onb) {
     const rl = range.toLowerCase();
-    if (rl.includes('url-takip')) return arrToValues(S._panelCache.urls||[]);
-    return arrToValues(S._panelCache.shorts||[]);
+    if (rl.includes('url-takip')) return arrToValues(onb.urls||[]);
+    return arrToValues(onb.shorts||[]);
   }
   const key = S.cfg.shkey;
   if (!key||!sheetId) return null;
@@ -3393,17 +3408,39 @@ async function loadAllSheetData(page) {
   return loadSheetPage(page);
 }
 
+// Sayfa başına tablo gövdesi + kolon sayısı — yapılandırma eksikken ekrana
+// sebep yazabilmek için. Eskiden burada sessizce return ediliyordu ve
+// sl-tbody / url-tbody'nin statik "Veriler yükleniyor..." metni EKRANDA
+// KALIYORDU: kullanıcı yükleniyor mu bozuk mu ayırt edemiyordu.
+const SHEET_TBODY = { kuyruk:['kuyruk-tbody',6], shortlist:['sl-tbody',8],
+                      urltakip:['url-tbody',8], arsiv:['ar-tbody',5] };
+function sheetTbodyYaz(page, metin){
+  const t = SHEET_TBODY[page]; if (!t) return;
+  const el = document.getElementById(t[0]); if (!el) return;
+  el.innerHTML = '<tr><td colspan="'+t[1]+'" style="text-align:center;color:var(--wn);padding:16px">'
+    + esc0(metin) + '</td></tr>';
+}
+
 async function loadSheetPage(page) {
   const sid  = S.cfg.sheet  || '';
   const sid2 = S.cfg.sheet2 || sid;
-  if (!sid && !S._panelCache) { addLog('warn','sheets','Sheet ID girilmemis'); return; }
+  // Önbellek yoksa doğrudan Sheets API'ye gidilecek; o yol için HEM Sheet ID
+  // HEM API Key şart. Biri eksikse sheetsGet sessizce null dönüp tablolar
+  // sebepsiz "bulunamadı" gösteriyordu — hangisinin eksik olduğunu yaz.
+  if (!panelSheetOnb() && (!sid || !S.cfg.shkey)){
+    const eksik = !sid ? 'Google Sheet ID' : 'Google Sheets API Key';
+    addLog('warn','sheets', eksik + ' girilmemis');
+    sheetTbodyYaz(page, '⚙ ' + eksik + ' girilmemiş — Ayarlar\'dan gir (ya da n8n URL girip Dashboard\'ı yenile)');
+    return;
+  }
 
   addLog('info','sheets',page+' yukleniyor');
   let shorts=[],urls=[];
 
-  if (S._panelCache) {
-    shorts = S._panelCache.shorts||[];
-    urls   = S._panelCache.urls||[];
+  const onb = panelSheetOnb();
+  if (onb) {
+    shorts = onb.shorts||[];
+    urls   = onb.urls||[];
   } else {
     const [sv,uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid2,'URL-Takip!A:Z')]);
     shorts = parseSheet(sv); urls = parseSheet(uv);
