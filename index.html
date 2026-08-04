@@ -1430,6 +1430,8 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
     <button class="btn bp bsm" onclick="loadPlatforms(true)" title="Önbelleği atlar, Upload-Post'tan taze veri çeker">↻ Yenile</button>
     <button class="btn bg bsm" id="plat-kapsama-btn" onclick="platKapsama()" title="Profil × platform matrisi: her bağlı hesabın yayınlanmış / başarısız / planlı sayıları. Hiç kaydı olmayan hesaplar kırmızı HİÇ ile işaretlenir — 'bu hesaba hiç video gitmemiş' sorusunun cevabı">📋 Kapsama Denetimi</button>
+    <button class="btn bg bsm" id="plat-sifirla-btn" onclick="hsAc()" title="Bir sosyal medya hesabı engellenip yerine yenisi bağlandıysa: o profil+platformda eski yayınlar 'yayınlanmış' sayılmaz olur, böylece short'lar yeni hesaba tekrar gönderilebilir. Hiçbir kayıt silinmez, geri alınabilir.">🔄 Hesap Sıfırlama</button>
+    <button class="btn bg bsm" id="plat-kaynak-btn" onclick="ksAc()" title="Üretilmiş short'ların kaç tanesinin mp4 kaynağına hâlâ ulaşılabiliyor? Yeniden yayın yapabilmenin ön şartı bu — ölçer ve ölü linklerin OpusClip'ten tazelenip tazelenemediğine bakar.">🎬 Kaynak Sağlığı</button>
     <span id="plat-cift-oto-durum" style="font-size:11.5px;color:var(--mt);align-self:center"
           title="Çift kontrolü saatte bir kendiliğinden çalışır: kuyruktaki çift kopyalar silinir (her short'un EN ERKEN kopyası kalır), yayınlanmış gönderilere dokunulmaz, birden çok platforma bağlı işler otomatik silinmez. Çift bulunursa liste aşağıda kendiliğinden açılır. Panel AÇIKKEN çalışır — kapalıyken temizlik yapılmaz."></span>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
@@ -1443,6 +1445,9 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div style="color:var(--mt);font-size:13px;padding:16px;text-align:center;grid-column:1/-1">Yenile'ye bas veya Ayarlar → API Key gir</div>
   </div>
 </div>
+
+<div id="plat-sifirla" style="margin-bottom:14px"></div>
+<div id="plat-kaynak" style="margin-bottom:14px"></div>
 
 <!-- HESABI DOLDUR: bir platformun short'larını başka platforma kuyrukla -->
 <div id="plat-doldur-modal" style="display:none;position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.65);align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)platDoldurKapat()">
@@ -2376,7 +2381,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-04';
+const PANEL_YAPI = 'y2026.08.04-05';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4878,6 +4883,278 @@ function gndZamani(profil, platform, baslik, hataZamani){
   return (t != null && t >= (hataZamani || 0)) ? t : 0;
 }
 
+// ── HESAP SIFIRLAMA ────────────────────────────────────────────────────
+// Sosyal medya hesabı engellenip yerine YENİSİ bağlandığında Upload-Post'un
+// geçmişi eskisini SİLMİYOR: /history hâlâ aynı profil+platform altında eski
+// gönderileri listeliyor. Panelin "bu zaten yayınlandı mı?" diye soran dört
+// yeri de (çift koruması, Eşitle, Kapsama, Çift Kontrolü) aynı geçmişi
+// okuduğu için yeniden yayın SESSİZCE engelleniyordu — kullanıcı yeni hesaba
+// eski short'larını bir daha gönderemiyordu.
+//
+// Sıfırlama işareti = "bu profil+platformda ŞU TARİHTEN ÖNCEKİ yayınlar artık
+// sayılmaz". Hiçbir kayıt silinmez, Upload-Post'a dokunulmaz; yalnızca panelin
+// sayımı dışında bırakılır. Geri alınabilir.
+//
+// TEMKİNLİ TARAF: zamanı okunamayan geçmiş kaydı SAYILMAYA devam eder.
+// Yanlış tarafa düşmek "yeniden gönderemedim" (can sıkıcı) yerine "aynı
+// videoyu ikinci kez yayınladım" (geri alınamaz) olurdu.
+const HS_ANAHTAR = 'op_hesap_sifirlama';
+const HS_PLAT_AD = { instagram:'Instagram', youtube:'YouTube', tiktok:'TikTok', facebook:'Facebook', x:'X' };
+
+function hsOku(){
+  let o = null;
+  try { o = JSON.parse(localStorage.getItem(HS_ANAHTAR) || '{}'); } catch(e){ o = null; }
+  return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+}
+function hsYaz(o){
+  try { localStorage.setItem(HS_ANAHTAR, JSON.stringify(o)); } catch(e){}
+  // "zaten yayınlandı" önbelleği artık yanlış — hemen tazelensin
+  CK_ONB.t = 0; CK_ONB.kume = null; CK_KUYRUK.clear();
+}
+function hsAnahtar(profil, platform){
+  const p = String(platform||'').trim().toLowerCase();
+  return (profil && p) ? String(profil).trim()+'|'+(p === 'twitter' ? 'x' : p) : '';
+}
+function hsZaman(profil, platform){
+  const k = hsAnahtar(profil, platform); if (!k) return 0;
+  const v = hsOku()[k];
+  return (v && v.t) ? v.t : 0;
+}
+function hsKayitZamani(x){
+  return Date.parse((x && (x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date)) || '') || 0;
+}
+// Bu geçmiş kaydı "yayınlanmış" sayılsın mı?
+function hsSayilir(profil, platform, kayit){
+  const t = hsZaman(profil, platform);
+  if (!t) return true;                         // sıfırlama yok
+  const kt = hsKayitZamani(kayit);
+  if (!kt) return true;                        // zamanı okunamıyor → temkinli: SAY
+  return kt >= t;
+}
+function hsSay(){ return Object.keys(hsOku()).length; }
+
+// ── Hesap Sıfırlama ekranı (Platformlar içinde, satır içi) ─────────────
+function hsKapat(){ const e = document.getElementById('plat-sifirla'); if (e) e.innerHTML = ''; }
+
+function hsAc(){
+  const kutu = document.getElementById('plat-sifirla'); if (!kutu) return;
+  const esc = esc0;
+  const raw = S.uploadPostAccounts || {};
+  const profiller = ((raw && raw.profiles) || []).map(p => p.username).filter(Boolean);
+  if (!profiller.length){
+    kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Profil listesi yok — önce ↻ Yenile\'ye bas'});
+    return;
+  }
+  const bugun = new Date(); bugun.setHours(0,0,0,0);
+  const yerel = d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  kutu.innerHTML = '<div class="card">'
+    + '<div class="ct">🔄 Hesap Sıfırlama'
+    + '<button class="btn bsm" style="float:right" onclick="hsKapat()">✕</button></div>'
+    + '<div style="font-size:11.5px;color:var(--mt);margin-bottom:10px;line-height:1.6">'
+    + 'Bir sosyal medya hesabı engellenip yerine <b>yenisi bağlandığında</b> Upload-Post\'un geçmişi eskisini silmiyor; '
+    + 'panel de o short\'ları "zaten yayınlandı" sayıp yeniden göndermeyi engelliyor. Burada seçtiğin tarihten '
+    + '<b>önceki</b> yayınlar o profil+platform için sayılmaz olur — böylece <b>⚖ Eşitle</b> onları eksik görüp yeni hesaba kuyruklar. '
+    + '<b style="color:var(--ok)">Hiçbir gönderi silinmez</b>, Upload-Post\'a dokunulmaz, işaret geri alınabilir.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">'
+    + '<div class="fg" style="flex:1;min-width:150px;margin:0"><label>Profil</label><select id="hs-profil">'
+      + profiller.map(p => '<option value="'+esc(p)+'">'+esc(p)+'</option>').join('') + '</select></div>'
+    + '<div class="fg" style="flex:0 0 140px;margin:0"><label>Platform</label><select id="hs-plat">'
+      + Object.keys(HS_PLAT_AD).map(k => '<option value="'+k+'">'+HS_PLAT_AD[k]+'</option>').join('') + '</select></div>'
+    + '<div class="fg" style="flex:0 0 150px;margin:0"><label title="Bu tarihten ÖNCEKİ yayınlar sayılmaz">Sıfırlama tarihi</label>'
+      + '<input type="date" id="hs-tarih" value="'+yerel(bugun)+'"></div>'
+    + '<button class="btn bg bsm" onclick="hsOnizle()">🔍 Kaç kayıt etkilenir?</button>'
+    + '</div>'
+    + '<div id="hs-onizle" style="font-size:12px;margin-bottom:8px"></div>'
+    + '<div id="hs-liste"></div></div>';
+  hsListeCiz();
+}
+
+// Uygulamadan ÖNCE saydırır: kaç yayın sayım dışı kalacak, kaçının tarihi
+// okunamıyor (onlar sayılmaya devam eder), pencere yetiyor mu.
+async function hsOnizle(){
+  const el = document.getElementById('hs-onizle'); if (!el) return;
+  const profil = (document.getElementById('hs-profil')||{}).value || '';
+  const plat   = (document.getElementById('hs-plat')||{}).value || '';
+  const tarih  = (document.getElementById('hs-tarih')||{}).value || '';
+  const t = tarih ? Date.parse(tarih+'T00:00:00') : 0;
+  if (!profil || !plat || !t){ el.innerHTML = '<span style="color:var(--wn)">Profil, platform ve tarih gerekli</span>'; return; }
+  el.innerHTML = '⏳ Geçmiş okunuyor…';
+  try {
+    const onb = await histCek(KAPSAMA_SAYFA);
+    const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook', x:'x', twitter:'x' };
+    let onceki = 0, sonraki = 0, zamansiz = 0;
+    (onb.kayitlar || []).forEach(x => {
+      if (String(x.profile_username||x.user||'') !== profil) return;
+      if (NP[String(x.platform||'').toLowerCase()] !== plat) return;
+      if (x.success === false || x.error_message) return;
+      const kt = hsKayitZamani(x);
+      if (!kt) zamansiz++; else if (kt < t) onceki++; else sonraki++;
+    });
+    el.innerHTML = '<b style="color:var(--acc)">'+onceki+'</b> yayın sayım dışı kalacak — bu short\'lar '
+      + esc0(profil)+' · '+(HS_PLAT_AD[plat]||plat)+' için yeniden gönderilebilir hâle gelir.'
+      + (sonraki ? ' <span style="color:var(--mt)">'+sonraki+' yayın tarihten sonra, dokunulmaz.</span>' : '')
+      + (zamansiz ? ' <span style="color:var(--wn)">'+zamansiz+' kaydın tarihi okunamıyor — onlar sayılmaya devam eder (çift yayın riski almamak için).</span>' : '')
+      + (onb.kirpik ? '<div style="color:var(--wn);margin-top:3px">⚠ Geçmiş penceresi doldu ('+(onb.kayitlar||[]).length+' kayıt) — daha eski yayınlar hiç okunamadı, sayı eksik olabilir.</div>' : '')
+      + '<div style="margin-top:6px"><button class="btn bp bsm" onclick="hsUygula()">🔄 Sıfırlamayı uygula</button></div>';
+  } catch(e){
+    el.innerHTML = '<span style="color:var(--er)">Geçmiş okunamadı: '+esc0(histHataMetni(e))+'</span>';
+  }
+}
+
+function hsUygula(){
+  const profil = (document.getElementById('hs-profil')||{}).value || '';
+  const plat   = (document.getElementById('hs-plat')||{}).value || '';
+  const tarih  = (document.getElementById('hs-tarih')||{}).value || '';
+  const t = tarih ? Date.parse(tarih+'T00:00:00') : 0;
+  const k = hsAnahtar(profil, plat);
+  if (!k || !t) return;
+  if (!confirm(profil+' · '+(HS_PLAT_AD[plat]||plat)+' için sıfırlama işareti konacak.\n\n'
+      + tarih+' tarihinden ÖNCEKİ yayınlar artık "yayınlanmış" sayılmayacak; bu short\'lar yeniden gönderilebilir hâle gelecek.\n\n'
+      + 'Hiçbir gönderi silinmez. Bu işareti sonra geri alabilirsin.\n\nDevam edilsin mi?')) return;
+  const o = hsOku();
+  o[k] = { t, tarih, profil, plat, ts: Date.now() };
+  hsYaz(o);
+  hsListeCiz();
+  const el = document.getElementById('hs-onizle'); if (el) el.innerHTML = '';
+  toast('🔄 '+profil+' · '+(HS_PLAT_AD[plat]||plat)+' sıfırlandı — ⚖ Eşitle ile eksikleri yeni hesaba kuyruklayabilirsin', 'ok', 8000);
+  addLog('info','uploadpost','Hesap sıfırlama: '+k+' < '+tarih);
+}
+
+function hsGeriAl(k){
+  const o = hsOku(); const v = o[k]; if (!v) return;
+  if (!confirm((v.profil||'')+' · '+(HS_PLAT_AD[v.plat]||v.plat||'')+' sıfırlaması geri alınacak.\n\n'
+      + 'Eski yayınlar yeniden "yayınlanmış" sayılmaya başlayacak.\n\nDevam edilsin mi?')) return;
+  delete o[k]; hsYaz(o); hsListeCiz();
+  toast('✓ Sıfırlama geri alındı', 'ok', 4000);
+  addLog('info','uploadpost','Hesap sıfırlama geri alındı: '+k);
+}
+
+function hsListeCiz(){
+  const el = document.getElementById('hs-liste'); if (!el) return;
+  const o = hsOku();
+  const anahtarlar = Object.keys(o).sort((a,b) => (o[b].ts||0) - (o[a].ts||0));
+  if (!anahtarlar.length){
+    el.innerHTML = '<div style="font-size:11.5px;color:var(--mt);border-top:1px solid var(--brd);padding-top:7px">Etkin sıfırlama yok.</div>';
+    return;
+  }
+  el.innerHTML = '<div style="border-top:1px solid var(--brd);padding-top:7px">'
+    + '<div style="font-size:11.5px;color:var(--mt);margin-bottom:4px">Etkin sıfırlamalar — bu profil+platformlarda işaretli tarihten öncesi sayılmıyor:</div>'
+    + anahtarlar.map(k => {
+        const v = o[k];
+        return '<div style="font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--brd);color:var(--tx)">'
+          + '<b>'+esc0(v.profil||'?')+'</b> · '+(HS_PLAT_AD[v.plat]||v.plat||'?')
+          + ' <span style="color:var(--acc)">'+esc0(v.tarih||'')+' öncesi sayılmıyor</span>'
+          + ' <button class="btn bsm" style="padding:0 7px;font-size:10.5px" onclick="hsGeriAl(\''+esc0(k).replace(/'/g,'')+'\')">↩ geri al</button></div>';
+      }).join('')
+    + '</div>';
+}
+
+// ── KAYNAK SAĞLIĞI ─────────────────────────────────────────────────────
+// "Eski short'ları yeniden yayınlayabilir miyim?" sorusunun ÖN ŞARTI: mp4
+// kaynağına hâlâ ulaşılabiliyor mu? Sheet'teki short-url OpusClip export
+// linki ve bunlar süreli. Ölü linkler clip-id'den tazelenebiliyor ama yalnız
+// OpusClip projesi hâlâ duruyorsa. Bu ölçüm arşiv kararı için sayı üretir.
+const KS = { calisiyor:false, sonuc:null };
+
+function ksKapat(){ const e = document.getElementById('plat-kaynak'); if (e) e.innerHTML = ''; KS.sonuc = null; }
+
+function ksAc(){
+  const kutu = document.getElementById('plat-kaynak'); if (!kutu) return;
+  kutu.innerHTML = '<div class="card">'
+    + '<div class="ct">🎬 Kaynak Sağlığı'
+    + '<button class="btn bsm" style="float:right" onclick="ksKapat()">✕</button></div>'
+    + '<div style="font-size:11.5px;color:var(--mt);margin-bottom:10px;line-height:1.6">'
+    + 'short-kaydetme tablosundaki short\'ların mp4 linkleri <b>tek tek indirilmeye çalışılır</b>. '
+    + 'Ölü olanların clip-id\'si varsa OpusClip\'ten taze link alınıp o da sınanır. '
+    + 'Sonuç, "eski short\'ları yeniden yayınlayabilir miyim" sorusunun gerçek cevabıdır.'
+    + '<br><b style="color:var(--wn)">Not:</b> her link için bir indirme denemesi yapılır — 200 short ≈ 1–2 dakika.</div>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">'
+    + '<div class="fg" style="flex:0 0 170px;margin:0"><label title="En yeniden geriye doğru">Kaç short sınansın?</label>'
+      + '<select id="ks-adet"><option value="50">son 50</option><option value="150" selected>son 150</option>'
+      + '<option value="400">son 400</option><option value="0">tümü (uzun sürer)</option></select></div>'
+    + '<div class="fg" style="flex:1;min-width:150px;margin:0"><label>Profil (isteğe bağlı)</label>'
+      + '<select id="ks-profil"><option value="">tüm profiller</option>'
+      + Array.from(new Set(ydShortsAll().map(r => String(r['profil']||r['Profil']||'').trim()).filter(Boolean)))
+          .sort().map(p => '<option value="'+esc0(p)+'">'+esc0(p)+'</option>').join('') + '</select></div>'
+    + '<button class="btn bp bsm" id="ks-btn" onclick="ksOlc()">▶ Ölçümü başlat</button>'
+    + '</div>'
+    + '<div id="ks-sonuc" style="font-size:12px"></div></div>';
+}
+
+async function ksOlc(){
+  const el = document.getElementById('ks-sonuc'); if (!el || KS.calisiyor) return;
+  const btn = document.getElementById('ks-btn');
+  const adet = parseInt((document.getElementById('ks-adet')||{}).value, 10) || 0;
+  const profil = (document.getElementById('ks-profil')||{}).value || '';
+  await ydEnsureShorts();
+  let satirlar = ydShortsAll();
+  if (profil) satirlar = satirlar.filter(r => String(r['profil']||r['Profil']||'').trim() === profil);
+  if (!satirlar.length){ el.innerHTML = '<span style="color:var(--wn)">short-kaydetme\'de kayıt bulunamadı</span>'; return; }
+  if (adet > 0) satirlar = satirlar.slice(-adet);
+  KS.calisiyor = true; if (btn) btn.disabled = true;
+  const yaz = m => { el.innerHTML = '⏳ '+m; };
+  try {
+    const linksiz = [], sinanacak = [];
+    satirlar.forEach(r => {
+      const u = ydRowUrl(r);
+      const cid = r['clip-id'] || r['clipId'] || r['proje-id'] || '';
+      if (!u) linksiz.push({ r, cid }); else sinanacak.push({ r, url:u, cid });
+    });
+    let n = 0;
+    const canli = [], olu = [];
+    await upSirali(sinanacak, async s => {
+      const ok = await pdVideoErisilebilir(s.url, 8000);
+      n++; if (n % 5 === 0 || n === sinanacak.length) yaz('Linkler sınanıyor ('+n+'/'+sinanacak.length+')…');
+      (ok ? canli : olu).push(s);
+    }, 6);
+    // Ölülerin clip-id'si varsa OpusClip'ten tazelemeyi DENE
+    let tazelenen = 0, tazeBasarisiz = 0, kimliksiz = 0, tazeHata = '';
+    const idli = olu.filter(s => s.cid);
+    kimliksiz = olu.length - idli.length;
+    if (idli.length){
+      try {
+        yaz('Ölü linkler için OpusClip taranıyor…');
+        const harita = await pdTazeLinkler(Array.from(new Set(idli.map(s => String(s.cid)))), m => yaz(m));
+        let m = 0;
+        await upSirali(idli, async s => {
+          const yeni = harita.get(String(s.cid));
+          m++; if (m % 5 === 0 || m === idli.length) yaz('Taze linkler sınanıyor ('+m+'/'+idli.length+')…');
+          if (yeni && await pdVideoErisilebilir(yeni, 8000)) tazelenen++; else tazeBasarisiz++;
+        }, 4);
+      } catch(e){ tazeHata = e.message || 'tazeleme başarısız'; tazeBasarisiz = idli.length; }
+    }
+    const toplam = satirlar.length;
+    const kurtarilabilir = canli.length + tazelenen;
+    const kayip = toplam - kurtarilabilir;
+    const yuzde = toplam ? Math.round(kurtarilabilir/toplam*100) : 0;
+    KS.sonuc = { toplam, canli:canli.length, tazelenen, kayip, yuzde };
+    const sat = (renk, ad, n, aciklama) => '<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--brd)">'
+      + '<b style="color:'+renk+';min-width:52px;text-align:right;font-variant-numeric:tabular-nums">'+n+'</b>'
+      + '<div style="flex:1"><span style="color:var(--tx)">'+ad+'</span>'
+      + '<div style="font-size:11px;color:var(--mt)">'+aciklama+'</div></div></div>';
+    el.innerHTML = '<div style="font-size:13px;color:var(--tx);margin-bottom:6px">'
+        + toplam+' short sınandı — <b style="color:'+(yuzde>=80?'var(--ok)':yuzde>=50?'var(--wn)':'var(--er)')+'">%'+yuzde
+        + ' yeniden yayınlanabilir</b> ('+kurtarilabilir+'/'+toplam+')</div>'
+      + sat('var(--ok)', 'Linki çalışıyor', canli.length, 'mp4 doğrudan indirilebiliyor — hemen yeniden gönderilebilir')
+      + sat('var(--ok)', 'OpusClip\'ten tazelendi', tazelenen, 'link ölüydü ama klip OpusClip\'te duruyor, taze link alındı')
+      + sat('var(--er)', 'Kurtarılamadı', kayip,
+          'link ölü ve OpusClip\'te de yok'
+          + (kimliksiz ? ' · '+kimliksiz+' tanesinin clip-id\'si tabloda yok' : '')
+          + (linksiz.length ? ' · '+linksiz.length+' tanesinin short-url\'si hiç yok' : '')
+          + (tazeHata ? ' · tazeleme hatası: '+esc0(tazeHata) : ''))
+      + '<div style="font-size:11.5px;color:var(--mt);margin-top:8px;line-height:1.6">'
+      + (yuzde >= 80
+          ? '✓ Kaynakların çoğu duruyor — hesap engellenirse eski short\'lar yeniden yayınlanabilir.'
+          : '⚠ Kaynakların <b>%'+(100-yuzde)+'\'i kayıp</b>. Bir hesap engellenirse bu short\'lar geri getirilemez. '
+            + 'Kalıcı çözüm üretilen mp4\'leri Drive\'a arşivlemek — n8n tarafında bir kopyalama adımı gerekir.')
+      + '</div>';
+    addLog(yuzde>=80?'ok':'warn','sistem','Kaynak sağlığı: %'+yuzde+' ('+kurtarilabilir+'/'+toplam+') — canlı '+canli.length+', tazelenen '+tazelenen+', kayıp '+kayip);
+  } catch(e){
+    console.error('[KS]', e);
+    el.innerHTML = '<span style="color:var(--er)">Ölçüm başarısız: '+esc0(e.message||'bilinmeyen')+'</span>';
+  } finally { KS.calisiyor = false; if (btn) btn.disabled = false; }
+}
+
 // ── ÇİFT KORUMASI — kuyruğa almadan önce "zaten var mı?" ───────────────
 // Panelden yapılan HER kuyruk gönderimi (Kapsama pop-up, Eşitle, Hesabı
 // Doldur, Yayın Durumu) göndermeden önce burada sınanır: aynı profil +
@@ -4903,7 +5180,10 @@ async function ckKume(){
     const onb = await histCek(KAPSAMA_SAYFA);
     (onb.kayitlar||[]).forEach(x => {
       if (x.success === false || x.error_message) return;
-      const k = ckAnahtar(x.profile_username||x.user, x.platform, x.post_title||x.title||x.post_caption);
+      const u = x.profile_username||x.user;
+      const np = CK_NP[String(x.platform||'').toLowerCase()];
+      if (!hsSayilir(u, np, x)) return;        // hesap sıfırlanmış — eski yayın engellemesin
+      const k = ckAnahtar(u, x.platform, x.post_title||x.title||x.post_caption);
       if (k) kume.add(k);
     });
   } catch(e){ console.warn('[CK] history:', e.message); }
@@ -4980,6 +5260,7 @@ async function platKapsama(){
       const u = x.profile_username || x.user || '';
       const p = NP[String(x.platform||'').toLowerCase()];
       if (!u || !p) return;
+      if (!hsSayilir(u, p, x)) return;         // hesap sıfırlanmış — kapsama YENİ hesabı göstersin
       kayitlar.push({
         u, p,
         ok: x.success !== false && !x.error_message,
@@ -5199,6 +5480,7 @@ async function pdBasliklar(profil, platlar, sayfa){
     if (String(x.profile_username||x.user||'') !== profil) return;
     const p = NP[String(x.platform||'').toLowerCase()];
     if (!p) return;
+    if (!hsSayilir(profil, p, x)) return;      // hesap sıfırlanmış — "eksik" sayılsın ki Eşitle gönderebilsin
     ekle(p, String(x.post_title || x.title || x.post_caption || ''), x.success !== false && !x.error_message);
   });
   try {
@@ -5728,6 +6010,7 @@ async function ciftTara(){
       if (x.success === false || x.error_message) return;
       const u = x.profile_username || x.user || '';
       const p = NP[String(x.platform||'').toLowerCase()]; if (!u || !p) return;
+      if (!hsSayilir(u, p, x)) return;         // hesap sıfırlanmış — eski yayın "çift" sayılmasın
       const r = kayit(u, p, String(x.post_title || x.title || x.post_caption || '')); if (!r) return;
       const t = Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0;
       if (t && r.yayin.indexOf(t) >= 0) return;   // aynı kaydın sayfalar arası tekrarı — çift DEĞİL
@@ -9383,6 +9666,8 @@ document.addEventListener('DOMContentLoaded', function() {
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
       ciftTara,ciftOtoKur,ciftOtoCalis,ciftOtoTik,kuyrukDoluMu,
       ciftYoksay,ciftYoksayTumu,ciftYoksayGoster,ciftYoksayGeriAl,ciftYoksayTemizle,
+      hsAc,hsKapat,hsOnizle,hsUygula,hsGeriAl,hsListeCiz,hsSayilir,hsZaman,hsAnahtar,
+      ksAc,ksKapat,ksOlc,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
       rapHareketDenetimi,rapHareketCiz,rapHareketListe,hrkGonder,hrkGonderTumu,hrkListeCiz,hrkKaynakCoz,
       nabizCiz,dashTumunuYenile,kuyrukDerinlik,kuyrukCiz,
