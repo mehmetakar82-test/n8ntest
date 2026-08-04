@@ -2362,7 +2362,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-19';
+const PANEL_YAPI = 'y2026.08.04-20';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
@@ -4425,6 +4425,46 @@ async function hrkKaynakCoz(k){
   return k._kaynak;
 }
 
+// Sheet'te eşleşmeyenleri OPUSCLIP başlıklarıyla ara. Kapsama pop-up'ındaki
+// khKaynakAra ile aynı yol: pdKlipDizini + pdBaslikEslesme (KATI eşleştirme,
+// birden çok aday varsa dokunulmaz) ve bulunan link SINANIR — indirilemeyen
+// kabul edilmez. Bu adım olmadan "kaynak yok" satırları hiç gönderilemiyordu,
+// oysa klipler OpusClip'te duruyor.
+async function hrkOpusAra(kat, i){
+  const k = (RAP_HAREKET_SON[kat]||[])[i]; if (!k || !k._kaynak) return;
+  const hedef = k._kaynak.filter(x => !x.video && !x._ok);
+  if (!hedef.length) return;
+  const durEl = document.getElementById('hrk-ara-'+kat+'-'+i);
+  const btn   = document.getElementById('hrk-arabtn-'+kat+'-'+i);
+  const yaz = m => { if (durEl) durEl.innerHTML = '<span style="color:var(--mt)">'+esc0(m)+'</span>'; };
+  if (btn) btn.disabled = true;
+  try {
+    yaz('OpusClip klipleri taranıyor…');
+    const dizin = await pdKlipDizini(yaz);
+    let bulundu = 0, olu = 0, yok = 0, n = 0;
+    await upSirali(hedef, async r => {
+      const c = pdBaslikEslesme(dizin, r.title);
+      n++; yaz('Eşleştiriliyor ('+n+'/'+hedef.length+')…');
+      if (!c){ yok++; return; }
+      if (await pdVideoErisilebilir(c.url, 8000)){
+        r.video = c.url; r.clipId = c.clipId || r.clipId || ''; bulundu++;
+      } else olu++;
+    }, 4);
+    hrkListeCiz(kat, i);
+    const p = [];
+    if (bulundu) p.push('<b style="color:var(--ok)">'+bulundu+' kaynak bulundu</b>');
+    if (yok)     p.push(yok+' tanesi OpusClip\'te eşleşmedi');
+    if (olu)     p.push(olu+' tanesinin linki indirilemedi');
+    const el2 = document.getElementById('hrk-ara-'+kat+'-'+i);
+    if (el2) el2.innerHTML = p.join(' · ') || 'Sonuç yok';
+    addLog(bulundu?'ok':'warn','sistem','Hareket denetimi OpusClip arama: '+p.join(' · ').replace(/<[^>]+>/g,''));
+  } catch(e){
+    console.error('[HRK] opus ara:', e);
+    const el2 = document.getElementById('hrk-ara-'+kat+'-'+i);
+    if (el2) el2.innerHTML = '<span style="color:var(--er)">'+esc0(e.message||'arama başarısız')+'</span>';
+  } finally { const b2 = document.getElementById('hrk-arabtn-'+kat+'-'+i); if (b2) b2.disabled = false; }
+}
+
 // Gönderim: Kapsama pop-up'ıyla AYNI yol — ydTopluGonder çift korumasını
 // ve add_to_queue'yu zaten uyguluyor. Kaynak ölüyse OpusClip'ten taze link
 // çekilip BİR KEZ yeniden denenir.
@@ -4445,35 +4485,67 @@ async function hrkTekGonder(k, it){
   return s;
 }
 
+// TEK SATIR + sabit durum sütunu. Başlıklar aslında hashtag'li uzun
+// açıklamalar; eskiden sarılıp üç satıra yayılıyor ve liste okunamaz hâle
+// geliyordu. Tam metin title niteliğinde duruyor.
 function hrkSatirCiz(kat, i, j, it){
   const esc = esc0;
-  // Çift koruması eleyeni "kuyruğa alındı" diye göstermek yanlış olur:
-  // gönderilmedi, zaten vardı. Ayrı etiket.
-  const durum = it._cift ? '<span style="color:var(--mt);font-size:10.5px;white-space:nowrap" title="Bu short bu hesapta zaten yayınlanmış ya da kuyrukta — çift önlendi">· zaten var</span>'
-    : it._ok ? '<span style="color:var(--ok);font-size:10.5px;white-space:nowrap">✓ kuyruğa alındı</span>'
-    : it._hata ? '<span style="color:var(--er);font-size:10.5px;white-space:nowrap" title="'+esc(it._hata)+'">✕ '+esc(String(it._hata).slice(0,28))+'</span>'
-    : !it.video ? '<span style="color:#f5a623;font-size:10.5px;white-space:nowrap" title="short-kaydetme tablosunda bu başlıkla eşleşen mp4 bulunamadı">kaynak yok</span>'
-    : '<button class="btn bsm" style="padding:0 6px;font-size:10.5px;white-space:nowrap" onclick="hrkGonder(\''+kat+'\','+i+','+j+')">↻ Gönder</button>';
-  return '<div id="hrks-'+kat+'-'+i+'-'+j+'" style="display:flex;gap:6px;align-items:flex-start;justify-content:space-between;'
-    + 'font-size:11px;padding:2px 0;border-bottom:1px solid var(--brd)'+(it._ok?';opacity:.6':'')+'">'
-    + '<span style="color:var(--mt);word-break:break-word'+(it._ok?';text-decoration:line-through':'')+'">'+esc(it.title)+'</span>'
-    + durum + '</div>';
+  const durum = it._cift
+      ? '<span style="color:var(--mt)" title="Bu short bu hesapta zaten yayınlanmış ya da kuyrukta — çift önlendi">· zaten var</span>'
+    : it._ok
+      ? '<span style="color:var(--ok)">✓ kuyrukta</span>'
+    : it._hata
+      ? '<span style="color:var(--er)" title="'+esc(it._hata)+'">✕ '+esc(String(it._hata).slice(0,22))+'</span>'
+    : !it.video
+      ? '<span style="color:#f5a623" title="short-kaydetme tablosunda bu başlıkla eşleşen mp4 yok — 🔎 OpusClip\'te Ara ile bulunabilir">kaynak yok</span>'
+      : '<button class="btn bsm" style="padding:0 7px;font-size:10.5px" onclick="hrkGonder(\''+kat+'\','+i+','+j+')">↻ Gönder</button>';
+  return '<div id="hrks-'+kat+'-'+i+'-'+j+'" style="display:flex;gap:8px;align-items:center;'
+    + 'font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--brd)'+(it._ok?';opacity:.55':'')+'">'
+    + '<span title="'+esc(it.title)+'" style="flex:1;min-width:0;color:var(--tx);white-space:nowrap;overflow:hidden;'
+    + 'text-overflow:ellipsis'+(it._ok?';text-decoration:line-through':'')+'">'+esc(it.title)+'</span>'
+    + '<span style="flex:0 0 auto;font-size:10.5px;white-space:nowrap;min-width:78px;text-align:right">'+durum+'</span></div>';
 }
 
 function hrkListeCiz(kat, i){
   const k = (RAP_HAREKET_SON[kat] || [])[i];
   const el = document.getElementById('hrk-'+kat+'-'+i); if (!el || !k || !k._kaynak) return;
-  const kalan = k._kaynak.filter(x=>x.video && !x._ok).length;
-  const kaynaksiz = k._kaynak.filter(x=>!x.video).length;
-  el.innerHTML = '<div style="margin:3px 0 5px 10px;border-left:2px solid var(--brd);padding-left:8px">'
-    + (kalan ? '<button class="btn bp bsm" id="hrk-toplu-'+kat+'-'+i+'" style="padding:1px 8px;font-size:10.5px;margin-bottom:4px"'
-        + ' onclick="hrkGonderTumu(\''+kat+'\','+i+')">↻ '+kalan+' short\'u kuyruğa al</button>'
-        + (kaynaksiz ? '<span style="font-size:10.5px;color:#f5a623;margin-left:6px">'+kaynaksiz+' kaydın kaynağı yok, atlanır</span>' : '')
-      : '<div style="font-size:10.5px;color:var(--mt);margin-bottom:4px">Gönderilebilecek short kalmadı</div>')
-    + '<div style="max-height:200px;overflow-y:auto">'
-    + k._kaynak.slice(0,60).map((it,j)=>hrkSatirCiz(kat,i,j,it)).join('')
-    + (k._kaynak.length>60 ? '<div style="font-size:10.5px;color:var(--mt)">… ve '+(k._kaynak.length-60)+' tane daha</div>' : '')
-    + '</div></div>';
+  const hepsi = k._kaynak.map((it,j)=>({ it, j }));
+  const gonderilebilir = hepsi.filter(x =>  x.it.video && !x.it._ok);
+  const kaynaksiz      = hepsi.filter(x => !x.it.video && !x.it._ok);
+  const bitmis         = hepsi.filter(x =>  x.it._ok);
+  const cip = (renk, metin, ipucu) => '<span title="'+esc0(ipucu||'')+'" style="font-size:10.5px;color:'+renk
+    + ';background:var(--sur2);border:1px solid var(--brd);border-radius:10px;padding:1px 8px;white-space:nowrap">'+metin+'</span>';
+  // SIRA = iş sırası: önce gönderilebilirler, sonra kaynaksızlar, en sonda bitenler
+  const blok = (liste, baslik, ipucu) => !liste.length ? '' :
+      (baslik ? '<div style="font-size:10.5px;color:var(--mt);margin:6px 0 2px" title="'+esc0(ipucu||'')+'">'+baslik+'</div>' : '')
+    + liste.slice(0,40).map(x => hrkSatirCiz(kat, i, x.j, x.it)).join('')
+    + (liste.length>40 ? '<div style="font-size:10.5px;color:var(--mt);padding:3px 0">… ve '+(liste.length-40)+' tane daha</div>' : '');
+
+  el.innerHTML = '<div style="margin:4px 0 8px 10px;border-left:2px solid var(--brd);padding-left:10px">'
+    // ── ÜST ŞERİT: sayılar + eylemler ──
+    + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">'
+      + (gonderilebilir.length
+          ? '<button class="btn bp bsm" id="hrk-toplu-'+kat+'-'+i+'" style="padding:1px 9px;font-size:10.5px"'
+            + ' onclick="hrkGonderTumu(\''+kat+'\','+i+')">↻ '+gonderilebilir.length+' short\'u kuyruğa al</button>'
+          : '')
+      + (kaynaksiz.length
+          ? '<button class="btn bg bsm" id="hrk-arabtn-'+kat+'-'+i+'" style="padding:1px 9px;font-size:10.5px"'
+            + ' title="Bu short\'ların mp4\'ü short-kaydetme tablosunda eşleşmedi. OpusClip klip başlıklarında aranır; bulunan link indirilebiliyorsa kaynak olarak kabul edilir."'
+            + ' onclick="hrkOpusAra(\''+kat+'\','+i+')">🔎 '+kaynaksiz.length+' kaynağı OpusClip\'te ara</button>'
+          : '')
+      + cip('var(--ok)', gonderilebilir.length+' hazır', 'Kaynağı bulunmuş, kuyruğa alınabilir')
+      + (kaynaksiz.length ? cip('#f5a623', kaynaksiz.length+' kaynaksız', 'mp4 bulunamadı — OpusClip\'te aranabilir') : '')
+      + (bitmis.length ? cip('var(--mt)', bitmis.length+' tamam', 'Kuyruğa alındı ya da zaten vardı') : '')
+      + '<span id="hrk-ara-'+kat+'-'+i+'" style="font-size:10.5px;color:var(--mt)"></span>'
+    + '</div>'
+    + (gonderilebilir.length || kaynaksiz.length || bitmis.length
+        ? '<div style="max-height:230px;overflow-y:auto">'
+          + blok(gonderilebilir, '', '')
+          + blok(kaynaksiz, '⚠ Kaynağı bulunamayanlar — gönderilemez', 'short-kaydetme tablosunda eşleşme yok')
+          + blok(bitmis, '✓ Tamamlananlar', 'Kuyruğa alındı ya da çift korumasıyla elendi')
+          + '</div>'
+        : '<div style="font-size:10.5px;color:var(--mt)">Gönderilebilecek short kalmadı</div>')
+    + '</div>';
 }
 
 async function hrkGonder(kat, i, j){
@@ -9892,7 +9964,7 @@ document.addEventListener('DOMContentLoaded', function() {
       hsAc,hsKapat,hsOnizle,hsUygula,hsGeriAl,hsListeCiz,hsSayilir,hsZaman,hsAnahtar,
       ksAc,ksKapat,ksOlc,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
-      rapHareketDenetimi,rapHareketCiz,rapHareketListe,hrkGonder,hrkGonderTumu,hrkListeCiz,hrkKaynakCoz,
+      rapHareketDenetimi,rapHareketCiz,rapHareketListe,hrkGonder,hrkGonderTumu,hrkListeCiz,hrkKaynakCoz,hrkOpusAra,
       nabizCiz,dashTumunuYenile,kuyrukDerinlik,kuyrukCiz,
       // Çerçeve sayfası
       initCerceve,cerProfilleriYukle,cerDuzenle,cerEditorKapat,cerKaydet,cerYayinla,
