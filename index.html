@@ -3,6 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Sayfanin adresi ucuncu taraflara (Google Fonts, YouTube, ytimg) sizmasin.
+     API anahtarlarini sizdirmiyordu - anahtar giden istegin URL'sinde, Referer'da
+     degil - ama IP + tam adres yine de gereksiz yere paylasiliyordu. -->
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<!-- CSP - DURUST SINIRLARI:
+     script-src 'unsafe-inline' KALDIRILAMIYOR: panelin tamami tek bir gomulu
+     betik blogu ve yuzlerce inline onclick uzerine kurulu. Yani CSP burada
+     XSS'i TEK BASINA durdurmaz - asil savunma kacis standardi
+     (esc0 / guvenliUrl / jsStr). CSP'nin gercekten kazandirdiklari:
+       base-uri 'none'    enjekte edilen base etiketiyle goreli URL kacirma
+       form-action 'none' enjekte edilen form ile veri disari gonderme
+       object-src 'none'  eklenti tabanli vektorler
+       frame-src          yalniz YouTube gomulebilir
+     connect-src SIKI OLAMAZ: n8n adresi kullanicinin kendi girdigi degisken bir
+     origin (app.n8n.cloud / workers.dev / kendi sunucusu). https: ile
+     sinirlandirdim - duz metin http'yi keser, keyfi origin'i kesmez.
+     NOT: bu yorumda etiket adlarini acili parantezsiz yaziyorum - yorum icinde
+     bile olsa arac zincirini (sozdizimi cikarici) yaniltiyorlar. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src https://www.youtube.com; connect-src https:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>OPUS PRO v9</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -661,7 +680,9 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div>
       <b>Sheets API 403:</b> Aşağıdakilerden birini yap:<br>
       1. Google Sheet → Paylaş → "Bağlantıya sahip herkes görüntüleyebilir" yap<br>
-      2. Google Cloud Console → API Key → Kısıtlamaları kaldır<br>
+      2. Cloud Console → API Key → <b>API restrictions</b>'a <i>Google Sheets API</i>'yi ekle.
+         Referrer kısıtlaması varsa <b>kaldırma</b> — paneli açtığın adresi izinli listeye ekle
+         (kısıtlamasız anahtar tarayıcıdan çalınabilir)<br>
       3. Ayarlar'dan n8n URL giriliyse bu sorun olmaz (n8n proxy kullanılır)
     </div>
   </div>
@@ -783,7 +804,8 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div class="alert ai"><span>ℹ</span><span>Anahtar kelime veya @handle girin. Eşleşen kanallar abone / izlenme / video sayısı ile listelenir; bir kanala tıklayınca videoları sağda açılır.</span></div>
         <div class="fg"><label>YouTube API Key <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--acc);font-size:12px;margin-left:6px">Console ↗</a></label>
           <div style="display:flex;gap:6px">
-            <input id="ytk-apikey" type="text" placeholder="AIza..." style="flex:1" oninput="if(S.cfg.ytApiKey!==this.value){S.cfg.ytApiKey=this.value;localStorage.setItem('op_cfg',JSON.stringify(S.cfg));}"/>
+            <input id="ytk-apikey" type="password" placeholder="AIza..." style="flex:1" oninput="if(S.cfg.ytApiKey!==this.value){S.cfg.ytApiKey=this.value;localStorage.setItem('op_cfg',JSON.stringify(S.cfg));}"/>
+            <button class="btn bg bsm" type="button" onclick="sirGoster()" title="Anahtarları göster/gizle" style="flex-shrink:0">👁</button>
             <button class="btn bg bsm" onclick="ytkTestApi()" title="API Key'i test et">✓ Test</button>
           </div>
         </div>
@@ -1864,23 +1886,35 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div class="fg"><label>Webhook: YouTube Ara</label><div id="wh-ytara" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/youtube-ara</div></div>
       </div>
       <div class="card">
-        <div class="ct">API Anahtarları</div>
+        <div class="ct" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span>API Anahtarları</span>
+          <span style="display:flex;gap:6px">
+            <button class="btn bg bsm" type="button" onclick="sirGoster()" title="Anahtarları göster/gizle">👁 Göster</button>
+            <button class="btn bd bsm" type="button" onclick="sirlariSil()" title="Tüm API anahtarlarını bu tarayıcıdan sil">🗑 Anahtarları Sil</button>
+          </span>
+        </div>
+        <div style="font-size:11px;color:var(--mt);margin:-4px 0 10px;line-height:1.5">
+          <b style="color:var(--wn)">Anahtarlarını kısıtla.</b> Google anahtarları tarayıcıda görünür —
+          Cloud Console → API Key → <b>Application restrictions = HTTP referrers</b> (paneli açtığın adres) ve
+          <b>API restrictions</b> = yalnız <i>YouTube Data API v3</i> + <i>Google Sheets API</i>.
+          Kısıtlamasız bir anahtarı ele geçiren kişi kotanı yakar ya da faturalı kullanım üretir.
+        </div>
         <div class="fg">
-  <label>Google Sheets API Key <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--acc);font-size:11px">→ Oluştur</a></label>
-  <input id="cfg-shkey" type="text" placeholder="AIza..."/>
+  <label>Google Sheets API Key <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--acc);font-size:11px">→ Oluştur</a></label>
+  <input id="cfg-shkey" type="password" placeholder="AIza..."/>
   <div style="font-size:11px;color:var(--mt);margin-top:3px">console.cloud.google.com → Sheets API → Etkinleştir → API Anahtarı</div>
 </div>
         <div class="fg"><label>Sheet ID (Short Kaydet)</label><input id="cfg-sheet" type="text" placeholder="1eAm6yyasd_..."/></div>
         <div class="fg"><label>Sheet ID (URL-Takip)</label><input id="cfg-sheet2" type="text" placeholder="aynı veya farklı"/></div>
-        <div class="fg"><label>Upload-Post API Key</label><input id="cfg-blot" type="text" placeholder="blt_..."/></div>
-        <div class="fg"><label>OpusClip API Key <span style="color:var(--mt)">(1. takım)</span></label><input id="cfg-opus" type="text" placeholder="sk-..."/><div style="font-size:11px;color:var(--mt);margin-top:3px">opus.pro → Settings → API → API Key</div></div>
-        <div class="fg"><label>OpusClip API Key <span style="color:var(--mt)">(2. takım — isteğe bağlı)</span></label><input id="cfg-opus2" type="text" placeholder="sk-... (boş bırakılabilir)"/><div style="font-size:11px;color:var(--mt);margin-top:3px">Her takımın <b>kendi</b> API anahtarı vardır — tek anahtar iki takımı birden göremez (ölçüldü). İkinci takıma geçip Settings → API'den anahtarını al. Girilirse galeride her iki takımın projeleri birlikte listelenir.</div></div>
+        <div class="fg"><label>Upload-Post API Key</label><input id="cfg-blot" type="password" placeholder="blt_..."/></div>
+        <div class="fg"><label>OpusClip API Key <span style="color:var(--mt)">(1. takım)</span></label><input id="cfg-opus" type="password" placeholder="sk-..."/><div style="font-size:11px;color:var(--mt);margin-top:3px">opus.pro → Settings → API → API Key</div></div>
+        <div class="fg"><label>OpusClip API Key <span style="color:var(--mt)">(2. takım — isteğe bağlı)</span></label><input id="cfg-opus2" type="password" placeholder="sk-... (boş bırakılabilir)"/><div style="font-size:11px;color:var(--mt);margin-top:3px">Her takımın <b>kendi</b> API anahtarı vardır — tek anahtar iki takımı birden göremez (ölçüldü). İkinci takıma geçip Settings → API'den anahtarını al. Girilirse galeride her iki takımın projeleri birlikte listelenir.</div></div>
         <div class="fg"><label>Takım adları <span style="color:var(--mt)">(görünen ad, isteğe bağlı)</span></label>
           <div style="display:flex;gap:8px">
             <input id="cfg-opus-ad" type="text" placeholder="1. Takım" style="flex:1"/>
             <input id="cfg-opus2-ad" type="text" placeholder="2. Takım" style="flex:1"/>
           </div></div>
-        <div class="fg"><label>Cobalt API Key</label><input id="cfg-cobalt" type="text" placeholder="..."/><div style="font-size:11px;color:var(--mt);margin-top:3px">cobalt.tools → API Key (Direkt Yayınla için gerekli)</div></div>
+        <div class="fg"><label>Cobalt API Key</label><input id="cfg-cobalt" type="password" placeholder="..."/><div style="font-size:11px;color:var(--mt);margin-top:3px">cobalt.tools → API Key (Direkt Yayınla için gerekli)</div></div>
         <div style="display:flex;gap:10px">
           <div class="fg" style="flex:1"><label>Toplu Gönderim Uyarı Sınırı</label><input id="cfg-batchmax" type="number" min="1" value="15" placeholder="15"/><div style="font-size:11px;color:var(--mt);margin-top:3px">Bu sayıyı aşınca onay ister</div></div>
           <div class="fg" style="flex:1"><label>Gönderimler Arası Aralık (sn)</label><input id="cfg-batchdelay" type="number" min="0" value="8" placeholder="8"/><div style="font-size:11px;color:var(--mt);margin-top:3px">n8n/Upload-Post'u yormamak için</div></div>
@@ -2377,7 +2411,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-22';
+const PANEL_YAPI = 'y2026.08.04-23';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -7895,7 +7929,7 @@ async function ytkTestApi(){
     if (/keyInvalid|API key not valid/i.test(hata+kod)) ipucu = ' → anahtar geçersiz, Console\'dan kopyalarken boşluk kalmış olabilir';
     else if (/quota/i.test(hata+kod))                   ipucu = ' → günlük kota bitmiş, yarın sıfırlanır';
     else if (/accessNotConfigured|disabled/i.test(hata+kod)) ipucu = ' → Cloud Console\'da YouTube Data API v3 etkin değil';
-    else if (/ipRefererBlocked|referer/i.test(hata+kod))     ipucu = ' → anahtarda HTTP referrer/IP kısıtlaması var, kaldır';
+    else if (/ipRefererBlocked|referer/i.test(hata+kod))     ipucu = ' → anahtarın referrer/IP kısıtlaması bu adresi kapsamıyor; kısıtlamayı KALDIRMA, bu adresi izinli listeye ekle';
     toast('✕ ' + hata.slice(0,90) + ipucu,'err',9000);
     addLog('err','sistem','YouTube API Key testi: ' + hata.slice(0,90));
   } catch(e){
@@ -8007,6 +8041,35 @@ function updateSVWHDisplay() {
   const path=CAT_WH[selCat]||'/webhook/video-gonder';
   const sv=document.getElementById('sv-wh-display');
   if(sv)sv.textContent=b?b+path:path;
+}
+
+// Sır tutan TÜM alanlar — göster/gizle ve silme bu listeden yürür.
+const SIR_ALANLARI = ['cfg-shkey','cfg-blot','cfg-opus','cfg-opus2','cfg-cobalt',
+                      'ytk-apikey','cfg-n8n-key','cer-gh-pat','str-tw-sec'];
+
+// Alanlar artık type=password — ekran görüntüsü/ekran paylaşımı sırasında
+// anahtarlar açıkta durmasın diye. Gerektiğinde tek düğmeyle açılıyor.
+function sirGoster(){
+  const acik = SIR_ALANLARI.some(id => { const e=document.getElementById(id); return e && e.type==='text'; });
+  SIR_ALANLARI.forEach(id => { const e=document.getElementById(id); if(e) e.type = acik ? 'password' : 'text'; });
+  toast(acik ? 'Anahtarlar gizlendi' : 'Anahtarlar görünür — işin bitince tekrar gizle', acik?'ok':'warn', 3000);
+}
+
+// Denetimde çıktı: anahtarları localStorage'dan SİLEN hiçbir yol yoktu.
+// Bir anahtarı iptal etmek isteyince tek çare DevTools'tu.
+function sirlariSil(){
+  if (!confirm('Bu tarayıcıdaki TÜM API anahtarları silinecek:\n\n'
+             + '• Google Sheets / YouTube · Upload-Post · OpusClip (2 takım)\n'
+             + '• Cobalt · Twitch · n8n webhook anahtarı · GitHub token\n\n'
+             + 'Sheet ID\'leri, limitler ve loglar KALIR.\n'
+             + 'Anahtarları sağlayıcı tarafında da iptal etmeyi unutma.\n\nDevam?')) return;
+  ['shkey','blot','opus','opus2','cobalt','ytApiKey','n8nKey','n8nKeyAd',
+   'twClientId','twSecret','twTok','twTokExp','twTokCid'].forEach(k => { delete S.cfg[k]; });
+  localStorage.setItem('op_cfg', JSON.stringify(S.cfg));
+  try { CER.ghPat = ''; if (typeof cerYaz === 'function') cerYaz(); } catch(e){ console.warn('[SIR] cerceve:', e.message); }
+  SIR_ALANLARI.forEach(id => { const e=document.getElementById(id); if(e){ e.value=''; e.type='password'; } });
+  addLog('ok','sistem','Tüm API anahtarları tarayıcıdan silindi');
+  toast('Anahtarlar silindi — sağlayıcı tarafında da iptal et','ok',6000);
 }
 
 function saveSettings() {
@@ -8256,10 +8319,10 @@ function ytkErrMsg(e) {
   const reason = (r.errors && r.errors[0] && r.errors[0].reason) || r.status || '';
   const msg = (typeof e === 'string') ? e : (r.message || '');
   if (reason === 'ipRefererBlocked' || /referer|referrer|API_KEY_HTTP_REFERRER_BLOCKED/i.test(msg)) {
-    return 'API Key HTTP Referrer kısıtlı — Google Cloud Console → "APIs & Credentials" → API Key düzenle → "Application restrictions" = None (veya bu domain\'i whitelist). Panel dosyayı çift tıklayarak açıyorsan file:// referrer\'ı bloklanır.';
+    return 'API Key HTTP Referrer kısıtlı — Cloud Console → "APIs & Credentials" → API Key düzenle → "Application restrictions" = HTTP referrers ve paneli açtığın adresi izinli listeye EKLE. Kısıtlamayı tümden kaldırma: kısıtlamasız anahtar tarayıcıdan çalınıp kotanı yakabilir. Paneli dosyaya çift tıklayarak (file://) açıyorsan referrer gönderilemez — paneli bir adresten sun (örn. GitHub Pages) ya da n8n proxy kullan.';
   }
   if (/API_KEY_IP_ADDRESS_BLOCKED|IP address .* (blocked|not allowed)/i.test(msg)) {
-    return 'Key IP kısıtı alıyor — Cloud Console → "Application restrictions" bölümünde bu makinenin IP\'si izinli değil.';
+    return 'Key IP kısıtı alıyor — Cloud Console → "Application restrictions" bölümünde bu makinenin IP\'si izinli değil. Kısıtlamayı kaldırmak yerine bu IP\'yi listeye ekle.';
   }
   if (reason === 'API_KEY_INVALID' || /API key not valid/i.test(msg)) {
     return 'API Key geçersiz — Ayarlar\'daki key yanlış veya silinmiş. Yenisini oluştur.';
@@ -10657,6 +10720,14 @@ async function cerTest(){
     const dl = 'https://api.upload-post.com/api/uploadposts/ffmpeg/jobs/'+is.job_id+'/download';
     let modu = '', blob = null;
     const dene = async (url, opts)=>{ try{ const r = await fetch(url, opts); return r.ok ? r : null; }catch(e){ return null; } };
+    // DENEME SIRASI — BİLEREK DEĞİŞTİRİLMEDİ.
+    // Güvenlik açısından header modu tercih edilirdi (query modunda anahtar
+    // n8n çalıştırma geçmişine ve ffmpeg komut satırına kalıcı olarak düşüyor),
+    // AMA aşağıdaki MODU_ACIKLAMA'nın da söylediği gibi header modunda n8n
+    // çerçeveyi ATLIYOR — n8n tarafında ikili aktarım henüz yazılmadı.
+    // Sırayı değiştirmek anahtarı korurdu ama çerçeve özelliğini kırardı.
+    // Doğru çözüm n8n tarafında: indirmeyi Authorization başlığıyla yapan bir
+    // HTTP Request düğümü. O yazılana kadar sıra böyle kalmalı.
     let r = await dene(dl);
     if (r){ modu = 'public'; blob = await r.blob(); }
     if (!modu){ r = await dene(dl+'?apikey='+encodeURIComponent(S.cfg.blot)); if (r){ modu='query'; blob = await r.blob(); } }
@@ -10665,7 +10736,7 @@ async function cerTest(){
     if (!modu) throw new Error('Sonuç hiçbir yöntemle indirilemedi');
     const MODU_ACIKLAMA = {
       public:  '✓ <b>public</b> — indirme linki açık; n8n URL\'yi doğrudan kullanır (EN İYİ durum)',
-      query:   '✓ <b>query</b> — <code>?apikey=</code> ile erişiliyor; n8n URL\'ye anahtar ekler',
+      query:   '⚠ <b>query</b> — <code>?apikey=</code> ile erişiliyor; n8n URL\'ye anahtar ekler. Anahtar bu modda n8n çalıştırma geçmişine düz metin olarak düşer — kalıcı çözüm için n8n\'de indirmeyi Authorization başlığıyla yapan bir düğüm gerekir',
       query2:  '✓ <b>query</b> (api_key paramı) — n8n URL\'ye anahtar ekler',
       header:  '⚠ <b>header</b> — yalnız Authorization başlığıyla iniyor; bu modda n8n çerçeveyi <b>atlar</b> (bana bildir, ikili aktarım gerekir)'
     };
