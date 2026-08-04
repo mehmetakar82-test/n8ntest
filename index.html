@@ -2362,7 +2362,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-20';
+const PANEL_YAPI = 'y2026.08.04-21';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
@@ -7012,7 +7012,60 @@ function kapsamaHataCiz(){
 // hatayı alır — döngü erken durmalı, yoksa 20 istek boşa gider ve hız
 // sınırını yer (yaşandı: 4 başarılı sonra 6 aynı hata).
 function kuyrukDoluMu(s){
-  return /no available queue slot|queue is full|no free slot/i.test(String((s && (s.mesaj||s.sebep)) || s || ''));
+  // "365 günlük sınıra dayandı" da buraya girer: tarihli planlama yedeği de
+  // tükendiyse kalan gönderimler de aynı duvara çarpar, döngü yine durmalı.
+  return /no available queue slot|queue is full|no free slot|365 günlük sınıra dayandı/i
+           .test(String((s && (s.mesaj||s.sebep)) || s || ''));
+}
+
+// ── KUYRUK TAŞMASI → TARİHLİ PLANLAMAYA GEÇ ────────────────────────────
+// add_to_queue YALNIZCA profilin yapılandırılmış yuvalarına koyuyor
+// (queue/settings: saat/dakika çiftleri × aktif günler). Yuvalar dolunca
+// "No available queue slots found" geliyor ve panel pes ediyordu.
+// Oysa OpenAPI: scheduled_date ile 365 GÜNE kadar planlanabiliyor —
+// "Must be in the future (≤365 days). Cannot be used with add_to_queue."
+// İkisi birlikte kullanılamıyor ama kuyruk dolunca İKİNCİSİNE geçilebilir.
+// Yani 365 gün sınırı kuyruğun değil, TARİHLİ planlamanın sınırı.
+const KT_TTL = 120000;
+const KT_ONB = new Map();            // profil -> { t, imlec, aralikMs }
+
+async function ktBaslangic(profil){
+  const c = KT_ONB.get(profil);
+  if (c && Date.now() - c.t < KT_TTL) return c;
+  // 1) Profilin bekleyen gönderilerinin EN İLERİ tarihi — yeni işler onun ardına
+  let son = 0;
+  try {
+    const { data } = await upFetchRetry('/uploadposts/schedule');
+    const s = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
+    s.forEach(x => {
+      if (String(x.profile_username||'') !== profil) return;
+      const t = Date.parse(x.scheduled_date||x.scheduledDate||x.scheduled_at||'') || 0;
+      if (t > son) son = t;
+    });
+  } catch(e){ console.warn('[KT] schedule:', e.message); }
+  // 2) Günlük yuva sayısı → aralık. Profilin kendi ritmi korunsun; alınamazsa
+  //    günde 3 varsayılır (aralık en az 1 saat).
+  let yuva = 3;
+  try {
+    const { data } = await upFetchRetry('/uploadposts/queue/settings?profile_username='+encodeURIComponent(profil));
+    const qs = (data && (data.queue_settings || data)) || {};
+    if (Array.isArray(qs.slots) && qs.slots.length) yuva = qs.slots.length;
+  } catch(e){ console.warn('[KT] queue/settings:', e.message); }
+  const rec = { t: Date.now(),
+                imlec: Math.max(son, Date.now()),
+                aralikMs: Math.max(3600000, Math.round(86400000 / Math.max(1, yuva))) };
+  KT_ONB.set(profil, rec);
+  return rec;
+}
+
+// Sıradaki boş tarihi ver ve imleci ilerlet — aynı ana yığılmasınlar.
+// 365 gün tavanını aşarsa null döner (o zaman gerçekten yapılacak bir şey yok).
+async function ktTarihAl(profil){
+  const rec = await ktBaslangic(profil);
+  const yeni = rec.imlec + rec.aralikMs;
+  if (yeni > Date.now() + 364*86400000) return null;   // tavana 1 gün pay
+  rec.imlec = yeni;
+  return new Date(yeni).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
 // "Video URL is not accessible" = kaynak mp4 ölü. Diğer hatalardan
@@ -9958,7 +10011,7 @@ document.addEventListener('DOMContentLoaded', function() {
       khKaynakAra,pdKlipDizini,pdBaslikEslesme,
       esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
-      ciftTara,ciftOtoKur,ciftOtoCalis,ciftOtoTik,kuyrukDoluMu,
+      ciftTara,ciftOtoKur,ciftOtoCalis,ciftOtoTik,kuyrukDoluMu,ktBaslangic,ktTarihAl,
       ciftYoksay,ciftYoksayTumu,ciftYoksayGoster,ciftYoksayGeriAl,ciftYoksayTemizle,ciftYenidenTara,
       fafSonuc,panelSheetOnb,sheetTbodyYaz,ydBekleyenHata,
       hsAc,hsKapat,hsOnizle,hsUygula,hsGeriAl,hsListeCiz,hsSayilir,hsZaman,hsAnahtar,
@@ -12161,7 +12214,7 @@ const HATA_KURALLARI = [
   // günlük yuva sayısı × aktif günler kadar gönderi alınabiliyor.
   [/no available queue slot|queue is full|no free slot/i,
     'Kuyrukta boş yuva kalmadı',
-    'Bu profilin kuyruğu dolu — add_to_queue yerleştirecek yuva bulamıyor. Çözüm: Upload-Post → profil → Configuration → Posting Times\'tan günlük yuva sayısını artır (günde en fazla 24) ya da kuyruk boşalana kadar bekle. Dashboard → 📦 Kuyruk Derinliği kuyruğun ne zaman biteceğini gösteriyor.', 'kritik'],
+    'Kuyruk yalnızca profilin YAPILANDIRILMIŞ yuvalarına koyar (Upload-Post → profil → Configuration → Posting Times); o yuvalar dolduğunda bu hata gelir. Panel bunu görünce otomatik olarak TARİHLİ planlamaya geçiyor (scheduled_date ile 365 güne kadar), yani gönderim genelde yine de yapılır. Bu mesajı hâlâ görüyorsan tarihli yol da denenmiş ve başarısız olmuş demektir — günlük yuva sayısını artır (günde en fazla 24). Dashboard → 📦 Kuyruk Derinliği kuyruğun ne zaman biteceğini gösterir.', 'kritik'],
   [/no facebook pages? found|personal profiles is not supported|select a facebook page/i,
     'Facebook Sayfası seçili değil',
     'Facebook Reels yalnız SAYFALARA yayınlanabiliyor, kişisel profile değil. Upload-Post’ta bu profilin Facebook bağlantısını bir Sayfa seçerek yeniden kur. (n8n tarafındaki boş page_id hatası y2026.08.03-12 ile düzeltildi — workflow’u içe aktarmayı unutma.)', 'kritik'],
@@ -13047,7 +13100,9 @@ async function ydTopluGonder(it){
   try {
     if (S.cfg.blot){
       const aciklama = it._caption || it.caption || '';
-      const kur = (v) => {
+      // tarih verilirse add_to_queue YERİNE scheduled_date gider — OpenAPI
+      // ikisinin birlikte kullanılmasını yasaklıyor.
+      const kur = (v, tarih) => {
         const fd = new FormData();
         fd.append('user', profil);
         fd.append('platform[]', platform);
@@ -13055,7 +13110,8 @@ async function ydTopluGonder(it){
         if (it.title)  fd.append('title', String(it.title).slice(0,95));
         if (aciklama)  fd.append('description', aciklama);
         fd.append('async_upload','true');
-        fd.append('add_to_queue','true');          // ← doğal akış: sıradaki boş yuva
+        if (tarih) fd.append('scheduled_date', tarih);
+        else       fd.append('add_to_queue','true');   // ← doğal akış: sıradaki boş yuva
         fd.append('selfDeclaredMadeForKids','false');
         if (platform === 'youtube'){
           fd.append('categoryId', ytKategoriId(profilKategori(profil)));
@@ -13077,6 +13133,23 @@ async function ydTopluGonder(it){
           if (yeni){ it._video = yeni; u = await upYukle(kur(yeni)); }
           else u = { ok:false, mesaj:'Kaynak mp4 indirilemiyor ve klip OpusClip\'te de bulunamadı' };
         } catch(e){ u = { ok:false, mesaj:'Taze link alınamadı: '+(e.message||'bilinmeyen') }; }
+      }
+      // KUYRUK DOLU → TARİHLİ PLANLAMAYA GEÇ. Kuyruk yalnız yapılandırılmış
+      // yuvalara koyuyor; scheduled_date ise 365 güne kadar serbest.
+      if (!u.ok && kuyrukDoluMu(u) && !it._tarihDenendi){
+        it._tarihDenendi = true;
+        const tarih = await ktTarihAl(profil);
+        if (tarih){
+          const u2 = await upYukle(kur(it._video || video, tarih));
+          if (u2.ok){
+            ckEkle(profil, platform, it.title);
+            return { ok:true, tarihli:tarih };
+          }
+          u = u2;
+        } else {
+          u = { ok:false, mesaj:'Kuyruk dolu ve tarihli planlama da 365 günlük sınıra dayandı — '
+                             + 'bu profilin günlük yuva sayısını artırman gerekiyor' };
+        }
       }
       if (u.ok){ ckEkle(profil, platform, it.title); return { ok:true }; }
       return { ok:false, sebep:'api', mesaj: u.mesaj };
