@@ -27,6 +27,8 @@ Thumbs.db
 scratchpad/
 _test_*
 *.tmp
+# js_dogrula.py'nin urettigi sozdizimi kontrol ciktisi
+_syn.html
 
 # Kaynak dosya sadece 'index.html' olarak push ediliyor
 opuspro_panel_v9.html

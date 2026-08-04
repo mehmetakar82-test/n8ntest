@@ -1837,6 +1837,21 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <div class="card">
         <div class="ct">n8n Bağlantısı</div>
         <div class="fg"><label>n8n Base URL (Cloudflare Worker)</label><input id="cfg-n8n" type="url" placeholder="https://opus-proxy.xxx.workers.dev" oninput="updateWHs()"/><div style="font-size:12px;color:var(--mt);margin-top:4px">Sadece n8n adresi — workflow düzenleme linkini (…/workflow/xxxx) DEĞİL, sadece domain kısmını yapıştır (örn. https://xxx.app.n8n.cloud)</div></div>
+        <div class="fg" style="border-top:1px solid var(--brd);padding-top:10px;margin-top:4px">
+          <label>Webhook Anahtarı <span style="color:var(--mt)">(n8n Header Auth)</span></label>
+          <div style="display:flex;gap:8px">
+            <input id="cfg-n8n-key-ad" type="text" placeholder="X-OPUS-KEY" style="width:130px;flex-shrink:0"/>
+            <input id="cfg-n8n-key" type="password" placeholder="başlık değeri" style="flex:1"/>
+          </div>
+          <div style="font-size:11px;color:var(--mt);margin-top:4px">
+            <b style="color:var(--wn)">Boş bırakılırsa webhook'ların herkese açık kalır.</b>
+            n8n'deki 24 webhook'un yolu tahmin edilebilir (<code>/webhook/video-gonder</code> gibi);
+            adresi öğrenen biri senin hesaplarına yayın yaptırabilir, tüm iş verini okuyabilir.
+            Kapatmak için: n8n → <b>Credentials → New → Header Auth</b> ile bir kimlik oluştur
+            (Name alanına başlık adını, Value alanına uzun rastgele bir metin yaz), sonra
+            webhook düğümlerinde <b>Authentication = Header Auth</b> seç. Aynı ikiliyi buraya gir.
+          </div>
+        </div>
         <div class="fg"><label>Webhook: Video Gönder (Genel)</label><div id="wh-video" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder</div></div>
         <div class="fg"><label>Webhook: Film</label><div id="wh-film" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-film</div></div>
         <div class="fg"><label>Webhook: Eğlence</label><div id="wh-eglence" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-eglence</div></div>
@@ -2362,8 +2377,24 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-21';
+const PANEL_YAPI = 'y2026.08.04-22';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
+
+// ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
+// n8n'deki 24 webhook'un tamamı kimlik doğrulamasız ve yolları tahmin
+// edilebilir (video-gonder, panel-data …). Adresi öğrenen herkes gerçek sosyal
+// hesaplara yayın yaptırabiliyor, tüm iş verisini okuyabiliyor ve Sheets'e
+// yazabiliyordu. n8n tarafında Header Auth açıldığında panelin de bu başlığı
+// göndermesi gerekiyor.
+//
+// Ayarlar'da anahtar BOŞSA hiçbir başlık eklenmez — yani bu değişiklik mevcut
+// kurulumu bozmaz; n8n tarafını açana kadar panel eskisi gibi çalışır.
+function n8nBaslik(ek){
+  const h = Object.assign({}, ek || {});
+  const k = String(S.cfg.n8nKey || '').trim();
+  if (k) h[String(S.cfg.n8nKeyAd || '').trim() || 'X-OPUS-KEY'] = k;
+  return h;
+}
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
 function PFAV(domain){ return '<img class="pfav" src="https://www.google.com/s2/favicons?domain='+domain+'&sz=64" alt="" loading="lazy"/>'; }
@@ -2381,7 +2412,7 @@ async function faf(url, body) {
       addLog('info','webhook','Istek teslim edildi, n8n isliyor (yanit beklenmedi): '+url);
       resolve({ok:true, pending:true});
     },8000);
-    fetch(url,{method:'POST',mode:'cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    fetch(url,{method:'POST',mode:'cors',headers:n8nBaslik({'Content-Type':'application/json'}),body:JSON.stringify(body)})
       .then(r=>{
         clearTimeout(tid);
         if (!r.ok) addLog('err','webhook','HTTP '+r.status+' — '+url);
@@ -2407,7 +2438,7 @@ async function n8nGet(path) {
   const ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
   const sure = setTimeout(()=>{ try{ ctl && ctl.abort(); }catch(e){} }, 25000);
   try {
-    const r = await fetch(base+path,{method:'GET',mode:'cors',signal:ctl?ctl.signal:undefined});
+    const r = await fetch(base+path,{method:'GET',mode:'cors',headers:n8nBaslik(),signal:ctl?ctl.signal:undefined});
     clearTimeout(sure);
     if (!r.ok) {
       addLog('err','webhook','GET '+path+': HTTP '+r.status+(r.status===404?' — webhook kayıtlı değil (workflow Active mi? path doğru mu?)':''));
@@ -2950,17 +2981,19 @@ function renderYARVideos() {
     const sel = YAR.selected.has(v.id);
     const durS = ytkParseDur(v.duration);
     const pubDate = (v.publishedAt||'').slice(0,10);
-    return `<div onclick="yarToggle('${v.id}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s">
-      <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();yarToggle('${v.id}')">
+    // KAÇIŞ: başlık, kanal adı ve küçük resim YouTube Data API'den — yani
+    // videoyu yükleyen üçüncü tarafın yazdığı metin.
+    return `<div onclick="yarToggle('${jsStr(v.id)}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s">
+      <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();yarToggle('${jsStr(v.id)}')">
       <div style="position:relative;flex-shrink:0">
-        ${v.thumb?`<img src="${v.thumb}" style="width:100px;height:60px;object-fit:cover;border-radius:3px">` : '<div style="width:100px;height:60px;background:var(--brd);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
+        ${v.thumb?`<img src="${guvenliUrl(v.thumb)}" style="width:100px;height:60px;object-fit:cover;border-radius:3px">` : '<div style="width:100px;height:60px;background:var(--brd);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
         <span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.8);color:var(--tx);font-size:11px;padding:1px 4px;border-radius:2px">${ytkDurFmt(durS)}</span>
       </div>
       <div style="min-width:0;flex:1">
-        <div style="font-size:14px;font-weight:600;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.title}</div>
-        <div style="font-size:12px;color:var(--mt);margin-top:4px">📺 ${v.channelTitle||''} &nbsp;👁 ${ytkFmt(v.viewCount)} &nbsp;👍 ${v.likeCount!=null?ytkFmt(v.likeCount):'–'} &nbsp;💬 ${v.commentCount!=null?ytkFmt(v.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
+        <div style="font-size:14px;font-weight:600;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc0(v.title)}</div>
+        <div style="font-size:12px;color:var(--mt);margin-top:4px">📺 ${esc0(v.channelTitle||'')} &nbsp;👁 ${ytkFmt(v.viewCount)} &nbsp;👍 ${v.likeCount!=null?ytkFmt(v.likeCount):'–'} &nbsp;💬 ${v.commentCount!=null?ytkFmt(v.commentCount):'–'} &nbsp;📅 ${esc0(pubDate)}</div>
       </div>
-      <a href="https://www.youtube.com/watch?v=${v.id}" target="_blank" onclick="event.stopPropagation()" style="align-self:center;color:var(--acc);font-size:12px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px;text-decoration:none;flex-shrink:0">↗ Aç</a>
+      <a href="https://www.youtube.com/watch?v=${encodeURIComponent(v.id)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="align-self:center;color:var(--acc);font-size:12px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px;text-decoration:none;flex-shrink:0">↗ Aç</a>
     </div>`;
   }).join('') + islenmisNotu(_ay.gizlenen);
 }
@@ -3319,7 +3352,8 @@ async function loadDriveSheet() {
   setEl('dr-sent-cnt',S.sentURLs.size);
   setEl('dr-new-cnt',newU.length);
   const listEl=document.getElementById('dr-url-list');
-  if(listEl)listEl.innerHTML=allU.map(r=>'<div class="url-item '+(S.sentURLs.has(r.url)?'done':'')+'"><span class="url-text" title="'+r.url+'">'+r.url+'</span><span class="badge bi" style="margin-left:4px">'+(r.kategori||'genel')+'</span><span class="badge '+(S.sentURLs.has(r.url)?'bgr':'bi')+'">'+(S.sentURLs.has(r.url)?'Islendi':'Yeni')+'</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:12px">URL bulunamadi</div>';
+  // KAÇIŞ: url ve kategori Drive Sheet'inden geliyor — üçüncü taraf metni.
+  if(listEl)listEl.innerHTML=allU.map(r=>'<div class="url-item '+(S.sentURLs.has(r.url)?'done':'')+'"><span class="url-text" title="'+esc0(r.url)+'">'+esc0(r.url)+'</span><span class="badge bi" style="margin-left:4px">'+esc0(r.kategori||'genel')+'</span><span class="badge '+(S.sentURLs.has(r.url)?'bgr':'bi')+'">'+(S.sentURLs.has(r.url)?'Islendi':'Yeni')+'</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:12px">URL bulunamadi</div>';
   renderSentURLs();
   showRes('dr-res','✓ '+allU.length+' URL ('+newU.length+' yeni)','ok');
   addLog('ok','drive',allU.length+' URL, '+newU.length+' yeni');
@@ -3329,7 +3363,7 @@ function renderSentURLs() {
   const el=document.getElementById('dr-sent-list');
   if(!el)return;
   const arr=[...S.sentURLs];
-  el.innerHTML=arr.slice(0,50).map(u=>'<div class="url-item"><span class="url-text" title="'+u+'">'+u+'</span><span class="badge bgr">Islendi</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:12px">Islenmis URL yok</div>';
+  el.innerHTML=arr.slice(0,50).map(u=>'<div class="url-item"><span class="url-text" title="'+esc0(u)+'">'+esc0(u)+'</span><span class="badge bgr">Islendi</span></div>').join('')||'<div style="padding:10px;color:var(--mt);font-size:12px">Islenmis URL yok</div>';
 }
 
 async function sendDriveURLs() {
@@ -3472,13 +3506,15 @@ async function loadSheetPage(page) {
     const tb=document.getElementById('kuyruk-tbody');
     if(tb) tb.innerHTML = proc.length ? proc.map(r => {
       const url = pURL(r), kaynak = pKaynak(r), tarih = pTarih(r);
+      // KAÇIŞ: hücrelerin tamamı Sheet'ten, yani n8n'in YouTube metadata'sından
+      // yazdığı üçüncü taraf metni. Kaçışsız hâli sayfa açılır açılmaz çalışırdı.
       return '<tr>'
-        + '<td class="uc" title="'+url+'">'+(url ? url.slice(0,35)+(url.length>35?'…':'') : '-')+'</td>'
-        + '<td>'+(kaynak ? '<span class="badge bi">'+kaynak+'</span>' : '-')+'</td>'
-        + '<td>'+(pick(r,['video-suresi-sn','sure','duration'])||'-')+'</td>'
-        + '<td>'+(pBekle(r)||'-')+'</td>'
-        + '<td><span class="badge bw2">'+(pDurum(r)||'İşlemde')+'</span></td>'
-        + '<td>'+(tarih.slice(0,16)||'-')+'</td>'
+        + '<td class="uc" title="'+esc0(url)+'">'+(url ? esc0(url.slice(0,35))+(url.length>35?'…':'') : '-')+'</td>'
+        + '<td>'+(kaynak ? '<span class="badge bi">'+esc0(kaynak)+'</span>' : '-')+'</td>'
+        + '<td>'+esc0(pick(r,['video-suresi-sn','sure','duration'])||'-')+'</td>'
+        + '<td>'+esc0(pBekle(r)||'-')+'</td>'
+        + '<td><span class="badge bw2">'+esc0(pDurum(r)||'İşlemde')+'</span></td>'
+        + '<td>'+esc0(tarih.slice(0,16)||'-')+'</td>'
         + '</tr>';
     }).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--mt);padding:16px">Aktif işlem yok</td></tr>';
   }
@@ -3518,15 +3554,17 @@ async function loadSheetPage(page) {
       let dur = pick(r, stK);
       if (!dur) dur = (ig || yt || tt) ? 'Yayınlandı' : 'Bekliyor';
       const durCls = /bekli/i.test(dur) ? 'bw2' : 'bs2';
+      // KAÇIŞ: title/score/hesap adları Sheet'ten geliyor (OpusClip'in ürettiği
+      // başlıklar dahil) — hepsi üçüncü taraf metni.
       return '<tr>'
-        + '<td class="uc" title="'+(r['title']||'')+'">'+(r['title']||'-').slice(0,30)+'</td>'
-        + '<td>'+(r['score']||'-')+'</td>'
+        + '<td class="uc" title="'+esc0(r['title']||'')+'">'+esc0((r['title']||'-').slice(0,30))+'</td>'
+        + '<td>'+esc0(r['score']||'-')+'</td>'
         + '<td>'+fmtSec(durSec(r))+'</td>'
-        + '<td>'+(ig ? '<span class="badge bi">'+ig+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
-        + '<td>'+(yt ? '<span class="badge bi">'+yt+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
-        + '<td>'+(tt ? '<span class="badge bi">'+tt+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
-        + '<td><span class="badge '+durCls+'">'+dur+'</span></td>'
-        + '<td>'+(r['created-at']||r['tarih']||'-').slice(0,10)+'</td>'
+        + '<td>'+(ig ? '<span class="badge bi">'+esc0(ig)+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
+        + '<td>'+(yt ? '<span class="badge bi">'+esc0(yt)+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
+        + '<td>'+(tt ? '<span class="badge bi">'+esc0(tt)+'</span>' : '<span style="color:var(--mt)">-</span>')+'</td>'
+        + '<td><span class="badge '+durCls+'">'+esc0(dur)+'</span></td>'
+        + '<td>'+esc0((r['created-at']||r['tarih']||'-').slice(0,10))+'</td>'
         + '</tr>';
     }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">Short bulunamadı</td></tr>';
   }
@@ -3536,15 +3574,16 @@ async function loadSheetPage(page) {
     if(tb) tb.innerHTML = urls.length ? urls.map(r => {
       const url = pURL(r), durum = pDurum(r), kaynak = pKaynak(r), tarih = pTarih(r);
       const durCls = isProcStr(durum) ? 'bw2' : (isDoneStr(durum) ? 'bs2' : 'bi');
+      // KAÇIŞ: tüm hücreler Sheet kaynaklı üçüncü taraf metni.
       return '<tr>'
-        + '<td class="uc" title="'+url+'">'+(url ? url.slice(0,35)+(url.length>35?'…':'') : '-')+'</td>'
-        + '<td>'+(kaynak ? '<span class="badge bi">'+kaynak+'</span>' : '-')+'</td>'
-        + '<td>'+(pick(r,['video-suresi-sn','sure','duration'])||'-')+'</td>'
-        + '<td>'+(pIzl(r)||'-')+'</td>'
-        + '<td>'+(pShort(r)||'-')+'</td>'
-        + '<td>'+(pBekle(r)||'-')+'</td>'
-        + '<td><span class="badge '+durCls+'">'+(durum||'-')+'</span></td>'
-        + '<td>'+(tarih.slice(0,16)||'-')+'</td>'
+        + '<td class="uc" title="'+esc0(url)+'">'+(url ? esc0(url.slice(0,35))+(url.length>35?'…':'') : '-')+'</td>'
+        + '<td>'+(kaynak ? '<span class="badge bi">'+esc0(kaynak)+'</span>' : '-')+'</td>'
+        + '<td>'+esc0(pick(r,['video-suresi-sn','sure','duration'])||'-')+'</td>'
+        + '<td>'+esc0(pIzl(r)||'-')+'</td>'
+        + '<td>'+esc0(pShort(r)||'-')+'</td>'
+        + '<td>'+esc0(pBekle(r)||'-')+'</td>'
+        + '<td><span class="badge '+durCls+'">'+esc0(durum||'-')+'</span></td>'
+        + '<td>'+esc0(tarih.slice(0,16)||'-')+'</td>'
         + '</tr>';
     }).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--mt);padding:16px">URL bulunamadı</td></tr>';
   }
@@ -3560,12 +3599,13 @@ async function loadSheetPage(page) {
     const tb=document.getElementById('ar-tbody');
     if(tb) tb.innerHTML = arch.length ? arch.map(r => {
       const url = pURL(r), kaynak = pKaynak(r), tarih = pTarih(r);
+      // KAÇIŞ: tüm hücreler Sheet kaynaklı üçüncü taraf metni.
       return '<tr>'
-        + '<td class="uc" title="'+url+'">'+(url ? url.slice(0,35)+(url.length>35?'…':'') : '-')+'</td>'
-        + '<td>'+(kaynak ? '<span class="badge bi">'+kaynak+'</span>' : '-')+'</td>'
-        + '<td>'+(pShort(r)||'-')+'</td>'
-        + '<td>'+(pProje(r)||'-')+'</td>'
-        + '<td>'+(tarih.slice(0,16)||'-')+'</td>'
+        + '<td class="uc" title="'+esc0(url)+'">'+(url ? esc0(url.slice(0,35))+(url.length>35?'…':'') : '-')+'</td>'
+        + '<td>'+(kaynak ? '<span class="badge bi">'+esc0(kaynak)+'</span>' : '-')+'</td>'
+        + '<td>'+esc0(pShort(r)||'-')+'</td>'
+        + '<td>'+esc0(pProje(r)||'-')+'</td>'
+        + '<td>'+esc0(tarih.slice(0,16)||'-')+'</td>'
         + '</tr>';
     }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--mt);padding:16px">Arşiv boş — Filtrele\'ye bas veya "Tamamlandı" durumunda kayıt yok</td></tr>';
   }
@@ -5638,6 +5678,48 @@ const PD_PLAT_KEY = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb', 
 const PD_IKON = { instagram:'📸', youtube:'▶', tiktok:'♪', facebook:'ⓕ', x:'𝕏' };
 function esc0(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// KAÇIŞ STANDARDI — panelin TEK doğru kaçış takımı
+// ───────────────────────────────────────────────────────────────────────────
+// Panele giren metinlerin çoğu ÜÇÜNCÜ TARAFIN yazdığı metindir: YouTube video
+// başlıkları, kanal adları, OpusClip klip başlıkları, Upload-Post hata
+// mesajları, Sheets hücreleri. Bunlar kaçırılmadan innerHTML'e girerse panel
+// origin'inde script çalışır — ve localStorage'da GitHub PAT'i, Upload-Post,
+// Sheets, Twitch anahtarları duruyor. Yani tek bir kaçırılmamış alan = tüm
+// anahtarların çalınması. (Canlı kanıtlandı: Geçmiş listesindeki ham `r.url`
+// üzerinden enjekte edilen onerror gerçekten çalıştı ve hepsini okudu.)
+//
+// Hangi bağlamda hangisi:
+//   metin / nitelik  → esc0(v)          &<>"' hepsini kaçırır
+//   href / src       → guvenliUrl(v)    ŞEMA denetler; javascript: engellenir
+//   inline onclick   → jsStr(v)         JS string literali için \xNN kaçışı
+//
+// DİKKAT — esc0 inline JS için YETMEZ: HTML çözümleyici nitelik içindeki
+// &#39;'ı JS ayrıştırmasından ÖNCE ' yapar, yani string kırılır. Bu yüzden
+// onclick="f('...')" içine jsStr() gider; jsStr backslash-\xNN üretir ve bu
+// bir HTML varlığı olmadığı için çözümleyici ona dokunmaz.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// href/src için şema beyaz listesi. javascript: ve data: URL'leri elenir —
+// bunlar kaçış fonksiyonlarından sağ çıkar (hiç özel karakter içermezler).
+function guvenliUrl(u){
+  const s = String(u ?? '').trim();
+  if (!s) return '';
+  // Başta görünmez karakter/boşluk sıkıştırıp "java\tscript:" gibi kaçamaklar
+  // deneniyor olabilir; şemayı ayıklarken bunları temizliyoruz.
+  const sade = s.replace(/[\x00-\x20]/g, '').toLowerCase();
+  if (/^(https?:|mailto:|blob:)/.test(sade)) return esc0(s);
+  if (/^[a-z][a-z0-9+.\-]*:/.test(sade)) return '';   // bilinmeyen şema → at
+  return esc0(s);                                     // şemasız (göreli) yol
+}
+
+// Inline onclick/onmouseenter içindeki tek tırnaklı JS string'i için.
+// HTML varlığı üretmez — çözümleyici geri çeviremez, string kırılamaz.
+function jsStr(s){
+  return String(s ?? '').replace(/[\\'"<>&\r\n\u2028\u2029]/g,
+    c => '\\x' + c.charCodeAt(0).toString(16).padStart(2,'0'));
+}
+
 // Profilin GERÇEKTEN bağlı platformları — olmayan platformu hedef olarak
 // önermenin anlamı yok, gönderim zaten reddedilirdi.
 function pdBagliPlatformlar(profil){
@@ -7707,7 +7789,7 @@ async function upFetch(path, opts) {
   if (opts.method && opts.method !== 'GET') throw new Error('Yazma işlemi için Upload-Post API Key gerekli (Ayarlar)');
   const base = getN8N();
   if (base) {
-    const r = await fetch(base + '/webhook/uploadpost-proxy?path=' + encodeURIComponent(path));
+    const r = await fetch(base + '/webhook/uploadpost-proxy?path=' + encodeURIComponent(path), {headers:n8nBaslik()});
     if (r.ok) return { data: await r.json(), src: 'n8n proxy' };
     const e = new Error('Proxy hatası: HTTP ' + r.status); e.status = r.status; throw e;
   }
@@ -7947,8 +8029,17 @@ function saveSettings() {
       document.getElementById('cfg-n8n').value = n8nUrl;
     }
   }
+  // Webhook anahtarı düz metin HTTP üzerinden gitmemeli — girildiyse https zorunlu.
+  const whKey = (document.getElementById('cfg-n8n-key')||{}).value||'';
+  if (whKey.trim() && n8nUrl && !/^https:\/\//i.test(n8nUrl)) {
+    alert('n8n adresi https:// ile başlamalı.\n\nWebhook anahtarı girdin; http:// üzerinden '
+        + 'gönderilirse anahtar ağda düz metin olarak görünür.\n\nMevcut adres: ' + n8nUrl);
+    return;
+  }
   S.cfg={
     n8n:   n8nUrl,
+    n8nKey:   whKey,
+    n8nKeyAd: (document.getElementById('cfg-n8n-key-ad')||{}).value||'',
     shkey: (document.getElementById('cfg-shkey')||{}).value||'',
     sheet: (document.getElementById('cfg-sheet')||{}).value||'',
     sheet2:(document.getElementById('cfg-sheet2')||{}).value||'',
@@ -8005,6 +8096,7 @@ function loadSettings() {
   const c=S.cfg;
   const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
   set('cfg-n8n',c.n8n); set('cfg-shkey',c.shkey); set('cfg-sheet',c.sheet);
+  set('cfg-n8n-key',c.n8nKey); set('cfg-n8n-key-ad',c.n8nKeyAd);
   set('cfg-sheet2',c.sheet2); set('cfg-blot',c.blot); set('cfg-opus',c.opus); set('cfg-cobalt',c.cobalt);
   set('cfg-opus2',c.opus2); set('cfg-opus-ad',c.opusAd); set('cfg-opus2-ad',c.opus2Ad);
   set('cfg-batchmax',c.batchMax||'15'); set('cfg-batchdelay',c.batchDelay||'8');
@@ -8268,13 +8360,16 @@ function renderYTKChannels() {
     const active = YTK.channelInfo && YTK.channelInfo.channelId === c.id;
     const thumb = c.snippet.thumbnails?.default?.url || '';
     const handle = c.snippet.customUrl || '';
-    return `<div class="ytk-channel-row" data-cid="${c.id}" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;align-items:center;background:${active?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${active?'var(--acc)':'transparent'};transition:all .15s">
-      ${thumb?`<img src="${thumb}" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">`:''}
+    // KAÇIŞ: kanal adı, handle ve avatar YouTube Data API'den — kanal sahibinin
+    // yazdığı metin. (Bu satırlar event delegation kullanıyor, yani inline JS
+    // yok; yalnız nitelik ve metin bağlamı kaçırılıyor.)
+    return `<div class="ytk-channel-row" data-cid="${esc0(c.id)}" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;align-items:center;background:${active?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${active?'var(--acc)':'transparent'};transition:all .15s">
+      ${thumb?`<img src="${guvenliUrl(thumb)}" style="width:36px;height:36px;border-radius:50%;flex-shrink:0">`:''}
       <div style="min-width:0;flex:1">
-        <div style="font-size:13px;font-weight:700;color:${active?'var(--acc)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.snippet.title} <span style="color:var(--mt);font-weight:400">${handle}</span></div>
+        <div style="font-size:13px;font-weight:700;color:${active?'var(--acc)':'#fff'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc0(c.snippet.title)} <span style="color:var(--mt);font-weight:400">${esc0(handle)}</span></div>
         <div style="font-size:11px;color:var(--mt);margin-top:2px">👥 ${ytkFmt(st.subscriberCount)} abone &nbsp;👁 ${ytkFmt(st.viewCount)} izlenme &nbsp;🎬 ${ytkFmt(st.videoCount)} video</div>
       </div>
-      <button class="btn bs bsm ytk-fetch-btn" data-cid="${c.id}" style="flex-shrink:0;font-size:12px;padding:5px 8px">▶ Videoları Getir</button>
+      <button class="btn bs bsm ytk-fetch-btn" data-cid="${esc0(c.id)}" style="flex-shrink:0;font-size:12px;padding:5px 8px">▶ Videoları Getir</button>
     </div>`;
   }).join('');
   // Event delegation: satıra tıklanınca kanalı seç, "Videoları Getir" butonuna tıklanınca modal aç + fetch
@@ -8368,9 +8463,9 @@ function renderYTKHistory() {
   el.innerHTML = YTK.history.map((h, i) => {
     const timeAgo = ytkTimeAgo(h.lastAt);
     return `<div class="ytk-hist-item" data-idx="${i}" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;align-items:center;transition:background .15s" title="Tıkla → videoları modal olarak aç">
-      ${h.thumb?`<img src="${h.thumb}" style="width:32px;height:32px;border-radius:50%;flex-shrink:0" onerror="this.remove()">`:''}
+      ${h.thumb?`<img src="${guvenliUrl(h.thumb)}" style="width:32px;height:32px;border-radius:50%;flex-shrink:0" onerror="this.remove()">`:''}
       <div style="min-width:0;flex:1">
-        <div style="font-size:13px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.title}${h.handle?' <span style="color:var(--mt);font-weight:400">'+h.handle+'</span>':''}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc0(h.title)}${h.handle?' <span style="color:var(--mt);font-weight:400">'+esc0(h.handle)+'</span>':''}</div>
         <div style="font-size:11px;color:var(--mt);margin-top:2px">👥 ${ytkFmt(h.subscriberCount)} · 🎬 ${ytkFmt(h.videoCount)} · ${timeAgo}</div>
       </div>
       <button class="btn bg bsm ytk-hist-remove" data-idx="${i}" title="Geçmişten sil" style="flex-shrink:0;padding:2px 6px;font-size:12px">✕</button>
@@ -8455,7 +8550,7 @@ function ytvOpenModal(vid) {
   if (body) {
     body.innerHTML = `
       <div style="position:relative;width:100%;padding-bottom:56.25%;background:#000;border-radius:4px;overflow:hidden;margin-bottom:14px">
-        <iframe src="https://www.youtube.com/embed/${v.id}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
+        <iframe src="https://www.youtube.com/embed/${encodeURIComponent(v.id)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen
                 style="position:absolute;inset:0;width:100%;height:100%;border:0"></iframe>
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px">
@@ -8560,15 +8655,15 @@ function renderYTKVideos() {
     const thumb = v.snippet.thumbnails?.medium?.url || v.snippet.thumbnails?.default?.url || '';
     const durS = ytkParseDur(v.contentDetails.duration);
     const pubDate = (v.snippet.publishedAt||'').slice(0,10);
-    return `<div onclick="ytvOpenModal('${v.id}')" style="display:flex;gap:10px;padding:10px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s;align-items:center">
-      <input type="checkbox" style="flex-shrink:0;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();ytkToggle('${v.id}');renderYTKVideos()">
+    return `<div onclick="ytvOpenModal('${jsStr(v.id)}')" style="display:flex;gap:10px;padding:10px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s;align-items:center">
+      <input type="checkbox" style="flex-shrink:0;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();ytkToggle('${jsStr(v.id)}');renderYTKVideos()">
       <div style="position:relative;flex-shrink:0">
-        ${thumb?`<img src="${thumb}" style="width:120px;height:72px;object-fit:cover;border-radius:4px">` : '<div style="width:120px;height:72px;background:var(--brd);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
+        ${thumb?`<img src="${guvenliUrl(thumb)}" style="width:120px;height:72px;object-fit:cover;border-radius:4px">` : '<div style="width:120px;height:72px;background:var(--brd);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
         <span style="position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.85);color:var(--tx);font-size:12px;padding:2px 5px;border-radius:2px">${ytkDurFmt(durS)}</span>
       </div>
       <div style="min-width:0;flex:1">
-        <div style="font-size:14px;font-weight:700;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.snippet.title}</div>
-        <div style="font-size:12px;color:var(--mt);margin-top:4px">👁 ${ytkFmt(st.viewCount)} &nbsp;👍 ${st.likeCount!=null?ytkFmt(st.likeCount):'–'} &nbsp;💬 ${st.commentCount!=null?ytkFmt(st.commentCount):'–'} &nbsp;📅 ${pubDate}</div>
+        <div style="font-size:14px;font-weight:700;color:${sel?'var(--acc)':'#fff'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc0(v.snippet.title)}</div>
+        <div style="font-size:12px;color:var(--mt);margin-top:4px">👁 ${ytkFmt(st.viewCount)} &nbsp;👍 ${st.likeCount!=null?ytkFmt(st.likeCount):'–'} &nbsp;💬 ${st.commentCount!=null?ytkFmt(st.commentCount):'–'} &nbsp;📅 ${esc0(pubDate)}</div>
       </div>
       <span style="flex-shrink:0;color:var(--acc);font-size:12px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px">Detay ▶</span>
     </div>`;
@@ -8716,7 +8811,7 @@ async function kickFetch(path){
   const base=getN8N();
   if(base){
     try{
-      const r=await fetch(base+'/webhook/kick-proxy?path='+encodeURIComponent(path));
+      const r=await fetch(base+'/webhook/kick-proxy?path='+encodeURIComponent(path),{headers:n8nBaslik()});
       if(r.ok) return await r.json();
     }catch(e){ /* doğrudan dene */ }
   }
@@ -9080,26 +9175,26 @@ function trRenderPending() {
     const ktLbl = (getCats()[kt.kategori]||{}).label || kt.kategori;
     const ktSel = ktGuven>=40 ? kt.kategori : 'genel';
     const ktHint = ktGuven>=40
-      ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--acc3)" title="${(kt.neden||'').replace(/"/g,'&quot;')} · güven %${ktGuven}">🏷 Önerilen: <b>${ktLbl}</b> <span style="color:var(--mt)">%${ktGuven} · seçili</span></div>`
+      ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--acc3)" title="${esc0(kt.neden||'')} · güven %${ktGuven}">🏷 Önerilen: <b>${esc0(ktLbl)}</b> <span style="color:var(--mt)">%${ktGuven} · seçili</span></div>`
       : (ktGuven>0
-        ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--wn)" title="Zayıf sinyal — kontrol edip seç">🤔 belki <b>${ktLbl}</b> — emin değilim, kontrol et</div>`
+        ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--wn)" title="Zayıf sinyal — kontrol edip seç">🤔 belki <b>${esc0(ktLbl)}</b> — emin değilim, kontrol et</div>`
         : `<div style="font-size:10.5px;margin-bottom:5px;color:var(--mt)">kategori sinyali yok — elle seç</div>`);
     let pub = '';
     if (v.publishedAt) { const d = new Date(v.publishedAt); if (!isNaN(d)) pub = d.toLocaleDateString('tr',{day:'2-digit',month:'short',year:'numeric'}); }
-    return `<div class="card${already?' rd-done':''}" data-trvid="${vid}" style="padding:0;overflow:hidden${already?';border-color:rgba(52,211,153,.55)':''}">
+    return `<div class="card${already?' rd-done':''}" data-trvid="${esc0(vid)}" style="padding:0;overflow:hidden${already?';border-color:rgba(52,211,153,.55)':''}">
       <div class="opc-thumb" style="border-radius:8px 8px 0 0">
-        <img src="${v.thumbnail}" style="width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${v.thumbnail}','${(v.title||'').replace(/'/g,'’').replace(/"/g,'&quot;')}')" onmouseleave="hidePrev()">
+        <img src="${guvenliUrl(v.thumbnail)}" style="width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${jsStr(v.thumbnail)}','${jsStr(v.title||'')}')" onmouseleave="hidePrev()">
         <span class="opc-dur">${trDur(v.durationSec)}</span>
         ${deltaBadge}
-        <label onclick="event.stopPropagation()" title="Toplu işlem için seç — Shift+tık ile aralık seçilir" style="position:absolute;top:6px;right:6px;z-index:5;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;cursor:pointer;display:flex"><input type="checkbox" class="tr-selbox" ${selChk?'checked':''} onclick="trSecTikla(event,'${vid}')" style="width:16px;height:16px;margin:0;accent-color:var(--acc);cursor:pointer"></label>
+        <label onclick="event.stopPropagation()" title="Toplu işlem için seç — Shift+tık ile aralık seçilir" style="position:absolute;top:6px;right:6px;z-index:5;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;cursor:pointer;display:flex"><input type="checkbox" class="tr-selbox" ${selChk?'checked':''} onclick="trSecTikla(event,'${jsStr(vid)}')" style="width:16px;height:16px;margin:0;accent-color:var(--acc);cursor:pointer"></label>
         ${already?rdDoneTik(already):''}
       </div>
       <div style="padding:10px 12px">
-        <div style="font-size:14px;font-weight:600;color:var(--tx);line-height:1.3;min-height:28px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${v.title||vid}</div>
-        ${channel ? `<div style="font-size:11px;color:var(--tx);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${channel.replace(/"/g,'&quot;')}">📺 ${channel}</div>` : ''}
+        <div style="font-size:14px;font-weight:600;color:var(--tx);line-height:1.3;min-height:28px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc0(v.title||vid)}</div>
+        ${channel ? `<div style="font-size:11px;color:var(--tx);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc0(channel)}">📺 ${esc0(channel)}</div>` : ''}
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--mt);margin:5px 0 8px">
-          <span>👁 ${views}${pub?` · 📅 ${pub}`:''}</span>
-          <a href="${v.youtubeLink}" target="_blank" rel="noopener" style="color:var(--acc)">YouTube ↗</a>
+          <span>👁 ${esc0(views)}${pub?` · 📅 ${esc0(pub)}`:''}</span>
+          <a href="${guvenliUrl(v.youtubeLink)}" target="_blank" rel="noopener" style="color:var(--acc)">YouTube ↗</a>
         </div>
         ${already?rdDoneLbl(already):''}
         ${ktHint}
@@ -9109,8 +9204,8 @@ function trRenderPending() {
         </div>
         <input class="tr-desc" type="text" placeholder="Açıklama / not (isteğe bağlı)" style="width:100%;font-size:12px;margin-bottom:8px"/>
         <div class="tr-actions" style="display:flex;gap:6px">
-          <button class="btn bp bsm" style="flex:1" onclick="trApprove('${vid}')">✓ Onayla ve Gönder</button>
-          <button class="btn bg bsm" onclick="trReject('${vid}')">✗ Reddet</button>
+          <button class="btn bp bsm" style="flex:1" onclick="trApprove('${jsStr(vid)}')">✓ Onayla ve Gönder</button>
+          <button class="btn bg bsm" onclick="trReject('${jsStr(vid)}')">✗ Reddet</button>
         </div>
       </div>
     </div>`;
@@ -11091,10 +11186,14 @@ function renderTakAy() {
       const status = pickK(r, ['platform-status','durum','status','Durum']);
       const kat = pickK(r, ['kategori','category','Kategori']) || 'genel';
       const gi = TAK.items.indexOf(item);
-      const dataAttrs = `data-plat="${item.plat}" data-time="${item.time||''}" data-title="${(rawTitle||'').replace(/"/g,'&quot;')}" data-desc="${desc.replace(/"/g,'&quot;')}" data-status="${status}" data-thumb="${thumbUrl}" data-kat="${kat}"`;
+      // KAÇIŞ: status/thumb/kat Upload-Post history'den geliyor (`Hata: `+error_message
+      // dahil), title/desc Sheet'ten. Önceden yalnız `"` değiştiriliyordu; status,
+      // thumb ve kat hiç kaçırılmıyordu — nitelikten çıkıp kardeş element
+      // enjekte edilebiliyordu. esc0 beşini birden kapatır.
+      const dataAttrs = `data-plat="${esc0(item.plat)}" data-time="${esc0(item.time||'')}" data-title="${esc0(rawTitle||'')}" data-desc="${esc0(desc)}" data-status="${esc0(status)}" data-thumb="${esc0(thumbUrl)}" data-kat="${esc0(kat)}"`;
       inner += `<div ${dataAttrs} onclick="event.stopPropagation();takOpenPost(${gi})" onmouseenter="showTakTip(event,this)" onmouseleave="hideTakTip()" style="background:${col}1c;border-left:2px solid ${col};border-radius:3px;padding:2px 5px;margin-bottom:2px;cursor:pointer;font-size:11px;line-height:1.35;overflow:hidden">
-        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)"><span style="color:${col};opacity:.85">${t}</span> ${pIcon} ${title}</div>
-        ${item.profile?`<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;color:var(--mt)">${item.profile}</div>`:''}
+        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)"><span style="color:${col};opacity:.85">${esc0(t)}</span> ${pIcon} ${esc0(title)}</div>
+        ${item.profile?`<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;color:var(--mt)">${esc0(item.profile)}</div>`:''}
       </div>`;
     });
     if (extra > 0) {
@@ -11498,17 +11597,25 @@ function showTakTip(e, el) {
   document.getElementById('ttt-desc').textContent  = desc || '(açıklama yok)';
 
   const thumbEl = document.getElementById('ttt-thumb');
-  if (thumb) {
-    thumbEl.innerHTML = `<img src="${thumb}" style="width:100%;border-radius:4px;max-height:80px;object-fit:cover" onerror="this.style.display='none'">`;
-  } else {
-    thumbEl.innerHTML = '';
+  // İKİNCİ SIÇRAMA: değerler data-* niteliklerinden geliyor ve HTML çözümleyici
+  // oradaki varlıkları OKURKEN zaten çözüyor. Yani `&quot;` yazarak kaydedilen
+  // bir yük burada gerçek tırnağa dönüşüp innerHTML'i kırabiliyordu — dataAttrs
+  // kaçırılsa bile. Çözüm: HTML ayrıştırmasını tamamen atlayıp DOM API kullanmak.
+  thumbEl.textContent = '';
+  if (thumb && guvenliUrl(thumb)) {          // guvenliUrl burada ŞEMA denetçisi
+    const im = document.createElement('img');
+    im.src = thumb;                          // property ataması — ayrıştırma yok
+    im.style.cssText = 'width:100%;border-radius:4px;max-height:80px;object-fit:cover';
+    im.onerror = function(){ this.style.display = 'none'; };
+    thumbEl.appendChild(im);
   }
 
   const badgeEl = document.getElementById('ttt-badges');
   const col = PLAT_COLOR[plat] || 'var(--acc)';
-  badgeEl.innerHTML = `<span class="badge" style="background:${col}22;color:${col}">${PLAT_LABEL[plat]||plat}</span>` +
-    (status ? `<span class="badge bw2">${status}</span>` : '') +
-    (kat ? `<span class="badge bi">${kat}</span>` : '');
+  // status ve kat da dataset'ten — aynı ikinci sıçrama yüzeyi.
+  badgeEl.innerHTML = `<span class="badge" style="background:${col}22;color:${col}">${esc0(PLAT_LABEL[plat]||plat)}</span>` +
+    (status ? `<span class="badge bw2">${esc0(status)}</span>` : '') +
+    (kat ? `<span class="badge bi">${esc0(kat)}</span>` : '');
 
   const timeEl = document.getElementById('ttt-time');
   if (time) {
@@ -12133,7 +12240,7 @@ function svcSet(id, cls, title){ const d=document.getElementById(id); if(d){ d.c
 async function svcCheck() {
   const base=getN8N();
   if(!base) svcSet('svc-n8n','warn','n8n URL girilmemiş (Ayarlar)');
-  else { try { const r=await fetch(base+'/webhook/kworb-bekleyenler',{method:'GET',mode:'cors'}); if(!r.ok){ svcSet('svc-n8n','err','n8n HTTP '+r.status+' — workflow Active mi?'); } else { const t=(await r.text()).trim(); svcSet('svc-n8n', t?'ok':'warn', t?'n8n bağlı ✓':'n8n boş yanıt — akış Respond aşamasına ulaşmıyor (n8n Executions listesini kontrol et)'); } } catch(e){ svcSet('svc-n8n','err','n8n erişilemiyor / CORS — workflow Active mi?'); } }
+  else { try { const r=await fetch(base+'/webhook/kworb-bekleyenler',{method:'GET',mode:'cors',headers:n8nBaslik()}); if(!r.ok){ svcSet('svc-n8n','err','n8n HTTP '+(r.status===401||r.status===403?r.status+' — webhook anahtarı yanlış ya da eksik (Ayarlar → n8n Bağlantısı)':r.status+' — workflow Active mi?')); } else { const t=(await r.text()).trim(); svcSet('svc-n8n', t?'ok':'warn', t?'n8n bağlı ✓':'n8n boş yanıt — akış Respond aşamasına ulaşmıyor (n8n Executions listesini kontrol et)'); } } catch(e){ svcSet('svc-n8n','err','n8n erişilemiyor / CORS — workflow Active mi?'); } }
   if(!S.cfg.blot) svcSet('svc-up','warn','Upload-Post API Key yok');
   else { try { const r=await fetch('https://api.upload-post.com/api/uploadposts/users',{headers:{'Authorization':'Apikey '+S.cfg.blot}}); svcSet('svc-up',r.ok?'ok':'err',r.ok?'Upload-Post ✓':'Upload-Post HTTP '+r.status); } catch(e){ svcSet('svc-up','err','Upload-Post erişilemiyor'); } }
   if(!S.cfg.opus) svcSet('svc-opc','warn','OpusClip API Key yok');
@@ -12167,8 +12274,8 @@ function renderGecmis() {
   if(!rows.length){ list.innerHTML=''; if(empty) empty.style.display='block'; return; }
   if(empty) empty.style.display='none';
   list.innerHTML=rows.slice(0,300).map(r=>`<div class="card" style="padding:8px 12px;display:flex;align-items:center;gap:10px">
-    <div style="flex:1;min-width:0"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${r.url}" target="_blank" rel="noopener" style="color:var(--acc)">${r.url}</a></div><div style="font-size:11px;color:var(--mt);margin-top:2px">${r.kategori||''} · ${r.t||''}</div></div>
-    <button class="btn bg bsm" onclick="gcResend('${encodeURIComponent(r.url)}','${(r.kategori||'genel').split(/[, ]+/)[0]}')">↻ Tekrar</button>
+    <div style="flex:1;min-width:0"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${guvenliUrl(r.url)}" target="_blank" rel="noopener" style="color:var(--acc)">${esc0(r.url)}</a></div><div style="font-size:11px;color:var(--mt);margin-top:2px">${esc0(r.kategori||'')} · ${esc0(r.t||'')}</div></div>
+    <button class="btn bg bsm" onclick="gcResend('${encodeURIComponent(r.url)}','${jsStr((r.kategori||'genel').split(/[, ]+/)[0])}')">↻ Tekrar</button>
   </div>`).join('');
 }
 async function gcResend(encUrl, kat) {
