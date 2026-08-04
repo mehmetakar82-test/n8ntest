@@ -2362,7 +2362,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-16';
+const PANEL_YAPI = 'y2026.08.04-17';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
@@ -12338,7 +12338,11 @@ async function ydFetchItems(){
   items.forEach(it => {
     if (it.status === 'failed'){
       const src = ydFindSource(it.title, it.thumb, it.profile, it.caption);
-      if (src){ it._video = src.video; it._caption = src.caption || it.caption; }
+      // clipId DE saklanmalı: OpusClip export linkleri süreli, eski
+      // short'larda "Video URL is not accessible" ile reddediliyor. Panelin
+      // beş ekranı bu durumda clip-id'den taze link alıyor; Yayın Durumu
+      // alamıyordu çünkü kimliği burada atıyordu.
+      if (src){ it._video = src.video; it._caption = src.caption || it.caption; it._clipId = src.clipId || ''; }
     }
   });
   items.sort((a,b)=>{ const ta=Date.parse(a.time)||0, tb=Date.parse(b.time)||0; return tb-ta; });
@@ -12770,13 +12774,13 @@ async function ydRetry(idx){
   // düğmesi ona gitmeye devam ediyordu — asıl kusur buydu.
   // 1) Kaynak elde varsa doğrudan kuyruğa
   if (it._video){
-    await ydDoRetry({ profil: it.profile, platform: ydPlatApi(it.plat), video: it._video, title: it.title, description: it._caption||it.caption }, idx);
+    await ydDoRetry({ profil: it.profile, platform: ydPlatApi(it.plat), video: it._video, title: it.title, description: it._caption||it.caption, clipId: it._clipId||'' }, idx);
   } else {
     // 2) Kaynağı Sheet'ten / OpusClip'ten çözmeyi dene
     await ydEnsureShorts();
     const late = ydFindSource(it.title, it.thumb, it.profile, it.caption);
     if (late && late.video){
-      it._video = late.video; it._caption = late.caption || it.caption;
+      it._video = late.video; it._caption = late.caption || it.caption; it._clipId = late.clipId || '';
       return ydRetry(idx);
     }
     // 3) Kaynak yok. Native retry tek seçenek ama kuyruğa yazmıyor —
@@ -12903,21 +12907,38 @@ async function ydTopluGonder(it){
     return { ok:false, sebep:'cift', mesaj:'Çift önlendi — bu short bu hesapta zaten yayınlanmış ya da kuyrukta' };
   try {
     if (S.cfg.blot){
-      const fd = new FormData();
-      fd.append('user', profil);
-      fd.append('platform[]', platform);
-      fd.append('video', video);
-      if (it.title)  fd.append('title', String(it.title).slice(0,95));
       const aciklama = it._caption || it.caption || '';
-      if (aciklama)  fd.append('description', aciklama);
-      fd.append('async_upload','true');
-      fd.append('add_to_queue','true');          // ← doğal akış: sıradaki boş yuva
-      fd.append('selfDeclaredMadeForKids','false');
-      if (platform === 'youtube'){
-        fd.append('categoryId', ytKategoriId(profilKategori(profil)));
-        ytEtiketler(aciklama || it.title, profilKategori(profil)).forEach(t => fd.append('tags[]', t));
+      const kur = (v) => {
+        const fd = new FormData();
+        fd.append('user', profil);
+        fd.append('platform[]', platform);
+        fd.append('video', v);
+        if (it.title)  fd.append('title', String(it.title).slice(0,95));
+        if (aciklama)  fd.append('description', aciklama);
+        fd.append('async_upload','true');
+        fd.append('add_to_queue','true');          // ← doğal akış: sıradaki boş yuva
+        fd.append('selfDeclaredMadeForKids','false');
+        if (platform === 'youtube'){
+          fd.append('categoryId', ytKategoriId(profilKategori(profil)));
+          ytEtiketler(aciklama || it.title, profilKategori(profil)).forEach(t => fd.append('tags[]', t));
+        }
+        return fd;
+      };
+      let u = await upYukle(kur(video));            // 429'da bekleyip yeniden dener
+      // Ölü OpusClip linki → clip-id'den taze link alıp BİR KEZ yeniden dene.
+      // _tazeDenendi bayrağı ORTAK: hrkTekGonder ve kapsamaHataGonder kendi
+      // tazelemelerini bu bayrakla koruyor, böylece aynı klip iki kez
+      // sorgulanmıyor — tazeleme artık en içteki katmanda yapılıyor.
+      const kimlik = it._clipId || it.clipId || '';
+      if (!u.ok && khErisimHatasi(u) && kimlik && !it._tazeDenendi){
+        it._tazeDenendi = true;
+        try {
+          const harita = await pdTazeLinkler([kimlik]);
+          const yeni = harita.get(String(kimlik));
+          if (yeni){ it._video = yeni; u = await upYukle(kur(yeni)); }
+          else u = { ok:false, mesaj:'Kaynak mp4 indirilemiyor ve klip OpusClip\'te de bulunamadı' };
+        } catch(e){ u = { ok:false, mesaj:'Taze link alınamadı: '+(e.message||'bilinmeyen') }; }
       }
-      const u = await upYukle(fd);                 // 429'da bekleyip yeniden dener
       if (u.ok){ ckEkle(profil, platform, it.title); return { ok:true }; }
       return { ok:false, sebep:'api', mesaj: u.mesaj };
     }
@@ -12954,7 +12975,7 @@ async function ydTopluKuyruk(){
   hedef.forEach(it => {
     if (it._video) return;
     const s = ydFindSource(it.title, it.thumb, it.profile, it.caption);
-    if (s && s.video){ it._video = s.video; it._caption = s.caption || it.caption; }
+    if (s && s.video){ it._video = s.video; it._caption = s.caption || it.caption; it._clipId = s.clipId || ''; }
   });
   const gonderilebilir = hedef.filter(i => i._video);
   const kaynaksiz = hedef.length - gonderilebilir.length;
@@ -13006,27 +13027,48 @@ async function ydDoRetry(payload, idx){
   try {
     let ok=false, msg='';
     if (S.cfg.blot){
-      const fd = new FormData();
-      fd.append('user', payload.profil);
-      fd.append('platform[]', payload.platform);
-      fd.append('video', payload.video);
-      if (payload.title)       fd.append('title', String(payload.title).slice(0,95));
-      if (payload.description)  fd.append('description', payload.description);
-      fd.append('async_upload','true');
-      fd.append('add_to_queue','true');
-      // COPPA beyanını AÇIKÇA gönder. Gönderilmediğinde YouTube Studio'da
-      // "Is this video made for kids?" CEVAPSIZ kalıyor ve YouTube cevapsız
-      // videoyu önermiyor. false = "No, it's not made for kids".
-      fd.append('selfDeclaredMadeForKids','false');
-      // Yeniden gönderim de n8n hattıyla AYNI kategori ve etiketleri almalı,
-      // yoksa retry'lanan video kategorisiz (varsayılan 22) ve etiketsiz kalır.
-      // Burada FormData olduğu için tekrarlanan tags[] serbestçe eklenebiliyor.
-      if (payload.platform === 'youtube') {
-        fd.append('categoryId', ytKategoriId(profilKategori(payload.profil)));
-        ytEtiketler(payload.description || payload.title, profilKategori(payload.profil))
-          .forEach(t => fd.append('tags[]', t));
+      const kur = (video) => {
+        const fd = new FormData();
+        fd.append('user', payload.profil);
+        fd.append('platform[]', payload.platform);
+        fd.append('video', video);
+        if (payload.title)       fd.append('title', String(payload.title).slice(0,95));
+        if (payload.description)  fd.append('description', payload.description);
+        fd.append('async_upload','true');
+        fd.append('add_to_queue','true');
+        // COPPA beyanını AÇIKÇA gönder. Gönderilmediğinde YouTube Studio'da
+        // "Is this video made for kids?" CEVAPSIZ kalıyor ve YouTube cevapsız
+        // videoyu önermiyor. false = "No, it's not made for kids".
+        fd.append('selfDeclaredMadeForKids','false');
+        // Yeniden gönderim de n8n hattıyla AYNI kategori ve etiketleri almalı,
+        // yoksa retry'lanan video kategorisiz (varsayılan 22) ve etiketsiz kalır.
+        // Burada FormData olduğu için tekrarlanan tags[] serbestçe eklenebiliyor.
+        if (payload.platform === 'youtube') {
+          fd.append('categoryId', ytKategoriId(profilKategori(payload.profil)));
+          ytEtiketler(payload.description || payload.title, profilKategori(payload.profil))
+            .forEach(t => fd.append('tags[]', t));
+        }
+        return fd;
+      };
+      let u = await upYukle(kur(payload.video));   // 429'da bekleyip yeniden dener
+      // ÖLÜ KAYNAK KURTARMASI: OpusClip export linkleri süreli, eski
+      // short'larda "Video URL is not accessible" ile reddediliyor. Panelin
+      // diğer beş gönderim yolu bu durumda clip-id'den taze link alıp BİR KEZ
+      // yeniden deniyordu; Yayın Durumu'nun yeniden gönderimi bu adımdan
+      // yoksundu — kullanıcı doğrudan hata görüyordu.
+      if (!u.ok && khErisimHatasi(u) && payload.clipId){
+        toast('⟳ Kaynak linki ölmüş — OpusClip\'ten taze link alınıyor…','info',5000);
+        try {
+          const harita = await pdTazeLinkler([payload.clipId]);
+          const yeni = harita.get(String(payload.clipId));
+          if (yeni){
+            const it0 = YD.items[idx]; if (it0) it0._video = yeni;   // sonraki denemeler taze linki kullansın
+            u = await upYukle(kur(yeni));
+          } else {
+            u = { ok:false, mesaj:'Kaynak mp4 indirilemiyor ve klip OpusClip\'te de bulunamadı — video kalıcı olarak kayıp olabilir' };
+          }
+        } catch(e){ u = { ok:false, mesaj:'Taze link alınamadı: '+(e.message||'bilinmeyen') }; }
       }
-      const u = await upYukle(fd);                 // 429'da bekleyip yeniden dener
       ok = u.ok; msg = u.mesaj;
     } else {
       const base = getN8N();
