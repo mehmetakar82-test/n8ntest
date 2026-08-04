@@ -675,7 +675,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <!-- TEK denetim çubuğu: her kartın kendi Yenile'si yerine tek yerden.
        Kartların kendi düğmeleri de duruyor ama artık zorunlu değil. -->
   <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
-    <button class="btn bp bsm" onclick="dashTumunuYenile()" title="Aksiyon Merkezi + Üretim Nabzı + Profil dağılımını birlikte tazeler">↻ Tümünü Yenile</button>
+    <button class="btn bp bsm" onclick="dashTumunuYenile()" title="Aksiyon Merkezi + Üretim Nabzı + Kuyruk Derinliği'ni birlikte tazeler">↻ Tümünü Yenile</button>
     <span id="dash-last" style="font-size:12px;color:var(--mt)"></span>
   </div>
 
@@ -1650,12 +1650,12 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div id="rd-res" class="res"></div>
 
   <div class="card">
-    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— müzik ve 5 dk altı hariç</span></span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— müzik ve 15 dk altı hariç</span></span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-trend" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card" style="border-color:rgba(52,211,153,.3)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
-      <span style="color:var(--ok)">🇹🇷 Haftanın En Çok İzlenenleri <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— son 7 gün, Türkiye</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Son &lt;b&gt;7 günde yayınlanmış&lt;/b&gt;, Türkiye'de en çok izlenen videolar.&lt;br&gt;&lt;br&gt;Filtreler: Türkçe içerik, &lt;b&gt;4–60 dk&lt;/b&gt; süre, &lt;b&gt;100K+ abone&lt;/b&gt;.&lt;br&gt;&lt;br&gt;Sonuç gün boyu saklanır — ↻ ile yeniden taranır (~800 API birimi).">ⓘ</button></span>
+      <span style="color:var(--ok)">🇹🇷 Haftanın En Çok İzlenenleri <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— son 7 gün, Türkiye</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Son &lt;b&gt;7 günde yayınlanmış&lt;/b&gt;, Türkiye'de en çok izlenen videolar.&lt;br&gt;&lt;br&gt;Filtreler: Türkçe içerik, &lt;b&gt;15–60 dk&lt;/b&gt; süre, &lt;b&gt;100K+ abone&lt;/b&gt;.&lt;br&gt;&lt;br&gt;Sonuç gün boyu saklanır — ↻ ile yeniden taranır (~800 API birimi).">ⓘ</button></span>
       <span style="display:flex;gap:8px;align-items:center">
         <span id="rd-hafta-status" style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt);font-size:11px"></span>
         <span id="rd-hafta-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span>
@@ -1666,7 +1666,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   </div>
   <div class="card" style="border-color:rgba(251,191,36,.3)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
-      <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için günün <b>en iyi 5</b>'i</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Her kategori için günün &lt;b&gt;en iyi 5&lt;/b&gt; videosu.&lt;br&gt;&lt;br&gt;&lt;b&gt;Nasıl:&lt;/b&gt; kategori başına 2 sorgu × 2 süre bandı (son 14 gün), dil filtresi, &lt;b&gt;4–60 dk&lt;/b&gt; ve &lt;b&gt;100K+ abone&lt;/b&gt; şartı, outlier'a göre sıralama. Genel kategorisi için TR ve EN ayrı taranır.&lt;br&gt;&lt;br&gt;&lt;b&gt;Neden:&lt;/b&gt; YouTube genel trend listesini kaldırdı; bu tarama o boşluğu dolduruyor.&lt;br&gt;&lt;br&gt;&lt;b&gt;Maliyet:&lt;/b&gt; ~3600 API birimi. Sonuç gün boyu saklanır, butona tekrar basınca yeniden taranır.">ⓘ</button></span>
+      <span style="color:var(--gld)">🎯 Kategori Avı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— her kategori için günün <b>en iyi 5</b>'i</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Her kategori için günün &lt;b&gt;en iyi 5&lt;/b&gt; videosu.&lt;br&gt;&lt;br&gt;&lt;b&gt;Nasıl:&lt;/b&gt; kategori başına 2 sorgu × 2 süre bandı (son 14 gün), dil filtresi, &lt;b&gt;15–60 dk&lt;/b&gt; ve &lt;b&gt;100K+ abone&lt;/b&gt; şartı, outlier'a göre sıralama. Genel kategorisi için TR ve EN ayrı taranır.&lt;br&gt;&lt;br&gt;&lt;b&gt;Neden:&lt;/b&gt; YouTube genel trend listesini kaldırdı; bu tarama o boşluğu dolduruyor.&lt;br&gt;&lt;br&gt;&lt;b&gt;Maliyet:&lt;/b&gt; ~3600 API birimi. Sonuç gün boyu saklanır, butona tekrar basınca yeniden taranır.">ⓘ</button></span>
       <button class="btn bg bsm" onclick="rdKategoriTara(true)" title="Her kategori için günün en iyi 5 videosu. Sonuç gün boyu saklanır; tekrar basınca yeniden taranır.">🎯 Günün En İyi 5'i</button>
     </div>
     <div id="rd-kat-status" style="font-size:12px;color:var(--mt);margin-bottom:8px"></div>
@@ -1681,7 +1681,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div id="rd-rising" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card" style="border-color:rgba(251,191,36,.3)">
-    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--gld)">💎 Potansiyel <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— küçük kanaldan patlayan taze video (izlenme ≥ abone)</span></span><span id="rd-potential-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--gld)">💎 Potansiyel <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— küçük kanaldan patlayan taze video (izlenme ≥ 1.5× abone)</span></span><span id="rd-potential-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-potential" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card" style="border-color:rgba(0,229,255,.3)">
@@ -2383,7 +2383,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-10';
+const PANEL_YAPI = 'y2026.08.04-11';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -3649,7 +3649,25 @@ async function loadReports(){
   // kapsiyordu; seyrek yayinlayan profiller pencere disina dusup SIFIR gorunuyordu.
   const HIST_MAX_SAYFA = 10;   // 10 x 100 = 1000 kayit
   RAP.histKirpik = false;
-  const pHist=(async()=>{ for(let pg=1;pg<=HIST_MAX_SAYFA;pg++){ try{ const {data}=await upFetch('/uploadposts/history?limit=100&page='+pg); const h=Array.isArray(data)?data:(data.history||data.data||[]); h.forEach(x=>hist.push(x)); if(h.length<100) break; if(pg===HIST_MAX_SAYFA) RAP.histKirpik=true; }catch(e){ break; } } })();
+  // upFetchRetry: çıplak upFetch tek bir 429'da fırlatıyor, catch{break} da
+  // onu yutuyordu → RAP.hist boş kalıyor ama ekran "✓ rapor hazır" diyordu.
+  // Sonuç daha da yanıltıcıydı: geçmiş boş olunca rapRenderProfiles kuyruğu
+  // dolu her profile "⚠ hiç akmamış" damgası basıyordu.
+  RAP.histHata = '';
+  const pHist=(async()=>{ for(let pg=1;pg<=HIST_MAX_SAYFA;pg++){
+    try{
+      const {data}=await upFetchRetry('/uploadposts/history?limit=100&page='+pg);
+      const h=Array.isArray(data)?data:(data.history||data.data||[]);
+      h.forEach(x=>hist.push(x));
+      if(h.length<100) break;
+      if(pg===HIST_MAX_SAYFA) RAP.histKirpik=true;
+    }catch(e){
+      // İlk sayfa düşerse geçmiş YOK demektir — sessizce "boş" sayma, söyle.
+      if (pg === 1) RAP.histHata = histHataMetni(e);
+      console.warn('[RAP] history sayfa '+pg+':', e.message);
+      break;
+    }
+  } })();
   const pPlan=(async()=>{
     try{ const {data}=await upFetch('/uploadposts/schedule'); const s=Array.isArray(data)?data:(data.scheduled_posts||data.scheduled||[]); s.forEach(x=>{ if(x.job_id) seenJobs.add(x.job_id); plan.push({profile:x.profile_username||'', time:x.scheduled_date||'', queue:false}); }); }catch(e){}
     await Promise.all(profs.map(p=>upFetch('/uploadposts/queue/preview?profile_username='+encodeURIComponent(p.username)+'&count=50').then(({data})=>{
@@ -3659,7 +3677,12 @@ async function loadReports(){
   await Promise.all([pHist,pPlan]);
   RAP.hist=hist; RAP.plan=plan; RAP.loaded=true; RAP.analytics={};
   rapRenderCore();
-  if (st) st.textContent='✓ rapor hazır — canlı metrikler çekiliyor…';
+  // Geçmiş alınamadıysa "hazır" DEME: sayılar sıfır olduğu için rapor
+  // "hiçbir profil akmıyor" gibi okunuyor, oysa veri hiç gelmemiş.
+  if (st) st.textContent = RAP.histHata
+    ? '⚠ Yayın geçmişi alınamadı ('+RAP.histHata+') — aşağıdaki yayın sayıları EKSİK, tekrar dene'
+    : '✓ rapor hazır — canlı metrikler çekiliyor…';
+  if (RAP.histHata) addLog('err','uploadpost','Rapor: yayın geçmişi alınamadı — '+RAP.histHata);
   addLog('ok','sistem','Rapor: '+hist.length+' geçmiş, '+plan.length+' planlı/kuyruk');
   rapLoadAnalytics(profs).finally(()=>{ RAP.loading=false; });
 }
@@ -6423,7 +6446,20 @@ function ciftYoksayGeriAl(i){
   ciftYoksayYaz(o);
   CIFT_SON.gizli = Math.max(0, (CIFT_SON.gizli||0) - 1);
   ciftCiz();
-  toast('✓ Geri alındı — 🔁 Çift Kontrolü ile yeniden tarayınca listeye döner', 'ok', 5000);
+  toast('✓ Geri alındı — liste yeniden taranıyor…', 'ok', 4000);
+  ciftYenidenTara();
+}
+
+// Yoksayma geri alındığında listeyi HEMEN tazele. "🔁 Çift Kontrolü ile
+// yeniden tara" diyen eski mesajlar, kaldırılmış bir düğmeyi işaret ediyordu;
+// elle tetikleme yolu olmadığı için kayıtların dönmesi saatlik turu beklemek
+// demekti. Burada YALNIZCA tarama+çizim yapılır — silme yok, bu bilinçli:
+// kullanıcı "geri al" derken temizlik değil görünürlük istedi.
+async function ciftYenidenTara(){
+  if (!S.cfg.blot && !getN8N()) return;
+  try { await ciftTara(); ciftCiz(); }
+  catch(e){ console.warn('[CIFT] yeniden tara:', e.message);
+            toast('Liste tazelenemedi: '+histHataMetni(e)+' — saatlik tur yine deneyecek','warn',6000); }
 }
 
 function ciftYoksayTemizle(){
@@ -6433,8 +6469,9 @@ function ciftYoksayTemizle(){
   CIFT_SON.gizli = 0;
   CIFT_SON.gizliGoster = false;
   ciftCiz();
-  toast('✓ ' + n + ' kayıt geri alındı — 🔁 Çift Kontrolü ile yeniden tara', 'ok', 5500);
+  toast('✓ ' + n + ' kayıt geri alındı — liste yeniden taranıyor…', 'ok', 5000);
   addLog('info','uploadpost','Yoksayılan çiftler geri alındı: '+n+' kayıt');
+  ciftYenidenTara();
 }
 
 // ── ÇİFT KONTROLÜ (saatte bir, kendiliğinden) ──────────────────────────
@@ -9800,7 +9837,8 @@ document.addEventListener('DOMContentLoaded', function() {
       esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
       ciftTara,ciftOtoKur,ciftOtoCalis,ciftOtoTik,kuyrukDoluMu,
-      ciftYoksay,ciftYoksayTumu,ciftYoksayGoster,ciftYoksayGeriAl,ciftYoksayTemizle,
+      ciftYoksay,ciftYoksayTumu,ciftYoksayGoster,ciftYoksayGeriAl,ciftYoksayTemizle,ciftYenidenTara,
+      fafSonuc,panelSheetOnb,sheetTbodyYaz,
       hsAc,hsKapat,hsOnizle,hsUygula,hsGeriAl,hsListeCiz,hsSayilir,hsZaman,hsAnahtar,
       ksAc,ksKapat,ksOlc,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
@@ -10468,7 +10506,12 @@ async function loadTakvim() {
     }
     try { ydSetFailBadge(failN); } catch(e) {}
   } catch(e) { gecmisHata = e.message || 'bilinmeyen hata'; console.warn('[TAK] history hata:', e.message); }
-  gecmisN = items.filter(x => x.status === 'pub' || x.status === 'fail').length;
+  // pub ve fail AYRI sayılır: özet "N yayınlanmış" derken başarısızları da
+  // topluyordu, yani takvim başarısız gönderimleri yayınlanmış gibi gösteriyordu.
+  // (Hemen aşağıdaki console.log doğruyu yazıyordu, ekrandaki metin yanlıştı.)
+  const pubN  = items.filter(x => x.status === 'pub').length;
+  const failN2 = items.filter(x => x.status === 'fail').length;
+  gecmisN = pubN + failN2;
 
   // 3) Kuyruk (add_to_queue) — profil başına dolu yuvalar.
   // Geçmişten SONRA ve en fazla 4 eşzamanlı istekle: 15 profili tek seferde
@@ -10510,7 +10553,8 @@ async function loadTakvim() {
       uyari.style.display = 'none';
     }
   }
-  setEl('tak-ozet', gecmisHata ? '' : (gecmisN + ' yayınlanmış · ' + planN + ' planlı'));
+  setEl('tak-ozet', gecmisHata ? ''
+    : (pubN + ' yayınlanmış' + (failN2 ? ' · ' + failN2 + ' başarısız' : '') + ' · ' + planN + ' planlı'));
   if (!items.length) addLog('warn','sistem','Takvim: Upload-Post API\'den kayıt gelmedi (konsola bak: [TAK])');
   if (gecmisHata) addLog('err','uploadpost','Takvim yayın geçmişi alınamadı: ' + gecmisHata);
   renderTakvim();
@@ -12039,13 +12083,32 @@ async function kuyrukDenetimi(){
       kutu.innerHTML = durumHTML('kurulum',{alt:'short-kaydetme sayfası okunamadı — Sheet ID / n8n URL girili mi?'});
       return;
     }
-    // 2) KUYRUKTA — /uploadposts/schedule
+    // 2) KUYRUKTA — /uploadposts/schedule VE queue/preview
+    // Eskiden yalnız /schedule okunuyordu. Panelin asıl gönderim yolu
+    // add_to_queue ve o işler queue/preview'da duruyor — kuyrukta bekleyen
+    // short burada "Bulunamayan" (yani "Upload-Post'a hiç ulaşmamış olabilir")
+    // diye listeleniyordu. Düğmenin ⓘ metni de zaten "kuyruğu karşılaştırır"
+    // diyor; kod sözünü tutmuyordu.
     const kuyruk = new Set();
     try{
       const { data } = await upFetchRetry('/uploadposts/schedule');
       const arr = Array.isArray(data)?data:(data.scheduled_posts||data.scheduled||data.jobs||data.data||data.results||data.posts||data.schedules||[]);
       arr.forEach(s => { const k = kdAnahtar(s.profile_username||s.profile||s.user, s.title||s.post_title); if(k) kuyruk.add(k); });
     }catch(e){ console.warn('[KD] schedule:', e.message); }
+    let kuyrukOkunamadi = 0;
+    try{
+      const raw = S.uploadPostAccounts || await phFetchAccounts();
+      const profs = ((raw && raw.profiles) || []).map(p=>p.username).filter(Boolean);
+      await upSirali(profs, async u => {
+        try{
+          const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(u)+'&count=50');
+          (data.slots||[]).forEach(sl => {
+            const sp = sl.scheduled_post; if (!sp) return;
+            const k = kdAnahtar(u, sp.title||sp.post_title); if (k) kuyruk.add(k);
+          });
+        }catch(e){ kuyrukOkunamadi++; console.warn('[KD] queue '+u+':', e.message); }
+      }, 4);
+    }catch(e){ console.warn('[KD] profiller:', e.message); }
     // 3) YAYINLANMIŞ/BAŞARISIZ — /uploadposts/history (derinlik ayarını kullanır)
     const gecmis = new Set();
     let gecmisKirpik = false;
@@ -12070,7 +12133,7 @@ async function kuyrukDenetimi(){
       if (!kuyruk.has(k) && !gecmis.has(k))
         eksik.push({ profil, baslik, tarih: r['created-at']||r['tarih']||'' });
     });
-    kdCiz({ uretilen: gorulen.size, kuyruk: kuyruk.size, gecmis: gecmis.size, eksik, gecmisKirpik });
+    kdCiz({ uretilen: gorulen.size, kuyruk: kuyruk.size, gecmis: gecmis.size, eksik, gecmisKirpik, kuyrukOkunamadi });
   } catch(e){
     kutu.innerHTML = durumHTML('hata',{alt: e.message});
   } finally { if (btn) btn.disabled = false; }
@@ -12088,6 +12151,11 @@ function kdCiz(s){
     + kutucuk('Upload-Post geçmişi', s.gecmis, 'var(--ok)')
     + kutucuk('Bulunamayan', s.eksik.length, s.eksik.length ? 'var(--er)' : 'var(--ok)')
     + '</div>';
+  // Kuyruk kısmen okunamadıysa "bulunamayan" sayısı ŞİŞMİŞ olabilir — söyle.
+  if (s.kuyrukOkunamadi)
+    html += '<div class="alert aw" style="font-size:12px;margin-bottom:8px"><span>⚠</span><div>'
+      + s.kuyrukOkunamadi + ' profilin kuyruğu okunamadı (hız sınırı olabilir). O profillerin kuyrukta '
+      + 'bekleyen short\'ları <b>"Bulunamayan"</b> sütununa düşmüş olabilir — tekrar çalıştır.</div></div>';
   if (s.gecmisKirpik)
     html += '<div class="alert aw" style="font-size:12px;margin-bottom:8px"><span>⚠</span><div>Geçmiş penceresi doldu ('
       + (YD.derinlik*100) + ' kayıt). Daha eski yayınlar denetime girmedi; <b>Derinlik</b>\'i büyütüp tekrar çalıştır — '
@@ -12208,6 +12276,14 @@ async function ydFetchItems(){
     (sched||[]).forEach(s => {
       items.push({
         status:'scheduled', plat:'sch',
+        // Zamanlanmış kaydın plat'ı 'sch' — hangi platformlara gideceği ayrı
+        // tutulmalı. Eskiden hiç saklanmıyordu ve ydKapsam yalnız i.plat===pl
+        // baktığı için platform süzgeci seçilince PLANLI kartı 0 gösteriyor,
+        // "⏰ Planlı" filtresi boş liste veriyordu. (Takvim'de bu zaten
+        // plats[] ile çözülmüş; burası atlanmış.)
+        plats: (s.platforms || (s.platform ? [s.platform] : []))
+                 .map(z => YD_PLATMAP[String(z).toLowerCase()] || String(z).toLowerCase())
+                 .filter(Boolean),
         profile: s.profile_username || s.profile || s.user || '',
         title:   s.title || s.post_title || '(başlıksız)',
         caption: s.caption || s.post_caption || '',
@@ -12487,7 +12563,11 @@ function ydKapsam(){
   const pl = (document.getElementById('yd-toplu-plat')||{}).value || '';
   let l = YD.items;
   if (pr) l = l.filter(i => String(i.profile||'') === pr);
-  if (pl) l = l.filter(i => i.plat === pl);
+  // Zamanlanmışlarda plat='sch'; gerçek hedefler plats[] içinde. Platform
+  // bilgisi hiç gelmemiş bir zamanlanmış kayıt ELENMEZ — süzgeç yüzünden
+  // görünmez olmaktansa görünsün (planlı sayısı eksik gösterilmesin).
+  if (pl) l = l.filter(i => i.plat === pl
+      || (i.plat === 'sch' && (!i.plats || !i.plats.length || i.plats.indexOf(pl) >= 0)));
   return l;
 }
 function ydKapsamVar(){
