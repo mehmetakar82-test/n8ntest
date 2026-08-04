@@ -1,6 +1,11 @@
 # n8n workflow JSON — credential icerdigi icin push edilmez
-# (n8n'den yeni export alindiginda dosya adi degisebiliyor: OPUSPRO* ile hepsi kapsanir)
-OPUSPRO*.json
+# DIKKAT: 'OPUSPRO*.json' kaliba .json ile BITEN adlari kapsiyor; bir yedek
+# alirken olusan 'OPUSPRO ... .json.yedek' ELENMIYORDU ve takip edilmeyen
+# dosya olarak goruldu (icinde canli OpusClip token'i vardi). Kalip genisletildi.
+OPUSPRO*
+*.yedek
+*.bak
+*.orig
 OPUSPRO_v13_UploadPost.json
 OPUSPRO_v14_Kworb.json
 *.n8n.json
