@@ -1270,7 +1270,6 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <div class="ct">Bağlantı</div>
       <div class="fg"><label>Sheets URL veya ID</label><input id="sh-id" type="text" placeholder="https://docs.google.com/spreadsheets/d/..."/></div>
       <div class="fg"><label>URL Sütunu</label><input id="sh-col" type="text" value="Youtube Linki"/></div>
-      <div class="fg"><label>İşlendi Sütunu</label><input id="sh-done" type="text" value="İşlendi"/></div>
       <div class="fg"><label>Kategori Sütunu <span style="color:var(--mt)">(opsiyonel — sheet'te varsa)</span></label><input id="sh-cat-col" type="text" value="Kategori" placeholder="Kategori"/></div>
       <div class="fg"><label>Açıklama Notu Sütunu <span style="color:var(--mt)">(opsiyonel — her URL için farklı not)</span></label><input id="sh-not-col" type="text" value="Aciklama Notu" placeholder="Aciklama Notu"/></div>
       <div class="fg"><label>Varsayılan Kategori <span style="color:var(--mt)">(sütun boşsa kullanılır)</span></label><div class="cat-chips" id="sh-cats"></div></div>
@@ -1928,13 +1927,21 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div class="fg"><label>Zamanlanmış short alt sınırı</label><input id="cfg-stok-esik" type="number" min="0" step="5" value="50" placeholder="50"/></div>
         <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
       </div>
+      <!-- "Otomasyon Toggle" kartı KALDIRILDI (denetim bulgusu): beş anahtarın
+           tamamı yalnızca this.classList.toggle('on') yapıyordu — hiçbir yere
+           kaydedilmiyor, hiçbir yerde okunmuyor, sayfa yenilenince beşi de
+           tekrar "açık" oluyordu. Altlarındaki "Her 30 dk" / "5 hesap"
+           açıklamaları da sabit metindi, gerçek durumu yansıtmıyordu.
+           Panelin n8n iş akışlarını açıp kapatacak bir ucu yok; çalışır hâle
+           getirmek yerine yanlış bilgi veren kart kaldırıldı. -->
       <div class="card">
-        <div class="ct">Otomasyon Toggle</div>
-        <div class="trow"><div><div class="tn">Drive Kontrol</div><div class="td">Her 30 dk</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
-        <div class="trow"><div><div class="tn">YouTube Arama</div><div class="td">Webhook tetikli</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
-        <div class="trow"><div><div class="tn">Instagram Yayın</div><div class="td">5 hesap</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
-        <div class="trow"><div><div class="tn">YouTube Yayın</div><div class="td">5 hesap</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
-        <div class="trow"><div><div class="tn">TikTok Yayın</div><div class="td">5 hesap</div></div><div class="tg on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="ct">🔗 n8n İş Akışları</div>
+        <div style="font-size:11.5px;color:var(--mt);line-height:1.6">
+          Otomasyonlar (Drive kontrolü, YouTube arama, yayın akışları) <b>n8n tarafında</b> çalışıyor.
+          Panelin bunları açıp kapatacak bir ucu yok — durumlarını görmek ya da değiştirmek için
+          n8n arayüzündeki workflow listesini kullan. Panelin bu akışlara gönderdiği webhook
+          adresleri yukarıdaki <b>Webhook Adresleri</b> kartında listeli.
+        </div>
       </div>
     </div>
   </div>
@@ -2047,7 +2054,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <button class="btn bg bsm" onclick="clearLogs()">✕ Temizle</button>
     <button class="btn bg bsm" onclick="exportLogs()">⬇ İndir</button>
     <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;margin-left:auto">
-      <input type="checkbox" id="log-auto" checked onchange="toggleAutoLog()"> Canlı
+      <input type="checkbox" id="log-auto" checked onchange="toggleAutoLog()" title="Açıkken bu sayfa açık olduğu sürece tablo 5 saniyede bir kendiliğinden tazelenir. Log ÜRETMEZ."> Canlı görünüm
     </label>
   </div>
   <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap" id="log-stats"></div>
@@ -2383,9 +2390,8 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-11';
+const PANEL_YAPI = 'y2026.08.04-12';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
-function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
 function PFAV(domain){ return '<img class="pfav" src="https://www.google.com/s2/favicons?domain='+domain+'&sz=64" alt="" loading="lazy"/>'; }
@@ -2632,13 +2638,19 @@ async function kuyrukDerinlik(zorla){
   const btn = document.getElementById('kuyruk-btn');
   const stEl = document.getElementById('kuyruk-durum');
   if (!zorla && KUYRUK_SON_T && Date.now() - KUYRUK_SON_T < KUYRUK_TAZE) return;
-  if (!S.cfg.blot && !getN8N()){ el.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
+  // Erken çıkışlarda durum yazısı TEMİZLENMELİ: eskiden dokunulmuyordu ve
+  // önceki başarılı turdan kalan "tümü dolu ✓" ekranda kalıyordu — liste
+  // "Kuyruk okunamadı" derken yanındaki özet iyimser görünüyordu.
+  if (!S.cfg.blot && !getN8N()){
+    if (stEl) stEl.textContent = '';
+    el.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
   if (btn) btn.disabled = true;
   el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Bekleyen gönderiler okunuyor…'});
   try {
     const raw = S.uploadPostAccounts || await phFetchAccounts();
     const profs = ((raw && raw.profiles) || []).map(p=>p.username).filter(Boolean);
-    if (!profs.length){ el.innerHTML = durumHTML('bos',{kompakt:true, alt:'Profil bulunamadı — Platformlar → Yenile'}); return; }
+    if (!profs.length){ if (stEl) stEl.textContent = '';
+      el.innerHTML = durumHTML('bos',{kompakt:true, alt:'Profil bulunamadı — Platformlar → Yenile'}); return; }
     const { data } = await upFetchRetry('/uploadposts/schedule');
     const liste = Array.isArray(data) ? data : (data.scheduled_posts || data.scheduled || []);
     const by = {};
@@ -2657,6 +2669,7 @@ async function kuyrukDerinlik(zorla){
     KUYRUK_SON_T = Date.now();          // yalnız BAŞARIDA damgala
     if (stEl && !satir.length) stEl.textContent = '';
   } catch(e){
+    if (stEl) stEl.textContent = '⚠ okunamadı';
     el.innerHTML = durumHTML('hata',{kompakt:true, alt:'Kuyruk okunamadı: '+histHataMetni(e)});
   } finally { if (btn) btn.disabled = false; }
 }
@@ -2667,23 +2680,22 @@ function kuyrukCiz(satir){
   const esc = esc0;
   const gunFark = t => t ? Math.max(0, Math.round((t-Date.now())/864e5)) : 0;
   // Sıra = aciliyet: BOŞ olanlar en üstte, sonra tarihi en yakın olanlar,
-  // tarihi bilinmeyenler onların ardından, okunamayanlar en sonda.
-  const oncelik = s => s.hata ? 3 : (!s.dolu ? 0 : (!s.son ? 2 : 1));
+  // tarihi bilinmeyenler onların ardından.
+  // NOT: eskiden bir de "okunamadı" (s.hata) dalı vardı — profil başına
+  // queue/preview okunduğu dönemden kalma. Kaynak TEK /uploadposts/schedule
+  // çağrısına indirilince o alan hiç doldurulmaz oldu; ölü dal kaldırıldı.
+  const oncelik = s => (!s.dolu ? 0 : (!s.son ? 2 : 1));
   satir.sort((a,b)=>{
     const fa = oncelik(a), fb = oncelik(b);
     if (fa !== fb) return fa - fb;
     return (a.son||0) - (b.son||0);
   });
-  const bos = satir.filter(s=>!s.hata && !s.dolu).length;
-  const azalan = satir.filter(s=>!s.hata && s.dolu && gunFark(s.son) < 2).length;
-  const hatali = satir.filter(s=>s.hata).length;
+  const bos = satir.filter(s=>!s.dolu).length;
+  const azalan = satir.filter(s=>s.dolu && gunFark(s.son) < 2).length;
   if (stEl) stEl.textContent = bos ? (bos+' profilin kuyruğu BOŞ')
     : (azalan ? (azalan+' profilde 2 günden az kaldı') : 'tümü dolu ✓');
   el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px">'
     + satir.map(s=>{
-        if (s.hata) return '<div style="border:1px solid var(--brd);border-left:3px solid var(--mt);border-radius:6px;padding:8px 10px;background:var(--sur)">'
-          + '<div style="font-size:12px;color:var(--tx);font-weight:600">'+esc(s.u)+'</div>'
-          + '<div style="font-size:11px;color:var(--er)">okunamadı: '+esc(String(s.hata).slice(0,40))+'</div></div>';
         const g = gunFark(s.son);
         const col = !s.dolu ? 'var(--er)' : (g < 2 ? 'var(--wn)' : 'var(--ok)');
         const deger = !s.dolu ? 'BOŞ' : (!s.son ? 'tarih yok' : (g === 0 ? 'bugün biter' : g+' gün'));
@@ -2697,7 +2709,6 @@ function kuyrukCiz(satir){
           + '<div style="font-size:11px;color:var(--mt)">'+alt+'</div></div>';
       }).join('')
     + '</div>'
-    + (hatali ? '<div style="font-size:11px;color:var(--mt);margin-top:8px">'+hatali+' profil okunamadı — hız sınırı olabilir, tekrar dene.</div>' : '')
     + '<div style="font-size:11px;color:var(--mt);margin-top:8px">Süre, bekleyen gönderilerin <b>en ileri tarihinden</b> hesaplanır — tahmin değil, '
     + 'Upload-Post\'un verdiği takvim. Kaynak: <code>/uploadposts/schedule</code> (tüm bekleyenler, pencere sınırı yok).</div>';
 }
@@ -2753,10 +2764,6 @@ async function nabizCiz(){
 // VIDEO GONDER
 // ═══════════════════════════════════════════════════════════
 
-
-function getSelCats(prefix) {
-  return [...document.querySelectorAll('#'+prefix+'-cats .cat-chip.sel')].map(c=>c.dataset.cat);
-}
 
 // faf DÖRT ayrı biçim dönüyor ve çağıranların çoğu bunu hiç okumuyordu:
 // HTTP 500 de, geçersiz URL de, CORS engeli de ekranda "✓ gönderildi"
@@ -3151,7 +3158,6 @@ function catChipSingle(el, containerId) {
 function catChipToggle(el, containerId) {
   el.classList.toggle('sel');
   // bv-cats için webhook display güncelle
-  if(containerId==='bv-cats') updateBVWHDisplay();
   updateLangVisibility(containerId);
 }
 
@@ -3285,15 +3291,10 @@ const MC_CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gon
 function mcPath(cats){ return cats.length>1 ? '/webhook/video-gonder' : (MC_CAT_WH[cats[0]]||'/webhook/video-gonder'); }
 function mcFields(cats){ const f={kategori:(cats[0]||'genel')}; if(cats.length>1) f.kategoriler=cats; return f; }
 
-function updateBVWHDisplay() {
-  const cats = getSelCatList('bv-cats');
-  const el = document.getElementById('bv-wh-display');
-  if (!el) return;
-  const b = getN8N();
-  const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  const paths = cats.map(c=>(b||'')+(CAT_WH[c]||'/webhook/video-gonder')).join(' | ');
-  el.textContent = paths || '/webhook/video-gonder';
-}function saveCats() {
+// updateBVWHDisplay KALDIRILDI: yazdığı 'bv-wh-display' elemanı arayüzden
+// çıkarılmış, fonksiyon her kategori tıklamasında çağrılıp ilk satırda
+// sessizce return ediyordu.
+function saveCats() {
   const cats=getCats();
   document.querySelectorAll('#cat-grid .cat-chip').forEach(el=>{
     const {cat,pk,acc}=el.dataset;
@@ -3343,7 +3344,7 @@ async function loadDriveSheet() {
   const allU=rows.map(r=>({url:r[col],kategori:r[catCol]||'',aciklama_notu:r[drNotColV]||''})).filter(r=>r.url);
   const newU=allU.filter(r=>!S.sentURLs.has(r.url));
   S.driveURLs=allU;
-  S.driveRows=rows; // satır başvurusu için sakla
+  // (S.driveRows ataması kaldırıldı — dosyada okuyan tek bir yer yoktu)
   setEl('dr-sent-cnt',S.sentURLs.size);
   setEl('dr-new-cnt',newU.length);
   const listEl=document.getElementById('dr-url-list');
@@ -5066,7 +5067,6 @@ function hsSayilir(profil, platform, kayit){
   if (!kt) return true;                        // zamanı okunamıyor → temkinli: SAY
   return kt >= t;
 }
-function hsSay(){ return Object.keys(hsOku()).length; }
 
 // ── Hesap Sıfırlama ekranı (Platformlar içinde, satır içi) ─────────────
 function hsKapat(){ const e = document.getElementById('plat-sifirla'); if (e) e.innerHTML = ''; }
@@ -7430,23 +7430,8 @@ function platAccName(a, p) {
   return a.display_name || a.displayName || a.name || a.username || a.handle || a.vanity_url || a.id || (p.label + ' Hesabı');
 }
 
-function platAccCard(a, p, idx) {
-  const name = platAccName(a, p);
-  const handle = cleanHandle(a.username || a.handle);
-  const avatar = a.profile_picture_url || a.profile_pic_url || a.profile_image_url || a.avatar_url || a.thumbnail || '';
-  const followers = a.followers_count || a.follower_count || null;
-  return `<div class="acc-card" onclick="platOpenModal('${p.key}',${idx})" style="cursor:pointer">
-    <div class="acc-info">
-      ${avatar ? `<img src="${avatar}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0" onerror="this.remove()">` : `<div class="acc-icon" style="background:${p.color}22;color:${p.color}">${p.icon}</div>`}
-      <div style="min-width:0">
-        <div class="acc-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
-        <div class="acc-id" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${handle ? '@'+handle : ''}${followers!=null ? ' · '+ytkFmt(followers)+' takipçi' : ''}</div>
-      </div>
-    </div>
-    <span class="badge bi" style="font-size:11px;flex-shrink:0">Detay ▶</span>
-  </div>`;
-}
-
+// platAccCard KALDIRILDI: hiç çağrılmıyordu (window'a da bağlı değildi).
+// Hesap kartlarını renderPlatformsGrid satır içi üretiyor (.pl-hesap).
 // Hesap detay modal — profil bilgisi + direkt link + kopyala
 function platOpenModal(platKey, idx) {
   const p = PLAT_MAP[platKey]; if (!p) return;
@@ -7761,15 +7746,8 @@ function updateWHs() {
     'wh-ytara':    '/webhook/youtube-ara'
   };
   Object.entries(map).forEach(([id,p])=>{const el=document.getElementById(id);if(el)el.textContent=b?b+p:p;});
-  // Kategori webhook listesini güncelle (Video Gönder sayfası)
-  const catEl=document.getElementById('cat-wh-list');
-  if(catEl){
-    const cats=[['film','Film'],['eglence','Eğlence'],['bilim','Bilim'],['vlog','Vlog'],['komedi','Komedi'],['oyun','Oyun'],['spor','Spor'],['genel','Genel']];
-    catEl.innerHTML=cats.map(([k,label])=>{
-      const url=b?b+'/webhook/video-gonder'+(k==='genel'?'':'-'+k):'/webhook/video-gonder'+(k==='genel'?'':'-'+k);
-      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--brd)"><span style="color:var(--mt)">'+label+'</span><span style="color:var(--acc);font-size:11px;cursor:pointer" onclick="copyText(\''+url+'\')" title="Kopyala">'+url.split('/').pop()+' ⊕</span></div>';
-    }).join('');
-  }
+  // 'cat-wh-list' bloğu KALDIRILDI: o eleman arayüzde yok (yorumu da yanlış
+  // yeri gösteriyordu — Video Gönder sayfasında böyle bir liste bulunmuyor).
   // OpusClip WH display güncelle
   const opcEl=document.getElementById('opc-wh-display');
   if(opcEl)opcEl.textContent=b?b+'/webhook/opus-clip-direkt':'/webhook/opus-clip-direkt';
@@ -7900,7 +7878,7 @@ function addLog(sev,cat,msg) {
 }
 
 function renderLogs() {
-  const el=document.getElementById('log-tbody') || document.getElementById('log-out');
+  const el=document.getElementById('log-tbody');   // 'log-out' yedeği kaldırıldı: o kimlik hiç oluşturulmuyor
   if(!el)return;
   const sf=(document.getElementById('log-sev')||{}).value||'';
   const cf=(document.getElementById('log-cat')||{}).value||'';
@@ -7941,10 +7919,20 @@ function updateLogStats() {
 
 function clearLogs(){S.logs=[];try{localStorage.removeItem('op_logs');}catch(e){}renderLogs();updateLogStats();}
 function exportLogs(){dl('opus_logs.txt',S.logs.map(l=>l.t+' ['+l.cat+'] ['+l.sev.toUpperCase()+'] '+l.msg).join('\n'));}
+// "Canlı" = GÖRÜNÜMÜ canlı tut. Eskiden 60 sn'de bir "Heartbeat - sistem
+// aktif" LOGU YAZIYORDU: kalıcı depo 200 kayıtla sınırlı olduğu için panel
+// birkaç saat açık kalınca gerçek loglar heartbeat'lerle taşınıp diskten
+// düşüyordu — yani log göstermek yerine log SİLDİRİYORDU. Etiket de yaptığı
+// işi yanlış anlatıyordu. Artık yalnızca tabloyu tazeliyor ve bunu YALNIZCA
+// Loglar sayfası açıkken yapıyor.
 function toggleAutoLog(){
   clearInterval(S.logTimer);
   if((document.getElementById('log-auto')||{}).checked)
-    S.logTimer=setInterval(()=>addLog('info','sistem','Heartbeat - sistem aktif'),60000);
+    S.logTimer = setInterval(()=>{
+      const p = document.getElementById('page-loglar');
+      if (!p || !p.classList.contains('active')) return;
+      try { renderLogs(); updateLogStats(); } catch(e){}
+    }, 5000);
 }
 
 // ═══════════════════════════════════════════════════════════
