@@ -1020,6 +1020,16 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div class="fg"><label>IG Business User ID</label><input id="oy-ig-uid" type="text" placeholder="1784..."/></div>
         <div class="fg"><label>IG Access Token <span style="color:var(--mt)">(uzun ömürlü, 60gün)</span></label><input id="oy-ig-token" type="password" placeholder="EAAx..."/></div>
         <div class="fg"><label>Kendi Instagram Kullanıcı Adın</label><input id="oy-ig-user" type="text" placeholder="kullanici_adin"/></div>
+        <div class="fg">
+          <label>Doğrulama Token'ı <span style="color:var(--mt)">(Meta Webhooks → Verify Token)</span></label>
+          <input id="oy-ig-verify" type="password" placeholder="opuspro (boş = kontrol yapılmaz)"/>
+          <div style="font-size:11px;color:var(--mt);margin-top:3px">
+            <code>/webhook/ig-mention</code> Meta tarafından çağrıldığı için başlık anahtarıyla korunamıyor.
+            Meta abonelik doğrulamasında bu token'ı gönderir; n8n şimdiye kadar <b>hiç kontrol etmiyordu</b>,
+            yani doğrulama akışını herkes geçebiliyordu. Meta app → Webhooks → Instagram'da yazdığın
+            <b>Verify Token</b>'ın aynısını buraya gir. Boş bırakırsan kontrol yapılmaz (mevcut kurulum bozulmaz).
+          </div>
+        </div>
         <div class="fg"><label>Tetik Kelimeler <span style="color:var(--mt)">(virgülle ayır)</span></label><input id="oy-ig-tetik" type="text" placeholder="güzel, short, işle"/></div>
         <div class="fg"><label>Kategori</label><select id="oy-ig-kat"></select></div>
         <div class="fg"><label>Dil</label>
@@ -2411,7 +2421,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-23';
+const PANEL_YAPI = 'y2026.08.04-24';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -7732,14 +7742,16 @@ function platOpenModal(platKey, idx) {
   if (handle)              rows.push([canli ? 'Upload-Post kaydı (kullanıcı adı)' : 'Kullanıcı adı', '@'+handle]);
   if (a.id)                rows.push(['Hesap ID', a.id]);
   if (a.urn)               rows.push(['URN', a.urn]);
-  const rowsHtml = rows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:13px"><span style="color:var(--mt)">${k}</span><span style="color:var(--tx);font-family:var(--fm);word-break:break-all;text-align:right">${v}</span></div>`).join('');
+  // KAÇIŞ: ad, handle, id, urn ve avatar Upload-Post yanıtından; LinkedIn/
+  // Pinterest gibi platformlarda bunlar tamamen dıştan gelen metin.
+  const rowsHtml = rows.map(([k,v])=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:13px"><span style="color:var(--mt)">${esc0(k)}</span><span style="color:var(--tx);font-family:var(--fm);word-break:break-all;text-align:right">${esc0(v)}</span></div>`).join('');
   const body = document.getElementById('plat-modal-body');
   if (body) body.innerHTML = `
     <div style="display:flex;gap:14px;align-items:center;margin-bottom:16px">
-      ${avatar ? `<img src="${avatar}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid ${p.color}" onerror="this.remove()">` : `<div style="width:64px;height:64px;border-radius:50%;background:${p.color}22;color:${p.color};display:flex;align-items:center;justify-content:center;font-size:24px">${p.icon}</div>`}
+      ${avatar ? `<img src="${guvenliUrl(avatar)}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid ${p.color}" onerror="this.remove()">` : `<div style="width:64px;height:64px;border-radius:50%;background:${p.color}22;color:${p.color};display:flex;align-items:center;justify-content:center;font-size:24px">${p.icon}</div>`}
       <div style="min-width:0;flex:1">
-        <div style="font-size:14px;font-weight:700;color:var(--tx)">${name}</div>
-        <div style="font-size:13px;color:var(--mt);margin-top:2px">${p.label}${handle?' · @'+handle:''}</div>
+        <div style="font-size:14px;font-weight:700;color:var(--tx)">${esc0(name)}</div>
+        <div style="font-size:13px;color:var(--mt);margin-top:2px">${p.label}${handle?' · @'+esc0(handle):''}</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:6px;margin-bottom:14px">
@@ -7754,18 +7766,18 @@ function platOpenModal(platKey, idx) {
           ${s.api ? `<div style="font-size:11px;color:var(--mt);margin-top:6px;font-family:var(--fm);word-break:break-all">API: ${e(s.api)}</div>` : ''}
         </div>`; })()}
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <a href="${link}" target="_blank" rel="noopener" class="btn bp bsm" style="text-decoration:none">↗ ${p.label}'da Aç</a>
-      <button class="btn bg bsm" onclick="platCopyLink('${link.replace(/'/g,"\\'")}')">📋 Linki Kopyala</button>
-      <span style="font-size:12px;color:var(--mt);margin-left:auto;word-break:break-all;text-align:right;max-width:60%">${link}</span>
+      <a href="${guvenliUrl(link)}" target="_blank" rel="noopener" class="btn bp bsm" style="text-decoration:none">↗ ${p.label}'da Aç</a>
+      <button class="btn bg bsm" onclick="platCopyLink('${jsStr(link)}')">📋 Linki Kopyala</button>
+      <span style="font-size:12px;color:var(--mt);margin-left:auto;word-break:break-all;text-align:right;max-width:60%">${esc0(link)}</span>
     </div>
     <!-- Analytics — accordion (butonla aç, kota harcamaz) -->
     <div style="margin-top:14px;border-top:1px solid var(--brd);padding-top:12px">
-      <button class="btn bg bsm" onclick="platLoadAnalytics('${a._profile||handle}','${p.key}','plat-analytics-body')" style="width:100%">📊 Analytics'i Yükle</button>
+      <button class="btn bg bsm" onclick="platLoadAnalytics('${jsStr(a._profile||handle)}','${jsStr(p.key)}','plat-analytics-body')" style="width:100%">📊 Analytics'i Yükle</button>
       <div id="plat-analytics-body" style="margin-top:8px"></div>
     </div>
     ${['facebook','linkedin','pinterest'].includes(p.key) ? `
     <div style="margin-top:10px;border-top:1px solid var(--brd);padding-top:12px">
-      <button class="btn bg bsm" onclick="platLoadExtra('${p.key}','${a._profile||handle}','plat-extra-body')" style="width:100%">${p.key==='pinterest'?"📌 Board'ları Yükle":"📄 Sayfaları Yükle"}</button>
+      <button class="btn bg bsm" onclick="platLoadExtra('${jsStr(p.key)}','${jsStr(a._profile||handle)}','plat-extra-body')" style="width:100%">${p.key==='pinterest'?"📌 Board'ları Yükle":"📄 Sayfaları Yükle"}</button>
       <div id="plat-extra-body" style="margin-top:8px"></div>
     </div>` : ''}`;
   document.getElementById('plat-modal').style.display = 'block';
@@ -7962,7 +7974,8 @@ async function platLoadAnalytics(profileUsername, platformKey, containerId) {
     }
     el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px">${stat('Takipçi',followers,'var(--acc)')}${stat('İzlenme',views)}${stat('Impressions',impressions)}${stat('Reach',reach)}</div>${chart}`;
   } catch(e) {
-    el.innerHTML = '<div style="color:var(--wn);font-size:12px;padding:10px">Analytics çekilemedi: ' + e.message + '</div>';
+    // upFetch mesajı API gövdesinden kuruluyor ('HTTP 400: ' + j.message) — dıştan gelir.
+    el.innerHTML = '<div style="color:var(--wn);font-size:12px;padding:10px">Analytics çekilemedi: ' + esc0(e.message) + '</div>';
   }
 }
 
@@ -7977,8 +7990,10 @@ async function platLoadExtra(platformKey, profileUsername, containerId) {
   // Burada page_name/page_id okunuyordu; sayfa VARKEN bile "undefined"
   // yazıyor, kullanıcı "sayfa yok" sanıyordu. Her iki ad da denenir.
   if (platformKey === 'facebook')  { path = '/uploadposts/facebook/pages?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'pages';  renderItem = p => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:13px;font-weight:600;color:var(--tx)">${esc0(p.name || p.page_name || '(adsız sayfa)')}</div><div style="font-size:11px;color:var(--mt);font-family:var(--fm)">ID: ${esc0(p.id || p.page_id || '—')}</div></div>`; }
-  else if (platformKey === 'linkedin') { path = '/uploadposts/linkedin/pages?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'pages';  renderItem = p => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:13px;font-weight:600;color:var(--tx)">${p.page_name}</div><div style="font-size:11px;color:var(--mt);font-family:var(--fm)">URN: ${p.page_urn}</div></div>`; }
-  else if (platformKey === 'pinterest'){ path = '/uploadposts/pinterest/boards?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'boards'; renderItem = b => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:13px;font-weight:600;color:var(--tx)">${b.board_name}</div>${b.description?'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+b.description+'</div>':''}<div style="font-size:11px;color:var(--mt);font-family:var(--fm)">ID: ${b.board_id}</div></div>`; }
+  // KAÇIŞ: sayfa/pano adları ve açıklamaları tamamen dıştan gelen metin.
+  // Facebook dalı zaten esc0 kullanıyordu; LinkedIn ve Pinterest atlanmıştı.
+  else if (platformKey === 'linkedin') { path = '/uploadposts/linkedin/pages?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'pages';  renderItem = p => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:13px;font-weight:600;color:var(--tx)">${esc0(p.page_name)}</div><div style="font-size:11px;color:var(--mt);font-family:var(--fm)">URN: ${esc0(p.page_urn)}</div></div>`; }
+  else if (platformKey === 'pinterest'){ path = '/uploadposts/pinterest/boards?profile=' + encodeURIComponent(profileUsername||''); itemsKey = 'boards'; renderItem = b => `<div style="padding:6px 10px;background:var(--sur2);border-radius:4px;border:1px solid var(--brd);margin-bottom:4px"><div style="font-size:13px;font-weight:600;color:var(--tx)">${esc0(b.board_name)}</div>${b.description?'<div style="font-size:11px;color:var(--mt);margin-top:2px">'+esc0(b.description)+'</div>':''}<div style="font-size:11px;color:var(--mt);font-family:var(--fm)">ID: ${esc0(b.board_id)}</div></div>`; }
   else return;
   el.innerHTML = '<div style="color:var(--mt);font-size:12px;padding:10px;text-align:center">⏳ Yükleniyor…</div>';
   try {
@@ -7987,7 +8002,7 @@ async function platLoadExtra(platformKey, profileUsername, containerId) {
     if (!items.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;padding:10px">Bağlı '+itemsKey+' bulunamadı</div>'; return; }
     el.innerHTML = items.map(renderItem).join('');
   } catch(e) {
-    el.innerHTML = '<div style="color:var(--wn);font-size:12px;padding:10px">' + e.message + '</div>';
+    el.innerHTML = '<div style="color:var(--wn);font-size:12px;padding:10px">' + esc0(e.message) + '</div>';
   }
 }
 
@@ -9492,6 +9507,7 @@ function initOtoYakala() {
   setVal('oy-ig-uid', saved.IG_USER_ID);
   setVal('oy-ig-token', saved.IG_TOKEN);
   setVal('oy-ig-user', saved.BENIM_KULLANICI_ADIM);
+  setVal('oy-ig-verify', saved.IG_VERIFY_TOKEN);
   setVal('oy-ig-tetik', Array.isArray(saved.TETIK_KELIMELER) ? saved.TETIK_KELIMELER.join(', ') : saved.TETIK_KELIMELER);
   setVal('oy-ig-kat', saved.IG_KATEGORI || 'genel');
   if (saved.IG_DIL === 'en') {
@@ -9528,6 +9544,7 @@ async function oySave() {
     IG_USER_ID: (document.getElementById('oy-ig-uid')||{}).value||'',
     IG_TOKEN: (document.getElementById('oy-ig-token')||{}).value||'',
     BENIM_KULLANICI_ADIM: (document.getElementById('oy-ig-user')||{}).value||'',
+    IG_VERIFY_TOKEN: (document.getElementById('oy-ig-verify')||{}).value||'',
     TETIK_KELIMELER: ((document.getElementById('oy-ig-tetik')||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean),
     IG_KATEGORI: (document.getElementById('oy-ig-kat')||{}).value||'genel',
     IG_DIL: oyGetDil(),
@@ -9761,11 +9778,13 @@ function opcRenderProjects(projects) {
       : '';
     // Birden çok takım varsa hangi takımdan geldiği kartta görünsün
     const takimRozet = (p._takimAd && OPC.takimlar && OPC.takimlar.length > 1)
-      ? `<span class="opc-takim t${p._takimIx||0}" title="OpusClip takımı">${p._takimAd}</span>` : '';
+      ? `<span class="opc-takim t${p._takimIx||0}" title="OpusClip takımı">${esc0(p._takimAd)}</span>` : '';
+    // KAÇIŞ: başlık ve küçük resim OpusClip'ten — kaynak videodan (YouTube)
+    // türetilmiş üçüncü taraf metni.
     const thumbHtml = thumb
-      ? `<img src="${thumb}" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      ? `<img src="${guvenliUrl(thumb)}" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
       : '';
-    return `<div onclick="opcOpenProject('${pid}')" style="position:relative;background:var(--card);border:1px solid ${doneBorder};border-radius:8px;cursor:pointer;transition:all .15s;overflow:hidden" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='${doneBorder}'">
+    return `<div onclick="opcOpenProject('${jsStr(pid)}')" style="position:relative;background:var(--card);border:1px solid ${doneBorder};border-radius:8px;cursor:pointer;transition:all .15s;overflow:hidden" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='${doneBorder}'">
       <div class="opc-thumb" style="border-radius:6px 6px 0 0">
       ${thumbHtml}
       <div style="display:${thumb?'none':'flex'};align-items:center;justify-content:center;height:140px;background:linear-gradient(135deg,#0a1628,#162a4a);color:var(--acc);font-size:36px">◈</div>
@@ -9773,14 +9792,14 @@ function opcRenderProjects(projects) {
       ${projScrim}
       </div>
       <div style="padding:10px 12px">
-        <div style="font-size:14px;font-weight:600;color:var(--tx);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
+        <div style="font-size:14px;font-weight:600;color:var(--tx);line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc0(title)}</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:12px">
-          <span style="color:var(--mt);font-family:var(--fm)">${String(pid).substring(0,12)}</span>
-          ${plat ? `<span class="badge bi">${plat}</span>` : ''}
+          <span style="color:var(--mt);font-family:var(--fm)">${esc0(String(pid).substring(0,12))}</span>
+          ${plat ? `<span class="badge bi">${esc0(plat)}</span>` : ''}
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:11px">
-          <span style="color:var(--mt)">${date}</span>
-          ${stage ? `<span style="color:${statusColor};text-transform:uppercase;letter-spacing:.5px">${stage}</span>` : ''}
+          <span style="color:var(--mt)">${esc0(date)}</span>
+          ${stage ? `<span style="color:${statusColor};text-transform:uppercase;letter-spacing:.5px">${esc0(stage)}</span>` : ''}
         </div>
       </div>
     </div>`;
@@ -9863,15 +9882,16 @@ function opcRenderClips() {
     const scrim = state
       ? `<div class="opc-scrim on ${state}"><div class="opc-check ${state}">✓</div></div>`
       : `<div class="opc-scrim"></div>`;
-    return `<div data-cid="${id}" onclick="opcToggleClip('${id}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':(done?'var(--ok)':'var(--brd)')};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='${done?'var(--ok)':'var(--brd)'}'" class="${sel?'opc-sel':''}">
+    // KAÇIŞ: klip başlığı ve önizleme görseli OpusClip'ten geliyor.
+    return `<div data-cid="${esc0(id)}" onclick="opcToggleClip('${jsStr(id)}')" style="background:var(--card);border:2px solid ${sel?'var(--acc)':(done?'var(--ok)':'var(--brd)')};border-radius:8px;cursor:pointer;overflow:hidden;transition:all .15s;position:relative" onmouseover="if(!this.classList.contains('opc-sel'))this.style.borderColor='rgba(0,229,255,.4)'" onmouseout="if(!this.classList.contains('opc-sel'))this.style.borderColor='${done?'var(--ok)':'var(--brd)'}'" class="${sel?'opc-sel':''}">
       <div class="opc-thumb">
-        ${previewThumb ? `<img src="${previewThumb}" style="width:100%;height:120px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${previewThumb}','${(title||'').replace(/'/g,'’').replace(/"/g,'&quot;')}')" onmouseleave="hidePrev()">` : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#0a1628,#162a4a);display:flex;align-items:center;justify-content:center;color:var(--acc);font-size:24px">▶</div>`}
-        ${score ? `<span class="opc-score">⭐ ${score}</span>` : ''}
-        <span class="opc-dur">${durFmt}</span>
+        ${previewThumb ? `<img src="${guvenliUrl(previewThumb)}" style="width:100%;height:120px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${jsStr(previewThumb)}','${jsStr(title||'')}')" onmouseleave="hidePrev()">` : `<div style="width:100%;height:120px;background:linear-gradient(135deg,#0a1628,#162a4a);display:flex;align-items:center;justify-content:center;color:var(--acc);font-size:24px">▶</div>`}
+        ${score ? `<span class="opc-score">⭐ ${esc0(score)}</span>` : ''}
+        <span class="opc-dur">${esc0(durFmt)}</span>
         ${scrim}
       </div>
       <div style="padding:8px 10px">
-        <div class="opc-ctitle" style="font-size:13px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${title}</div>
+        <div class="opc-ctitle" style="font-size:13px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc0(title)}</div>
       </div>
     </div>`;
   }).join('');
@@ -11386,7 +11406,7 @@ function takOpenPost(gi){
   if (it.status==='fail' && it.error){ const h=hataCevir(it.error); errEl.innerHTML = '<div style="font-weight:700">'+(HATA_IKON[h.ciddiyet]||'⚠')+' '+h.baslik.replace(/[<>]/g,'')+'</div><div style="font-size:11px;color:var(--mt);margin-top:2px">'+h.cozum.replace(/[<>]/g,'')+'</div><div style="font-size:10px;color:var(--mt);opacity:.6;margin-top:3px">Ham: '+String(h.ham).slice(0,120).replace(/[<>]/g,'')+'</div>'; errEl.style.display='block'; }
   else errEl.style.display='none';
   document.getElementById('tpm-actions').innerHTML =
-    (it.postUrl?`<a class="btn bp bsm" style="text-decoration:none" href="${esc(it.postUrl)}" target="_blank">↗ Postu Aç</a>`:'')
+    (it.postUrl?`<a class="btn bp bsm" style="text-decoration:none" href="${guvenliUrl(it.postUrl)}" target="_blank">↗ Postu Aç</a>`:'')
     + (it.status==='fail'?`<button class="btn bg bsm" onclick="takPostClose();acTileClick('failed')">↻ Yayın Durumu'nda yeniden gönder</button>`:'');
   const mEl = document.getElementById('tpm-metrics');
   setEl('tpm-metrics-src','');
@@ -11591,7 +11611,7 @@ function _dmRenderList(items) {
 
       <!-- THUMBNAIL (video URL varsa tıklayınca yeni sekmede oynatır) -->
       ${videoUrl
-        ? `<a href="${videoUrl}" target="_blank" rel="noopener" title="Videoyu yeni sekmede oynat" style="flex-shrink:0;width:120px;height:76px;overflow:hidden;position:relative;background:var(--sur2);text-decoration:none;display:block">`
+        ? `<a href="${guvenliUrl(videoUrl)}" target="_blank" rel="noopener" title="Videoyu yeni sekmede oynat" style="flex-shrink:0;width:120px;height:76px;overflow:hidden;position:relative;background:var(--sur2);text-decoration:none;display:block">`
         : `<div style="flex-shrink:0;width:120px;height:76px;overflow:hidden;position:relative;background:var(--sur2)">`}
         ${thumb
           ? `<img src="${thumb}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px\\'>${meta.icon}</div>'">`
@@ -11628,7 +11648,7 @@ function _dmRenderList(items) {
             <span style="opacity:.6">🕐</span>${timeStr}
           </span>
           <!-- Video linki (varsa) -->
-          ${videoUrl ? `<a href="${videoUrl}" target="_blank" rel="noopener" style="font-size:12px;color:var(--acc);text-decoration:none;padding:1px 8px;border:1px solid var(--acc);border-radius:3px">▶ Videoyu Aç</a>` : ''}
+          ${videoUrl ? `<a href="${guvenliUrl(videoUrl)}" target="_blank" rel="noopener" style="font-size:12px;color:var(--acc);text-decoration:none;padding:1px 8px;border:1px solid var(--acc);border-radius:3px">▶ Videoyu Aç</a>` : ''}
           <!-- Hashtaglar -->
           ${hashtags.map(h=>`<span style="font-size:11px;color:var(--acc3);background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);border-radius:3px;padding:1px 6px">${h}</span>`).join('')}
         </div>
@@ -12933,11 +12953,11 @@ function renderYayinDurumu(){
     const t = it.time ? new Date(it.time).toLocaleString('tr',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
     const thumb = it.thumb ? `<img src="${esc(it.thumb)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0" onerror="this.style.display='none'"/>` : '';
     let right = '';
-    if ((it.status==='published') && it.permalink) right = `<a href="${esc(it.permalink)}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ Aç</a>`;
+    if ((it.status==='published') && it.permalink) right = `<a href="${guvenliUrl(it.permalink)}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ Aç</a>`;
     else if (cz){
       // Çözülmüş: "Yeniden Gönder" gösterme (tekrar yayınlar), başarılı postu aç
       right = it._cozuldu.permalink
-        ? `<a href="${esc(it._cozuldu.permalink)}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ Yayını Aç</a>` : '';
+        ? `<a href="${guvenliUrl(it._cozuldu.permalink)}" target="_blank" rel="noopener" class="btn bg bsm" style="text-decoration:none">↗ Yayını Aç</a>` : '';
     }
     else if (it.status==='failed'){
       const native = !!(it.reqId || it.jobId);
@@ -13164,7 +13184,8 @@ async function ydRetry(idx){
           + 'Yine de hemen yeniden denensin mi?')) return ydNativeRetry(it, idx);
     }
     YD.retry = { idx };
-    document.getElementById('yd-retry-info').innerHTML = `<b>${(it.title||'').slice(0,60)}</b><br>${YD_PLAT_LABEL[it.plat]||it.plat} · ${it.profile||'—'}<br>Otomatik eşleşme bulunamadı — aşağıdan seç ya da mp4 URL'si gir.`;
+    // KAÇIŞ: title Upload-Post post_title'ından, profile hesap adından.
+    document.getElementById('yd-retry-info').innerHTML = `<b>${esc0((it.title||'').slice(0,60))}</b><br>${esc0(YD_PLAT_LABEL[it.plat]||it.plat)} · ${esc0(it.profile||'—')}<br>Otomatik eşleşme bulunamadı — aşağıdan seç ya da mp4 URL'si gir.`;
     // Açılır liste: en yeni 40 short (short-kaydetme)
     const pick = document.getElementById('yd-retry-pick');
     if (pick){
@@ -14042,7 +14063,7 @@ function rdRenderKat(){
           +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span>'+rdAge(x.ageH)+'</span></div>'
           +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
           +(x.katTahmin?rdKatSatiri(x):'')
-          +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+rdEsc(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
+          +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+guvenliUrl(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
           +'</div></div>';
       }).join('')+'</div></div>';
   }).join('');
@@ -14242,7 +14263,7 @@ function renderRadar(){
         +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span style="flex-shrink:0">'+rdAge(x.ageH)+'</span></div>'
         +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
         +'<div class="prog"><div class="pf" style="background:var(--acc);width:'+Math.max(3,Math.round((x.vph||0)/maxVph*100))+'%"></div></div>'
-        +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+rdEsc(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
+        +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+guvenliUrl(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
         +'</div></div>';
     }).join('') + islenmisNotu(_ay.gizlenen);
   });
