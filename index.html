@@ -2383,7 +2383,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-09';
+const PANEL_YAPI = 'y2026.08.04-10';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -2758,6 +2758,24 @@ function getSelCats(prefix) {
   return [...document.querySelectorAll('#'+prefix+'-cats .cat-chip.sel')].map(c=>c.dataset.cat);
 }
 
+// faf DÖRT ayrı biçim dönüyor ve çağıranların çoğu bunu hiç okumuyordu:
+// HTTP 500 de, geçersiz URL de, CORS engeli de ekranda "✓ gönderildi"
+// yazıyor ve recordSend videoyu kalıcı olarak "gönderildi" diye
+// işaretliyordu — kullanıcı hiç gitmemiş videoyu gitmiş sanıyordu.
+//   {ok:true, pending:true}   → teslim edildi, n8n işliyor  → BAŞARI
+//   Response (r.ok)           → BAŞARI
+//   Response (!r.ok)          → HTTP hatası                 → BAŞARISIZ
+//   {ok:false, invalidUrl}    → URL bozuk                   → BAŞARISIZ
+//   {ok:false, corsOrNetwork} → BELİRSİZ: n8n'e ulaşmış olabilir
+function fafSonuc(r){
+  if (!r)               return { ok:false, belirsiz:false, mesaj:'yanıt alınamadı' };
+  if (r.invalidUrl)     return { ok:false, belirsiz:false, mesaj:'n8n URL geçersiz — Ayarlar\'dan düzelt' };
+  if (r.corsOrNetwork)  return { ok:false, belirsiz:true,  mesaj:'ağ/CORS engeli — istek n8n\'e ulaşmış olabilir, Loglar\'dan doğrula' };
+  if (r.pending)        return { ok:true,  belirsiz:false, mesaj:'' };
+  if (r.ok)             return { ok:true,  belirsiz:false, mesaj:'' };
+  return { ok:false, belirsiz:false, mesaj:'HTTP '+(r.status||'?')+' — n8n workflow\'u aktif mi, webhook yolu doğru mu?' };
+}
+
 async function sendSingle() {
   const url = (document.getElementById('sv-url')||{}).value||'';
   if (!url.trim()) return showRes('sv-res','URL bos olamaz','err');
@@ -2782,10 +2800,19 @@ async function sendSingle() {
     showRes('sv-res','⏳ Gonderiliyor... ['+selCat+']','info');
     addLog('info','webhook','Video gonderiliyor ['+selCat+']: '+url.slice(0,60));
   }
-  await faf(base + path, payload);
-  showRes('sv-res', direkt ? '✓ Direkt yayın başlatıldı ['+selCat+']' : '✓ n8n\'e gonderildi ['+selCat+']','ok');
+  const s = fafSonuc(await faf(base + path, payload));
+  if (!s.ok && !s.belirsiz){
+    // KESİN hata: "gönderildi" deme, recordSend'e de yazma — yoksa hiç
+    // gitmemiş video kalıcı olarak "gönderilmiş" sayılırdı.
+    showRes('sv-res','✕ Gönderilemedi — '+s.mesaj,'err');
+    addLog('err','webhook','Video gonderilemedi ['+selCat+']: '+s.mesaj);
+    return;
+  }
+  showRes('sv-res', (s.belirsiz ? '⚠ ' : '✓ ')
+    + (direkt ? 'Direkt yayın başlatıldı' : 'n8n\'e gönderildi') + ' ['+selCat+']'
+    + (s.belirsiz ? ' — ama ' + s.mesaj : ''), s.belirsiz ? 'warn' : 'ok');
   recordSend(url, selCat);
-  addLog('ok','webhook',(direkt?'Direkt yayın':'Video gonderildi')+' ['+selCat+']');
+  addLog(s.belirsiz?'warn':'ok','webhook',(direkt?'Direkt yayın':'Video gonderildi')+' ['+selCat+']'+(s.belirsiz?' (belirsiz: '+s.mesaj+')':''));
   await oncelikIsaretle('sv-cats', url.slice(0,60));
 }
 
@@ -2799,15 +2826,18 @@ async function sendBulkURLs() {
   if (!base) return alert('Ayarlar\'dan n8n URL girin');
   let urls = raw.split('\n').map(u=>u.trim()).filter(Boolean);
   const dupes = urls.filter(u=>findDupeSend(u));
+  // İlerleme kabı ERKEN açılmalı: "vazgeçildi" / "yeni video kalmadı"
+  // mesajları bv-st'ye yazılıyor ve o kap display:none olduğu için ilk
+  // kullanımda kullanıcı hiçbir geri bildirim görmüyordu.
+  setStyle('bv-prog','display','block');
   if (dupes.length) {
     const choice = await dupeChoiceModal(dupes.length, urls.length-dupes.length);
     if (choice==='cancel') return setEl('bv-st','İşlem vazgeçildi');
     if (choice==='skip') urls = urls.filter(u=>!findDupeSend(u));
   }
   if (!urls.length) return setEl('bv-st','Gönderilecek yeni video kalmadı');
-  setStyle('bv-prog','display','block');
   addLog('info','webhook','Toplu gonderim ['+selCats.join(',')+']:'+urls.length+' URL');
-  let sent = 0;
+  let sent = 0, hata = 0, belirsiz = 0; const sebepler = [];
   for (let i=0;i<urls.length;i++) {
     const u=urls[i];
     // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
@@ -2815,13 +2845,26 @@ async function sendBulkURLs() {
     setEl('bv-st',(i+1)+'/'+urls.length+' ['+selCats.join(',')+']: '+u.slice(0,40));
     setStyle('bv-bar','width',((i+1)/urls.length*100)+'%');
     const bvAciklama = (document.getElementById('bv-aciklama')||{}).value||'';
-    await faf(base+mcPath(selCats),{'Youtube linki':u, channelTitle: await ytKanalAdi(u), kaynak:'toplu', ...mcFields(selCats), dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama});
-    sent++;
-    recordSend(u, selCats.join(','));
+    const s = fafSonuc(await faf(base+mcPath(selCats),{'Youtube linki':u, channelTitle: await ytKanalAdi(u), kaynak:'toplu', ...mcFields(selCats), dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama}));
+    if (s.ok || s.belirsiz){
+      sent++; if (s.belirsiz) belirsiz++;
+      recordSend(u, selCats.join(','));     // kesin hatada KAYDETME
+    } else {
+      hata++; if (sebepler.length < 3) sebepler.push(s.mesaj);
+      addLog('err','webhook','Toplu gonderim hatasi: '+u.slice(0,50)+' — '+s.mesaj);
+    }
     if (i<urls.length-1) await sleep(delay);
   }
-  setEl('bv-st','✓ '+urls.length+' URL × '+selCats.length+' kategori gonderildi');
-  addLog('ok','webhook','Toplu tamamlandi ['+selCats.join(',')+']:'+urls.length);
+  // Özet GERÇEĞİ yazsın: eskiden hata olsa da "N URL × M kategori gonderildi"
+  // yazıyordu. "× kategori" ifadesi de yanlıştı — kod URL başına TEK istek
+  // atıyor, çoklu kategori tek gönderimde diziyle taşınıyor.
+  const parca = [];
+  if (sent) parca.push(sent+' URL gönderildi');
+  if (belirsiz) parca.push(belirsiz+' tanesi belirsiz (ağ/CORS)');
+  if (hata) parca.push(hata+' başarısız — '+sebepler[0]);
+  setEl('bv-st', (hata ? '⚠ ' : '✓ ') + (parca.join(' · ') || 'gönderilecek bir şey yoktu')
+    + (selCats.length>1 ? '  ['+selCats.join(', ')+']' : ''));
+  addLog(hata?'warn':'ok','webhook','Toplu bitti ['+selCats.join(',')+']: '+sent+' ok, '+hata+' hata');
   await oncelikIsaretle('bv-cats', urls.length+' video (toplu)');
 }
 
@@ -7742,6 +7785,16 @@ function saveSettings() {
     batchMax:(document.getElementById('cfg-batchmax')||{}).value||'15',
     batchDelay:(document.getElementById('cfg-batchdelay')||{}).value||'8',
     ytApiKey:(document.getElementById('ytk-apikey')||{}).value||S.cfg.ytApiKey||'',   // Kaydet'te silinmesin
+    // Twitch bilgileri Ayarlar'da DEĞİL, Yayın Tekrarları sayfasında giriliyor
+    // (str-tw-cid / str-tw-sec doğrudan S.cfg'ye yazıyor). S.cfg burada
+    // sıfırdan kurulduğu için listede olmayan her anahtar düşüyordu: Ayarlar'da
+    // Kaydet'e basmak Twitch kimliğini ve token'ını siliyordu. ytApiKey için
+    // aynı tuzak daha önce fark edilmiş, Twitch atlanmış.
+    twClientId: S.cfg.twClientId || '',
+    twSecret:   S.cfg.twSecret   || '',
+    twTok:      S.cfg.twTok      || '',
+    twTokExp:   S.cfg.twTokExp   || 0,
+    twTokCid:   S.cfg.twTokCid   || '',
     viralEsik:{
       ig: Math.max(0,parseInt((document.getElementById('cfg-viral-ig')||{}).value||10000)||10000),
       yt: Math.max(0,parseInt((document.getElementById('cfg-viral-yt')||{}).value||10000)||10000),
@@ -9087,8 +9140,12 @@ function oyGetDil() {
 }
 
 async function oySave() {
+  // n8n KONTROLÜ EN BAŞTA DEĞİL: eskiden burada erken return ediliyordu ve
+  // localStorage'a yazan satıra hiç ulaşılmıyordu. Oysa sayfanın kendi bilgi
+  // kutusu "kaydettiğin bilgiler bu tarayıcıda saklanır, formu her açtığında
+  // otomatik doldurulur" diyor — kullanıcı formu doldurup Kaydet'e basıyor ve
+  // her şeyi kaybediyordu. Önce YEREL kayıt, sonra n8n'e gönderim denemesi.
   const base = getN8N();
-  if (!base) return showRes('oy-res','Ayarlar\'dan n8n URL girin','warn');
 
   const ayar = {
     YT_API_KEY: (document.getElementById('oy-yt-key')||{}).value||'',
@@ -9110,7 +9167,15 @@ async function oySave() {
     return showRes('oy-res','En az bir bölümü (Playlist veya IG) doldurun','warn');
   }
 
-  localStorage.setItem('op_oto_ayarlar', JSON.stringify(ayar));
+  // Yerel kayıt HER HÂLÜKÂRDA — n8n olmasa da form dolu gelsin
+  try { localStorage.setItem('op_oto_ayarlar', JSON.stringify(ayar)); }
+  catch(e){ showRes('oy-res','✕ Tarayıcıya kaydedilemedi: '+e.message,'err'); return; }
+  addLog('ok','sistem','Oto Yakala ayarları tarayıcıya kaydedildi');
+
+  if (!base){
+    showRes('oy-res','✓ Tarayıcıya kaydedildi — n8n\'e göndermek için Ayarlar\'dan n8n URL gir','warn');
+    return;
+  }
   showRes('oy-res','⏳ n8n\'e gönderiliyor…','info');
   const r = await faf(base+'/webhook/oto-yakala-ayarlar', ayar);
   if (r && r.ok) {
