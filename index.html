@@ -1296,11 +1296,13 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div class="ph"><div class="pt">Short Listesi</div><div class="ps">Short Kaydet sayfasındaki tüm short videolar</div></div>
   <div class="utab-bar" data-group="takip" data-utab="shortlist"></div>
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-    <input type="text" id="sl-q" placeholder="Ara..." style="width:160px" oninput="filterTbl('sl-tbody','sl-q')"/>
-    <select id="sl-status" style="width:120px" onchange="filterTbl('sl-tbody','sl-q')">
+    <input type="text" id="sl-q" placeholder="Ara..." style="width:160px" oninput="slFiltrele()"/>
+    <select id="sl-status" style="width:130px" onchange="slFiltrele()" title="Durum sütununa göre süzer">
       <option value="">Tüm Durumlar</option><option>Bekliyor</option><option>Yayınlandı</option>
     </select>
-    <select id="sl-cat" style="width:120px"><option value="">Tüm Kategoriler</option></select>
+    <!-- "Tüm Kategoriler" kutusu KALDIRILDI: bu tabloda kategori sütunu yok
+         (Başlık/Puan/Süre/IG/YT/TT/Durum/Tarih). Kutu hiç doldurulmuyordu,
+         onchange'i yoktu ve hiçbir yerde okunmuyordu. -->
     <button class="btn bg bsm" onclick="loadAllSheetData('shortlist')">↻ Yenile</button>
     <button class="btn bg bsm" onclick="exportCSV('sl-tbody','shorts')">⬇ CSV</button>
   </div>
@@ -2360,7 +2362,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-15';
+const PANEL_YAPI = 'y2026.08.04-16';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
@@ -7572,13 +7574,19 @@ async function upSirali(liste, isFn, esZaman) {
 // bu yanıt webhook'un VAR olduğunu kanıtlar. Hiç kayıtlı değilse mesaj
 // "not registered" olur. Böylece gerçek bir gönderim tetiklenmez.
 async function testWH(gosterId, sonucId){
-  const yol = (document.getElementById(gosterId) || {}).textContent || '';
+  const gosterilen = ((document.getElementById(gosterId) || {}).textContent || '').trim();
   const base = getN8N();
   if (!base) return showRes(sonucId, 'Ayarlar\'dan n8n URL girin', 'warn');
-  if (!yol)  return showRes(sonucId, 'Webhook yolu okunamadı', 'err');
+  if (!gosterilen) return showRes(sonucId, 'Webhook yolu okunamadı', 'err');
+  // EKRANDAKİ METİN ZATEN TAM URL: updateWHs onu b+path olarak yazıyor.
+  // Eskiden buna "yol" muamelesi yapılıp başına base BİR KEZ DAHA
+  // ekleniyordu → https://n8nhttps://n8n/webhook/... → düğme n8n kayıtlıyken
+  // HER ZAMAN "✕ Ulaşılamadı" diyordu.
+  const tam = /^https?:\/\//i.test(gosterilen) ? gosterilen : base + gosterilen;
+  const yol = tam.indexOf(base) === 0 ? tam.slice(base.length) : gosterilen;
   showRes(sonucId, '⏳ ' + yol + ' sınanıyor…', 'info');
   try {
-    const r = await fetch(base + yol, { method:'GET' });
+    const r = await fetch(tam, { method:'GET' });
     const t = (await r.text()).slice(0, 400);
     if (r.ok)
       return showRes(sonucId, '✓ ' + yol + ' yanıt verdi (HTTP ' + r.status + ')', 'ok');
@@ -7917,6 +7925,20 @@ function showRes(id,msg,type){const e=document.getElementById(id);if(!e)return;e
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 function copyText(txt){navigator.clipboard.writeText(txt).then(()=>addLog('ok','sistem','Kopyalandi'));}
 function dl(name,content){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'text/plain'}));a.download=name;a.click();}
+// Short Listesi süzgeci: metin + DURUM birlikte. filterTbl yalnızca metin
+// kutusunu okuyor, select'in değerine hiç bakmıyordu — durum seçmek sadece
+// mevcut metin filtresini yeniden uygulamaktan ibaretti.
+// Durum, tablonun 7. hücresinde (Başlık/Puan/Süre/IG/YT/TT/DURUM/Tarih).
+function slFiltrele(){
+  const q  = ((document.getElementById('sl-q')||{}).value||'').toLowerCase().trim();
+  const st = ((document.getElementById('sl-status')||{}).value||'').toLowerCase().trim();
+  document.querySelectorAll('#sl-tbody tr').forEach(tr=>{
+    if (!tr.cells || tr.cells.length < 8) return;          // "kayıt yok" satırı
+    const metin = tr.textContent.toLowerCase();
+    const durum = (tr.cells[6].textContent||'').toLowerCase();
+    tr.style.display = ((!q || metin.includes(q)) && (!st || durum.includes(st))) ? '' : 'none';
+  });
+}
 function filterTbl(tbodyId,searchId){const q=(document.getElementById(searchId)||{}).value||'';document.querySelectorAll('#'+tbodyId+' tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
 function exportCSV(tbodyId,name){const rows=[];const tb=document.getElementById(tbodyId);if(!tb)return;const ths=tb.closest('table')?.querySelectorAll('thead th');if(ths)rows.push([...ths].map(t=>t.textContent).join(','));tb.querySelectorAll('tr').forEach(tr=>{if(tr.style.display==='none')return;rows.push([...tr.querySelectorAll('td')].map(t=>'"'+t.textContent.replace(/"/g,'""')+'"').join(','));});dl(name+'.csv',rows.join('\n'));}
 function saveSent(){try{localStorage.setItem('op_sent',JSON.stringify([...S.sentURLs]));}catch(e){}setEl('dr-sent-cnt',S.sentURLs.size);}
