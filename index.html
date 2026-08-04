@@ -1535,7 +1535,11 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <input type="date" id="ar-s" style="width:140px"/>
     <input type="date" id="ar-e" style="width:140px"/>
-    <select id="ar-k" style="width:130px"><option value="">Tüm Kaynaklar</option><option value="drive">Drive</option><option value="youtube-arama">YT Arama</option><option value="panel">Manuel</option><option value="bulk-keyword">Toplu</option></select>
+    <!-- Değerler panelin GERÇEKTEN yazdığı kaynak adlarıyla eşleşmeli.
+         Eskiden "bulk-keyword" vardı ama panel "toplu" yazıyor → o seçenek
+         hiçbir zaman kayıt getirmiyordu; sheets/ytkanal/kworb-onay/trend-radar
+         ve gecmis-tekrar ise listede hiç yoktu, yani süzülemiyorlardı. -->
+    <select id="ar-k" style="width:150px"><option value="">Tüm Kaynaklar</option><option value="drive">Drive</option><option value="sheets">Sheets</option><option value="youtube-arama">YT Arama</option><option value="ytkanal">YT Kanal</option><option value="panel">Manuel</option><option value="toplu">Toplu</option><option value="kworb-onay">Kworb Onay</option><option value="trend-radar">Trend Radar</option><option value="gecmis-tekrar">Geçmişten Tekrar</option></select>
     <button class="btn bg bsm" onclick="loadAllSheetData('arsiv')">⊙ Filtrele</button>
     <button class="btn bg bsm" onclick="exportCSV('ar-tbody','arsiv')">⬇ CSV</button>
   </div>
@@ -2390,7 +2394,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-12';
+const PANEL_YAPI = 'y2026.08.04-13';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
@@ -7887,7 +7891,12 @@ function renderLogs() {
   const rows=S.logs.filter(l=>{
     if(sf&&l.sev!==sf)return false;
     if(cf&&l.cat!==cf)return false;
-    if(df&&!l.t.startsWith(df))return false;
+    // l.t UTC ISO (addLog: new Date().toISOString()), df ise YEREL bir tarih.
+    // startsWith karşılaştırması UTC'ye göre süzüyordu: TR'de (UTC+3) gece
+    // 00:00–03:00 arası yazılan loglar "bugün"ü seçince kaybolup "dün"de
+    // çıkıyor, tabloda ise bugünün tarihiyle listeleniyordu. Yerel güne çevir.
+    if(df){ const d=new Date(l.t);
+      if (isNaN(d) || new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10) !== df) return false; }
     if(qf&&!l.msg.toLowerCase().includes(qf))return false;
     return true;
   }).slice(0,300);
@@ -10256,13 +10265,27 @@ async function cerAyarGonder(manuel){
     const c = CER.p[u];
     profiller[u] = { aktif: c.aktif !== false, bannerUrl: c.bannerUrl||'', filigran: c.filigran||'', ad: c.ad||u };
   });
-  const r = await faf(base+'/webhook/cerceve-ayar', {
+  const s = fafSonuc(await faf(base+'/webhook/cerceve-ayar', {
     aktif: CER.aktif, urlModu: CER.urlModu, apikey: S.cfg.blot||'',
     fontUrl: cerVarlik('Inter-ExtraBold.ttf'), profiller: profiller
-  });
+  }));
+  // "Son gönderim" damgası KOŞULSUZ yazılıyordu: HTTP 404/500 (workflow pasif,
+  // yanlış yol) hâlinde bile "şimdi" görünüyor, üstelik uyarı yalnız
+  // manuel && corsOrNetwork durumunda çıkıyordu. Yani toggle'lardan yapılan
+  // gönderimlerde hata tamamen sessizdi.
+  if (!s.ok && !s.belirsiz){
+    setEl('cer-sync-son', 'gönderilemedi');
+    addLog('err','webhook','Çerçeve ayarı gönderilemedi: '+s.mesaj);
+    if (manuel) alert('Çerçeve ayarı n8n\'e gönderilemedi — '+s.mesaj);
+    else toast('⚠ Çerçeve ayarı n8n\'e gönderilemedi — '+s.mesaj, 'err', 7000);
+    return;
+  }
   CER.syncSon = new Date().toISOString(); cerYaz();
-  setEl('cer-sync-son', new Date().toLocaleString('tr'));
-  if (manuel && r && r.corsOrNetwork) alert('Gönderilemedi — n8n URL/workflow aktif mi? (cerceve-ayar webhook yeni workflow ile gelir)');
+  setEl('cer-sync-son', new Date().toLocaleString('tr') + (s.belirsiz ? ' (yanıt alınamadı)' : ''));
+  if (s.belirsiz){
+    addLog('warn','webhook','Çerçeve ayarı: '+s.mesaj);
+    if (manuel) alert('Gönderildi ama yanıt alınamadı — '+s.mesaj);
+  }
 }
 
 // ── FFmpeg komutu (n8n "Çerçeve Hazırla" ile BİREBİR aynı mantık) ──
@@ -10644,17 +10667,39 @@ async function oneAlYukle(){
     const { data } = await upFetchRetry('/uploadposts/schedule');
     const liste = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
     let tarihsiz = 0;
-    ONEAL.kayitlar = liste
-      .filter(x => String(x.profile_username||'') === profil)
-      .map(x => {
-        const t = Date.parse(x.scheduled_date||x.scheduledDate||'') || 0;
-        if (!t) tarihsiz++;
-        return { jid:String(x.job_id||''), t, baslik:String(x.title||x.post_title||'(başlıksız)'),
-                 plat:(Array.isArray(x.platforms)&&x.platforms.length ? x.platforms.join('+') : String(x.platform||'')) || 'platformsuz' };
-      })
+    const ham = [];
+    liste.filter(x => String(x.profile_username||'') === profil).forEach(x => {
+      const t = Date.parse(x.scheduled_date||x.scheduledDate||'') || 0;
+      if (!t) tarihsiz++;
+      ham.push({ jid:String(x.job_id||''), t, baslik:String(x.title||x.post_title||'(başlıksız)'),
+                 plat:(Array.isArray(x.platforms)&&x.platforms.length ? x.platforms.join('+') : String(x.platform||'')) || 'platformsuz' });
+    });
+    // KUYRUK YUVALARI da alınmalı: panelin asıl gönderim yolu add_to_queue ve
+    // o işler queue/preview'da duruyor. Yalnız /schedule okunduğu için
+    // kuyruğa alınmış short'lar için düğme "tarihli bekleyen gönderi yok"
+    // diyordu. İki uç aynı işi ikisi birden listeleyebiliyor → job_id ile teklenir.
+    // (Panel bu kimliklere zaten PATCH/DELETE atıyor: ciftSil ve Öne Al aynı uç.)
+    let kuyruktan = 0;
+    try {
+      const { data: qd } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(profil)+'&count=50');
+      (qd.slots||[]).forEach(sl => {
+        const sp = sl.scheduled_post; if (!sp) return;
+        const t = Date.parse(sl.datetime_utc||sp.scheduled_date||'') || 0;
+        if (!t) { tarihsiz++; return; }
+        kuyruktan++;
+        ham.push({ jid:String(sp.job_id||sp.id||''), t, baslik:String(sp.title||sp.post_title||'(başlıksız)'),
+                   plat:(Array.isArray(sp.platforms)&&sp.platforms.length ? sp.platforms.join('+') : String(sp.platform||'')) || 'platformsuz' });
+      });
+    } catch(e){ console.warn('[ONEAL] kuyruk:', e.message); }
+    const gorulen = new Set();
+    ONEAL.kayitlar = ham
       .filter(k => k.jid && k.t)          // kimliksiz/tarihsiz sıralamaya giremez
+      .filter(k => !gorulen.has(k.jid) && gorulen.add(k.jid))
       .sort((a,b) => a.t - b.t);
     ONEAL.tarihsiz = tarihsiz;
+    // Kaç tanesinin kuyruk yuvasından geldiği — /schedule ile çakışanlar
+    // teklendiği için SON listeye göre sayılır, ham okuma sayısına göre değil.
+    ONEAL.kuyruktan = ONEAL.kayitlar.length ? Math.min(kuyruktan, ONEAL.kayitlar.length) : 0;
     // Gönderim sırasında "⏫ Öne al" işaretlenmişse: o andan SONRA kuyruğa
     // giren işler bu videonun short'larıdır. Hazır seçili gelirler ama
     // OTOMATİK UYGULANMAZ — araya başka videoların short'ları da girmiş
@@ -10699,6 +10744,7 @@ function oneAlCiz(){
   kutu.innerHTML = bant
     + '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">'+ONEAL.kayitlar.length+' bekleyen gönderi · '
     + gorunen.length+' görünüyor · <b style="color:var(--acc)">'+ONEAL.secim.size+' seçili</b>'
+    + (ONEAL.kuyruktan ? ' · '+ONEAL.kuyruktan+'\'i kuyruk yuvasından' : '')
     + (ONEAL.tarihsiz ? ' · '+ONEAL.tarihsiz+' kayıt tarihsiz (sıralamaya giremez)' : '')+'</div>'
     + gorunen.slice(0,300).map(k=>{
         const s = ONEAL.secim.has(k.jid);
@@ -11153,21 +11199,27 @@ function _dmRenderList(items) {
   let html = '';
   items.forEach(item => {
     const meta = PLAT_META[item.plat] || {label:item.plat, color:'var(--acc)', icon:'▪', accent:'var(--acc)'};
-    const title  = pick(item.r, ['title','baslik','Title','Başlık','name']) || '(başlıksız)';
-    const desc   = pick(item.r, ['description','aciklama','Description','Açıklama']).slice(0, 180);
-    const status = pick(item.r, ['platform-status','durum','status','Durum']) || 'Bekliyor';
-    const thumb  = pick(item.r, ['thumbnail-url','thumbnail','thumb','image','preview-url','image-url','Thumbnail']);
-    const videoUrl = pick(item.r, ['short-url','video-url','video_url','uriForExport','ShortUrl','ShortURL','preview_url']);
+    // HTML KAÇIŞI: bu kartlar başlık/açıklama/hata metnini şablona DOĞRUDAN
+    // basıyordu. Aynı dosyadaki renderTakGun, takWeekChip ve renderYayinDurumu
+    // kaçış yapıyor; burası atlanmış. Tırnak ya da < içeren bir başlık kart
+    // düzenini bozuyor, src/href niteliğine giren metin ise nitelik taşırabiliyordu.
+    const esc = s => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const title  = esc(pick(item.r, ['title','baslik','Title','Başlık','name']) || '(başlıksız)');
+    const desc   = esc(pick(item.r, ['description','aciklama','Description','Açıklama']).slice(0, 180));
+    const statusRaw = pick(item.r, ['platform-status','durum','status','Durum']) || 'Bekliyor';
+    const status = esc(statusRaw);                 // ham hâli aşağıdaki mantıkta kullanılıyor
+    const thumb  = esc(pick(item.r, ['thumbnail-url','thumbnail','thumb','image','preview-url','image-url','Thumbnail']));
+    const videoUrl = esc(pick(item.r, ['short-url','video-url','video_url','uriForExport','ShortUrl','ShortURL','preview_url']));
     const timeStr = item.time ? new Date(item.time).toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'}) : '--:--';
-    const hesap  = pick(item.r, platAccKeys[item.plat] || []);
-    const hashtags = (item.r['hashtags'] || item.r['hashtags-ig'] || '').split(/\s+/).filter(h=>h.startsWith('#')).slice(0,4);
+    const hesap  = esc(pick(item.r, platAccKeys[item.plat] || []));
+    const hashtags = (item.r['hashtags'] || item.r['hashtags-ig'] || '').split(/\s+/).filter(h=>h.startsWith('#')).slice(0,4).map(esc);
 
     // DURUM: item.status tek doğru kaynak ('pub'|'fail'|'plan') — loadTakvim
     // bunu API yanıtından kuruyor. Daha önce Türkçe 'platform-status' metni
     // ayrıştırılıyordu; başarısız kayıtta metin "Hata: ..." olduğu için satır
     // "Bekliyor" görünüyor, altta ise yayınlanmış sayılıyordu (hata görünmezdi).
     // status alanı yoksa (başka bir kaynaktan gelen kayıt) metne düşülür
-    const durum = item.status || (/yayın|tamamland/i.test(status) ? 'pub' : 'plan');
+    const durum = item.status || (/yayın|tamamland/i.test(statusRaw) ? 'pub' : 'plan');
     const isPublished = durum === 'pub';
     const isFailed    = durum === 'fail';
     const statusDot  = isFailed ? '#ef4444' : (isPublished ? '#10b981' : '#f59e0b');
@@ -11175,14 +11227,14 @@ function _dmRenderList(items) {
     const rozetBg    = isFailed ? 'rgba(239,68,68,.12)' : (isPublished ? 'rgba(16,185,129,.12)' : 'rgba(245,158,11,.1)');
     const rozetBrd   = isFailed ? 'rgba(239,68,68,.35)' : (isPublished ? 'rgba(16,185,129,.3)' : 'rgba(245,158,11,.25)');
     // Başarısızsa sebebi göster — asıl işe yarayan bilgi bu
-    const hataMetni = isFailed ? (item.error || String(status).replace(/^Hata:\s*/i,'') || 'sebep belirtilmemiş') : '';
+    const hataMetni = isFailed ? esc(item.error || String(statusRaw).replace(/^Hata:\s*/i,'') || 'sebep belirtilmemiş') : '';
 
     // Platform rozeti stili
+    // Son dal sabit TikTok rengi veriyordu: FB, X ve Planlı rozetleri de
+    // turkuaz çiziliyordu. Platform renkleri PLAT_COLOR'da zaten tanımlı.
     const platBadgeStyle = item.plat === 'ig'
       ? `background:${IG_GRAD};-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-weight:700`
-      : item.plat === 'yt'
-      ? `color:#ff4444;font-weight:700`
-      : `color:#69c9d0;font-weight:700`;
+      : `color:${PLAT_COLOR[item.plat] || 'var(--acc)'};font-weight:700`;
 
     html += `<div onclick="takOpenPost(${TAK.items.indexOf(item)})" style="display:flex;gap:0;margin-bottom:10px;border-radius:10px;overflow:hidden;border:1px solid var(--brd);background:var(--bg);transition:border-color .15s;cursor:pointer" onmouseover="this.style.borderColor='${meta.accent}88'" onmouseout="this.style.borderColor='var(--brd)'">
 
