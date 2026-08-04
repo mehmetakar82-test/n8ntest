@@ -2362,7 +2362,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-17';
+const PANEL_YAPI = 'y2026.08.04-18';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
@@ -4868,6 +4868,7 @@ let YT_CANLI_DURUM = '';
 // (kanal kimliği 'UC' + 22 karakterdir, URL içinde geçse bile yakalanır).
 function ytKanalIdBul(a){
   if (!a || typeof a !== 'object') return '';
+  if (a._ytKanalId) return a._ytKanalId;        // handle'dan çözülmüş kimlik
   for (const k of ['id','channel_id','channelId','channel','account_id','accountId']){
     const v = String(a[k]||'');
     if (/^UC[A-Za-z0-9_-]{22}$/.test(v)) return v;
@@ -4875,11 +4876,59 @@ function ytKanalIdBul(a){
   const m = JSON.stringify(a).match(/UC[A-Za-z0-9_-]{22}/);
   return m ? m[0] : '';
 }
+// Upload-Post bazı YouTube hesaplarında kanal kimliğini HİÇ döndürmüyor —
+// o hâlde @handle'dan çözülür. YouTube Data API v3 'forHandle' parametresi
+// (2023) handle → kanal döndürüyor, 1 kota birimi. Çözülen kimlik hesaba
+// yazılıyor, böylece canlı ad + Studio bağlantısı da çalışır hâle geliyor.
+const YT_HANDLE_ID = {};        // handle(küçük harf) -> channelId ('' = çözülemedi)
+function ytHandleBul(a){
+  const h = cleanHandle((a && (a.username || a.custom_url || a.customUrl || a.handle)) || '');
+  return /^[A-Za-z0-9._-]{3,30}$/.test(h) ? h : '';
+}
 async function platYtCanliAdlar(byPlat){
   const key = S.cfg.ytApiKey || '';
   const ytHesaplar = byPlat.youtube || [];
-  const tumIdler = [...new Set(ytHesaplar.map(ytKanalIdBul).filter(Boolean))];
-  if (ytHesaplar.length && !tumIdler.length){ YT_CANLI_DURUM = 'kimlik-yok'; return; }
+  if (!ytHesaplar.length) return;
+  let tumIdler = [...new Set(ytHesaplar.map(ytKanalIdBul).filter(Boolean))];
+
+  // Kimliği hiç dönmeyen hesaplar: @handle'dan çözmeyi dene. Bu adım
+  // olmadığında "kanal kimliği yok" deyip pes ediliyordu ve o hesapların
+  // adları bağlama anındaki hâliyle donuyordu.
+  const kimliksiz = ytHesaplar.filter(a => !ytKanalIdBul(a));
+  let handleDenendi = 0, handleCozuldu = 0;
+  if (kimliksiz.length && key){
+    for (const a of kimliksiz){
+      const h = ytHandleBul(a); if (!h) continue;
+      const ah = h.toLowerCase();
+      if (YT_HANDLE_ID[ah] !== undefined){                 // önbellek
+        if (YT_HANDLE_ID[ah]){ a._ytKanalId = YT_HANDLE_ID[ah]; tumIdler.push(YT_HANDLE_ID[ah]); }
+        continue;
+      }
+      handleDenendi++;
+      try {
+        const r = await fetch('https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=@'
+                              + encodeURIComponent(h) + '&key=' + encodeURIComponent(key));
+        const j = await r.json().catch(()=>({}));
+        if (!r.ok){
+          YT_CANLI_DURUM = 'api-'+r.status;
+          addLog('warn','uploadpost','YouTube handle çözülemedi (@'+h+'): '+((j.error&&j.error.message)||('HTTP '+r.status)));
+          break;                                            // kota/anahtar sorunu — kalanları deneme
+        }
+        const id = (j.items && j.items[0] && j.items[0].id) || '';
+        YT_HANDLE_ID[ah] = id;
+        if (id){ a._ytKanalId = id; tumIdler.push(id); handleCozuldu++; }
+      } catch(e){ console.warn('[PLAT] handle çözülemedi (@'+h+'):', e.message); }
+    }
+    tumIdler = [...new Set(tumIdler)];
+    if (handleDenendi) addLog(handleCozuldu?'ok':'warn','uploadpost',
+      'YouTube handle→kanal: '+handleCozuldu+'/'+handleDenendi+' çözüldü');
+  }
+
+  if (!tumIdler.length){
+    // Neden başarısız olduğunu AYIR: anahtar mı yok, kimlik mi gelmiyor
+    YT_CANLI_DURUM = key ? 'kimlik-yok' : 'anahtar-yok';
+    return;
+  }
   const idler = tumIdler.filter(id => !YT_CANLI[id]);
   if (!idler.length) return;   // hepsi zaten önbellekte (durum korunur)
   if (!key){ YT_CANLI_DURUM = 'anahtar-yok'; return; }
@@ -7381,10 +7430,14 @@ function renderPlatformsGrid(byPlat) {
     // YouTube canlı okuma NEDEN çalışmadıysa ekranda söylenir — sessiz atlama
     // "adlar hâlâ eski" diye görünüp sebebini gizliyordu.
     const ytN = Object.keys(YT_CANLI).length;
+    // Bu uyarı YALNIZCA ad gösterimiyle ilgili — yayın gönderimi kanal
+    // kimliğini kullanmıyor, Upload-Post profili üzerinden gidiyor. Metin
+    // bunu söylemezse kullanıcı "YouTube hesabım bozuk" sanıyor (sandı).
+    const ytKuyruk = ' <span style="color:var(--mt)">(yayınlar etkilenmez — yalnız adlar bağlama anındaki hâliyle görünür)</span>';
     if (ytN)                                     m += ' · <span style="color:var(--ok)">YouTube canlı: '+ytN+' kanal ✓</span>';
-    else if (YT_CANLI_DURUM === 'anahtar-yok')   m += ' · <span style="color:#f5a623">⚠ YouTube canlı okunamadı — YT Kanal sayfasına <b>YouTube API anahtarı</b> girip Kaydet\'e bas</span>';
-    else if (YT_CANLI_DURUM === 'kimlik-yok')    m += ' · <span style="color:#f5a623">⚠ YouTube canlı okunamadı — Upload-Post verisinde kanal kimliği (UC…) yok</span>';
-    else if (YT_CANLI_DURUM)                     m += ' · <span style="color:#f5a623">⚠ YouTube canlı okunamadı ('+esc(YT_CANLI_DURUM)+')</span>';
+    else if (YT_CANLI_DURUM === 'anahtar-yok')   m += ' · <span style="color:#f5a623">⚠ YouTube adları canlı okunamadı — Ayarlar\'a <b>YouTube API anahtarı</b> gir</span>'+ytKuyruk;
+    else if (YT_CANLI_DURUM === 'kimlik-yok')    m += ' · <span style="color:#f5a623">⚠ YouTube adları canlı okunamadı — Upload-Post kanal kimliği vermiyor, @handle\'dan da çözülemedi</span>'+ytKuyruk;
+    else if (YT_CANLI_DURUM)                     m += ' · <span style="color:#f5a623">⚠ YouTube adları canlı okunamadı ('+esc(YT_CANLI_DURUM)+')</span>'+ytKuyruk;
     e2.innerHTML = m;
   }
 }
