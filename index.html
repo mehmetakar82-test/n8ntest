@@ -2381,7 +2381,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-06';
+const PANEL_YAPI = 'y2026.08.04-07';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -4888,8 +4888,13 @@ try { GONDERILDI = JSON.parse(localStorage.getItem(GND_ANAHTAR) || '{}') || {}; 
 function gndAnahtar(profil, platform, baslik){
   const t = String(baslik||'').trim().toLowerCase().replace(/\s+/g,' ');
   if (!t || t.length < 6) return '';                    // ayırt edici değil
-  return String(profil||'').trim()+'|'+String(platform||'').trim().toLowerCase()+'|'+t;
+  // profil/platform ZORUNLU: boş bırakılırsa "|" + "|" + başlık gibi bir
+  // anahtar çıkıyor ve kimliği eksik iki farklı kayıt aynı işareti paylaşıyor.
+  const p = String(profil||'').trim(), pl = String(platform||'').trim().toLowerCase();
+  if (!p || !pl) return '';
+  return p+'|'+pl+'|'+t;
 }
+function gndSay(){ return Object.keys(GONDERILDI).length; }
 function gndIsaretle(profil, platform, baslik){
   const k = gndAnahtar(profil, platform, baslik);
   if (!k) return;
@@ -9688,6 +9693,7 @@ document.addEventListener('DOMContentLoaded', function() {
       pdOrgKimlik,pdKaynakTanisi,platDoldurTazele,pdTazeLinkler,pdProjeKimligi,
       khErisimHatasi,khYapilandirmaHatasi,khYapilandirmaUyarisi,khTazele,
       gndIsaretle,gndCozuldu,gndZamani,gndAnahtar,kapsamaMatrisCiz,kapsamaYenidenGonderildi,ydYenidenCozmez,
+      gndSay,gndNotHTML,gndGoster,gndSil,gndHepsiniTemizle,
       khKaynakAra,pdKlipDizini,pdBaslikEslesme,
       esitleAc,esitleGonder,esitleKapat,kapsamaPlanArtir,
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
@@ -12283,7 +12289,11 @@ function renderYayinDurumu(){
   const gizlenen = tumu.length - list.length;
   // Yeniden gönderilmiş ama henüz yayınlanmamışlar AYRI sayılır: gizlenmezler
   // (yayın kanıtı yok) ama "bunlara zaten dokundum" bilgisi üstte de görünsün.
-  const bekleyen = list.filter(i => i._yeniden).length;
+  // "Yolda" sayılabilenler YALNIZ çözülebilir hatalar. Hesap bağlantısı
+  // kopmuşsa yeniden gönderim zaten yayınlanamaz — onu "bekliyor" diye
+  // göstermek yanlış güven veriyordu (satırda hem "gönderdin, bekle" hem
+  // "bu hata öyle geçmez" yazıyordu; kullanıcı haklı olarak itiraz etti).
+  const bekleyen = list.filter(i => i._yeniden && !ydYenidenCozmez(i.error)).length;
   const not = (gizlenen
       ? '<div class="isl-not"><span>✓ ' + gizlenen + ' başarısız gönderim yeniden gönderilip yayınlandığı için gizlendi</span>'
         + '<button type="button" class="isl-btn" onclick="ydCozulenGoster(true)">yine de göster</button></div>'
@@ -12291,7 +12301,8 @@ function renderYayinDurumu(){
     + (bekleyen
       ? '<div class="isl-not"><span>↻ ' + bekleyen + ' gönderim yeniden gönderildi ama henüz yayınlanmadı — '
         + 'yayınlandığında kendiliğinden listeden düşer, tekrar göndermene gerek yok</span></div>'
-      : '');
+      : '')
+    + gndNotHTML();
   if (!list.length){
     el.innerHTML = (gizlenen
       ? durumHTML('bos',{ic:'✓',bas:'Bekleyen hata yok',
@@ -12310,8 +12321,11 @@ function renderYayinDurumu(){
     // Yeniden gönderilmiş ama henüz yayın kanıtı yok — çözülmüş DEĞİL,
     // ham hatadan da farklı: kullanıcı zaten bir kez gönderdi.
     const yn = it.status==='failed' && !cz && it._yeniden;
-    const stColor = cz?'var(--ok)':yn?'var(--acc)':it.status==='published'?'var(--ok)':it.status==='failed'?'var(--er)':it.status==='retried'?'var(--acc)':'var(--wn)';
-    const stLabel = cz?'✓ Sonradan yayınlandı':yn?'↻ Yeniden gönderildi':it.status==='published'?'✅ Yayınlandı':it.status==='failed'?'❌ Başarısız':it.status==='retried'?'↻ Tekrar denendi':'⏰ Planlı';
+    // Yeniden gönderim ancak hata çözülebilir cinstense "yolda" sayılır.
+    // Bağlantı/izin hatasında gönderim kuyruğa girse bile yayınlanamaz.
+    const ynBekliyor = yn && !ydYenidenCozmez(it.error);
+    const stColor = cz?'var(--ok)':ynBekliyor?'var(--acc)':it.status==='published'?'var(--ok)':it.status==='failed'?'var(--er)':it.status==='retried'?'var(--acc)':'var(--wn)';
+    const stLabel = cz?'✓ Sonradan yayınlandı':ynBekliyor?'↻ Yeniden gönderildi':it.status==='published'?'✅ Yayınlandı':it.status==='failed'?'❌ Başarısız':it.status==='retried'?'↻ Tekrar denendi':'⏰ Planlı';
     const platLabel = YD_PLAT_LABEL[it.plat] || (it.plat==='sch'?'':it.plat);
     const t = it.time ? new Date(it.time).toLocaleString('tr',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
     const thumb = it.thumb ? `<img src="${esc(it.thumb)}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0" onerror="this.style.display='none'"/>` : '';
@@ -12341,11 +12355,13 @@ function renderYayinDurumu(){
         ${yn?(()=>{
           const dk = Math.max(0, Math.round((Date.now()-it._yeniden)/60000));
           const ne = dk<60 ? (dk+' dk önce') : (dk<1440 ? (Math.round(dk/60)+' saat önce') : (Math.round(dk/1440)+' gün önce'));
-          return `<div style="margin-top:4px;font-size:11.5px;color:var(--acc)">↻ Bu gönderimi ${ne} yeniden gönderdin — henüz yayınlanmadı.`
-            + (ydYenidenCozmez(it.error)
-                ? `<div style="color:var(--wn);margin-top:1px">Bu hata yeniden göndermekle geçmez: önce yukarıdaki bağlantı sorununu gider, sonra tekrar dene.</div>`
-                : `<div style="color:var(--mt);margin-top:1px">Kuyruğa alındıysa sırası gelince yayınlanır; yayınlandığında bu kayıt listeden kendiliğinden düşer.</div>`)
-            + `</div>`;
+          // İki AYRI durum, iki AYRI cümle — eskiden ikisi üst üste yazılıp
+          // "gönderdin, bekle" ile "böyle geçmez" aynı satırda çelişiyordu.
+          return ynBekliyor
+            ? `<div style="margin-top:4px;font-size:11.5px;color:var(--acc)">↻ Bu gönderimi ${ne} yeniden gönderdin — henüz yayınlanmadı.`
+              + `<div style="color:var(--mt);margin-top:1px">Kuyruğa alındıysa sırası gelince yayınlanır; yayınlandığında bu kayıt listeden kendiliğinden düşer.</div></div>`
+            : `<div style="margin-top:4px;font-size:11.5px;color:var(--wn)">↻ ${ne} yeniden gönderdin ama <b>yayınlanmadı</b> — bu hata yeniden göndermekle geçmiyor.`
+              + `<div style="color:var(--mt);margin-top:1px">Önce yukarıdaki bağlantı sorununu gider (Upload-Post → Manage Users), sonra tekrar dene. O zamana kadar her deneme aynı hatayı alır.</div></div>`;
         })():''}
       </div>
       <span style="font-size:12px;color:${stColor};font-weight:700;white-space:nowrap">${stLabel}</span>
@@ -12392,6 +12408,64 @@ function ydFiltreliListe(){
   if (YD.filter !== 'all') list = list.filter(i => i.status === YD.filter);
   if (!YD.cozulenGoster) list = list.filter(i => !i._cozuldu);
   return list;
+}
+
+// ── YENİDEN GÖNDERİM İŞARETLERİ: denetle ve temizle ────────────────────
+// İşaret YALNIZ gönderim başarılı olunca yazılır (beş çağrı yerinin beşi de
+// s.ok/ok kontrolünden sonra). Ama kayıt görünmezdi: "bunu ben göndermedim"
+// denildiğinde kanıtı gösterecek yer yoktu. Burası ham kaydı açıyor —
+// profil, platform, başlık ve gönderim zamanı — ve tek tek ya da toplu
+// silinebiliyor. Silmek yalnız PANELİN HAFIZASINI siler; Upload-Post'ta
+// gerçekten yapılmış bir gönderim varsa o durmaya devam eder.
+const GND_GOSTER = { acik:false, liste:[] };
+
+function gndNotHTML(){
+  const n = gndSay();
+  if (!n) { GND_GOSTER.liste = []; return ''; }
+  const esc = esc0;
+  const o = GONDERILDI;
+  GND_GOSTER.liste = Object.keys(o).sort((a,b) => (o[b]||0) - (o[a]||0));
+  let s = '<div class="isl-not"><span>↻ ' + n + ' yeniden gönderim işareti kayıtlı '
+    + '(panelden gönderdiğin, henüz yayın kanıtı olmayanlar)</span>'
+    + '<button type="button" class="isl-btn" onclick="gndGoster()">' + (GND_GOSTER.acik ? 'gizle' : 'göster') + '</button>'
+    + '<button type="button" class="isl-btn" onclick="gndHepsiniTemizle()">hepsini temizle</button></div>';
+  if (GND_GOSTER.acik){
+    const gun = t => t ? new Date(t).toLocaleString('tr',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '?';
+    s += '<div style="border:1px solid var(--brd);border-radius:6px;padding:7px 10px;margin-bottom:8px;background:var(--sur)">'
+      + GND_GOSTER.liste.slice(0,80).map((k,i) => {
+          const p = k.split('|');
+          return '<div style="font-size:11.5px;padding:2px 0;border-bottom:1px solid var(--brd);word-break:break-word;color:var(--tx)">'
+            + '<b>'+esc(p[0]||'?')+'</b> · '+esc(p[1]||'?')+' · '+esc(p.slice(2).join('|'))
+            + ' <span style="color:var(--mt)">('+gun(o[k])+' gönderildi)</span>'
+            + ' <button class="btn bsm" style="padding:0 6px;font-size:10.5px" onclick="gndSil('+i+')">✕ işareti sil</button></div>';
+        }).join('')
+      + (GND_GOSTER.liste.length > 80 ? '<div style="font-size:11px;color:var(--mt);padding:2px 0">… ve '+(GND_GOSTER.liste.length-80)+' tane daha</div>' : '')
+      + '</div>';
+  }
+  return s;
+}
+
+function gndGoster(){ GND_GOSTER.acik = !GND_GOSTER.acik; renderYayinDurumu(); }
+
+function gndSil(i){
+  const k = (GND_GOSTER.liste||[])[i]; if (!k || GONDERILDI[k] == null) return;
+  delete GONDERILDI[k];
+  try { localStorage.setItem(GND_ANAHTAR, JSON.stringify(GONDERILDI)); } catch(e){}
+  ydCozulenleriIsaretle(YD.items); ydUpdateCounts(); renderYayinDurumu();
+  toast('✓ İşaret silindi — kayıt yeniden ham hata olarak görünecek','ok',4000);
+}
+
+function gndHepsiniTemizle(){
+  const n = gndSay(); if (!n) return;
+  if (!confirm(n+' yeniden gönderim işareti silinecek.\n\n'
+      + 'Bu YALNIZCA panelin hafızasını siler — Upload-Post\'ta gerçekten yapılmış bir gönderim varsa o durmaya devam eder.\n\n'
+      + 'Kayıtlar yeniden ham "başarısız" olarak listelenir.\n\nDevam edilsin mi?')) return;
+  GONDERILDI = {};
+  try { localStorage.removeItem(GND_ANAHTAR); } catch(e){}
+  GND_GOSTER.acik = false;
+  ydCozulenleriIsaretle(YD.items); ydUpdateCounts(); renderYayinDurumu();
+  toast('✓ '+n+' işaret silindi','ok',5000);
+  addLog('info','uploadpost','Yeniden gönderim işaretleri temizlendi: '+n);
 }
 
 // "yine de göster" — çözülmüş hataları da listele (oturumluk, kaydedilmez)
