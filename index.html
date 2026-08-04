@@ -2381,7 +2381,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-07';
+const PANEL_YAPI = 'y2026.08.04-08';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 function getWH(path){ const b=getN8N(); return b?b+path:path; }
 
@@ -12338,13 +12338,17 @@ function renderYayinDurumu(){
     }
     else if (it.status==='failed'){
       const native = !!(it.reqId || it.jobId);
-      const known = native ? ' title="Upload-Post yerel yeniden deneme — tek tık, yalnız başarısız platform"'
-                   : (it._video ? ' title="Kaynak video bulundu — tek tık"' : ' title="Kaynak bilinmiyor — mp4 sorulacak"');
+      const known = it._video
+        ? ' title="Kaynak video bulundu — kuyruğa, yani planın sonuna eklenir"'
+        : ' title="Kaynak Sheet/OpusClip\'ten aranacak; bulunursa kuyruğa (planın sonuna) eklenir, bulunamazsa mp4 sorulur"';
       // Zaten gönderilmişse düğme İKİNCİL: kullanıcı bir kez gönderdi, ana
       // eylem artık tekrar göndermek değil (çoğu kez aynı hatayı alır).
       const sinif = yn ? 'btn bg bsm' : 'btn bp bsm';
       const etiket = yn ? '↻ Tekrar dene' : '↻ Yeniden Gönder';
-      right = `<button class="${sinif}" onclick="ydRetry(${realIdx})"${known}>${etiket}${(native||it._video)?'':' *'}</button>`;
+      // "*" = kaynak henüz çözülmedi, mp4 sorulabilir. Eskiden reqId varsa
+      // yıldız gizleniyordu (native retry kaynak istemiyordu); artık kuyruk
+      // yolu asıl yol olduğu için ölçüt yalnızca kaynağın bilinip bilinmemesi.
+      right = `<button class="${sinif}" onclick="ydRetry(${realIdx})"${known}>${etiket}${it._video?'':' *'}</button>`;
     }
     return `<div style="display:flex;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--brd);border-left:3px solid ${stColor};border-radius:6px;margin-bottom:6px;background:var(--sur)">
       ${thumb}
@@ -12502,8 +12506,10 @@ async function ydNativeRetry(it, idx){
       gndIsaretle(it.profile, ydPlatApi(it.plat), it.title);
       kapsamaYenidenGonderildi(it.profile, ydPlatApi(it.plat));
       ckEkle(it.profile, ydPlatApi(it.plat), it.title);
-      toast('✓ Yeniden kuyruğa alındı — '+(it.profile||'')+' ['+it.plat+']','ok');
-      addLog('ok','uploadpost','Native retry OK: '+(it.reqId||it.jobId));
+      // "Kuyruğa alındı" DEME: bu uç planın sonuna eklemiyor, işi hemen
+      // yeniden işleme alıyor. Yanlış ifade kullanıcıyı yanılttı.
+      toast('↻ Upload-Post hemen yeniden denedi (kuyruğun sonuna EKLENMEDİ) — '+(it.profile||'')+' ['+it.plat+']','info',6000);
+      addLog('ok','uploadpost','Native retry OK (anında): '+(it.reqId||it.jobId));
       // status='retried' YAPILMIYOR: kayıt "başarısız" süzgecinden anında
       // düşüyordu ama liste yenilenince ham hata olarak geri geliyordu.
       // Kalıcı işaretle aynı görünüm — yenilemeden önce/sonra fark yok.
@@ -12522,18 +12528,33 @@ async function ydNativeRetry(it, idx){
 
 async function ydRetry(idx){
   const it = YD.items[idx]; if (!it) return;
-  // 1) Upload-Post yerel retry (request_id/job_id varsa) — tek tık, kaynak gerekmez
-  if (it.reqId || it.jobId) return ydNativeRetry(it, idx);
-  // 2) Yedek: kaynak mp4 ile yeniden gönder
+  // SIRA BİLEREK BÖYLE: önce KUYRUK (add_to_queue), native retry en sonda.
+  // add_to_queue gönderiyi sıradaki BOŞ yuvaya koyar — yani planın SONUNA
+  // eklenir ve yayın ritmi korunur. Native retry (/posts/retry) ise işi
+  // hemen yeniden kuyruğa sokuyor: 12 short aynı dakikaya düşüyordu
+  // (kullanıcı Takvim'de 01:13–01:14'e yığıldıklarını gördü).
+  // Toplu gönderim bu yüzden native retry'ı zaten kullanmıyordu; tek satır
+  // düğmesi ona gitmeye devam ediyordu — asıl kusur buydu.
+  // 1) Kaynak elde varsa doğrudan kuyruğa
   if (it._video){
     await ydDoRetry({ profil: it.profile, platform: ydPlatApi(it.plat), video: it._video, title: it.title, description: it._caption||it.caption }, idx);
   } else {
-    // Son bir şans: sheet verisi sonradan gelmiş olabilir → tekrar eşleştir
+    // 2) Kaynağı Sheet'ten / OpusClip'ten çözmeyi dene
     await ydEnsureShorts();
     const late = ydFindSource(it.title, it.thumb, it.profile, it.caption);
     if (late && late.video){
       it._video = late.video; it._caption = late.caption || it.caption;
       return ydRetry(idx);
+    }
+    // 3) Kaynak yok. Native retry tek seçenek ama kuyruğa yazmıyor —
+    //    ne olacağını SÖYLEYİP onay al, yoksa sessizce anında yayınlanır.
+    if (it.reqId || it.jobId){
+      if (confirm('Bu short\'un kaynak mp4\'ü bulunamadı, bu yüzden kuyruğa eklenemiyor.\n\n'
+          + 'Upload-Post\'un kendi "yeniden dene" ucu kullanılabilir — ama o gönderiyi '
+          + 'PLANIN SONUNA EKLEMEZ, hemen yeniden işleme alır.\n\n'
+          + 'Bunun yerine "İptal" deyip açılacak pencereden mp4 URL\'si seçersen gönderi '
+          + 'sıradaki boş kuyruk yuvasına, yani planın sonuna eklenir.\n\n'
+          + 'Yine de hemen yeniden denensin mi?')) return ydNativeRetry(it, idx);
     }
     YD.retry = { idx };
     document.getElementById('yd-retry-info').innerHTML = `<b>${(it.title||'').slice(0,60)}</b><br>${YD_PLAT_LABEL[it.plat]||it.plat} · ${it.profile||'—'}<br>Otomatik eşleşme bulunamadı — aşağıdan seç ya da mp4 URL'si gir.`;
