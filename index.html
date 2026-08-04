@@ -2394,7 +2394,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-13';
+const PANEL_YAPI = 'y2026.08.04-14';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
@@ -3375,25 +3375,50 @@ async function sendDriveURLs() {
   const base=getN8N();
   if(!base)return showRes('dr-res','n8n URL girin','warn');
   showRes('dr-res','⏳ '+newU.length+' URL gonderiliyor...','info');
+  let ok=0, hata=0, belirsiz=0, ilkHata='';
   for(const r of newU){
     const url=r.url||r;
     const kat=(r.kategori&&r.kategori.trim())||defCat;
     const path=CAT_WH[kat]||'/webhook/video-gonder';
-    const drNotCol = (document.getElementById('dr-not-col')||{}).value||'Aciklama Notu';
-    const drAciklama = (r[drNotCol]||'').trim();
-    await faf(base+path,{'Youtube linki':url,channelTitle:await ytKanalAdi(url),kaynak:'drive',kategori:kat,dil:getSelLang('dr-cats'),platformlar:getSelPlatforms('dr-cats'),aciklama_notu:drAciklama});
-    recordSend(url, kat);
-    addLog('ok','drive','Drive ['+kat+']: '+url.slice(0,60));
+    // Açıklama notu, satır objesinin KENDİ anahtarından okunur. Eskiden
+    // r['Aciklama Notu'] deneniyordu ama bu objeler {url, kategori,
+    // aciklama_notu} olarak kuruluyor → değer HER ZAMAN boş gidiyordu,
+    // yani "Açıklama Notu Sütunu" ayarı hiçbir şey yapmıyordu.
+    const drAciklama = String(r.aciklama_notu||'').trim();
+    const s = fafSonuc(await faf(base+path,{'Youtube linki':url,channelTitle:await ytKanalAdi(url),kaynak:'drive',kategori:kat,dil:getSelLang('dr-cats'),platformlar:getSelPlatforms('dr-cats'),aciklama_notu:drAciklama}));
+    if (s.ok || s.belirsiz){
+      ok++; if (s.belirsiz) belirsiz++;
+      recordSend(url, kat);
+      addLog(s.belirsiz?'warn':'ok','drive','Drive ['+kat+']: '+url.slice(0,60)+(s.belirsiz?' (belirsiz)':''));
+    } else {
+      hata++; if (!ilkHata) ilkHata = s.mesaj;
+      addLog('err','drive','Drive gonderilemedi ['+kat+']: '+url.slice(0,50)+' — '+s.mesaj);
+    }
   }
-  saveSent(); renderSentURLs(); loadDriveSheet();
-  showRes('dr-res','✓ '+newU.length+' URL gonderildi','ok');
+  saveSent(); renderSentURLs();
+  // Özet ÖNCE yazılır: loadDriveSheet aynı kutuya (dr-res) yazdığı için
+  // eskiden başarı mesajı anında eziliyordu ve kullanıcı onay göremiyordu.
+  const par = [];
+  if (ok) par.push(ok+' URL gönderildi');
+  if (belirsiz) par.push(belirsiz+' belirsiz (ağ/CORS)');
+  if (hata) par.push(hata+' başarısız — '+ilkHata);
+  showRes('dr-res', (hata?'⚠ ':'✓ ')+(par.join(' · ')||'gönderilecek bir şey yoktu'), hata?'warn':'ok');
+  await loadDriveSheet();
+  showRes('dr-res', (hata?'⚠ ':'✓ ')+(par.join(' · ')||'gönderilecek bir şey yoktu'), hata?'warn':'ok');
 }
 
 function clearSentURLs() {
-  if(!confirm('Islenmis URL gecmisi silinsin mi?'))return;
-  S.sentURLs.clear(); saveSent(); renderSentURLs();
+  if(!confirm('İşlenmiş URL geçmişi silinsin mi?\n\nHem listedeki "işlenmiş" işaretleri hem de tekrar gönderim uyarısı sıfırlanır.'))return;
+  S.sentURLs.clear();
+  // S.sentLog DA temizlenmeli: tekrar uyarısını (findDupeSend) o besliyor.
+  // Eskiden yalnız S.sentURLs siliniyordu → Drive listesi her şeyi "Yeni"
+  // gösterirken gönderirken hâlâ "bu video daha önce gönderilmiş" uyarısı
+  // çıkıyordu. (Gönderim Geçmişi sayfasının temizleme düğmesi ikisini de siler.)
+  S.sentLog = {};
+  try { localStorage.removeItem('op_sent_log'); } catch(e){}
+  saveSent(); renderSentURLs();
   setEl('dr-sent-cnt','0');
-  addLog('ok','drive','Sent URL gecmisi temizlendi');
+  addLog('ok','drive','Gonderim gecmisi temizlendi (isaretler + tekrar uyarisi)');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3492,6 +3517,11 @@ async function loadSheetPage(page) {
   } else {
     const [sv,uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid2,'URL-Takip!A:Z')]);
     shorts = parseSheet(sv); urls = parseSheet(uv);
+    // Okunanı PAYLAŞILAN yere de yaz: eskiden yerel değişkende kalıyordu,
+    // dolayısıyla doğrudan bu sayfaya girildiğinde ydShortsAll() boş
+    // kalıyor ve Kaynak Sağlığı / Eşitle / Kuyruk Denetimi "kayıt yok"
+    // diyordu. Aynı veri ayrıca ikinci kez indiriliyordu.
+    if (shorts.length || urls.length) S.sheetData = { shorts, urls };
   }
 
   // Ortak yardımcılar — sheet sütun adları projeye göre değişebilir
@@ -7926,7 +7956,14 @@ function updateLogStats() {
   el.innerHTML=Object.entries(SEV_C).map(([s,col])=>'<span class="badge" style="background:'+col+'22;color:'+col+'">'+s.toUpperCase()+': '+(c[s]||0)+'</span>').join('');
 }
 
-function clearLogs(){S.logs=[];try{localStorage.removeItem('op_logs');}catch(e){}renderLogs();updateLogStats();}
+function clearLogs(){
+  // Onay eklendi: diğer tüm yıkıcı işlemler (ciftSil, hsUygula,
+  // ciftYoksayTemizle, clearSentURLs) confirm kullanıyor; burası atlanmıştı
+  // ve tek tıkla tüm log geçmişi geri alınamaz biçimde siliniyordu.
+  const n = (S.logs||[]).length;
+  if (n && !confirm(n+' log kaydı silinecek. Bu işlem geri alınamaz.\n\nDışa aktarmak istersen önce "⇩ Dışa Aktar"a bas.\n\nDevam edilsin mi?')) return;
+  S.logs=[];try{localStorage.removeItem('op_logs');}catch(e){}renderLogs();updateLogStats();
+}
 function exportLogs(){dl('opus_logs.txt',S.logs.map(l=>l.t+' ['+l.cat+'] ['+l.sev.toUpperCase()+'] '+l.msg).join('\n'));}
 // "Canlı" = GÖRÜNÜMÜ canlı tut. Eskiden 60 sn'de bir "Heartbeat - sistem
 // aktif" LOGU YAZIYORDU: kalıcı depo 200 kayıtla sınırlı olduğu için panel
@@ -9835,7 +9872,7 @@ document.addEventListener('DOMContentLoaded', function() {
       ciftCiz,ciftSil,ciftSilTumu,kapsamaPlanDus,ckCiftMi,ckEkle,ckAnahtar,
       ciftTara,ciftOtoKur,ciftOtoCalis,ciftOtoTik,kuyrukDoluMu,
       ciftYoksay,ciftYoksayTumu,ciftYoksayGoster,ciftYoksayGeriAl,ciftYoksayTemizle,ciftYenidenTara,
-      fafSonuc,panelSheetOnb,sheetTbodyYaz,
+      fafSonuc,panelSheetOnb,sheetTbodyYaz,ydBekleyenHata,
       hsAc,hsKapat,hsOnizle,hsUygula,hsGeriAl,hsListeCiz,hsSayilir,hsZaman,hsAnahtar,
       ksAc,ksKapat,ksOlc,
       rapVizOlcut,rapKategoriToplamlar,rapVizBilesim,rapRenderPlatToplam,
@@ -10487,7 +10524,6 @@ async function loadTakvim() {
   let gecmisHata = '';
   let gecmisN = 0;
   try {
-    let failN = 0;
     for (let pg = 1; pg <= 3; pg++) {
       let data;
       try {
@@ -10504,7 +10540,6 @@ async function loadTakvim() {
         if (!time) return;
         const plat = platMap[String(h.platform || '').toLowerCase()] || 'yt';
         const ok = h.success !== false && !h.error_message;
-        if (!ok) failN++;
         const title = h.post_title || h.title || h.post_caption || '(başlıksız)';
         items.push({ time, plat, status: ok?'pub':'fail', profile:h.profile_username||h.user||'', title, caption:h.post_caption||h.caption||'', thumb:h.thumbnail||h.preview_url||'', postUrl:h.post_url||'', postId:h.platform_post_id||'', reqId:h.request_id||'', error:h.error_message||'', _url: h.post_url || '', r: {
           title, 'preview-url': h.thumbnail || h.preview_url || '', 'short-url': h.post_url || '',
@@ -10515,7 +10550,9 @@ async function loadTakvim() {
       });
       if (hist.length < 100) break;
     }
-    try { ydSetFailBadge(failN); } catch(e) {}
+    // Takvim ROZETİ YAZMAZ: kendi penceresi (3 sayfa) ve kendi ölçütü var,
+    // çözülmüşleri de düşmüyordu. Rozeti Yayın Durumu sahipleniyor —
+    // eskiden hangi sayfanın en son yüklendiğine göre sayı değişiyordu.
   } catch(e) { gecmisHata = e.message || 'bilinmeyen hata'; console.warn('[TAK] history hata:', e.message); }
   // pub ve fail AYRI sayılır: özet "N yayınlanmış" derken başarısızları da
   // topluyordu, yani takvim başarısız gönderimleri yayınlanmış gibi gösteriyordu.
@@ -11841,7 +11878,7 @@ async function notifCheck(derin){
     if(derin && (S.cfg.blot||getN8N())){
       try{
         const items=await ydFetchItems();
-        const fail=items.filter(i=>i.status==='failed').length;
+        const fail=ydBekleyenHata(items);          // rozetle AYNI ölçüt
         if(fail>0) notifEkle('fails','❌',fail+' başarısız gönderim','Yayın Durumu\'nda tek tık yeniden gönder','yayindurumu'); else notifSil('fails');
         try{ const raw=await phFetchAccounts();
           const sp=new Set(((S.sheetData&&S.sheetData.shorts)||(S._panelCache&&S._panelCache.shorts)||[]).map(r=>String(r.profil||'').trim()).filter(Boolean));
@@ -12088,8 +12125,23 @@ function ydNorm(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9ğüşö
 function ydShortsAll(){ return (S._panelCache && S._panelCache.shorts) || (S.sheetData && S.sheetData.shorts) || []; }
 async function ydEnsureShorts(){
   if (ydShortsAll().length) return;
-  const base = getN8N(); if (!base) return;
-  try { const d = await n8nGetCached('/webhook/panel-data'); if (d && !d._bos) S.sheetData = { shorts:d.shorts||[], urls:d.urls||[] }; } catch(e){}
+  const base = getN8N();
+  if (base){
+    try { const d = await n8nGetCached('/webhook/panel-data'); if (d && !d._bos) S.sheetData = { shorts:d.shorts||[], urls:d.urls||[] }; } catch(e){}
+    if (ydShortsAll().length) return;
+  }
+  // n8n YOKSA doğrudan Sheets API'ye git. Eskiden burada sadece return
+  // ediliyordu: yalnız Google Sheets ile kurulmuş panelde Kaynak Sağlığı,
+  // Eşitle, Hesabı Doldur ve Kuyruk Denetimi "short-kaydetme'de kayıt
+  // bulunamadı" diyordu — oysa Short Listesi aynı veriyi gösteriyordu.
+  // (Dashboard açıldıysa refreshDash S.sheetData'yı doldurduğu için sorun
+  // görünmüyordu; doğrudan o ekranlara gidildiğinde ortaya çıkıyordu.)
+  const sid = S.cfg.sheet || '';
+  if (!sid || !S.cfg.shkey) return;
+  try {
+    const shorts = parseSheet(await sheetsGet(sid, 'Sheet1!A:Z'));
+    if (shorts.length) S.sheetData = Object.assign({ urls:[] }, S.sheetData||{}, { shorts });
+  } catch(e){ console.warn('[YD] sheet okunamadi:', e.message); }
 }
 function ydRowUrl(r){ return r['short-url'] || r['shortUrl'] || r['uriForExport'] || ''; }
 
@@ -12462,7 +12514,7 @@ function ydUpdateCounts(){
   setEl('yd-c-sch', sch);
   // Kenar çubuğu rozeti GLOBAL kalmalı: filtreye göre daralırsa "hata yok"
   // sanılır. Bu yüzden tüm kayıtlardan hesaplanır.
-  ydSetFailBadge(YD.items.filter(i=>i.status==='failed' && !i._cozuldu).length);
+  ydSetFailBadge(ydBekleyenHata(YD.items));
   ydFailOzet();
 }
 
@@ -12486,6 +12538,16 @@ function ydFailOzet(){
     +'</div>';
 }
 
+// "Kaç başarısız gönderim ilgilenmemi bekliyor?" — bu sorunun TEK cevabı
+// olmalı. Kenar çubuğu rozeti, bildirim ve Aksiyon Merkezi aynı ydFetchItems
+// çıktısını kullanıyor ama üçü FARKLI süzgeç uyguluyordu: rozet çözülmüşleri
+// düşüyor, diğer ikisi düşmüyordu. Sonuç: bildirim "113 başarısız gönderim"
+// derken sayfa listesi çok daha azını gösteriyordu.
+// NOT: yeniden gönderilmiş ama yayınlanmamışlar (_yeniden) SAYILIR — onlar
+// hâlâ çözülmemiş durumda; yalnız yayın kanıtı olanlar (_cozuldu) düşer.
+function ydBekleyenHata(items){
+  return (items||[]).filter(i => i.status === 'failed' && !i._cozuldu).length;
+}
 function ydSetFailBadge(n){
   const b = document.getElementById('badge-fail'); if (!b) return;
   if (n>0){ b.textContent = n>99?'99+':String(n); b.classList.add('on'); }
@@ -13120,7 +13182,7 @@ async function loadActionCenter(){
     '<div style="border:1px solid var(--brd);border-radius:6px;padding:10px 12px;background:var(--sur)">'
     + '<div class="isk isk-sat" style="width:34px;height:17px;margin-bottom:6px"></div>'
     + '<div class="isk isk-sat" style="width:86%"></div></div>').join('');
-  const pFail = (async()=>{ try { if(!S.cfg.blot && !getN8N()) return null; const items = await ydFetchItems(); return items.filter(i=>i.status==='failed').length; } catch(e){ return null; } })();
+  const pFail = (async()=>{ try { if(!S.cfg.blot && !getN8N()) return null; const items = await ydFetchItems(); return ydBekleyenHata(items); } catch(e){ return null; } })();
   const pHealth = (async()=>{ try {
     const shorts = (S.sheetData&&S.sheetData.shorts)||(S._panelCache&&S._panelCache.shorts)||[];
     const sp = new Set(shorts.map(r=>String(r['profil']||r['Profil']||'').trim()).filter(Boolean));
