@@ -2362,7 +2362,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.04-18';
+const PANEL_YAPI = 'y2026.08.04-19';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // Platform favicon'u — gerçek marka ikonları (Google s2 favicon servisi)
@@ -7137,6 +7137,13 @@ async function platYayinHatalariCek(derinlik){
     h.forEach(x => {
       const t = Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0;
       if (t && t < sinir) return;
+      // HESAP SIFIRLAMA süzgeci: hesap engellenip/kopup yerine yenisi
+      // bağlandığında sıfırlama tarihinden ÖNCEKİ hatalar artık o hesabın
+      // sorunu değil. Bu, süzgeci uygulayan BEŞİNCİ yer — diğer dördü
+      // (ckKume, pdBasliklar, platKapsama, ciftTara) baştan bağlanmıştı,
+      // yayın hatası geçmişi atlanmıştı: kullanıcı hesabı yeniden bağladığı
+      // hâlde kırmızı "yayın hatası" damgası duruyordu.
+      if (!hsSayilir(x.profile_username||x.user, phPlatNormal(x.platform), x)) return;
       kayit++;
       const k = phAnahtar(x.profile_username||x.user, phPlatNormal(x.platform));
       const basarili = x.success !== false && !x.error_message;
@@ -7168,11 +7175,18 @@ function phYayinSorun(a){
   if (!g || !g.adet) return null;
   if (g.sonBasari && g.sonBasari >= g.sonZaman) return null;
   const ne = g.sonZaman ? new Date(g.sonZaman).toLocaleString('tr') : 'zamanı bilinmiyor';
+  // BU BİR BAĞLANTI SORUNU DEĞİL — buraya gelindiyse hesabın canlı durumu
+  // temiz (expired/reconnect/revoked kontrolleri yukarıda geçildi). Uyarı
+  // yalnızca GEÇMİŞ gönderimlerden geliyor. Metin bunu söylemezse kullanıcı
+  // hesabı yeniden bağladıktan sonra damgayı görüp "hâlâ bozuk" sanıyor.
   return {
-    kisa: g.adet > 1 ? g.adet+' yayın hatası' : 'Yayın hatası',
-    detay: 'Son başarısız gönderim: '+ne+'\n'+g.sonHata
-         + '\n\nBu hesapta son gönderim başarısız oldu ve sonrasında başarılı gönderim YOK. '
-         + 'Yayın Durumu sayfasından yeniden gönderebilirsin.',
+    kisa: g.adet > 1 ? g.adet+' geçmiş yayın hatası' : 'Geçmiş yayın hatası',
+    detay: 'Bağlantı ŞU AN sağlam görünüyor — bu uyarı GEÇMİŞTEKİ başarısız gönderimlerden geliyor.\n\n'
+         + 'Son başarısız gönderim: '+ne+'\n'+g.sonHata
+         + '\n\nSon hatadan sonra bu hesaba başarılı gönderim yapılmamış. '
+         + 'İLK BAŞARILI GÖNDERİMDE bu uyarı kendiliğinden kalkar.\n\n'
+         + 'Hesabı yeni bağladıysan: Platformlar → 🔄 Hesap Sıfırlama ile o tarihten '
+         + 'önceki kayıtları sayım dışı bırakabilirsin; uyarı hemen kalkar.',
     api: g.sonHata
   };
 }
