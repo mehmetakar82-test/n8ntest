@@ -1937,6 +1937,27 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <button class="btn bp bsm" onclick="saveSettings()">⊞ Kaydet</button>
         <div id="cfg-ok" style="display:none;font-size:12px;color:var(--ok);margin-top:6px">✓ Kaydedildi</div>
       </div>
+      <div class="card">
+        <div class="ct">💾 Tam Yedek</div>
+        <div style="font-size:11px;color:var(--mt);margin:-4px 0 10px;line-height:1.55">
+          Panelin <b>tüm hafızası bu tarayıcıda</b>. Tarayıcı verisi silinirse ya da başka bir
+          makineye geçersen şunlar kaybolur:
+          <b>hesap sıfırlama damgaları</b> (engellenen hesabın short'larını yeniden göndermeyi
+          mümkün kılan kayıt), <b>kanal→kategori hafızası</b>, <b>çift yayın koruması</b>,
+          Oto Yakala ve çerçeve yapılandırması.
+          <br><br>
+          Geri yükleme, Oto Yakala ve çerçeve ayarlarını <b>n8n'e de yeniden gönderir</b> —
+          n8n'e yeni bir workflow aktarımı yaptığında sıfırlanan <code>staticData</code> böylece geri gelir.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bp bsm" onclick="yedekAl()">⬇ Tam Yedek Al</button>
+          <button class="btn bg bsm" onclick="yedekYukleAc()">⬆ Yedekten Geri Yükle</button>
+          <input id="yedek-dosya" type="file" accept=".json,application/json" style="display:none" onchange="yedekYukle(this)"/>
+        </div>
+        <div style="font-size:11px;color:var(--wn);margin-top:8px">
+          ⚠ İndirilen dosya API anahtarlarını ve GitHub token'ını da taşır — parola dosyası gibi sakla.
+        </div>
+      </div>
     </div>
     <div>
       <div class="card">
@@ -2433,7 +2454,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.05-27';
+const PANEL_YAPI = 'y2026.08.05-28';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -8299,6 +8320,139 @@ function showRes(id,msg,type){const e=document.getElementById(id);if(!e)return;e
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 function copyText(txt){navigator.clipboard.writeText(txt).then(()=>addLog('ok','sistem','Kopyalandi'));}
 function dl(name,content){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'text/plain'}));a.download=name;a.click();}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TAM YEDEK / GERİ YÜKLEME
+// ───────────────────────────────────────────────────────────────────────────
+// Panelin TÜM hafızası tarayıcıda. Bugüne kadar dışa aktarma yalnız loglar
+// (exportLogs) ve tablo CSV'siydi; kurtarma açısından kritik veriler hiçbir
+// yere kopyalanmıyordu:
+//   op_hesap_sifirlama   engellenen hesabın short'larını yeniden göndermeyi
+//                        mümkün kılan damga. Kaybolursa hsSayilir'i kullanan
+//                        6 ayrı kontrol eski yayınları saymaya döner ve
+//                        yeniden gönderim SESSİZCE imkânsızlaşır.
+//   op_kat_ogrenme       aylarca birikmiş kanal→kategori hafızası
+//   op_sent / op_sent_log çift yayın korumasının TEK kaynağı
+//   op_yeniden_gonderildi hangi short'un yeniden gönderildiği
+// Ayrıca n8n reimport'u staticData'yı sıfırlıyor; geri yükleme Oto Yakala ve
+// çerçeve yapılandırmasını n8n'e otomatik geri gönderiyor.
+const YEDEK_ISARET = 'op_yedek_n8n_bekliyor';
+// Çift koruma anahtarları BİRLEŞTİRİLİR, ezilmez: eski bir yedeği geri
+// yüklemek aradaki gönderimlerin kaydını silseydi aynı short ikinci kez
+// yayınlanırdı. Birleştirme yalnız koruma yönünde hata yapar.
+const YEDEK_BIRLESTIR = ['op_sent', 'op_sent_log'];
+
+function yedekTopla(){
+  const veri = {};
+  for (const k of Object.keys(localStorage)){
+    if (k.startsWith('op_') || k === 'opus_cerceve') veri[k] = localStorage.getItem(k);
+  }
+  return veri;
+}
+
+function yedekAl(){
+  const veri = yedekTopla();
+  const n = Object.keys(veri).length;
+  const sirVar = !!veri['op_cfg'] || !!veri['opus_cerceve'];
+  if (sirVar && !confirm(
+      'Yedek dosyası API ANAHTARLARINI da içerir:\n'
+    + '  • op_cfg → Sheets/YouTube/Upload-Post/OpusClip/Cobalt/Twitch/webhook anahtarı\n'
+    + '  • opus_cerceve → GitHub token\n\n'
+    + 'Yani bu dosya bir parola dosyası gibi saklanmalı — paylaşma, herkese açık\n'
+    + 'bir yere koyma.\n\n' + n + ' anahtar indirilecek. Devam?')) return;
+  const zaman = new Date();
+  const ad = 'opuspro-yedek-' + zaman.toISOString().slice(0,10) + '-'
+           + String(zaman.getHours()).padStart(2,'0') + String(zaman.getMinutes()).padStart(2,'0') + '.json';
+  dl(ad, JSON.stringify({ _opuspro:'yedek', surum:PANEL_YAPI, tarih:zaman.toISOString(), anahtarSayisi:n, veri }, null, 2));
+  addLog('ok','sistem','Tam yedek indirildi ('+n+' anahtar)');
+  toast('Yedek indirildi — '+n+' anahtar','ok',5000);
+}
+
+function yedekYukleAc(){ const f=document.getElementById('yedek-dosya'); if(f){ f.value=''; f.click(); } }
+// ZORUNLU yenileme: bellekteki S/CER/TR geri yüklenen localStorage ile
+// ayrışmış durumda; yenilemeden devam etmek eski nesneleri diske geri yazar.
+// Ayrı fonksiyon olmasının sebebi sınanabilirlik — testte bu stub'lanıyor.
+function yedekYenile(){ location.reload(); }
+
+function yedekYukle(input){
+  const dosya = input && input.files && input.files[0];
+  if (!dosya) return;
+  const okuyucu = new FileReader();
+  okuyucu.onload = () => {
+    let y;
+    try { y = JSON.parse(okuyucu.result); }
+    catch(e){ toast('Dosya okunamadı — geçerli bir JSON değil','err',6000); return; }
+    if (!y || y._opuspro !== 'yedek' || !y.veri || typeof y.veri !== 'object'){
+      toast('Bu bir OPUS PRO yedeği değil','err',6000); return;
+    }
+    const anahtarlar = Object.keys(y.veri);
+    const birlesecek = anahtarlar.filter(k=>YEDEK_BIRLESTIR.includes(k));
+    const surumUyari = (y.surum && y.surum !== PANEL_YAPI)
+      ? '\n⚠ Yedek farklı panel sürümünden: ' + y.surum + ' (şu an ' + PANEL_YAPI + ')\n' : '\n';
+    if (!confirm(
+        'GERİ YÜKLEME\n\n'
+      + 'Yedek tarihi : ' + String(y.tarih||'?').slice(0,16).replace('T',' ') + '\n'
+      + 'Anahtar      : ' + anahtarlar.length + surumUyari + '\n'
+      + '• ' + birlesecek.join(', ') + ' BİRLEŞTİRİLİR (çift yayın koruması kaybolmasın)\n'
+      + '• Diğer tüm anahtarlar yedektekiyle DEĞİŞTİRİLİR\n'
+      + '• Yedekte olmayan anahtarlara dokunulmaz\n\n'
+      + 'Ardından sayfa yenilenecek ve Oto Yakala + çerçeve ayarları n8n\'e\n'
+      + 'yeniden gönderilecek. Devam?')) return;
+
+    let yazilan=0, birlestirilen=0, hata=[];
+    for (const k of anahtarlar){
+      try {
+        if (YEDEK_BIRLESTIR.includes(k)) { yedekBirlestirYaz(k, y.veri[k]); birlestirilen++; }
+        else { localStorage.setItem(k, y.veri[k]); yazilan++; }
+      } catch(e){ hata.push(k+': '+e.message); }
+    }
+    try { localStorage.setItem(YEDEK_ISARET, '1'); } catch(e){}
+    if (hata.length) { console.warn('[YEDEK] yazılamayan:', hata); alert('Bazı anahtarlar yazılamadı:\n'+hata.join('\n')); }
+    alert('✓ Geri yüklendi — '+yazilan+' değiştirildi, '+birlestirilen+' birleştirildi.\nSayfa yenileniyor.');
+    yedekYenile();
+  };
+  okuyucu.onerror = () => toast('Dosya okunamadı','err',5000);
+  okuyucu.readAsText(dosya);
+}
+
+// op_sent = URL dizisi, op_sent_log = {anahtar:kayıt} nesnesi. İkisinde de
+// BİRLEŞİM alınır; mevcut kayıtların hiçbiri düşmez.
+function yedekBirlestirYaz(k, yedekDeger){
+  const coz = s => { try { return JSON.parse(s); } catch(e){ return null; } };
+  const y = coz(yedekDeger), m = coz(localStorage.getItem(k));
+  if (Array.isArray(y) || Array.isArray(m)){
+    const birlesik = [...new Set([...(Array.isArray(m)?m:[]), ...(Array.isArray(y)?y:[])])];
+    localStorage.setItem(k, JSON.stringify(birlesik)); return;
+  }
+  if (y && typeof y === 'object'){
+    localStorage.setItem(k, JSON.stringify(Object.assign({}, y, (m && typeof m==='object') ? m : {})));
+    return;   // ÇAKIŞMADA MEVCUT KAZANIR — daha yeni gönderim kaydı korunur
+  }
+  if (yedekDeger != null) localStorage.setItem(k, yedekDeger);
+}
+
+// Geri yükleme sonrası n8n'e yapılandırmayı geri gönder. Açılışta çalışır
+// çünkü bellekteki CER/S ancak sayfa yenilendikten sonra yedekle uyumlu olur.
+async function yedekN8nBildir(){
+  if (localStorage.getItem(YEDEK_ISARET) !== '1') return;
+  localStorage.removeItem(YEDEK_ISARET);
+  const base = getN8N();
+  if (!base){ addLog('warn','sistem','Geri yükleme: n8n URL yok, yapılandırma gönderilemedi'); return; }
+  let ok=0, hata=0;
+  try { await cerAyarGonder(); ok++; }
+  catch(e){ hata++; addLog('warn','webhook','Geri yükleme: çerçeve ayarı gönderilemedi — '+(e.message||'')); }
+  try {
+    const oy = JSON.parse(localStorage.getItem('op_oto_ayarlar')||'null');
+    if (oy){
+      const r = await faf(base+'/webhook/oto-yakala-ayarlar', oy);
+      if (r && r.ok) ok++; else { hata++; addLog('warn','webhook','Geri yükleme: Oto Yakala ayarları n8n\'e ulaşmadı'); }
+    }
+  } catch(e){ hata++; addLog('warn','webhook','Geri yükleme: Oto Yakala gönderilemedi — '+(e.message||'')); }
+  // opcSyncProcessed'in hatayı tamamen yutan kalıbını TEKRARLAMA: sonuç görünür olsun.
+  addLog(hata?'warn':'ok','sistem','Geri yükleme sonrası n8n bildirimi: '+ok+' başarılı, '+hata+' başarısız');
+  toast(hata ? 'Geri yükleme tamam — n8n bildiriminde '+hata+' sorun (Loglar\'a bak)'
+             : 'Geri yükleme tamam — n8n yapılandırması da gönderildi', hata?'warn':'ok', 7000);
+}
 // Short Listesi süzgeci: metin + DURUM birlikte. filterTbl yalnızca metin
 // kutusunu okuyor, select'in değerine hiç bakmıyordu — durum seçmek sadece
 // mevcut metin filtresini yeniden uygulamaktan ibaretti.
@@ -10204,6 +10358,9 @@ document.addEventListener('DOMContentLoaded', function() {
       try { refreshDash(); }catch(e){ console.warn('[boot] refreshDash:', e.message); }
       try { loadActionCenter(); }catch(e){ console.warn('[boot] loadActionCenter:', e.message); }
     }, 250);
+    // Yedekten geri yüklendiyse n8n'e yapılandırmayı geri gönder. Burada,
+    // yenilemeden SONRA yapılıyor çünkü cerAyarGonder bellekteki CER'i okuyor.
+    setTimeout(()=>{ try{ yedekN8nBildir(); }catch(e){ console.warn('[boot] yedekN8nBildir:', e.message); } }, 1400);
     // Kuyruk Derinliği biraz geriden: profil listesini kullanıyor ve açılışta
     // üç isteği aynı anda atmak Upload-Post'un hız sınırını zorluyordu.
     setTimeout(()=>{ try{ kuyrukDerinlik(); }catch(e){ console.warn('[boot] kuyrukDerinlik:', e.message); } }, 900);
@@ -12462,9 +12619,22 @@ async function gcResend(encUrl, kat) {
   toast((res&&res.ok===true)?('Tekrar gönderildi ['+kat+']'):'Gönderilemedi (n8n/CORS)', (res&&res.ok===true)?'ok':'err');
 }
 function gcClearAll() {
-  if(!confirm('Tüm gönderim geçmişi silinsin mi? (Yalnız paneldeki kaydı siler, n8n\'i etkilemez)')) return;
+  // ESKİ ONAY METNİ YANILTIYORDU: "Yalnız paneldeki kaydı siler, n8n'i
+  // etkilemez" cümlesi zararsız bir temizlik izlenimi veriyordu. Oysa
+  // op_sent + op_sent_log ÇİFT YAYIN KORUMASININ TEK KAYNAĞI — silinince
+  // panel "hiç göndermemişsin" der ve aynı short'lar ikinci kez yayınlanır.
+  const n = (S.sentURLs && S.sentURLs.size) || 0;
+  if(!confirm(
+      'Gönderim geçmişi silinecek ('+n+' URL).\n\n'
+    + '⚠ Bu kayıt ÇİFT YAYIN KORUMASININ tek kaynağı. Silersen panel daha önce\n'
+    + 'gönderdiğin videoları "hiç gönderilmemiş" sayar ve aynı short\'lar ikinci\n'
+    + 'kez yayınlanabilir.\n\n'
+    + 'n8n tarafındaki kayıtlar etkilenmez — sorun panelin körleşmesi.\n\n'
+    + 'Önce Ayarlar → Tam Yedek Al demeni öneririm. Yine de silinsin mi?')) return;
   S.sentLog={}; localStorage.setItem('op_sent_log','{}'); S.sentURLs=new Set(); localStorage.setItem('op_sent','[]');
-  initGecmis(); toast('Geçmiş temizlendi','ok');
+  initGecmis();
+  addLog('warn','sistem','Gönderim geçmişi silindi ('+n+' URL) — çift yayın koruması sıfırlandı');
+  toast('Geçmiş temizlendi — çift koruma sıfırlandı','warn',6000);
 }
 // ═══════════════════════════════════════════════════════════
 // YAYIN DURUMU — teslimat sonucu (yayınlandı/başarısız + permalink) + hedefli retry
