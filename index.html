@@ -2454,7 +2454,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.05-28';
+const PANEL_YAPI = 'y2026.08.05-29';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -7481,13 +7481,13 @@ function platHesapSorun(a){
   const api = platHamDurum(a);
   const S_ = s => ({kisa:s.k, detay:s.d, api});
   if (a.expired===true || a.is_expired===true || a.token_expired===true)
-    return S_({k:'Yetki süresi dolmuş', d:'Erişim jetonu geçersiz. Upload-Post panelinde bu profili aç → hesabı yeniden bağla. Yeniden bağlanana kadar bu hesaba gönderim başarısız olur.'});
+    return S_({k:'Yetki süresi dolmuş', d:'Erişim jetonu geçersiz. Profil kartındaki 🔗 Bağla düğmesiyle hesabı yeniden bağla. Yeniden bağlanana kadar bu hesaba gönderim başarısız olur.'});
   if (a.needs_reconnect===true || a.reconnect_required===true)
-    return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post bu hesap için yeniden yetkilendirme istiyor.'});
+    return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post bu hesap için yeniden yetkilendirme istiyor — profil kartındaki 🔗 Bağla düğmesini kullan.'});
   const s = String(a.status||a.connection_status||a.state||'').toLowerCase();
-  if (/expir/.test(s))      return S_({k:'Yetki süresi dolmuş', d:'Erişim jetonu geçersiz — Upload-Post\'ta hesabı yeniden bağla.'});
-  if (/reconnect/.test(s))  return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post yeniden yetkilendirme istiyor.'});
-  if (/revoked/.test(s))    return S_({k:'Yetki iptal edilmiş', d:'Sosyal medya tarafında uygulama erişimi kaldırılmış. Hesap ayarlarından izni geri ver, sonra Upload-Post\'ta yeniden bağla.'});
+  if (/expir/.test(s))      return S_({k:'Yetki süresi dolmuş', d:'Erişim jetonu geçersiz — profil kartındaki 🔗 Bağla ile yeniden bağla.'});
+  if (/reconnect/.test(s))  return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post yeniden yetkilendirme istiyor — 🔗 Bağla düğmesini kullan.'});
+  if (/revoked/.test(s))    return S_({k:'Yetki iptal edilmiş', d:'Sosyal medya tarafında uygulama erişimi kaldırılmış. Önce hesap ayarlarından izni geri ver, sonra profil kartındaki 🔗 Bağla ile yeniden bağla.'});
   if (/disconnect/.test(s)) return S_({k:'Bağlantı kopmuş', d:'Hesap Upload-Post ile bağlı görünmüyor.'});
   if (/invalid/.test(s))    return S_({k:'Geçersiz hesap', d:'Upload-Post hesabı geçersiz olarak işaretlemiş.'});
   if (!phAcctConnected(a))
@@ -7706,8 +7706,17 @@ function renderPlatformsGrid(byPlat) {
       + '</div>'
       + '<div class="pl-prof-alt" style="display:flex;align-items:center;gap:8px">'
       +   '<span>'+altSatir+'</span>'
-      +   (g.eksik ? '' : '<button class="btn bsm" style="margin-left:auto;padding:1px 7px;font-size:10.5px;flex-shrink:0"'
-            + ' onclick="event.stopPropagation();platDoldurAc(\''+esc(g.profil).replace(/'/g,"\\'")+'\')"'
+      // Üretilmiş bağlama linki hâlâ geçerliyse kalan süreyi göster — kullanıcı
+      // "az önce link almıştım" diye tekrar üretmesin.
+      +   ((()=>{ const s=baglaKalanSaat(g.profil); return s
+            ? '<span style="margin-left:auto;flex-shrink:0;font-size:10px;color:var(--acc3)" '
+              + 'title="Bu profil için bağlama linki üretildi; süresi dolmadan yeniden üretmene gerek yok">🔗 link aktif · '+s+'sa</span>'
+            : ''; })())
+      +   (g.eksik ? '' : '<button class="btn bsm" style="'+(baglaKalanSaat(g.profil)?'':'margin-left:auto;')+'padding:1px 7px;font-size:10.5px;flex-shrink:0"'
+            + ' onclick="event.stopPropagation();platBaglaAc(\''+jsStr(g.profil)+'\')"'
+            + ' title="Bu profil için Upload-Post hesap bağlama sayfasını aç (48 saat gecerli, Turkce). Engellenen hesabi yeniden baglamak icin.">🔗 Bağla</button>')
+      +   (g.eksik ? '' : '<button class="btn bsm" style="padding:1px 7px;font-size:10.5px;flex-shrink:0"'
+            + ' onclick="event.stopPropagation();platDoldurAc(\''+jsStr(g.profil)+'\')"'
             + ' title="Bu profilin bir platformdaki short&#39;larını, aynı profilin başka bir platformuna kuyrukla doldur">🔁 Doldur</button>')
       + '</div>'
       + (hesapHtml || '<div style="font-size:11.5px;color:var(--mt);padding:6px 2px">— bağlı hesap yok —</div>')
@@ -8036,6 +8045,70 @@ async function platLoadExtra(platformKey, profileUsername, containerId) {
     el.innerHTML = items.map(renderItem).join('');
   } catch(e) {
     el.innerHTML = '<div style="color:var(--wn);font-size:12px;padding:10px">' + esc0(e.message) + '</div>';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PANELDEN HESAP BAĞLAMA (Upload-Post generate-jwt)
+// ───────────────────────────────────────────────────────────────────────────
+// Hesaplar düzenli engelleniyor ve panel sorunu BEŞ ayrı yerde doğru teşhis
+// ediyor ama çözümü hep başka siteye yolluyordu: "Upload-Post panelinde bu
+// profili aç → hesabı yeniden bağla (app.upload-post.com → Manage Users)".
+// Oysa Upload-Post bunun için bir uç veriyor ve panel onu hiç kullanmıyordu.
+//
+// Uç OpenAPI'den doğrulandı (docs.upload-post.com/openapi.json):
+//   POST /uploadposts/users/generate-jwt
+//   zorunlu: username · isteğe bağlı: language (enum'da 'tr' VAR),
+//            connect_title, connect_description, redirect_button_text,
+//            platforms (varsayılan: TÜM platformlar), show_calendar, ...
+//   yanıt  : { success, access_url, duration }   — JWT 48 saat geçerli
+//
+// platforms BİLEREK GÖNDERİLMİYOR: belgede sayılan platform listesi
+// eksik görünüyor; dar bir liste göndermek hesabı eksik bağlatabilir.
+// Varsayılan "tüm platformlar" doğru davranış.
+const BAGLA_ANAHTAR = 'op_baglama_link';
+const BAGLA_OMUR_MS = 48*3600000;
+
+function baglaOku(){ try{ return JSON.parse(localStorage.getItem(BAGLA_ANAHTAR)||'{}'); }catch(e){ return {}; } }
+function baglaYaz(m){ try{ localStorage.setItem(BAGLA_ANAHTAR, JSON.stringify(m)); }
+                      catch(e){ console.warn('[BAGLA] kaydedilemedi:', e.message); } }
+// Profil için geçerli bir link üretilmişse kalan saati döndürür, yoksa 0.
+function baglaKalanSaat(profil){
+  const k = baglaOku()[String(profil||'').trim()];
+  if (!k || !k.bitis) return 0;
+  const kalan = k.bitis - Date.now();
+  return kalan > 0 ? Math.ceil(kalan/3600000) : 0;
+}
+
+async function platBaglaAc(profil){
+  profil = String(profil||'').trim();
+  if (!profil) return;
+  if (!S.cfg.blot) return toast('Hesap bağlama için Upload-Post API Key gerekli (Ayarlar)','warn',7000);
+  // YANLIŞ PROFİL = YANLIŞ HESAP. Üretilen link neyi bağlayacaksa onu yazıp
+  // onay istiyoruz; bu link açıldığında bağlanan her hesap BU profile gider.
+  if (!confirm('Hesap bağlama sayfası şu profil için açılacak:\n\n      ' + profil + '\n\n'
+    + 'Bu sayfadan bağladığın sosyal hesaplar BU profile bağlanır.\n'
+    + 'Link 48 saat geçerlidir ve sayfa Türkçe açılır.\n\n'
+    + 'Profil doğru mu?')) return;
+  try {
+    const { data } = await upFetchRetry('/uploadposts/users/generate-jwt', { method:'POST', body:{
+      username: profil,
+      language: 'tr',
+      connect_title: 'OPUS PRO — ' + profil,
+      connect_description: 'Bağladığın hesaplar "' + profil + '" profiline eklenir.',
+      redirect_button_text: 'Bitti'
+      // platforms GÖNDERİLMİYOR — varsayılan tüm platformlar (yukarıdaki nota bak)
+    }});
+    const url = data && (data.access_url || data.url || data.link);
+    if (!url) throw new Error('Yanıtta access_url yok — ' + JSON.stringify(data).slice(0,120));
+    const m = baglaOku(); m[profil] = { bitis: Date.now()+BAGLA_OMUR_MS, t: new Date().toISOString() }; baglaYaz(m);
+    window.open(url, '_blank', 'noopener');
+    addLog('ok','uploadpost','Hesap bağlama linki üretildi: '+profil+' (48 sa)');
+    toast('Bağlama sayfası yeni sekmede açıldı — '+profil,'ok',6000);
+    setTimeout(()=>{ try{ loadPlatforms(true); }catch(e){} }, 1000);   // rozet tazelensin
+  } catch(e){
+    addLog('err','uploadpost','Bağlama linki üretilemedi ('+profil+'): '+(e.message||''));
+    toast('Bağlama linki üretilemedi: '+(e.message||'bilinmeyen hata'),'err',9000);
   }
 }
 
@@ -10410,6 +10483,7 @@ document.addEventListener('DOMContentLoaded', function() {
       testWH,ytkTestApi,platKapsama,kapsamaHataAc,kapsamaHataKapat,pdVideoErisilebilir,
       kapsamaHataCiz,kapsamaHataGonder,kapsamaHataTumu,
       platDoldurAc,platDoldurKapat,platDoldurTara,platDoldurGonder,pdBagliPlatformlar,platDoldurYineDe,
+      platBaglaAc,baglaKalanSaat,
       pdOrgKimlik,pdKaynakTanisi,platDoldurTazele,pdTazeLinkler,pdProjeKimligi,
       khErisimHatasi,khYapilandirmaHatasi,khYapilandirmaUyarisi,khTazele,
       gndIsaretle,gndCozuldu,gndZamani,gndAnahtar,kapsamaMatrisCiz,kapsamaYenidenGonderildi,ydYenidenCozmez,
@@ -12669,7 +12743,7 @@ const HATA_KURALLARI = [
     'Facebook Sayfası seçili değil',
     'Facebook Reels yalnız SAYFALARA yayınlanabiliyor, kişisel profile değil. Upload-Post’ta bu profilin Facebook bağlantısını bir Sayfa seçerek yeniden kur. (n8n tarafındaki boş page_id hatası y2026.08.03-12 ile düzeltildi — workflow’u içe aktarmayı unutma.)', 'kritik'],
   [/session (has )?expired|reconnect your|token (is )?expired|invalid[_ ]?token|reauth|please reconnect/i,
-    'Hesap bağlantısının süresi dolmuş', 'Bu profilin ilgili sosyal medya hesabını Upload-Post’ta yeniden bağla (app.upload-post.com → Manage Users). Sonra tekrar gönder.', 'kritik'],
+    'Hesap bağlantısının süresi dolmuş', 'Platformlar sayfasında bu profilin kartındaki 🔗 Bağla düğmesine bas — Türkçe bağlama sayfası açılır (48 saat geçerli). Hesabı yeniden bağladıktan sonra 🔄 Hesap Sıfırlama ile tarihi işaretle, sonra tekrar gönder.', 'kritik'],
   [/access token|oauth|permission|not authorized|unauthorized|forbidden|403/i,
     'Yayınlama izni yok / yetki düşmüş', 'Hesabı yeniden bağlarken gerekli izinleri (yayınlama) onayla. İzin eksikse platform gönderime kapatır.', 'kritik'],
   [/too many requests|rate.?limit|quota|429|throttl/i,
