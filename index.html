@@ -976,9 +976,14 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--brd)">
       <span style="font-size:12px;color:var(--mt)">Seçili: <b id="tr-selcount">0</b> →</span>
-      <div id="tr-bulk-cats" class="cat-chips" style="display:inline-flex;flex-wrap:wrap;gap:4px" title="Birden fazla kategori seçebilirsin — her video her kategori için ayrı gönderilir"></div>
+      <div id="tr-bulk-cats" class="cat-chips" style="display:inline-flex;flex-wrap:wrap;gap:4px" title="BOŞ bırakırsan her kart kendi kategorisiyle gider (önerilen). Buradan seçersen TÜM seçili videolar bu kategoriye zorlanır ve kartlardaki notlar kullanılmaz."></div>
+      <button class="btn bs bsm" onclick="trOneriliSec()" title="Panelin güvenle tahmin ettiği (%40+) kartları seç">🏷 Önerilenleri Seç</button>
       <button class="btn bp bsm" onclick="trBulkApprove()">✓ Seçilenleri Onayla</button>
       <button class="btn bg bsm" onclick="trBulkReject()">✗ Seçilenleri Reddet</button>
+    </div>
+    <div style="font-size:11px;color:var(--mt);padding-top:4px">
+      Üstteki kategori çipleri <b>boşken</b> her video kendi kartındaki kategori, dil ve açıklamayla gönderilir.
+      Çip seçersen bu bilinçli bir ezmedir: tüm seçililer o kategoriye gider, kartlardaki notlar kullanılmaz.
     </div>
     <div id="tr-kisayol">
       <span>⌨</span>
@@ -2428,7 +2433,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.05-26';
+const PANEL_YAPI = 'y2026.08.05-27';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -9266,7 +9271,7 @@ function trRenderPending() {
         : `<div style="font-size:10.5px;margin-bottom:5px;color:var(--mt)">kategori sinyali yok — elle seç</div>`);
     let pub = '';
     if (v.publishedAt) { const d = new Date(v.publishedAt); if (!isNaN(d)) pub = d.toLocaleDateString('tr',{day:'2-digit',month:'short',year:'numeric'}); }
-    return `<div class="card${already?' rd-done':''}" data-trvid="${esc0(vid)}" style="padding:0;overflow:hidden${already?';border-color:rgba(52,211,153,.55)':''}">
+    return `<div class="card${already?' rd-done':''}" data-trvid="${esc0(vid)}" data-trguven="${ktGuven|0}" style="padding:0;overflow:hidden${already?';border-color:rgba(52,211,153,.55)':''}">
       <div class="opc-thumb" style="border-radius:8px 8px 0 0">
         <img src="${guvenliUrl(v.thumbnail)}" style="width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${jsStr(v.thumbnail)}','${jsStr(v.title||'')}')" onmouseleave="hidePrev()">
         <span class="opc-dur">${trDur(v.durationSec)}</span>
@@ -9446,24 +9451,75 @@ document.addEventListener('keydown', ev => {
   else if (k === '?')              { ev.preventDefault(); trKisayolYardim(); }
   else if (k === 'Escape')         { TR.imlec = null; trImlecCiz(false); ipucKapat(); }
 });
+// Güven eşiği ≥40 olan kartları seç — kartta chip ZATEN önceden seçili gelir
+// (trRenderPending: ktSel = ktGuven>=40 ? kt.kategori : 'genel').
+function trOneriliSec(){
+  const kartlar=[...document.querySelectorAll('[data-trvid][data-trguven]')];
+  const uygun=kartlar.filter(el=>(parseInt(el.dataset.trguven,10)||0)>=40);
+  if(!uygun.length) return toast('Güvenilir kategori önerisi olan kart yok','warn');
+  uygun.forEach(el=>TR.selected.add(el.dataset.trvid));
+  trRenderPending();
+  toast(uygun.length+' kart seçildi — kendi önerdikleri kategoriyle gidecek','ok',4000);
+}
+
 async function trBulkApprove() {
   if(!TR.selected.size) return toast('Önce video seç','warn');
   const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
-  // Çoklu kategori: toolbar chip'lerinden seçilenler (her video her kategoriye ayrı gönderilir)
-  const kats=[...document.querySelectorAll('#tr-bulk-cats .cat-chip.sel')].map(c=>c.dataset.cat);
-  if(!kats.length) kats.push('genel');
-  const ids=[...TR.selected];
-  const vids=ids.map(id=>TR.pending.find(v=>v.videoId===id)).filter(Boolean);
-  const tasks=vids.map(v=>({ label:(v.title||v.videoId).slice(0,42), badge:kats.join(','), send: async()=>{
+
+  // ── KART FARKINDALIĞI ────────────────────────────────────────────────────
+  // ESKİ HÂLİ kartların kendi ayarlarını ÇÖPE ATIYORDU: kategori araç
+  // çubuğundan alınıyor, dil sabit 'tr', açıklama sabit '' gidiyordu — yani
+  // karta yazdığın not sessizce siliniyor, video araç çubuğundaki kategoriye
+  // (dolayısıyla yanlış profil havuzuna, yanlış hesaba) gidiyordu.
+  // Dahası katOgren HİÇ çağrılmıyordu; ağırlıklı toplu onay kullanıyorsan
+  // kategori tahmininin EN GÜÇLÜ sinyali olan op_kat_ogrenme hiç büyümüyordu.
+  //
+  // Yeni kural: araç çubuğunda chip SEÇİLİYSE bu bilinçli ezmedir, eski
+  // davranış aynen korunur. BOŞSA her kart kendi kategorisini/dilini/
+  // açıklamasını kullanır — tekli onaydaki okumanın aynısı.
+  const ustKats=[...document.querySelectorAll('#tr-bulk-cats .cat-chip.sel')].map(c=>c.dataset.cat);
+  const ezme = ustKats.length > 0;
+
+  const vids=[...TR.selected].map(id=>TR.pending.find(v=>v.videoId===id)).filter(Boolean);
+  // Kartları dataset üzerinden eşle — seçici içine videoId gömmüyoruz.
+  const kartlar=new Map([...document.querySelectorAll('[data-trvid]')].map(el=>[el.dataset.trvid, el]));
+
+  const isler = vids.map(v=>{
+    let kats=ustKats.slice(), dil='tr', aciklama='';
+    if(!ezme){
+      const card=kartlar.get(v.videoId);
+      if(card){
+        kats     = [...card.querySelectorAll('.tr-cats .cat-chip.sel')].map(c=>c.dataset.cat);
+        dil      = (card.querySelector('.tr-dil')||{}).value || 'tr';
+        aciklama = (card.querySelector('.tr-desc')||{}).value || '';
+      }
+    }
+    if(!kats.length) kats=['genel'];
+    return { v, kats, dil, aciklama };
+  });
+
+  // Öğrenme yalnız kart bazlı modda: araç çubuğuyla 20 videoyu tek kategoriye
+  // ezmek "bu kanal bu kategoridir" demek DEĞİL, hafızayı kirletirdi.
+  if(!ezme) isler.forEach(i=>{ try{ katOgren(i.v.channelId, i.v.channelTitle, i.kats[0]); }catch(e){} });
+
+  const tasks=isler.map(({v,kats,dil,aciklama})=>({
+    label:(v.title||v.videoId).slice(0,42), badge:kats.join(','), send: async()=>{
     // Çoklu kategoride bile TEK gönderim — OpusClip video başına bir kez çalışır,
     // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
-    const r=await faf(base+mcPath(kats),{'Youtube linki':v.youtubeLink, channelTitle:v.channelTitle||'', kaynak:'kworb-onay', ...mcFields(kats), dil:'tr', platformlar:['ig','yt','tt','fb','x'], aciklama_notu:''});
+    // platformlar: tekli onaydaki gibi BOŞ bırakıldı. Ölçüldü — n8n'in beş
+    // kapısı da (!Array.isArray(p)||p.length===0) ? true : p.includes(..)
+    // yaptığı için boş dizi ile ['ig','yt','tt','fb','x'] AYNI sonucu veriyor.
+    const r=await faf(base+mcPath(kats),{'Youtube linki':v.youtubeLink, channelTitle:v.channelTitle||'', kaynak:'kworb-onay', ...mcFields(kats), dil, platformlar:[], aciklama_notu:aciklama});
     if(r&&r.ok===true){ recordSend(v.youtubeLink,kats.join(',')); await faf(base+'/webhook/kworb-pending-sil',{videoId:v.videoId,durum:'onaylandı'}); TR.pending=TR.pending.filter(x=>x.videoId!==v.videoId); TR.selected.delete(v.videoId); return true; }
     return false;
   }}));
-  const res=await sqRunBatch(tasks,{name:'Trend onay ['+kats.join(', ')+']'});
+
+  const tumKat=[...new Set(isler.flatMap(i=>i.kats))];
+  const res=await sqRunBatch(tasks,{name:'Trend onay ['+(ezme?ustKats.join(', '):'kart bazlı')+']'});
   trRenderPending();
-  if(!res.cancel) showRes('tr-status',`✓ ${res.ok} onaylandı${res.err?` · ✕ ${res.err}`:''} [${kats.join(', ')}]`, res.err?'warn':'ok');
+  if(!res.cancel) showRes('tr-status',
+    `✓ ${res.ok} onaylandı${res.err?` · ✕ ${res.err}`:''} [${ezme?ustKats.join(', '):tumKat.join(', ')}]`
+    + (ezme?'':' · kartların kendi kategorisiyle'), res.err?'warn':'ok');
 }
 // P5: toplu reddetme de confirm() yerine geri alınabilir. Engelleyici
 // diyalog yerine iş hemen yapılır, 8 sn boyunca tek tuşla dönülebilir.
@@ -9490,7 +9546,7 @@ async function trBulkReject() {
     8000
   );
 }
-[trToggleSel,trSecTikla,trSelectAll,trClearSel,trBulkApprove,trBulkReject,
+[trToggleSel,trSecTikla,trSelectAll,trClearSel,trBulkApprove,trBulkReject,trOneriliSec,
  trImlecGit,trImlecCiz,trKisayolYardim].forEach(fn=>{ if(typeof fn==='function') window[fn.name]=fn; });
 
 // ═══════════════════════════════════════════════════════════
@@ -12216,7 +12272,10 @@ function notifRender(){
 function notifPanelAc(e){ if(e) e.stopPropagation(); const p=document.getElementById('notif-panel'); if(!p) return; if(p.classList.toggle('on')){ notifRender(); notifCheck(true); } }
 function notifPanelKapat(){ const p=document.getElementById('notif-panel'); if(p) p.classList.remove('on'); }
 function notifTikla(id){ NOTIF.seen.add(id); const it=NOTIF.items.find(x=>x.id===id); notifKaydet(); notifRender(); notifPanelKapat();
-  if(it&&it.page){ const ni=[...document.querySelectorAll('.ni')].find(n=>(n.getAttribute('onclick')||'').includes("'"+it.page+"'")); if(ni) ni.click(); else if(typeof goUretim==='function'){ try{ goUretim(it.page); }catch(e){} } } }
+  // acGo hem kenar çubuğunu hem hub sekmelerini biliyor; goUretim(it.page)
+  // yedeği doğru sayfayı açıyordu ama çapayı 'video' varsayıp menüde YANLIŞ
+  // öğeyi vurguluyordu. Tek yoldan gitmek ikisini de düzeltir.
+  if(it&&it.page){ try{ acGo(it.page); }catch(e){ console.warn('[NOTIF] gidilemedi:', it.page, e.message); } } }
 function notifTumunuOku(){ NOTIF.items.forEach(x=>NOTIF.seen.add(x.id)); notifKaydet(); notifRender(); }
 function notifTemizle(){ NOTIF.items=[]; notifKaydet(); notifRender(); }
 document.addEventListener('click', e=>{ const p=document.getElementById('notif-panel'); if(p&&p.classList.contains('on')&&!p.contains(e.target)&&!e.target.closest('#bell-btn')) notifPanelKapat(); });
@@ -12229,7 +12288,9 @@ async function notifCheck(derin){
     const errs=(S.logs||[]).filter(l=>l.sev==='err' && Date.parse(l.t)>=Date.now()-3600000);
     if(errs.length>=3) notifEkle('sys-err','⚠',errs.length+' sistem hatası (son 1 saat)','Loglar sayfasında ayrıntılar','loglar'); else notifSil('sys-err');
     if(getN8N()){ try{ const d=await n8nGetCached('/webhook/kworb-bekleyenler'); const n=(d&&!d._bos)?(d.count!=null?d.count:(d.pending?d.pending.length:0)):0;
-      if(n>0) notifEkle('trend-pending','🔥',n+' trend videosu onay bekliyor','Onaylayıp kategori belirle','radar'); else notifSil('trend-pending'); }catch(e){} }
+      // Hedef 'radar' değil 'trendonay': bildirim onay kuyruğundan bahsediyor,
+      // ama Keşif Radarı sekmesini açıyordu — kullanıcı bir tık daha atıyordu.
+      if(n>0) notifEkle('trend-pending','🔥',n+' trend videosu onay bekliyor','Onaylayıp kategori belirle','trendonay'); else notifSil('trend-pending'); }catch(e){} }
     try{ let urls=(S._panelCache&&S._panelCache.urls)||(S.sheetData&&S.sheetData.urls)||[];
       if(!urls.length&&getN8N()){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos) urls=d.urls||[]; }
       const st=urls.filter(acIsStuck).length;
@@ -13589,7 +13650,21 @@ function acIsStuck(r){
   const ts = Date.parse(t); if (!ts) return false;
   return (Date.now()-ts)/3600000 > 6;
 }
-function acGo(id){ const el=[...document.querySelectorAll('.ni')].find(n=>(n.getAttribute('onclick')||'').includes("'"+id+"'")); if (el) el.click(); }
+// Aksiyon Merkezi kutusundan hedefe git.
+// ESKİ HÂLİ SESSİZCE VAZGEÇİYORDU: yalnızca kenar çubuğundaki .ni öğelerine
+// bakıyordu, oysa 'urltakip' ve 'trendonay' kenar çubuğunda YOK — ikisi de hub
+// sekmesi (UTAB_GROUPS). `if (el)` eşleşme bulamayınca hiçbir şey yapmıyor,
+// hata bile vermiyordu; "Takılı video" ve "Onay bekleyen trend" kutuları bu
+// yüzden ölüydü. Aynı yedeği notifTikla zaten kullanıyor.
+function acGo(id){
+  const el=[...document.querySelectorAll('.ni')].find(n=>(n.getAttribute('onclick')||'').includes("'"+id+"'"));
+  if (el) { el.click(); return true; }
+  for (const g in UTAB_GROUPS){
+    if ((UTAB_GROUPS[g]||[]).some(t=>t.id===id)){ goUretim(id, UTAB_ANCHOR[g]); return true; }
+  }
+  console.warn('[AC] hedef bulunamadı:', id);
+  return false;
+}
 function acTileClick(target){
   if (target==='failed'){ acGo('yayindurumu'); setTimeout(()=>{ try{ ydFilter('failed'); }catch(e){} }, 350); }
   else if (target==='health'){ acGo('platformlar'); }
@@ -13621,6 +13696,12 @@ async function loadActionCenter(){
   const pTrend = (async()=>{ try { const base=getN8N(); if(!base) return null; const d=await n8nGetCached('/webhook/kworb-bekleyenler'); return (d&&!d._bos)?(d.count!=null?d.count:(d.pending?d.pending.length:0)):null; } catch(e){ return null; } })();
 
   const [fail, health, stuck, trend] = await Promise.all([pFail,pHealth,pStuck,pTrend]);
+  // Kenar çubuğundaki kırmızı "başarısız gönderim" rozetini AÇILIŞTA doldur.
+  // Önceden yalnız renderYayinDurumu çağırıyordu — yani o sayfaya gitmenin
+  // SEBEBİ olan işaret, ancak oraya gidince beliriyordu.
+  // null ile 0 AYRI: null = ölçüm yapılamadı (rozete dokunma, yoksa "0 hata"
+  // diye yanlış temiz izlenimi verir), 0 = gerçekten hata yok (rozeti temizle).
+  if (typeof fail === 'number') ydSetFailBadge(fail);
   const tiles = [
     { n:fail,   target:'failed', icon:'❌', label:'Başarısız gönderim', hint:'yeniden gönder',       sev:'var(--er)' },
     { n:health, target:'health', icon:'⚠',  label:'Profil sağlık sorunu', hint:'süresi dolmuş/hesapsız', sev:'var(--er)' },
