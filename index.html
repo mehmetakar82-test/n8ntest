@@ -1607,6 +1607,10 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <span class="badge bi" id="tak-f-x" onclick="takFilter('x')" style="cursor:pointer"><img class="pfav" src="https://www.google.com/s2/favicons?domain=x.com&sz=64" alt="" loading="lazy"/> X</span>
       <span class="badge bi" id="tak-f-sch" onclick="takFilter('sch')" style="cursor:pointer">⏰ Planlı</span>
       <span class="badge bgr" id="tak-f-all" onclick="takFilter('all')" style="cursor:pointer">Tümü</span>
+      <select id="tak-profil" onchange="takProfilSec(this.value)" title="Tek bir profilin planını göster — yeni gönderdiğin videonun short'larını böyle ayırt edersin" style="font-size:12px;padding:3px 6px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;color:var(--tx);margin-left:6px">
+        <option value="">Tüm profiller</option>
+      </select>
+      <span class="badge bi" id="tak-f-son" onclick="takPlanSonu()" style="cursor:pointer" title="Takvimi planın EN SONUNA götürür. Yeni gönderilen short'lar her zaman mevcut planın arkasına eklenir — az önce gönderdiğin video buradadır.">🔚 Plan Sonu</span>
     </div>
   </div>
   <div id="tak-bilinmeyen" style="display:none;font-size:11.5px;color:#f5a623;margin-bottom:8px"></div>
@@ -2454,7 +2458,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.05-29';
+const PANEL_YAPI = 'y2026.08.06-30';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -10453,6 +10457,7 @@ document.addEventListener('DOMContentLoaded', function() {
       filterTbl,exportCSV,loadReports,loadPlatforms,
       saveSettings,updateWHs,copyText,renderLogs,
       clearLogs,exportLogs,loadTakvim,takPrev,takNext,takFilter,openDayModal,takEslesir,takBilinmeyenUyari,
+      takProfilSec,takPlanSonu,takProfilKutusu,
       oneAlAc,oneAlKapat,oneAlYukle,oneAlCiz,oneAlSec,oneAlFiltreSec,oneAlHesapla,oneAlUygula,oneAlIsaretiUnut,
       renderOncelikToggle,oncelikChipToggle,getSelOncelik,oncelikIsaretle,oncelikOku,oncelikTemizle,
       closeDayModal,showTakTip,hideTakTip,dmFilter,dmToggleSort,
@@ -11099,6 +11104,7 @@ const TAK = {
   shorts: [],
   items: [],  // Upload-Post API'den normalize edilmiş {time, plat, status, profile, r, _url}
   filter: 'all', // 'ig','yt','tt','all'
+  profil: '',    // profil süzgeci — '' = tümü (takvim dolu olunca ayırt etmenin tek yolu)
   byDay: {}, // gün -> items cache (modal için)
 };
 const TAK_ST_COLOR = { pub:'var(--ok)', fail:'var(--er)', plan:'#00b8d4' };
@@ -11280,7 +11286,41 @@ const TAK_GUNLER = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
 // Planlı kayıtların plat'ı 'sch'tir; gerçek platformları plats[] içinde.
 // Bu yüzden FB filtresi hem yayınlanmış FB kayıtlarını hem de FB'ye
 // gidecek planlı/kuyruktaki kayıtları göstermeli.
+// Profil süzgeci — takvim dolu olduğunda "az önce gönderdiğim video nereye
+// gitti?" sorusunu cevaplayan tek şey. Platform süzgeci tek başına yetmiyordu.
+function takProfilSec(v){ TAK.profil = String(v||''); renderTakvim(); }
+
+// Takvimi planın EN SONUNA götürür. Yeni gönderimler her zaman profilin en
+// ileri planından SONRAYA yerleştiği için (n8n scheduled_date hesabı) yeni
+// short'lar oradadır. Profil seçiliyse yalnız o profilin sonuna gider.
+function takPlanSonu(){
+  const l = takFiltered();
+  if (!l.length) return toast('Planlı kayıt yok','warn');
+  const enSon = l.reduce((m,it)=>{ const t=Date.parse(it.time||'')||0; return t>m?t:m; }, 0);
+  if (!enSon) return toast('Kayıtlarda tarih yok','warn');
+  const d = new Date(enSon);
+  TAK.year = d.getFullYear(); TAK.month = d.getMonth(); TAK.cur = d;
+  renderTakvim();
+  const kimin = TAK.profil ? (' · ' + TAK.profil) : '';
+  toast('Planın sonu: ' + d.toLocaleDateString('tr') + ' ' +
+        d.toLocaleTimeString('tr',{hour:'2-digit',minute:'2-digit'}) + kimin, 'ok', 6000);
+}
+
+// Süzgeç kutusunu takvimdeki GERÇEK profillerden doldur (Upload-Post profil
+// listesi değil — planda görünmeyen profili listelemek yanıltırdı).
+function takProfilKutusu(){
+  const sel = document.getElementById('tak-profil'); if (!sel) return;
+  const say = {};
+  (TAK.items||[]).forEach(it=>{ const p=String(it.profile||'').trim(); if(p) say[p]=(say[p]||0)+1; });
+  const adlar = Object.keys(say).sort((a,b)=>a.localeCompare(b,'tr'));
+  const secili = TAK.profil || '';
+  sel.innerHTML = '<option value="">Tüm profiller ('+(TAK.items||[]).length+')</option>'
+    + adlar.map(a=>'<option value="'+esc0(a)+'"'+(a===secili?' selected':'')+'>'+esc0(a)+' ('+say[a]+')</option>').join('');
+  if (secili && !adlar.includes(secili)) sel.value = '';   // profil plandan düştüyse süzgeci bırak
+}
+
 function takEslesir(it){
+  if (TAK.profil && String(it.profile||'').trim() !== TAK.profil) return false;
   const f = TAK.filter;
   if (f === 'all' || f === it.plat) return true;
   return !!(it.plats && it.plats.indexOf(f) >= 0);
@@ -11498,6 +11538,7 @@ async function oneAlUygula(){
 }
 
 function renderTakvim() {
+  takProfilKutusu();                  // süzgeç kutusu takvimdeki gerçek profillerden
   takBilinmeyenUyari();               // üç görünümde de geçerli
   if (TAK.view === 'hafta') return renderTakHafta();
   if (TAK.view === 'gun')   return renderTakGun();
