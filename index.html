@@ -2521,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.08-42';
+const PANEL_YAPI = 'y2026.08.08-43';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -11492,22 +11492,36 @@ async function takKopyaTemizle(){
     '\n\nBu işlem Upload-Post tarafında KALICIDIR. Devam edilsin mi?');
   if (!onay) return;
 
+  // HIZ SINIRI: ilk sürümde çıplak upFetch kullanmıştım — o 429'da ne
+  // yeniden deniyor ne de ORTAK hız kapısını kapatıyor. Ölçüldü: 91
+  // silmeden 20'si geçti, 71'i "HTTP 429 Too many requests" aldı.
+  // upFetchRetry ikisini de yapar (upKapiKapat + artan bekleme); ayrıca
+  // istekler arasına nefes payı konuyor — sınıra çarpıp beklemektense
+  // baştan yavaş gitmek daha hızlı bitiriyor.
   let ok = 0, hata = 0; const hatalar = [];
+  const BEKLEME = 400;
   for (let i = 0; i < hedef.length; i++){
     const jid = hedef[i];
     try {
-      await upFetch('/uploadposts/schedule/' + encodeURIComponent(jid), { method: 'DELETE' });
+      await upFetchRetry('/uploadposts/schedule/' + encodeURIComponent(jid), { method: 'DELETE' }, 6);
       ok++;
     } catch(e){
       hata++;
       if (hatalar.length < 5) hatalar.push(jid.slice(0, 10) + ': ' + (e.message || '?'));
     }
-    if ((i + 1) % 10 === 0 || i === hedef.length - 1)
-      toast('Kopya temizleniyor… ' + (i + 1) + '/' + hedef.length + '  (silinen ' + ok + ', hata ' + hata + ')', 'info');
+    if ((i + 1) % 5 === 0 || i === hedef.length - 1){
+      const kalanMs = (typeof upKapiKalan === 'function') ? upKapiKalan() : 0;
+      toast('Kopya temizleniyor… ' + (i + 1) + '/' + hedef.length
+            + '  (silinen ' + ok + (hata ? ', hata ' + hata : '') + ')'
+            + (kalanMs > 0 ? ' · ⏳ hız sınırı, ' + Math.ceil(kalanMs / 1000) + ' sn' : ''), 'info');
+    }
+    if (i < hedef.length - 1) await sleep(BEKLEME);
   }
   addLog(hata ? 'warn' : 'ok', 'takvim',
     'kopya temizligi: silinen ' + ok + ', hata ' + hata + (hatalar.length ? ' — ' + hatalar.join(' | ') : ''));
-  toast('Bitti: ' + ok + ' kopya silindi' + (hata ? ', ' + hata + ' hata (Loglar\'a bak)' : ''), hata ? 'warn' : 'ok');
+  toast('Bitti: ' + ok + ' kopya silindi'
+        + (hata ? ' · ' + hata + ' tanesi silinemedi — takvim yenilendi, düğmeye tekrar basabilirsin' : ''),
+        hata ? 'warn' : 'ok');
   await loadTakvim();
 }
 
