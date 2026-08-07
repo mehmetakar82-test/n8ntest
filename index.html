@@ -2462,7 +2462,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.07-37';
+const PANEL_YAPI = 'y2026.08.07-38';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -2602,6 +2602,21 @@ function panelSheetOnb(){
 // yazılıyor.
 let SHEETS_HATA = '';
 function sheetsHataSifirla(){ SHEETS_HATA = ''; }
+
+// Ayarlar'a çoğu zaman tam BAĞLANTI yapıştırılıyor
+// (…/spreadsheets/d/<ID>/edit#gid=0). Ham hâliyle URL'ye eklenince istek
+// …/spreadsheets/<ID>/edit#gid=0/values/… oluyor ve Sheets HTTP 404
+// dönüyor — tarayıcı da bunu "CORS policy" diye raporlayıp gerçek sebebi
+// gizliyor. Kimliği neyin içinden gelirse gelsin çıkar.
+function sheetIdCoz(v){
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  const m = s.match(/\/spreadsheets\/d\/([A-Za-z0-9_-]{20,})/);
+  if (m) return m[1];
+  const m2 = s.match(/[A-Za-z0-9_-]{20,}/);   // baştaki/sondaki fazlalığı at
+  return m2 ? m2[0] : s;
+}
+
 async function sheetsGet(sheetId, range) {
   const onb = panelSheetOnb();
   if (onb) {
@@ -2614,11 +2629,16 @@ async function sheetsGet(sheetId, range) {
     SHEETS_HATA = (!sheetId ? 'Google Sheet ID' : 'Google Sheets API Key') + ' girilmemiş (Ayarlar)';
     return null;
   }
+  const ham = String(sheetId).trim();
+  sheetId = sheetIdCoz(ham);
+  if (sheetId !== ham) addLog('warn','sheets','Sheet ID temizlendi: "'+ham.slice(0,60)+'" -> '+sheetId);
   const yaz = (m) => { SHEETS_HATA = m; addLog('err','sheets',m); };
   try {
-    const r = await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+sheetId+'/values/'+encodeURIComponent(range)+'?key='+key);
+    const r = await fetch('https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(sheetId)+'/values/'+encodeURIComponent(range)+'?key='+encodeURIComponent(key));
     if (r.status===403) {
-      yaz('HTTP 403 — tablo herkese açık değil. API Key yalnız "bağlantısı olan herkes" tablolarını okur; ya tabloyu aç ya da Ayarlar\'a n8n URL\'si gir.');
+      yaz('HTTP 403 — ya tablo herkese açık değil ya da API Key\'in referer kısıtı bu adresi kabul etmiyor. '
+        + 'Google Cloud → Kimlik Bilgileri → anahtarın izinli referer listesinde '
+        + location.origin + '/* olmalı. Alternatif: Ayarlar\'a n8n URL\'si gir.');
       const h = document.getElementById('sheets-hint');
       if (h) h.style.display='block';
       return null;
@@ -2626,9 +2646,10 @@ async function sheetsGet(sheetId, range) {
     if (r.status===404) {
       // Sheets 404'te CORS başlığı göndermiyor; tarayıcı bunu "CORS policy"
       // diye raporluyor ve gerçek sebep gizleniyor. Asıl sebep bu satır.
-      yaz('HTTP 404 — bu Sheet ID bulunamadı ya da API Key ile erişilemiyor. '
-        + 'ID: ' + String(sheetId).slice(0,18) + '… | Sekme: ' + range.split('!')[0]
-        + ' — n8n URL\'si girilirse bu yola hiç düşülmez.');
+      yaz('HTTP 404 — Google bu tabloyu bulamadı. Kullanılan ID: "' + sheetId + '" '
+        + '(sekme: ' + range.split('!')[0] + '). Ayarlar\'daki Sheet ID alanına '
+        + 'tam bağlantı değil YALNIZ kimlik yazılmalı; fazlalık varsa bu hata çıkar. '
+        + 'n8n URL\'si girilirse bu yola hiç düşülmez.');
       return null;
     }
     if (r.status===400) {
