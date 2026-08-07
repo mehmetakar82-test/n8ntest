@@ -1616,6 +1616,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div id="tak-bilinmeyen" style="display:none;font-size:11.5px;color:#f5a623;margin-bottom:8px"></div>
   <div id="tak-kopya" style="display:none;font-size:11.5px;color:#f5a623;margin-bottom:8px"></div>
   <div id="tak-desc" style="display:none;font-size:11.5px;color:#f5a623;margin-bottom:8px"></div>
+  <div id="tak-kuyruk" style="display:none;font-size:11.5px;color:#f5a623;margin-bottom:8px"></div>
   <div id="tak-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px">
     <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">PTZ</div>
     <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">SAL</div>
@@ -2460,7 +2461,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.07-34';
+const PANEL_YAPI = 'y2026.08.07-35';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -11110,6 +11111,7 @@ const TAK = {
   byDay: {}, // gün -> items cache (modal için)
   kopyaSayisi: 0, // farklı job_id ama aynı zaman+profil+başlık = GERÇEK kopya
   birlesenIs: 0,  // aynı job_id'nin fazla platform satırları (görüntü kusuruydu)
+  kuyrukDusen: [],// kuyruk verisi hız sınırına takılan profiller — sayılar eksik demek
 };
 const TAK_ST_COLOR = { pub:'var(--ok)', fail:'var(--er)', plan:'#00b8d4' };
 const TAK_ST_LABEL = { pub:'✅ Yayınlandı', fail:'❌ Başarısız', plan:'⏰ Planlı' };
@@ -11323,6 +11325,24 @@ function takAciklamaUyari(){
   el.innerHTML = m;
 }
 
+// KUYRUK VERİSİ EKSİKSE SÖYLE. Upload-Post hız sınırı (HTTP 429) profil
+// başına kuyruk sorgusunu düşürebiliyor — Raporlar sayfası 15 profilin
+// analitiğini çekerken Takvim aynı sınırı paylaşıyor ve kaybediyor.
+// Eskiden bu yalnız console.warn'a yazılıyordu: takvim sessizce EKSİK
+// çiziliyor, kopya/planlı sayıları yükleme başına değişiyordu. Ölçüldü:
+// aynı panelde iki ardışık yüklemede gerçek kopya 81 ve 91 çıktı.
+function takKuyrukUyari(){
+  const el = document.getElementById('tak-kuyruk'); if (!el) return;
+  const d = TAK.kuyrukDusen || [];
+  if (!d.length){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '⚠ <b>' + d.length + '</b> profilin kuyruk verisi alınamadı (Upload-Post hız sınırı): <code>'
+    + d.slice(0, 6).map(esc0).join('</code> <code>') + '</code>'
+    + (d.length > 6 ? ' <i>+' + (d.length - 6) + ' daha</i>' : '')
+    + ' — <b>takvim eksik, sayılar güvenilir değil.</b> Raporlar sayfası açıkken '
+    + 'aynı sınır paylaşılıyor; birkaç saniye sonra <b>↻ Yenile</b>\'ye bas.';
+}
+
 async function loadTakvim() {
   if (!S.cfg.blot && !getN8N()) {
     setEl('tak-title', 'Upload-Post API Key gerekli');
@@ -11334,6 +11354,7 @@ async function loadTakvim() {
   const platMap = {instagram:'ig',youtube:'yt',tiktok:'tt',facebook:'fb',x:'x',twitter:'x',threads:'ig',linkedin:'fb'};
   const seenJobs = new Set();
   let descBosOrnek = null, descBosN = 0;   // açıklama alanı bulunamayan kayıtlar
+  const kuyrukDusen = [];                  // kuyruk sorgusu hız sınırına takılan profiller
   // Planlı kayıtlar tek bir sahte anahtarla ('sch') ekleniyordu; platform
   // filtresi it.plat ile eşleştiği için FB/X seçilince planlı short'ların
   // HİÇBİRİ görünmüyordu (kullanıcı fark etti: FB'de 36 planlı var ama
@@ -11435,9 +11456,14 @@ async function loadTakvim() {
             'platform-status':'Kuyruk ⏳ ' + p, kategori:'queue'
           }});
         });
-      } catch(e) { console.warn('[TAK] queue ' + p + ':', e.message); }
+      } catch(e) {
+        // SESSİZ KALMA: bu profilin planlı kayıtları takvime HİÇ girmiyor.
+        kuyrukDusen.push(p);
+        console.warn('[TAK] queue ' + p + ':', e.message);
+      }
     }, 4);
   } catch(e) { console.warn('[TAK] queue hata:', e.message); }
+  TAK.kuyrukDusen = kuyrukDusen;
 
   // Tekilleştirme: aynı job_id'nin platform satırları birleşir, gerçek
   // kopyalar tek karta iner ama ×N rozetiyle görünür kalır.
@@ -11778,6 +11804,7 @@ function renderTakvim() {
   takBilinmeyenUyari();               // üç görünümde de geçerli
   takKopyaUyari();                    // kopya kayıtlar sessizce yutulmasın
   takAciklamaUyari();                 // açıklama okunamıyorsa sebebini yaz
+  takKuyrukUyari();                   // eksik kuyruk verisi sessizce geçmesin
   if (TAK.view === 'hafta') return renderTakHafta();
   if (TAK.view === 'gun')   return renderTakGun();
   renderTakAy();
