@@ -2283,24 +2283,37 @@ function confirmDupeSend(url) {
 // Coklu secim gonderimlerinde kullanilir — native confirm()'in belirsiz
 // Tamam/Iptal anlamlarindan kacinmak icin 3 net secenekli ozel modal:
 // 'skip' = yalniz yenileri gonder, 'all' = hepsini gonder, 'cancel' = vazgec.
-function dupeChoiceModal(dupeCount, newCount) {
+// ayrinti: [{ad, t, kaynak}] — HANGİ video, NE ZAMAN, NEREDEN işlendi.
+// Yalnız sayı göstermek karar verdirmiyordu: kullanıcı "hangisi?" diye
+// soramadan seçim yapmak zorunda kalıyordu. findDupeSend artık URL-Takip'ten
+// tarih ve kaynak da döndürdüğü için bunu göstermemek israf olurdu.
+function dupeChoiceModal(dupeCount, newCount, ayrinti) {
   return new Promise(resolve => {
     const old = document.getElementById('dupe-modal'); if (old) old.remove();
+    const liste = (ayrinti || []).filter(Boolean).slice(0, 6).map(x =>
+      `<div style="margin-top:6px;padding-left:10px;border-left:2px solid var(--wn)">
+         <div style="color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc0(String(x.ad || '(başlıksız)')).slice(0, 60)}</div>
+         <div style="font-size:11px;opacity:.85">${esc0(x.t || '(tarihsiz)')}${x.kaynak ? ' · ' + esc0(x.kaynak) : ''}</div>
+       </div>`).join('');
+    const fazla = (ayrinti || []).length > 6 ? `<div style="margin-top:6px;font-size:11px;opacity:.8">… ve ${(ayrinti||[]).length - 6} tane daha</div>` : '';
+    const yeniYok = !newCount;
     const div = document.createElement('div');
     div.id = 'dupe-modal';
     div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center';
-    div.innerHTML = `<div style="background:var(--sur);border:1px solid var(--wn);border-radius:8px;padding:20px 24px;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+    div.innerHTML = `<div style="background:var(--sur);border:1px solid var(--wn);border-radius:8px;padding:20px 24px;max-width:420px;box-shadow:0 8px 40px rgba(0,0,0,.4)">
       <div style="font-family:var(--fh);font-weight:700;font-size:13px;color:var(--tx);margin-bottom:8px">⚠ Tekrar Gönderim Tespit Edildi</div>
-      <div style="font-size:14px;color:var(--mt);line-height:1.6;margin-bottom:16px">${dupeCount} video daha önce gönderilmiş görünüyor. Nasıl devam edelim?</div>
+      <div style="font-size:14px;color:var(--mt);line-height:1.6;margin-bottom:${liste?'10':'16'}px">${dupeCount} video daha önce işlenmiş görünüyor.${yeniYok ? ' <b style="color:var(--wn)">Seçtiklerinin tamamı bu durumda.</b>' : ''} Tekrar gönderirsen aynı short\'lar ikinci kez üretilip yayınlanır.</div>
+      ${liste ? `<div style="font-size:12px;color:var(--mt);margin-bottom:16px;max-height:190px;overflow:auto">${liste}${fazla}</div>` : ''}
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn bp bsm" id="dupe-skip" style="width:100%;justify-content:center">Yalnız Yenileri Gönder (${newCount})</button>
+        <button class="btn bp bsm" id="dupe-skip" style="width:100%;justify-content:center"${yeniYok?' disabled title="Seçilenlerin hepsi daha önce işlenmiş — gönderilecek yeni video yok"':''}>Yalnız Yenileri Gönder (${newCount})</button>
         <button class="btn bw bsm" id="dupe-all" style="width:100%;justify-content:center">Hepsini Yine de Gönder</button>
         <button class="btn bg bsm" id="dupe-cancel" style="width:100%;justify-content:center">Vazgeç</button>
       </div>
     </div>`;
     document.body.appendChild(div);
     const done = choice => { div.remove(); resolve(choice); };
-    div.querySelector('#dupe-skip').onclick = () => done('skip');
+    const skip = div.querySelector('#dupe-skip');
+    if (!yeniYok) skip.onclick = () => done('skip');
     div.querySelector('#dupe-all').onclick = () => done('all');
     div.querySelector('#dupe-cancel').onclick = () => done('cancel');
     div.onclick = e => { if (e.target === div) done('cancel'); };
@@ -2495,7 +2508,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.07-40';
+const PANEL_YAPI = 'y2026.08.07-41';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3037,7 +3050,8 @@ async function sendBulkURLs() {
   // kullanımda kullanıcı hiçbir geri bildirim görmüyordu.
   setStyle('bv-prog','display','block');
   if (dupes.length) {
-    const choice = await dupeChoiceModal(dupes.length, urls.length-dupes.length);
+    const choice = await dupeChoiceModal(dupes.length, urls.length-dupes.length,
+      dupes.map(u=>{ const k=findDupeSend(u)||{}; return { ad:u, t:k.t, kaynak:k.kategori }; }));
     if (choice==='cancel') return setEl('bv-st','İşlem vazgeçildi');
     if (choice==='skip') urls = urls.filter(u=>!findDupeSend(u));
   }
@@ -3232,7 +3246,10 @@ async function yarSendSelected() {
   if (!sel.length) return showRes('ya-res', 'Video seçin', 'warn');
   const dupeSel = sel.filter(raw => findDupeSend('https://www.youtube.com/watch?v=' + yarNormalizeVideo(raw).id));
   if (dupeSel.length) {
-    const choice = await dupeChoiceModal(dupeSel.length, sel.length-dupeSel.length);
+    const choice = await dupeChoiceModal(dupeSel.length, sel.length-dupeSel.length,
+      dupeSel.map(raw=>{ const v=yarNormalizeVideo(raw);
+        const k=findDupeSend('https://www.youtube.com/watch?v='+v.id)||{};
+        return { ad:v.title||v.id, t:k.t, kaynak:k.kategori }; }));
     if (choice==='cancel') return showRes('ya-res','İşlem vazgeçildi','warn');
     if (choice==='skip') sel = sel.filter(raw => !findDupeSend('https://www.youtube.com/watch?v=' + yarNormalizeVideo(raw).id));
   }
@@ -9213,7 +9230,9 @@ async function ytkSendSelected() {
   if (!sel.length) return showRes('ytk-res', 'Video seçin', 'warn');
   const dupeSel = sel.filter(v => findDupeSend('https://www.youtube.com/watch?v=' + v.id));
   if (dupeSel.length) {
-    const choice = await dupeChoiceModal(dupeSel.length, sel.length-dupeSel.length);
+    const choice = await dupeChoiceModal(dupeSel.length, sel.length-dupeSel.length,
+      dupeSel.map(v=>{ const k=findDupeSend('https://www.youtube.com/watch?v='+v.id)||{};
+        return { ad:(v.snippet&&v.snippet.title)||v.id, t:k.t, kaynak:k.kategori }; }));
     if (choice==='cancel') return showRes('ytk-res','İşlem vazgeçildi','warn');
     if (choice==='skip') sel = sel.filter(v => !findDupeSend('https://www.youtube.com/watch?v=' + v.id));
   }
@@ -15189,7 +15208,8 @@ async function rdSendSelected(){
   if(!base) return showRes('rd-res','Ayarlar\'dan n8n URL girin','warn');
   const dupes=sel.filter(x=>findDupeSend(x.url));
   if(dupes.length){
-    const choice=await dupeChoiceModal(dupes.length, sel.length-dupes.length);
+    const choice=await dupeChoiceModal(dupes.length, sel.length-dupes.length,
+      dupes.map(x=>{ const k=findDupeSend(x.url)||{}; return { ad:x.title||x.url, t:k.t, kaynak:k.kategori }; }));
     if(choice==='cancel') return showRes('rd-res','İşlem vazgeçildi','warn');
     if(choice==='skip') sel=sel.filter(x=>!findDupeSend(x.url));
   }
