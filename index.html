@@ -1737,6 +1737,19 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <!-- Çekilen pencere dolduysa (daha eski kayıt var ama listede yok) burada yazar -->
   <div id="yd-kirpik" class="alert aw" style="display:none;margin-bottom:12px;font-size:12px"></div>
 
+  <!-- YAYIN DEFTERİ — /history'nin GÖREMEDİĞİ gönderimler.
+       Upload-Post çağrısı reddedilirse (kuyruk dolu, hesap bağlı değil,
+       HTTP hatası) post geçmişe HİÇ girmez; yani yukarıdaki tablo onu
+       gösteremez. n8n her yayın denemesinin sonucunu YayinDefteri
+       sekmesine yazıyor — kaybolan short'ları ancak burada görürsün. -->
+  <div class="card" style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div class="ct" style="margin:0">📒 Yayın Defteri <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— gönderim <b>denemelerinin</b> sonucu (reddedilenler dahil)</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Yukarıdaki tablo Upload-Post &lt;b&gt;/history&lt;/b&gt;'den gelir; oraya yalnız Upload-Post'un &lt;b&gt;işlediği&lt;/b&gt; postlar düşer.&lt;br&gt;&lt;br&gt;Çağrı en başta REDDEDİLİRSE (kuyruk dolu, platform hesabı bağlı değil, HTTP hatası) post geçmişe hiç girmez ve yukarıda &lt;b&gt;görünmez&lt;/b&gt;.&lt;br&gt;&lt;br&gt;n8n her denemenin sonucunu &lt;code&gt;YayinDefteri&lt;/code&gt; sekmesine yazar. Bu kart oradan okur — sessizce kaybolan short'ları burada bulursun.">ⓘ</button></div>
+      <button class="btn bg bsm" onclick="ydDefterYukle(true)">↻ Defteri Oku</button>
+    </div>
+    <div id="yd-defter" style="margin-top:10px"><div style="color:var(--mt);font-size:12.5px;padding:8px 2px">Yükleniyor…</div></div>
+  </div>
+
   <!-- Üretilen her short Upload-Post'a girdi mi? -->
   <div class="card" style="margin-bottom:12px">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -2508,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.07-41';
+const PANEL_YAPI = 'y2026.08.08-42';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -2702,7 +2715,11 @@ async function sheetsGet(sheetId, range) {
   if (onb) {
     const rl = range.toLowerCase();
     if (rl.includes('url-takip')) return arrToValues(onb.urls||[]);
-    return arrToValues(onb.shorts||[]);
+    // n8n önbelleği YALNIZ bu iki sekmeyi taşıyor. Eskiden başka bir sekme
+    // istendiğinde (ör. YayinDefteri) sessizce SHORTS dönüyordu — yani
+    // yanlış tabloyu doğru sanıyorduk. Bilinmeyen sekmede önbelleği atla,
+    // doğrudan API'ye git.
+    if (rl.includes('sheet1')) return arrToValues(onb.shorts||[]);
   }
   const key = S.cfg.shkey;
   if (!key||!sheetId) {
@@ -3705,7 +3722,7 @@ function urlMukerrerBul(urls){
 function urlMukerrerUyari(urls){
   const el = document.getElementById('url-mukerrer'); if (!el) return;
   const n = (urls || []).length;
-  if (!n){ el.style.display = 'none'; return; }
+  if (!n){ el.style.display = 'none'; el.innerHTML = ''; return; }
   const m = urlMukerrerBul(urls);
   el.style.display = 'block';
   if (!m.length){
@@ -11425,14 +11442,21 @@ function takTekille(items){
 function takKopyaUyari(){
   const el = document.getElementById('tak-kopya'); if (!el) return;
   const k = TAK.kopyaSayisi || 0, b = TAK.birlesenIs || 0;
-  if (!k && !b){ el.style.display = 'none'; return; }
+  if (!k && !b){ el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'block';
   let m = '';
   if (b) m += '<b>' + b + '</b> satır aynı gönderimin platform kopyasıydı, tek karta birleştirildi. ';
   if (k) m += '<b style="color:#ff6b6b">' + k + '</b> planlı kayıt <b>gerçekten kopya</b> '
             + '(aynı profil, aynı saat, aynı başlık — ayrı job_id). Kartlarda <b>×N</b> rozetiyle işaretlendi; '
             + 'bunlar Upload-Post\'ta ayrı ayrı yayınlanır.';
-  el.innerHTML = '⚠ ' + m;
+  // Kullanıcı bu düğmeyi açıkça istedi. Tek tık silmiyor: takKopyaTemizle
+  // önce neyin silineceğini grup grup listeleyen bir onay penceresi açıyor
+  // ve her gruptan BİR kaydı koruyor.
+  el.innerHTML = '⚠ ' + m + (k
+    ? ' <button class="btn bg bsm" onclick="takKopyaTemizle()" style="margin-left:6px"'
+      + ' title="Her gruptan bir kaydı korur, fazlalıkları Upload-Post\'tan iptal eder. Önce onay ister.">'
+      + '🧹 Kopyaları temizle (' + k + ')</button>'
+    : '');
 }
 
 // ── KOPYALARI TEMİZLE ───────────────────────────────────────────────────
@@ -11533,7 +11557,7 @@ function takAciklamaUyari(){
   const el = document.getElementById('tak-desc'); if (!el) return;
   const kalan = TAK.descKalan || 0;
   const eslesen = TAK.descEslesen || 0;
-  if (!kalan && !eslesen){ el.style.display = 'none'; return; }
+  if (!kalan && !eslesen){ el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'block';
   let m = 'ℹ Upload-Post planlı kayıtlarda <b>açıklama döndürmüyor</b> '
         + '(<code>ScheduledPost</code> şeması yalnız job_id · scheduled_date · post_type · profile_username · title · preview_url). ';
@@ -11556,7 +11580,7 @@ function takAciklamaUyari(){
 function takKuyrukUyari(){
   const el = document.getElementById('tak-kuyruk'); if (!el) return;
   const d = TAK.kuyrukDusen || [];
-  if (!d.length){ el.style.display = 'none'; return; }
+  if (!d.length){ el.style.display = 'none'; el.innerHTML = ''; return; }
   el.style.display = 'block';
   el.innerHTML = '⚠ <b>' + d.length + '</b> profilin kuyruk verisi alınamadı (Upload-Post hız sınırı): <code>'
     + d.slice(0, 6).map(esc0).join('</code> <code>') + '</code>'
@@ -13653,6 +13677,97 @@ function ydYenidenCozmez(hataMetni){
   return /session (has )?expired|reconnect|token (is )?expired|invalid[_ ]?token|reauth|not authorized|unauthorized|forbidden|permission|no facebook pages found/i.test(s);
 }
 
+// ── YAYIN DEFTERİ ────────────────────────────────────────────────────────
+// Upload-Post /history YALNIZ işlenmiş postları döndürür. Çağrı en başta
+// reddedilirse (kuyruk dolu, platform hesabı bağlı değil, HTTP hatası) post
+// geçmişe HİÇ girmez — kullanıcının dört short'u tam böyle kayboldu ve
+// panelde hiçbir iz bırakmadı. n8n artık her denemenin sonucunu
+// YayinDefteri sekmesine yazıyor; reddedilenlerin TEK kaydı orası.
+const YDEF = { rows: [], t: 0, hata: '', yukleniyor: false };
+
+// Sheet başlıkları elle yazıldığı için tolerant okuma (ölçüldü: ' baslik'
+// başında boşlukla duruyor). trKatla ayraçları ve Türkçe farkları siler.
+function ydefAl(r, adaylar){
+  for (const k of adaylar){ if (r[k] != null && String(r[k]).trim() !== '') return String(r[k]).trim(); }
+  const kat = adaylar.map(trKatla);
+  for (const k of Object.keys(r || {})){
+    if (kat.indexOf(trKatla(k)) < 0) continue;
+    const v = r[k];
+    if (v != null && String(v).trim() !== '') return String(v).trim();
+  }
+  return '';
+}
+function ydefHata(r){ return /hata|error|fail/i.test(ydefAl(r, ['durum','status'])); }
+
+async function ydDefterYukle(zorla){
+  if (YDEF.yukleniyor) return;
+  if (!zorla && YDEF.t && Date.now() - YDEF.t < 60000){ ydDefterCiz(); return; }
+  YDEF.yukleniyor = true;
+  const el = document.getElementById('yd-defter');
+  if (el) el.innerHTML = '<div style="color:var(--mt);font-size:12.5px;padding:8px 2px">⏳ YayinDefteri okunuyor…</div>';
+  sheetsHataSifirla();
+  const sid = sheetIdCoz(S.cfg.sheet || '');
+  const v = sid ? await sheetsGet(sid, 'YayinDefteri!A:Z') : null;
+  YDEF.rows = parseSheet(v);
+  YDEF.hata = (v === null) ? (SHEETS_HATA || 'Sheet okunamadı') : '';
+  YDEF.t = Date.now();
+  YDEF.yukleniyor = false;
+  ydDefterCiz();
+}
+
+function ydDefterCiz(){
+  const el = document.getElementById('yd-defter'); if (!el) return;
+  if (YDEF.hata){
+    el.innerHTML = '<div class="alert aw" style="font-size:12px;margin:0"><span>⚠</span><div>'
+      + '<b>Yayın Defteri okunamadı.</b> ' + esc0(YDEF.hata) + '</div></div>';
+    return;
+  }
+  const rows = YDEF.rows || [];
+  if (!rows.length){
+    el.innerHTML = '<div style="color:var(--mt);font-size:12.5px;padding:8px 2px">'
+      + 'Defter boş — n8n henüz bir yayın denemesi kaydetmemiş. '
+      + 'İlk gönderimden sonra dolacak (workflow\'u içeri aktarmayı unutma).</div>';
+    return;
+  }
+  const hatalar = rows.filter(ydefHata);
+  const basari  = rows.length - hatalar.length;
+  ydRozetYaz('defter', hatalar.length);
+
+  const satir = hatalar.slice(-25).reverse().map(r => {
+    const zaman = ydefAl(r, ['zaman','tarih','time']).slice(0, 16);
+    const bas   = ydefAl(r, ['baslik','title','başlık']);
+    const prof  = ydefAl(r, ['profil','profile','profile_username']);
+    const plat  = ydefAl(r, ['platform']);
+    const mesaj = ydefAl(r, ['mesaj','message','hata','error']) || '(sebep yazılmamış)';
+    const plan  = ydefAl(r, ['planlanan-tarih','scheduled_date','planlanan']);
+    const ic = (PLAT_META[({instagram:'ig',youtube:'yt',tiktok:'tt',facebook:'fb',x:'x'})[plat] || plat] || {}).icon || '';
+    return '<tr>'
+      + '<td style="white-space:nowrap">' + esc0(zaman) + '</td>'
+      + '<td>' + ic + ' ' + esc0(plat || '-') + '</td>'
+      + '<td>' + esc0(prof || '-') + '</td>'
+      + '<td class="uc" title="' + esc0(bas) + '">' + esc0(bas.slice(0, 38)) + (bas.length > 38 ? '…' : '') + '</td>'
+      + '<td style="color:var(--er)" title="' + esc0(mesaj) + '">' + esc0(mesaj.slice(0, 70)) + (mesaj.length > 70 ? '…' : '') + '</td>'
+      + '<td style="white-space:nowrap;color:var(--mt)">' + esc0(plan.slice(0, 16) || '-') + '</td>'
+      + '</tr>';
+  }).join('');
+
+  el.innerHTML =
+      '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin-bottom:8px">'
+    +   '<span>toplam deneme <b>' + rows.length + '</b></span>'
+    +   '<span style="color:var(--ok)">yayınlandı <b>' + basari + '</b></span>'
+    +   '<span style="color:' + (hatalar.length ? 'var(--er)' : 'var(--mt)') + '">gönderilemedi <b>' + hatalar.length + '</b></span>'
+    + '</div>'
+    + (hatalar.length
+        ? '<div class="alert aw" style="font-size:12px;margin:0 0 8px"><span>⚠</span><div>'
+          + 'Bu <b>' + hatalar.length + '</b> gönderim Upload-Post tarafından <b>reddedildi</b>, '
+          + 'yani yukarıdaki geçmiş tablosunda <b>hiç görünmezler</b>. Sebep sütununu oku — '
+          + '"queue slots" kuyruk dolu, "no ... account configured" hesap bağlı değil demektir.</div></div>'
+          + '<div class="tw"><table><thead><tr><th>Zaman</th><th>Platform</th><th>Profil</th><th>Başlık</th><th>Sebep</th><th>Planlanan</th></tr></thead>'
+          + '<tbody>' + satir + '</tbody></table></div>'
+          + (hatalar.length > 25 ? '<div style="font-size:11.5px;color:var(--mt);margin-top:6px">Son 25 hata gösteriliyor (toplam ' + hatalar.length + ').</div>' : '')
+        : '<div style="color:var(--ok);font-size:12.5px;padding:4px 2px">✓ Reddedilen gönderim yok — her deneme Upload-Post\'a ulaşmış.</div>');
+}
+
 async function loadYayinDurumu(){
   const listEl = document.getElementById('yd-list');
   const stEl   = document.getElementById('yd-status');
@@ -13681,6 +13796,9 @@ async function loadYayinDurumu(){
   ydDerinlikCiz();
   if (!items.length) addLog('warn','sistem','Yayın Durumu: Upload-Post history boş (konsol: [YD])');
   renderYayinDurumu();
+  // Defter AYRI bir kaynak: geçmişte hiç görünmeyen (reddedilmiş) gönderimler
+  // yalnız orada. Geçmiş boş gelse bile okunmalı.
+  ydDefterYukle();
 }
 
 // Kaç sayfa geçmiş çekileceği — kullanıcı kendi seçsin (100 kayıt/sayfa)
@@ -13711,7 +13829,7 @@ function ydUpdateCounts(){
   setEl('yd-c-sch', sch);
   // Kenar çubuğu rozeti GLOBAL kalmalı: filtreye göre daralırsa "hata yok"
   // sanılır. Bu yüzden tüm kayıtlardan hesaplanır.
-  ydSetFailBadge(ydBekleyenHata(YD.items));
+  ydRozetYaz('gecmis', ydBekleyenHata(YD.items));
   ydFailOzet();
 }
 
@@ -13744,6 +13862,15 @@ function ydFailOzet(){
 // hâlâ çözülmemiş durumda; yalnız yayın kanıtı olanlar (_cozuldu) düşer.
 function ydBekleyenHata(items){
   return (items||[]).filter(i => i.status === 'failed' && !i._cozuldu).length;
+}
+// Rozet İKİ kaynaktan besleniyor: Upload-Post geçmişi (çözülmemiş hatalar)
+// ve Yayın Defteri (hiç ulaşamamış gönderimler). Eskiden ikisi de doğrudan
+// yazıyordu, yani hangisi en son çalıştıysa diğerinin sayısını SİLİYORDU.
+// Artık ayrı tutulup toplanıyor; null = "o kaynak henüz ölçülmedi".
+const YD_ROZET = { gecmis: null, defter: null };
+function ydRozetYaz(kaynak, n){
+  if (kaynak) YD_ROZET[kaynak] = n;
+  ydSetFailBadge((YD_ROZET.gecmis || 0) + (YD_ROZET.defter || 0));
 }
 function ydSetFailBadge(n){
   const b = document.getElementById('badge-fail'); if (!b) return;
@@ -14473,7 +14600,7 @@ async function loadActionCenter(){
   // SEBEBİ olan işaret, ancak oraya gidince beliriyordu.
   // null ile 0 AYRI: null = ölçüm yapılamadı (rozete dokunma, yoksa "0 hata"
   // diye yanlış temiz izlenimi verir), 0 = gerçekten hata yok (rozeti temizle).
-  if (typeof fail === 'number') ydSetFailBadge(fail);
+  if (typeof fail === 'number') ydRozetYaz('gecmis', fail);
   const tiles = [
     { n:fail,   target:'failed', icon:'❌', label:'Başarısız gönderim', hint:'yeniden gönder',       sev:'var(--er)' },
     { n:health, target:'health', icon:'⚠',  label:'Profil sağlık sorunu', hint:'süresi dolmuş/hesapsız', sev:'var(--er)' },
