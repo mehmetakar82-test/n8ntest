@@ -2458,7 +2458,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.06-30';
+const PANEL_YAPI = 'y2026.08.07-31';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -11316,7 +11316,11 @@ function takProfilKutusu(){
   const secili = TAK.profil || '';
   sel.innerHTML = '<option value="">Tüm profiller ('+(TAK.items||[]).length+')</option>'
     + adlar.map(a=>'<option value="'+esc0(a)+'"'+(a===secili?' selected':'')+'>'+esc0(a)+' ('+say[a]+')</option>').join('');
-  if (secili && !adlar.includes(secili)) sel.value = '';   // profil plandan düştüyse süzgeci bırak
+  // Profil plandan düştüyse süzgeci bırak. sel.value='' TEK BAŞINA YETMEZ:
+  // kutu "Tüm profiller" gösterirken TAK.profil eski değerde kalıyordu, bu
+  // yüzden takEslesir her kaydı eliyor ve takvim BOŞ görünüyordu — arayüz
+  // ise süzgeç yokmuş gibi duruyordu. Durum ile görüntü birlikte sıfırlanmalı.
+  if (secili && !adlar.includes(secili)){ TAK.profil = ''; sel.value = ''; }
 }
 
 function takEslesir(it){
