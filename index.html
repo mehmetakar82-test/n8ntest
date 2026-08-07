@@ -2460,7 +2460,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.07-33';
+const PANEL_YAPI = 'y2026.08.07-34';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -11211,20 +11211,116 @@ function takKopyaUyari(){
   el.innerHTML = '⚠ ' + m;
 }
 
+// ── KOPYALARI TEMİZLE ───────────────────────────────────────────────────
+// Gerçek kopyalar (ayrı job_id, aynı profil+saat+başlık) Upload-Post'ta AYRI
+// AYRI yayınlanır — yani aynı short birkaç kez paylaşılır. Her gruptan BİR
+// tanesi korunur, fazlalıklar DELETE /uploadposts/schedule/{job_id} ile
+// iptal edilir. Silme kalıcı olduğu için tek tıkla değil, onaydan sonra.
+function takKopyaListesi(){
+  const cikti = [];
+  for (const it of (TAK.items || [])){
+    if (!(it.kopya > 1)) continue;
+    const ids = Array.from(new Set((it.kopyaIds || []).filter(Boolean)));
+    if (ids.length < 2) continue;                 // job_id yoksa silinemez
+    cikti.push({ tut: ids[0], sil: ids.slice(1), baslik: it.title || '', profil: it.profile || '', zaman: it.time || '' });
+  }
+  return cikti;
+}
+
+async function takKopyaTemizle(){
+  if (!S.cfg.blot) return toast('Kopya silmek için Upload-Post API Key gerekli (Ayarlar)', 'warn');
+  const gruplar = takKopyaListesi();
+  const hedef = gruplar.reduce((a, g) => a.concat(g.sil), []);
+  if (!hedef.length) return toast('Silinecek kopya yok', 'ok');
+
+  const ornek = gruplar.slice(0, 6)
+    .map(g => '  • ' + (g.profil || '?') + ' — ' + String(g.baslik).slice(0, 42) + '  (×' + (g.sil.length + 1) + ')')
+    .join('\n');
+  const onay = confirm(
+    hedef.length + ' KOPYA PLANLI GÖNDERİM İPTAL EDİLECEK\n\n' +
+    gruplar.length + ' grupta fazlalık var. Her gruptan BİR tanesi KORUNUYOR,\n' +
+    'yani içerik kaybolmuyor — yalnızca tekrarlar siliniyor.\n\n' + ornek +
+    (gruplar.length > 6 ? '\n  … ve ' + (gruplar.length - 6) + ' grup daha' : '') +
+    '\n\nBu işlem Upload-Post tarafında KALICIDIR. Devam edilsin mi?');
+  if (!onay) return;
+
+  let ok = 0, hata = 0; const hatalar = [];
+  for (let i = 0; i < hedef.length; i++){
+    const jid = hedef[i];
+    try {
+      await upFetch('/uploadposts/schedule/' + encodeURIComponent(jid), { method: 'DELETE' });
+      ok++;
+    } catch(e){
+      hata++;
+      if (hatalar.length < 5) hatalar.push(jid.slice(0, 10) + ': ' + (e.message || '?'));
+    }
+    if ((i + 1) % 10 === 0 || i === hedef.length - 1)
+      toast('Kopya temizleniyor… ' + (i + 1) + '/' + hedef.length + '  (silinen ' + ok + ', hata ' + hata + ')', 'info');
+  }
+  addLog(hata ? 'warn' : 'ok', 'takvim',
+    'kopya temizligi: silinen ' + ok + ', hata ' + hata + (hatalar.length ? ' — ' + hatalar.join(' | ') : ''));
+  toast('Bitti: ' + ok + ' kopya silindi' + (hata ? ', ' + hata + ' hata (Loglar\'a bak)' : ''), hata ? 'warn' : 'ok');
+  await loadTakvim();
+}
+
+// ÖLÇÜLDÜ (07.08.2026): Upload-Post'un ScheduledPost şeması TAM 6 alan
+// taşıyor — job_id, scheduled_date, post_type, profile_username, title,
+// preview_url. Açıklama/caption alanı YOK; yanlış ad aramıyorduk, uç nokta
+// hiç göndermiyor. Yani planlı kartların açıklaması API'den GELEMEZ.
+// Çözüm: açıklama zaten BİZDE var (Short-Kaydetme sayfası). Başlıktan
+// eşleştirip dolduruyoruz.
+function takAciklamaEsle(){
+  const onb = (S.sheetData && S.sheetData.shorts) || (panelSheetOnb() || {}).shorts || [];
+  TAK.descKaynak = onb.length;
+  if (!onb.length) return 0;
+  // TÜRKÇE KATLAMA: toLowerCase Türkçe'de i/ı ailesini bozuyor —
+  // 'BAŞLIĞI'.toLowerCase() = 'başliği' ama yazılışı 'başlığı'. Ayrıca
+  // 'İ'.toLowerCase() = 'i' + U+0307 (birleşik nokta). Katlamadan
+  // eşleştirirsek Türkçe başlıkların çoğu kaçar.
+  const anahtar = s => String(s == null ? '' : s)
+    .replace(/[İIı]/g, 'i')
+    .toLowerCase()
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const al = (r, ks) => { for (const k of ks){ if (r[k] != null && String(r[k]).trim() !== '') return String(r[k]).trim(); } return ''; };
+  const harita = new Map();
+  for (const r of onb){
+    const b = anahtar(al(r, ['title','baslik','Başlık','Title','baslik-tr']));
+    if (!b || harita.has(b)) continue;
+    const d = al(r, ['description','aciklama','Açıklama','Description','aciklama-tr']);
+    if (d) harita.set(b, d);
+  }
+  if (!harita.size) return 0;
+  let n = 0;
+  for (const it of (TAK.items || [])){
+    if (!it.r || it.r.description) continue;
+    const d = harita.get(anahtar(it.title));
+    if (d){ it.r.description = d; it.caption = d; n++; }
+  }
+  return n;
+}
+
 // Açıklama alanının adı bulunamadıysa bunu SÖYLE. Eskiden "(açıklama yok)"
 // yazılıp geçiliyordu; alanın boş mu olduğu yoksa yanlış adla mı arandığı
 // ayırt edilemiyordu. API'nin gerçekten döndürdüğü metin alanlarını yazar —
 // doğru ad UP_ACIKLAMA_ALAN listesine eklenir.
 function takAciklamaUyari(){
   const el = document.getElementById('tak-desc'); if (!el) return;
-  const n = TAK.descBos || 0;
-  if (!n){ el.style.display = 'none'; return; }
+  const kalan = TAK.descKalan || 0;
+  const eslesen = TAK.descEslesen || 0;
+  if (!kalan && !eslesen){ el.style.display = 'none'; return; }
   el.style.display = 'block';
-  const alanlar = (TAK.descAlanlar || []);
-  el.innerHTML = '⚠ <b>' + n + '</b> planlı kayıtta açıklama okunamadı. '
-    + (alanlar.length
-        ? 'Upload-Post bu kayıtlarda şu metin alanlarını döndürüyor: <code>' + alanlar.map(esc0).join('</code> <code>') + '</code> — doğru alan adı bunlardan biriyse panele eklenecek.'
-        : 'API bu kayıtlarda hiç metin alanı döndürmüyor, yani açıklama gerçekten <b>boş gönderilmiş</b> (n8n tarafında bakılmalı).');
+  let m = 'ℹ Upload-Post planlı kayıtlarda <b>açıklama döndürmüyor</b> '
+        + '(<code>ScheduledPost</code> şeması yalnız job_id · scheduled_date · post_type · profile_username · title · preview_url). ';
+  if (eslesen) m += '<b style="color:var(--ok)">' + eslesen + '</b> kaydın açıklaması Short Listesi\'nden başlıkla eşleştirildi. ';
+  if (kalan){
+    m += '<b>' + kalan + '</b> kayıt eşleşmedi — ';
+    m += TAK.descKaynak
+       ? 'bu başlıklar Short-Kaydetme sayfasında yok (eski kayıtlar olabilir).'
+       : '<b>Short Listesi hiç yüklenmemiş</b>; bir kez açarsan açıklamalar da gelir.';
+  }
+  el.innerHTML = m;
 }
 
 async function loadTakvim() {
@@ -11354,7 +11450,12 @@ async function loadTakvim() {
     const v = descBosOrnek[k];
     return typeof v === 'string' && v.trim().length > 3 && !/^https?:/i.test(v.trim());
   }) : [];
-  if (descBosN) console.warn('[TAK] açıklama okunamayan kayıt:', descBosN, '| gelen metin alanları:', TAK.descAlanlar);
+  // API açıklama vermediği için kendi Short listemizden başlıkla eşleştir
+  TAK.descEslesen = takAciklamaEsle();
+  TAK.descKalan   = (TAK.items || []).filter(x => x.status === 'plan' && !(x.r && x.r.description)).length;
+  if (descBosN) console.warn('[TAK] API açıklama vermedi:', descBosN,
+    '| Sheet\'ten eşleşen:', TAK.descEslesen, '| eşleşmeyen:', TAK.descKalan,
+    '| API alanları:', TAK.descAlanlar);
   const planN = TAK.items.filter(x => x.status === 'plan').length;
   console.log('[TAK] ham:', hamN, '-> tekil:', TAK.items.length,
               '| yayınlanmış/başarısız:', gecmisN, '| planlı:', planN,
