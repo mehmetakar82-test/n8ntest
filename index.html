@@ -2460,7 +2460,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.07-32';
+const PANEL_YAPI = 'y2026.08.07-33';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -11769,7 +11769,7 @@ function renderTakAy() {
       // enjekte edilebiliyordu. esc0 beşini birden kapatır.
       const dataAttrs = `data-plat="${esc0(item.plat)}" data-time="${esc0(item.time||'')}" data-title="${esc0(rawTitle||'')}" data-desc="${esc0(desc)}" data-status="${esc0(status)}" data-thumb="${esc0(thumbUrl)}" data-kat="${esc0(kat)}"`;
       inner += `<div ${dataAttrs} onclick="event.stopPropagation();takOpenPost(${gi})" onmouseenter="showTakTip(event,this)" onmouseleave="hideTakTip()" style="background:${col}1c;border-left:2px solid ${col};border-radius:3px;padding:2px 5px;margin-bottom:2px;cursor:pointer;font-size:11px;line-height:1.35;overflow:hidden">
-        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)"><span style="color:${col};opacity:.85">${esc0(t)}</span> ${pIcon} ${esc0(title)}${item.kopya > 1 ? `<span title="Aynı profil, aynı saat, aynı başlıkla ${item.kopya} AYRI kayıt var — Upload-Post bunları ayrı ayrı yayınlar" style="background:#ff6b6b;color:#fff;border-radius:3px;padding:0 3px;font-size:9.5px;font-weight:700;margin-left:4px">×${item.kopya}</span>` : ''}</div>
+        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)">${item.kopya > 1 ? `<span title="Aynı profil, aynı saat, aynı başlıkla ${item.kopya} AYRI kayıt var — Upload-Post bunları ayrı ayrı yayınlar" style="background:#ff6b6b;color:#fff;border-radius:3px;padding:0 3px;font-size:9.5px;font-weight:700;margin-right:3px">×${item.kopya}</span>` : ''}<span style="color:${col};opacity:.85">${esc0(t)}</span> ${pIcon} ${esc0(title)}</div>
         ${item.profile?`<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;color:var(--mt)">${esc0(item.profile)}</div>`:''}
       </div>`;
     });
@@ -11792,7 +11792,7 @@ function takWeekChip(item) {
   const title = (item.title || (item.r&&item.r.title) || '(başlıksız)');
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   return `<div onclick="takOpenPost(${gi})" style="background:${col}1c;border-left:3px solid ${col};border-radius:4px;padding:5px 7px;margin-bottom:4px;cursor:pointer;font-size:11.5px;line-height:1.35">
-    <div style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--tx)"><span style="color:${col}">${t}</span> ${pIcon} ${esc(title)}</div>
+    <div style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--tx)">${item.kopya > 1 ? `<span title="Aynı profil, aynı saat, aynı başlıkla ${item.kopya} AYRI kayıt var — Upload-Post bunları ayrı ayrı yayınlar" style="background:#ff6b6b;color:#fff;border-radius:3px;padding:0 3px;font-size:9.5px;font-weight:700;margin-right:3px">×${item.kopya}</span>` : ''}<span style="color:${col}">${t}</span> ${pIcon} ${esc(title)}</div>
     <div style="display:flex;justify-content:space-between;gap:6px;font-size:10px;color:var(--mt);margin-top:2px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.profile||'')}</span><span style="color:${col};flex-shrink:0">${item.status==='pub'?'✓':item.status==='fail'?'✕':'⏰'}</span></div>
   </div>`;
 }
