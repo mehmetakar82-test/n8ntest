@@ -1614,6 +1614,8 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     </div>
   </div>
   <div id="tak-bilinmeyen" style="display:none;font-size:11.5px;color:#f5a623;margin-bottom:8px"></div>
+  <div id="tak-kopya" style="display:none;font-size:11.5px;color:#f5a623;margin-bottom:8px"></div>
+  <div id="tak-desc" style="display:none;font-size:11.5px;color:#f5a623;margin-bottom:8px"></div>
   <div id="tak-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:8px">
     <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">PTZ</div>
     <div style="text-align:center;font-size:11px;letter-spacing:2px;color:var(--mt);padding:4px">SAL</div>
@@ -2458,7 +2460,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.07-31';
+const PANEL_YAPI = 'y2026.08.07-32';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -11106,6 +11108,8 @@ const TAK = {
   filter: 'all', // 'ig','yt','tt','all'
   profil: '',    // profil süzgeci — '' = tümü (takvim dolu olunca ayırt etmenin tek yolu)
   byDay: {}, // gün -> items cache (modal için)
+  kopyaSayisi: 0, // farklı job_id ama aynı zaman+profil+başlık = GERÇEK kopya
+  birlesenIs: 0,  // aynı job_id'nin fazla platform satırları (görüntü kusuruydu)
 };
 const TAK_ST_COLOR = { pub:'var(--ok)', fail:'var(--er)', plan:'#00b8d4' };
 const TAK_ST_LABEL = { pub:'✅ Yayınlandı', fail:'❌ Başarısız', plan:'⏰ Planlı' };
@@ -11122,6 +11126,107 @@ function takProfiles() {
   if (src && Array.isArray(src.profiles)) return src.profiles.map(p => p.username).filter(Boolean);
   return [];
 }
+// Upload-Post açıklamayı uca göre farklı adla döndürüyor (/schedule,
+// /queue/preview ve /history aynı adı kullanmıyor). Tek bir ada bağlanmak
+// planlı kartlarda "(açıklama yok)" üretiyordu — alan boş değil, YANLIŞ
+// ADLA aranıyordu. Geniş liste + iç nesne taraması.
+const UP_ACIKLAMA_ALAN = ['caption','post_caption','description','post_description',
+                          'text','body','message','aciklama','Açıklama','content'];
+function upAciklama(o){
+  if (!o || typeof o !== 'object') return '';
+  for (const k of UP_ACIKLAMA_ALAN){
+    const v = o[k];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  for (const ic of ['payload','post','request','data']){
+    const n = o[ic];
+    if (n && typeof n === 'object' && !Array.isArray(n)){
+      for (const k of UP_ACIKLAMA_ALAN){
+        const v = n[k];
+        if (typeof v === 'string' && v.trim()) return v.trim();
+      }
+    }
+  }
+  return '';
+}
+
+// ── KOPYA PLANLI KAYITLAR ───────────────────────────────────────────────
+// Takvimde aynı short 2-3 kez üst üste görünüyordu. İki AYRI sebep var:
+//  (a) Aynı job_id birden çok satır: çok platformlu tek bir gönderim
+//      platform başına satır dönüyor. seenJobs.add çağrılıyordu ama
+//      schedule bloğu kendi içinde HİÇ kontrol etmiyordu (yalnız kuyruk
+//      bloğu bakıyordu). Bunlar aynı iştir -> sessizce birleştirilir.
+//  (b) FARKLI job_id ama aynı zaman+profil+başlık: Upload-Post'ta gerçekten
+//      kopya kayıt var demektir. Bunu gizlemek yanlış olur — tek kart
+//      gösterilir ama "×N" rozeti ve uyarı yazılır ki fark edilsin.
+function takTekille(items){
+  const isBir = new Map();
+  const tekil = [];
+  for (const it of items){
+    const jid = String(it.jobId || '').trim();
+    if (!jid){ tekil.push(it); continue; }
+    const v = isBir.get(jid);
+    if (!v){ isBir.set(jid, it); tekil.push(it); continue; }
+    v.platforms = Array.from(new Set([...(v.platforms||[]), ...(it.platforms||[])]));
+    v.plats     = Array.from(new Set([...(v.plats||[]), ...(it.plats||[])]));
+    if (v.r && !v.r.description && it.r && it.r.description) v.r.description = it.r.description;
+  }
+  const grup = new Map();
+  for (const it of tekil){
+    const k = [it.plat||'', it.time||'', it.profile||'', it.title||''].join('');
+    if (!grup.has(k)) grup.set(k, []);
+    grup.get(k).push(it);
+  }
+  const sonuc = [];
+  let gercek = 0;
+  for (const g of grup.values()){
+    if (g.length === 1){ sonuc.push(g[0]); continue; }
+    const ilk = g[0];
+    ilk.kopya     = g.length;
+    ilk.kopyaIds  = g.map(x => x.jobId || '').filter(Boolean);
+    ilk.platforms = Array.from(new Set(g.flatMap(x => x.platforms || [])));
+    ilk.plats     = Array.from(new Set(g.flatMap(x => x.plats || [])));
+    if (ilk.r && !ilk.r.description){
+      const d = g.find(x => x.r && x.r.description);
+      if (d) ilk.r.description = d.r.description;
+    }
+    gercek += g.length - 1;
+    sonuc.push(ilk);
+  }
+  TAK.kopyaSayisi = gercek;                       // gerçek kopya (farklı job_id)
+  TAK.birlesenIs  = items.length - tekil.length;  // aynı job_id'nin fazla satırları
+  return sonuc;
+}
+
+function takKopyaUyari(){
+  const el = document.getElementById('tak-kopya'); if (!el) return;
+  const k = TAK.kopyaSayisi || 0, b = TAK.birlesenIs || 0;
+  if (!k && !b){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  let m = '';
+  if (b) m += '<b>' + b + '</b> satır aynı gönderimin platform kopyasıydı, tek karta birleştirildi. ';
+  if (k) m += '<b style="color:#ff6b6b">' + k + '</b> planlı kayıt <b>gerçekten kopya</b> '
+            + '(aynı profil, aynı saat, aynı başlık — ayrı job_id). Kartlarda <b>×N</b> rozetiyle işaretlendi; '
+            + 'bunlar Upload-Post\'ta ayrı ayrı yayınlanır.';
+  el.innerHTML = '⚠ ' + m;
+}
+
+// Açıklama alanının adı bulunamadıysa bunu SÖYLE. Eskiden "(açıklama yok)"
+// yazılıp geçiliyordu; alanın boş mu olduğu yoksa yanlış adla mı arandığı
+// ayırt edilemiyordu. API'nin gerçekten döndürdüğü metin alanlarını yazar —
+// doğru ad UP_ACIKLAMA_ALAN listesine eklenir.
+function takAciklamaUyari(){
+  const el = document.getElementById('tak-desc'); if (!el) return;
+  const n = TAK.descBos || 0;
+  if (!n){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  const alanlar = (TAK.descAlanlar || []);
+  el.innerHTML = '⚠ <b>' + n + '</b> planlı kayıtta açıklama okunamadı. '
+    + (alanlar.length
+        ? 'Upload-Post bu kayıtlarda şu metin alanlarını döndürüyor: <code>' + alanlar.map(esc0).join('</code> <code>') + '</code> — doğru alan adı bunlardan biriyse panele eklenecek.'
+        : 'API bu kayıtlarda hiç metin alanı döndürmüyor, yani açıklama gerçekten <b>boş gönderilmiş</b> (n8n tarafında bakılmalı).');
+}
+
 async function loadTakvim() {
   if (!S.cfg.blot && !getN8N()) {
     setEl('tak-title', 'Upload-Post API Key gerekli');
@@ -11132,6 +11237,7 @@ async function loadTakvim() {
   const items = [];
   const platMap = {instagram:'ig',youtube:'yt',tiktok:'tt',facebook:'fb',x:'x',twitter:'x',threads:'ig',linkedin:'fb'};
   const seenJobs = new Set();
+  let descBosOrnek = null, descBosN = 0;   // açıklama alanı bulunamayan kayıtlar
   // Planlı kayıtlar tek bir sahte anahtarla ('sch') ekleniyordu; platform
   // filtresi it.plat ile eşleştiği için FB/X seçilince planlı short'ların
   // HİÇBİRİ görünmüyordu (kullanıcı fark etti: FB'de 36 planlı var ama
@@ -11150,8 +11256,16 @@ async function loadTakvim() {
       if (s.job_id) seenJobs.add(s.job_id);
       const title = s.title || s.post_title || '(başlıksız)';
       const sPlats = s.platforms || (s.platform ? [s.platform] : []);
-      items.push({ time, plat:'sch', status:'plan', profile:s.profile_username||'', title, caption:'', thumb:s.preview_url||'', jobId:s.job_id||'', platforms:sPlats, plats:platsCoz(sPlats), r: {
-        title, 'preview-url': s.preview_url || '', description: '',
+      // Açıklama daha önce sabit '' yazılıyordu; API açıklamayı dönse bile
+      // atılıyordu, bu yüzden HER planlı kartta "(açıklama yok)" görünüyordu.
+      // Upload-Post alan adını sürüme göre değiştirdiği için geniş liste.
+      const sDesc = upAciklama(s);
+      // Açıklama hâlâ bulunamıyorsa SESSİZ KALMA: alan adı listede yok
+      // demektir. Ham kaydın metin alanlarını sakla, ekranda göster —
+      // "(açıklama yok)" yazıp geçmek sorunu gizliyordu.
+      if (!sDesc){ descBosN++; if (!descBosOrnek) descBosOrnek = s; }
+      items.push({ time, plat:'sch', status:'plan', profile:s.profile_username||'', title, caption:sDesc, thumb:s.preview_url||'', jobId:s.job_id||'', platforms:sPlats, plats:platsCoz(sPlats), r: {
+        title, 'preview-url': s.preview_url || '', description: sDesc,
         'platform-status': 'Planlı ⏰ ' + (s.profile_username || ''), kategori: s.post_type || ''
       }});
     });
@@ -11216,8 +11330,12 @@ async function loadTakvim() {
           if (sp.job_id && seenJobs.has(sp.job_id)) return;
           if (sp.job_id) seenJobs.add(sp.job_id);
           const title = sp.title || '(başlıksız)';
-          items.push({ time:sl.datetime_utc, plat:'sch', status:'plan', profile:p, title, caption:'', thumb:'', jobId:sp.job_id||'', platforms:sp.platforms||[], plats:platsCoz(sp.platforms), r: {
-            title, 'preview-url':'', description:(sp.platforms||[]).join(', '),
+          // Açıklama yerine platform listesi yazılıyordu — platformlar zaten
+          // ikonlarda görünüyor, asıl metin kayboluyordu. Gerçek açıklama
+          // varsa o yazılsın, yoksa eski davranışa düş.
+          const qDesc = upAciklama(sp) || (sp.platforms||[]).join(', ');
+          items.push({ time:sl.datetime_utc, plat:'sch', status:'plan', profile:p, title, caption:qDesc, thumb:sp.preview_url||'', jobId:sp.job_id||'', platforms:sp.platforms||[], plats:platsCoz(sp.platforms), r: {
+            title, 'preview-url':sp.preview_url||'', description:qDesc,
             'platform-status':'Kuyruk ⏳ ' + p, kategori:'queue'
           }});
         });
@@ -11225,9 +11343,22 @@ async function loadTakvim() {
     }, 4);
   } catch(e) { console.warn('[TAK] queue hata:', e.message); }
 
-  TAK.items = items;
-  const planN = items.length - gecmisN;
-  console.log('[TAK] toplam item:', items.length, '| yayınlanmış/başarısız:', gecmisN, '| planlı:', planN);
+  // Tekilleştirme: aynı job_id'nin platform satırları birleşir, gerçek
+  // kopyalar tek karta iner ama ×N rozetiyle görünür kalır.
+  const hamN = items.length;
+  TAK.items = takTekille(items);
+  // Açıklama bulunamayan kayıtların GERÇEK alan adlarını çıkar (URL ve
+  // kimlik benzeri değerleri ele), böylece doğru ad tahmin edilmesin.
+  TAK.descBos = descBosN;
+  TAK.descAlanlar = descBosOrnek ? Object.keys(descBosOrnek).filter(k => {
+    const v = descBosOrnek[k];
+    return typeof v === 'string' && v.trim().length > 3 && !/^https?:/i.test(v.trim());
+  }) : [];
+  if (descBosN) console.warn('[TAK] açıklama okunamayan kayıt:', descBosN, '| gelen metin alanları:', TAK.descAlanlar);
+  const planN = TAK.items.filter(x => x.status === 'plan').length;
+  console.log('[TAK] ham:', hamN, '-> tekil:', TAK.items.length,
+              '| yayınlanmış/başarısız:', gecmisN, '| planlı:', planN,
+              '| birleşen platform satırı:', TAK.birlesenIs, '| gerçek kopya:', TAK.kopyaSayisi);
 
   // Yayın geçmişi çekilemediyse SESSİZ kalma: takvimde yalnız planlı postlar
   // kalır ve "yayınlanmışlar kayboldu" gibi görünür. Nedeni ekranda yazsın.
@@ -11544,6 +11675,8 @@ async function oneAlUygula(){
 function renderTakvim() {
   takProfilKutusu();                  // süzgeç kutusu takvimdeki gerçek profillerden
   takBilinmeyenUyari();               // üç görünümde de geçerli
+  takKopyaUyari();                    // kopya kayıtlar sessizce yutulmasın
+  takAciklamaUyari();                 // açıklama okunamıyorsa sebebini yaz
   if (TAK.view === 'hafta') return renderTakHafta();
   if (TAK.view === 'gun')   return renderTakGun();
   renderTakAy();
@@ -11636,7 +11769,7 @@ function renderTakAy() {
       // enjekte edilebiliyordu. esc0 beşini birden kapatır.
       const dataAttrs = `data-plat="${esc0(item.plat)}" data-time="${esc0(item.time||'')}" data-title="${esc0(rawTitle||'')}" data-desc="${esc0(desc)}" data-status="${esc0(status)}" data-thumb="${esc0(thumbUrl)}" data-kat="${esc0(kat)}"`;
       inner += `<div ${dataAttrs} onclick="event.stopPropagation();takOpenPost(${gi})" onmouseenter="showTakTip(event,this)" onmouseleave="hideTakTip()" style="background:${col}1c;border-left:2px solid ${col};border-radius:3px;padding:2px 5px;margin-bottom:2px;cursor:pointer;font-size:11px;line-height:1.35;overflow:hidden">
-        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)"><span style="color:${col};opacity:.85">${esc0(t)}</span> ${pIcon} ${esc0(title)}</div>
+        <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)"><span style="color:${col};opacity:.85">${esc0(t)}</span> ${pIcon} ${esc0(title)}${item.kopya > 1 ? `<span title="Aynı profil, aynı saat, aynı başlıkla ${item.kopya} AYRI kayıt var — Upload-Post bunları ayrı ayrı yayınlar" style="background:#ff6b6b;color:#fff;border-radius:3px;padding:0 3px;font-size:9.5px;font-weight:700;margin-left:4px">×${item.kopya}</span>` : ''}</div>
         ${item.profile?`<div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;color:var(--mt)">${esc0(item.profile)}</div>`:''}
       </div>`;
     });
