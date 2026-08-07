@@ -1361,6 +1361,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <button class="btn bg bsm" onclick="loadAllSheetData('urltakip')">↻ Yenile</button>
     <button class="btn bg bsm" onclick="exportCSV('url-tbody','url-takip')">⬇ CSV</button>
   </div>
+  <div id="url-mukerrer" style="display:none;margin-bottom:12px"></div>
   <div class="card">
     <div class="tw">
       <table>
@@ -2461,7 +2462,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.07-35';
+const PANEL_YAPI = 'y2026.08.07-36';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3541,6 +3542,64 @@ function sheetTbodyYaz(page, metin){
     + esc0(metin) + '</td></tr>';
 }
 
+// ── MÜKERRER İŞLENEN VİDEO ÖLÇÜMÜ ───────────────────────────────────────
+// Bu sayfanın başlığı "aynı URL tekrar gönderilmez" diyor — bu ölçüm o
+// iddiayı SINAR. Aynı kaynak URL için URL-Takip'te birden fazla satır
+// varsa video iki kez işlenmiş demektir: ikinci OpusClip projesi, ikinci
+// klip kümesi, ikinci yayın planı. Takvimdeki "gerçek kopya" kayıtlarının
+// kök sebebi budur ve `istek-tarihi` bunun NE ZAMAN olduğunu söyler —
+// düzeltme öncesi mi sonrası mı, ancak böyle ayırt edilir.
+function urlVideoAnahtar(u){
+  const s = String(u || '');
+  const m = s.match(/[?&]v=([\w-]{6,})/) || s.match(/youtu\.be\/([\w-]{6,})/)
+         || s.match(/\/shorts\/([\w-]{6,})/) || s.match(/\/embed\/([\w-]{6,})/);
+  if (m) return m[1];
+  return s.trim().toLowerCase()
+    .replace(/^https?:\/\//, '').replace(/^www\./, '')
+    .replace(/[?#].*$/, '').replace(/\/+$/, '');
+}
+function urlMukerrerBul(urls){
+  const al = (r, ks) => { for (const k of ks){ if (r && r[k] != null && String(r[k]).trim() !== '') return String(r[k]).trim(); } return ''; };
+  const g = new Map();
+  for (const r of (urls || [])){
+    const u = al(r, ['youtube-url','url','link','Link','YouTube URL','video-url','video_url']);
+    if (!u) continue;
+    const k = urlVideoAnahtar(u);
+    if (!k) continue;
+    if (!g.has(k)) g.set(k, { url: u, tarihler: [] });
+    g.get(k).tarihler.push(al(r, ['istek-tarihi','tarih','created-at','Tarih','olusturma-tarihi','date']) || '(tarihsiz)');
+  }
+  return [...g.values()]
+    .filter(x => x.tarihler.length > 1)
+    .map(x => ({ url: x.url, kez: x.tarihler.length, tarihler: x.tarihler.slice().sort() }))
+    .sort((a, b) => b.kez - a.kez);
+}
+function urlMukerrerUyari(urls){
+  const el = document.getElementById('url-mukerrer'); if (!el) return;
+  const n = (urls || []).length;
+  if (!n){ el.style.display = 'none'; return; }
+  const m = urlMukerrerBul(urls);
+  el.style.display = 'block';
+  if (!m.length){
+    el.className = 'alert ai';
+    el.innerHTML = '<span>✓</span><div><b>Mükerrer işlenen video yok.</b> ' + n
+      + ' satırın tamamı ayrı bir kaynak URL — yani aynı video ikinci kez işlenip '
+      + 'kopya short üretmemiş. Takvimdeki kopyalar varsa başka bir yoldan gelmiş demektir.</div>';
+    return;
+  }
+  const satirlar = m.slice(0, 12).map(x =>
+    '<div style="margin-top:3px"><b style="color:#ff6b6b">×' + x.kez + '</b> '
+    + '<code>' + esc0(x.url.slice(0, 58)) + (x.url.length > 58 ? '…' : '') + '</code><br>'
+    + '<span style="opacity:.8;margin-left:14px">' + x.tarihler.map(t => esc0(String(t).slice(0, 16))).join('  →  ') + '</span></div>').join('');
+  el.className = 'alert aw';
+  el.innerHTML = '<span>⚠</span><div><b>' + m.length + ' video birden fazla kez işlenmiş.</b> '
+    + 'Her tekrar ayrı bir OpusClip projesi ve ayrı bir yayın planı demek — takvimdeki kopyaların kaynağı budur. '
+    + 'Tarihlere bak: <b>hepsi eski ise</b> düzeltme tutuyor, sadece geçmiş temizlenecek; '
+    + '<b>yeni tarih varsa</b> hâlâ açık bir yol var.'
+    + satirlar + (m.length > 12 ? '<div style="margin-top:4px;opacity:.8">… ve ' + (m.length - 12) + ' video daha</div>' : '')
+    + '</div>';
+}
+
 async function loadSheetPage(page) {
   const sid  = S.cfg.sheet  || '';
   const sid2 = S.cfg.sheet2 || sid;
@@ -3654,6 +3713,7 @@ async function loadSheetPage(page) {
   }
 
   if (page==='urltakip') {
+    urlMukerrerUyari(urls);          // "aynı URL tekrar gönderilmez" iddiasını ölç
     const tb=document.getElementById('url-tbody');
     if(tb) tb.innerHTML = urls.length ? urls.map(r => {
       const url = pURL(r), durum = pDurum(r), kaynak = pKaynak(r), tarih = pTarih(r);
