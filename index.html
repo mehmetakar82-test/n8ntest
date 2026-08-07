@@ -2183,9 +2183,42 @@ function vidKey(url) {
   return id ? ('yt:'+id) : String(url||'').trim().toLowerCase();
 }
 
+// URL-Takip'ten kimlik haritası — her ARAMA yerine liste başına BİR kez
+// kurulur (toplu gönderimde yüzlerce kayıt taranabiliyor).
+let _utHarita = null, _utKaynak = null;
+function utHaritasi(){
+  const urls = (S.sheetData && S.sheetData.urls) || (panelSheetOnb() || {}).urls || [];
+  if (_utKaynak === urls && _utHarita) return _utHarita;
+  const m = new Map();
+  for (const r of urls){
+    if (!r) continue;
+    const u = r['youtube-url'] || r['youtube_url'] || r['url'] || '';
+    if (!u) continue;
+    const k = vidKey(u);
+    if (!m.has(k)) m.set(k, r);          // en eski kayıt kalsın
+  }
+  _utKaynak = urls; _utHarita = m;
+  return m;
+}
+
 function findDupeSend(url) {
   if (!url) return null;
-  return S.sentLog[vidKey(url)] || null;
+  const k = vidKey(url);
+  const yerel = S.sentLog[k];
+  if (yerel) return yerel;
+  // sentLog YALNIZ panelden yapılan gönderimleri biliyor. Drive'dan ya da
+  // Oto Yakala'dan işlenen video burada YOK — ölçüldü: hGtbW17oVH4 önce
+  // Drive'dan (06.08 10:59), sonra Trend Radar'dan (06.08 17:08) işlendi ve
+  // hiçbir uyarı çıkmadı; sonuç takvimde kopya short oldu. URL-Takip her
+  // giriş noktasını kaydettiği için asıl doğru kaynak orası.
+  const r = utHaritasi().get(k);
+  if (!r) return null;
+  return {
+    url: String(r['youtube-url'] || r['url'] || url).trim(),
+    t: String(r['istek-tarihi'] || r['tarih'] || '').slice(0, 16) || '(tarihsiz)',
+    kategori: String(r['kaynak'] || '') || 'üretim defteri',
+    _defterden: true
+  };
 }
 
 // Gonderim sonrasi kaydeder — hem yeni sentLog'a hem eski sentURLs setine
@@ -2462,7 +2495,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.07-39';
+const PANEL_YAPI = 'y2026.08.07-40';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
