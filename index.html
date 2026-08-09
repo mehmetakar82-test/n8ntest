@@ -2521,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.08-44';
+const PANEL_YAPI = 'y2026.08.08-45';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3066,13 +3066,23 @@ async function sendBulkURLs() {
   // mesajları bv-st'ye yazılıyor ve o kap display:none olduğu için ilk
   // kullanımda kullanıcı hiçbir geri bildirim görmüyordu.
   setStyle('bv-prog','display','block');
-  let bvZorla = false;
+  // LISTE ICI TEKILLESTIRME: ayni videonun iki bicimi (watch?v= ve
+  // youtu.be/) yan yana olursa 'dupes' bos doner, uyari hic cikmaz ve
+  // iki istek yarisir. Once listeyi kendi icinde tekille.
+  {
+    const _g = new Set(); const _once = urls.length;
+    urls = urls.filter(u => { const k = vidKey(u); if (_g.has(k)) return false; _g.add(k); return true; });
+    if (urls.length !== _once) addLog('info','webhook','listede ' + (_once - urls.length) + ' tekrar eden URL elendi');
+  }
+  // Onay SADECE kullaniciya GOSTERILEN kopyalari kapsar. Tek bir global
+  // bayrak, kullanicinin hic gormedigi videolari da kapidan gecirirdi.
+  const bvZorlaSet = new Set();
   if (dupes.length) {
     const choice = await dupeChoiceModal(dupes.length, urls.length-dupes.length,
       dupes.map(u=>{ const k=findDupeSend(u)||{}; return { ad:u, t:k.t, kaynak:k.kategori }; }));
     if (choice==='cancel') return setEl('bv-st','İşlem vazgeçildi');
     if (choice==='skip') urls = urls.filter(u=>!findDupeSend(u));
-    else if (choice==='all') bvZorla = true;   // kullanici bilerek onayladi
+    else if (choice==='all') dupes.forEach(u => bvZorlaSet.add(vidKey(u)));  // YALNIZ gosterilenler
   }
   if (!urls.length) return setEl('bv-st','Gönderilecek yeni video kalmadı');
   addLog('info','webhook','Toplu gonderim ['+selCats.join(',')+']:'+urls.length+' URL');
@@ -3084,7 +3094,7 @@ async function sendBulkURLs() {
     setEl('bv-st',(i+1)+'/'+urls.length+' ['+selCats.join(',')+']: '+u.slice(0,40));
     setStyle('bv-bar','width',((i+1)/urls.length*100)+'%');
     const bvAciklama = (document.getElementById('bv-aciklama')||{}).value||'';
-    const s = fafSonuc(await faf(base+mcPath(selCats),{'Youtube linki':u, channelTitle: await ytKanalAdi(u), kaynak:'toplu', _zorla:bvZorla, ...mcFields(selCats), dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama}));
+    const s = fafSonuc(await faf(base+mcPath(selCats),{'Youtube linki':u, channelTitle: await ytKanalAdi(u), kaynak:'toplu', _zorla:bvZorlaSet.has(vidKey(u)), ...mcFields(selCats), dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama}));
     if (s.ok || s.belirsiz){
       sent++; if (s.belirsiz) belirsiz++;
       recordSend(u, selCats.join(','));     // kesin hatada KAYDETME
@@ -3700,11 +3710,14 @@ function sheetTbodyYaz(page, metin){
 // düzeltme öncesi mi sonrası mı, ancak böyle ayırt edilir.
 function urlVideoAnahtar(u){
   const s = String(u || '');
+  // /live/ ve m.youtube.com da AYNI videodur; tanimazsak ayni video iki
+  // farkli anahtar uretir ve koruma delinir (denetimde olculdu).
   const m = s.match(/[?&]v=([\w-]{6,})/) || s.match(/youtu\.be\/([\w-]{6,})/)
-         || s.match(/\/shorts\/([\w-]{6,})/) || s.match(/\/embed\/([\w-]{6,})/);
+         || s.match(/\/shorts\/([\w-]{6,})/) || s.match(/\/embed\/([\w-]{6,})/)
+         || s.match(/\/live\/([\w-]{6,})/);
   if (m) return m[1];
   return s.trim().toLowerCase()
-    .replace(/^https?:\/\//, '').replace(/^www\./, '')
+    .replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/^(m|music)\./, '')
     .replace(/[?#].*$/, '').replace(/\/+$/, '');
 }
 function urlMukerrerBul(urls){
@@ -9533,7 +9546,11 @@ function initParcala() {
 }
 
 function vpExtractVideoId(url) {
-  const m = String(url||'').match(/(?:v=|\/shorts\/|\/embed\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  // vidKey -> findDupeSend zinciri buna dayaniyor: panelin TUM kopya
+  // korumasi bu cikaricinin dogrulugu kadar guclu. '/live/' eksikti —
+  // youtube.com/live/ABC ile watch?v=ABC iki farkli video sayiliyordu
+  // ve ayni video ikinci kez uretime girebiliyordu (denetimde bulundu).
+  const m = String(url||'').match(/(?:v=|\/shorts\/|\/embed\/|\/live\/|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : '';
 }
 
