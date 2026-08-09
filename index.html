@@ -2319,7 +2319,7 @@ function dupeChoiceModal(dupeCount, newCount, ayrinti) {
       ${liste ? `<div style="font-size:12px;color:var(--mt);margin-bottom:16px;max-height:190px;overflow:auto">${liste}${fazla}</div>` : ''}
       <div style="display:flex;flex-direction:column;gap:8px">
         <button class="btn bp bsm" id="dupe-skip" style="width:100%;justify-content:center"${yeniYok?' disabled title="Seçilenlerin hepsi daha önce işlenmiş — gönderilecek yeni video yok"':''}>Yalnız Yenileri Gönder (${newCount})</button>
-        <button class="btn bw bsm" id="dupe-all" style="width:100%;justify-content:center">Hepsini Yine de Gönder</button>
+        <button class="btn bw bsm" id="dupe-all" style="width:100%;justify-content:center">Kopyaları da gönder — aynı short'lar yeniden üretilir</button>
         <button class="btn bg bsm" id="dupe-cancel" style="width:100%;justify-content:center">Vazgeç</button>
       </div>
     </div>`;
@@ -2521,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.08-43';
+const PANEL_YAPI = 'y2026.08.08-44';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3066,11 +3066,13 @@ async function sendBulkURLs() {
   // mesajları bv-st'ye yazılıyor ve o kap display:none olduğu için ilk
   // kullanımda kullanıcı hiçbir geri bildirim görmüyordu.
   setStyle('bv-prog','display','block');
+  let bvZorla = false;
   if (dupes.length) {
     const choice = await dupeChoiceModal(dupes.length, urls.length-dupes.length,
       dupes.map(u=>{ const k=findDupeSend(u)||{}; return { ad:u, t:k.t, kaynak:k.kategori }; }));
     if (choice==='cancel') return setEl('bv-st','İşlem vazgeçildi');
     if (choice==='skip') urls = urls.filter(u=>!findDupeSend(u));
+    else if (choice==='all') bvZorla = true;   // kullanici bilerek onayladi
   }
   if (!urls.length) return setEl('bv-st','Gönderilecek yeni video kalmadı');
   addLog('info','webhook','Toplu gonderim ['+selCats.join(',')+']:'+urls.length+' URL');
@@ -3082,7 +3084,7 @@ async function sendBulkURLs() {
     setEl('bv-st',(i+1)+'/'+urls.length+' ['+selCats.join(',')+']: '+u.slice(0,40));
     setStyle('bv-bar','width',((i+1)/urls.length*100)+'%');
     const bvAciklama = (document.getElementById('bv-aciklama')||{}).value||'';
-    const s = fafSonuc(await faf(base+mcPath(selCats),{'Youtube linki':u, channelTitle: await ytKanalAdi(u), kaynak:'toplu', ...mcFields(selCats), dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama}));
+    const s = fafSonuc(await faf(base+mcPath(selCats),{'Youtube linki':u, channelTitle: await ytKanalAdi(u), kaynak:'toplu', _zorla:bvZorla, ...mcFields(selCats), dil:getSelLang('bv-cats'), platformlar:getSelPlatforms('bv-cats'), aciklama_notu:bvAciklama}));
     if (s.ok || s.belirsiz){
       sent++; if (s.belirsiz) belirsiz++;
       recordSend(u, selCats.join(','));     // kesin hatada KAYDETME
@@ -3262,6 +3264,7 @@ async function yarSendSelected() {
   let sel = YAR.videos.filter(v => YAR.selected.has(v.id));
   if (!sel.length) return showRes('ya-res', 'Video seçin', 'warn');
   const dupeSel = sel.filter(raw => findDupeSend('https://www.youtube.com/watch?v=' + yarNormalizeVideo(raw).id));
+  let yaZorla = false;
   if (dupeSel.length) {
     const choice = await dupeChoiceModal(dupeSel.length, sel.length-dupeSel.length,
       dupeSel.map(raw=>{ const v=yarNormalizeVideo(raw);
@@ -3269,6 +3272,7 @@ async function yarSendSelected() {
         return { ad:v.title||v.id, t:k.t, kaynak:k.kategori }; }));
     if (choice==='cancel') return showRes('ya-res','İşlem vazgeçildi','warn');
     if (choice==='skip') sel = sel.filter(raw => !findDupeSend('https://www.youtube.com/watch?v=' + yarNormalizeVideo(raw).id));
+    else if (choice==='all') yaZorla = true;   // kullanici bilerek onayladi
   }
   if (!sel.length) return showRes('ya-res', 'Gönderilecek yeni video kalmadı', 'warn');
   const cats = getSelCatList('ya-cats');
@@ -3283,7 +3287,7 @@ async function yarSendSelected() {
     // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
     // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
     const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
-    await faf(base + mcPath(cats), {'Youtube linki': url, kaynak: 'youtube-arama', ...mcFields(cats), dil: getSelLang('ya-cats'), platformlar: getSelPlatforms('ya-cats'), title: v.title, durationSec: ytkParseDur(v.duration), channelTitle: v.channelTitle||'', aciklama_notu: yaAciklama});
+    await faf(base + mcPath(cats), {'Youtube linki': url, kaynak: 'youtube-arama', _zorla: yaZorla, ...mcFields(cats), dil: getSelLang('ya-cats'), platformlar: getSelPlatforms('ya-cats'), title: v.title, durationSec: ytkParseDur(v.duration), channelTitle: v.channelTitle||'', aciklama_notu: yaAciklama});
     recordSend(url, cats.join(','));
     sent++;
     await sleep(500);
@@ -9246,12 +9250,14 @@ async function ytkSendSelected() {
   let sel = YTK.videos.filter(v => YTK.selected.has(v.id));
   if (!sel.length) return showRes('ytk-res', 'Video seçin', 'warn');
   const dupeSel = sel.filter(v => findDupeSend('https://www.youtube.com/watch?v=' + v.id));
+  let ytkZorla = false;
   if (dupeSel.length) {
     const choice = await dupeChoiceModal(dupeSel.length, sel.length-dupeSel.length,
       dupeSel.map(v=>{ const k=findDupeSend('https://www.youtube.com/watch?v='+v.id)||{};
         return { ad:(v.snippet&&v.snippet.title)||v.id, t:k.t, kaynak:k.kategori }; }));
     if (choice==='cancel') return showRes('ytk-res','İşlem vazgeçildi','warn');
     if (choice==='skip') sel = sel.filter(v => !findDupeSend('https://www.youtube.com/watch?v=' + v.id));
+    else if (choice==='all') ytkZorla = true;   // kullanici bilerek onayladi
   }
   if (!sel.length) return showRes('ytk-res', 'Gönderilecek yeni video kalmadı', 'warn');
   const cats = getSelCatList('ytk-cats');
@@ -9264,7 +9270,7 @@ async function ytkSendSelected() {
     const url = 'https://www.youtube.com/watch?v=' + v.id;
     // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler.
     const ytkAciklama = (document.getElementById('ytk-aciklama')||{}).value||'';
-    await faf(base + mcPath(cats), {'Youtube linki': url, kaynak: 'ytkanal', ...mcFields(cats), dil: getSelLang('ytk-cats'), platformlar: getSelPlatforms('ytk-cats'), title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
+    await faf(base + mcPath(cats), {'Youtube linki': url, kaynak: 'ytkanal', _zorla: ytkZorla, ...mcFields(cats), dil: getSelLang('ytk-cats'), platformlar: getSelPlatforms('ytk-cats'), title: v.snippet.title, durationSec: ytkParseDur(v.contentDetails.duration), channelTitle: YTK.channelInfo?.channelTitle || '', aciklama_notu: ytkAciklama});
     recordSend(url, cats.join(','));
     sent++;
     await sleep(500);
@@ -15348,11 +15354,13 @@ async function rdSendSelected(){
   const base=getN8N();
   if(!base) return showRes('rd-res','Ayarlar\'dan n8n URL girin','warn');
   const dupes=sel.filter(x=>findDupeSend(x.url));
+  let rdZorla=false;
   if(dupes.length){
     const choice=await dupeChoiceModal(dupes.length, sel.length-dupes.length,
       dupes.map(x=>{ const k=findDupeSend(x.url)||{}; return { ad:x.title||x.url, t:k.t, kaynak:k.kategori }; }));
     if(choice==='cancel') return showRes('rd-res','İşlem vazgeçildi','warn');
     if(choice==='skip') sel=sel.filter(x=>!findDupeSend(x.url));
+    else if(choice==='all') rdZorla=true;   // kullanici bilerek onayladi
   }
   if(!sel.length) return showRes('rd-res','Gönderilecek yeni video kalmadı','warn');
   const genelCats=getSelCatList('rd-cats');
@@ -15363,7 +15371,7 @@ async function rdSendSelected(){
     const cats=secilen?[secilen]:genelCats;
     sonCats=cats;                       // dongu disinda ozet icin
     showRes('rd-res','⏳ '+(sent+1)+'/'+sel.length+' gönderiliyor: '+(x.title||'').slice(0,40)+'…','info');
-    const res=await faf(base+mcPath(cats), Object.assign({'Youtube linki':x.url, kaynak:'trend-radar', dil:getSelLang('rd-cats'), platformlar:getSelPlatforms('rd-cats'), title:x.title, channelTitle:x.channel, durationSec:x.durSec||0}, mcFields(cats)));
+    const res=await faf(base+mcPath(cats), Object.assign({'Youtube linki':x.url, kaynak:'trend-radar', _zorla:rdZorla, dil:getSelLang('rd-cats'), platformlar:getSelPlatforms('rd-cats'), title:x.title, channelTitle:x.channel, durationSec:x.durSec||0}, mcFields(cats)));
     if(res&&res.ok===true){
       sent++; if(res.pending) bekleyen++;
       recordSend(x.url,cats.join(',')); katOgren(x.channelId,x.channel,cats[0]); RD.selected.delete(x.id);
