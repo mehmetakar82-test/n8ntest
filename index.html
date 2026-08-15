@@ -2521,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.15-46';
+const PANEL_YAPI = 'y2026.08.15-47';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -2932,8 +2932,19 @@ function kuyrukCiz(satir){
           : s.dolu+' gönderi'
             + (s.son ? ' · son: '+new Date(s.son).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}) : '')
             + (s.tarihsiz ? ' · '+s.tarihsiz+' tanesinde tarih bilgisi yok' : '');
+        // Profil adının yanında KATEGORİ: "General-4 neden 5 günde tükeniyor,
+        // General-5 neden 27 gün dayanıyor" sorusu ancak hangi kategoriyi
+        // taşıdıkları görülünce cevaplanıyor — tek profilli kategori (Bilim)
+        // ile dört profilli havuz (Genel) aynı hızda dolmaz.
+        const kat = profilKategori(s.u);
+        const katRozet = kat
+          ? '<span class="badge bi" style="font-size:10px;padding:0 5px" title="'+esc(katLabel(kat))+' kategorisinin havuzunda">'+esc(katLabel(kat))+'</span>'
+          : '<span class="badge be" style="font-size:10px;padding:0 5px" title="Hicbir kategoriye bagli degil — bu profile icerik gitmez, kuyrugu kendiliginden dolmaz. KATEGORI_PROFIL_POOL havuzuna eklenmeli (panel + n8n, ikisi elle senkron).">⚠ bağsız</span>';
         return '<div style="border:1px solid var(--brd);border-left:3px solid '+col+';border-radius:6px;padding:8px 10px;background:var(--sur)">'
-          + '<div style="font-size:12px;color:var(--tx);font-weight:600">'+esc(s.u)+'</div>'
+          + '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-height:17px">'
+          +   '<span style="font-size:12px;color:var(--tx);font-weight:600">'+esc(s.u)+'</span>'
+          +   katRozet
+          + '</div>'
           + '<div style="font-size:16px;font-weight:800;color:'+col+';font-family:var(--fh);line-height:1.3">'+deger+'</div>'
           + '<div style="font-size:11px;color:var(--mt)">'+alt+'</div></div>';
       }).join('')
