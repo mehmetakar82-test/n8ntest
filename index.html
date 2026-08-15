@@ -588,7 +588,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
 .dlt.art {color:var(--ok);background:rgba(52,211,153,.13)}
 .dlt.azal{color:var(--er);background:rgba(248,113,113,.13)}
 .dlt.esit{color:var(--mt);background:var(--sur2)}
-/* "7g" / "30g" ön eki: hangi pencere olduğunu söyler, sayıyı bastırmaz */
+/* "7g" / "14g" / "30g" ön eki: seçili pencereyi söyler, sayıyı bastırmaz */
 .dlt i{font-style:normal;opacity:.62;margin-right:3px;font-size:9.5px;letter-spacing:.02em}
 
 /* ── İşlenmiş video gizleme notu ──────────────────────────────────
@@ -2521,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.08-45';
+const PANEL_YAPI = 'y2026.08.15-46';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -4120,33 +4120,54 @@ function rapSnapYaz(tot){
   Object.keys(s).forEach(k=>{ if((Date.parse(k)||0) < esik) delete s[k]; });
   try { localStorage.setItem('op_rap_snap', JSON.stringify(s)); } catch(e){}
 }
-// N gün öncesine EN YAKIN kaydı bul (±%40 tolerans; yoksa null)
-function rapSnapGecmis(gun){
+// N gün öncesine EN YAKIN kaydı bul (±%40 tolerans; yoksa null).
+// Eşleşen kaydın TARİHİNİ de döndürür: rozet "7g" yazsa bile tolerans
+// yüzünden kullanılan anlık görüntü 5 ya da 9 günlük olabilir — ipucu
+// gerçek tarihi söylemezse kullanıcı yanlış aralığa bakar.
+function rapSnapGecmisKayit(gun){
   const s = rapSnapOku();
   const hedef = Date.now() - gun*864e5;
   const tol = gun*864e5*0.4;
-  let enIyi = null, enYakin = Infinity;
+  let enIyi = null, enIyiGun = '', enYakin = Infinity;
   Object.keys(s).forEach(k=>{
     const t = Date.parse(k)||0; if(!t) return;
     const d = Math.abs(t-hedef);
-    if (d <= tol && d < enYakin){ enYakin = d; enIyi = s[k]; }
+    if (d <= tol && d < enYakin){ enYakin = d; enIyi = s[k]; enIyiGun = k; }
   });
-  return enIyi;
+  return enIyi ? { veri:enIyi, gun:enIyiGun } : null;
 }
-// Anlık bir ölçüt için 7g + 30g delta etiketleri
+function rapSnapGecmis(gun){ const r = rapSnapGecmisKayit(gun); return r ? r.veri : null; }
+
+// Rozetin ipucu: seçili pencereyi DEĞİL, karşılaştırmada gerçekten
+// kullanılan anlık görüntünün tarihini ve yaşını yazar.
+function rapDeltaBaslik(g, snapGun){
+  const t = Date.parse(snapGun)||0;
+  if (!t) return g+' gün önceye göre';
+  const yas = Math.round((Date.now()-t)/864e5);
+  return g+' günlük pencere\nKarşılaştırma: '+new Date(t).toLocaleDateString('tr')+' ('+yas+' gün önce)';
+}
+// Seçili pencerede kayıt yoksa rozet sessizce kaybolmamalı — boşluk
+// "değişim yok" diye okunur. Neden ölçülemediğini söyleyen soluk bir
+// işaret bırakılır.
+function rapDeltaYok(g){
+  return '<span class="dlt esit" style="opacity:.5" title="'+g+' gün öncesine ait anlık görüntü yok.\n\n'
+       + 'Bu kartlar canlı sayaçtan besleniyor; Upload-Post geçmiş vermiyor, panel Raporlar sayfası '
+       + 'her açıldığında günlük bir kayıt tutuyor. O aralıkta sayfa açılmadıysa karşılaştırma yapılamaz.\n\n'
+       + 'Daha kısa bir pencere seçmeyi dene."><i>'+g+'g</i>—</span>';
+}
+// Anlık bir ölçüt için SEÇİLİ döneme (7/14/30) göre delta etiketi.
+// Eskiden sabit 7g+30g çifti basılıyordu ve üstteki gün seçicisinden
+// bağımsızdı — 7 gün seçiliyken "30g" rozeti görünüyor, kullanıcı iki
+// kartın aynı pencereyi gösterdiğini sanıyordu.
 function rapAnlikDelta(alan, simdi){
   if (simdi == null) return '';
-  let html = '';
-  [[7,'hafta'],[30,'ay']].forEach(([g,ad])=>{
-    const eski = rapSnapGecmis(g);
-    if (!eski || eski[alan] == null) return;
-    // Ölçüt hem şimdi hem geçmişte 0 ise o platform bu veriyi hiç vermiyor
-    // demektir; "±0" yazmak bilgi değil gürültü olur.
-    if (!simdi && !eski[alan]) return;
-    html += deltaEtiketi(simdi - eski[alan], {etiket: g+'g',
-             baslik: g+' gün önceye göre ('+ad+'lık değişim)'});
-  });
-  return html;
+  const g = RAP.period || 7;
+  const k = rapSnapGecmisKayit(g);
+  if (!k || k.veri[alan] == null) return rapDeltaYok(g);
+  // Ölçüt hem şimdi hem geçmişte 0 ise o platform bu veriyi hiç vermiyor
+  // demektir; "±0" yazmak bilgi değil gürültü olur.
+  if (!simdi && !k.veri[alan]) return '';
+  return deltaEtiketi(simdi - k.veri[alan], {etiket:g+'g', baslik:rapDeltaBaslik(g, k.gun)});
 }
 
 function rapRenderCore(){
@@ -4324,17 +4345,18 @@ function rapPlatToplamlar(){
   });
   return by;
 }
-// Platform + ölçüt için 7g/30g değişim (anlık görüntü deposundan)
+// Platform + ölçüt için SEÇİLİ döneme göre değişim (anlık görüntü deposundan).
+// KPI kartlarıyla aynı pencereyi kullanır — tabloda 7g, üstteki kartta 30g
+// görünmesi iki ayrı gerçek varmış izlenimi veriyordu.
+// Burada kayıt yoksa rozet BASILMAZ (kartlardaki gibi "—" değil): bu tablo
+// satır × 6 ölçüt, her hücreye açıklama çipi koymak okunmaz hale getirir.
 function rapPlatDelta(pk, alan, simdi){
-  let html = '';
-  [[7,'hafta'],[30,'ay']].forEach(([g,ad])=>{
-    const eski = rapSnapGecmis(g);
-    const v = eski && eski.plat && eski.plat[pk] ? eski.plat[pk][alan] : null;
-    if (v == null) return;
-    if (!simdi && !v) return;
-    html += deltaEtiketi(simdi - v, {etiket:g+'g', baslik:g+' gün önceye göre ('+ad+'lık değişim)'});
-  });
-  return html;
+  const g = RAP.period || 7;
+  const k = rapSnapGecmisKayit(g);
+  const v = k && k.veri.plat && k.veri.plat[pk] ? k.veri.plat[pk][alan] : null;
+  if (v == null) return '';
+  if (!simdi && !v) return '';
+  return deltaEtiketi(simdi - v, {etiket:g+'g', baslik:rapDeltaBaslik(g, k.gun)});
 }
 // Platform → kategorik renk yuvası. SABİT SIRA, asla döngüye girmez:
 // renk varlığı takip eder, sıralamayı değil — filtre platform çıkarsa

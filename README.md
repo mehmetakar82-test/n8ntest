@@ -18,7 +18,7 @@ YouTube video → Short otomasyon sisteminin kontrol paneli. Tek dosyalık stati
 
 ## Kullanım
 
-1. `opuspro_panel_v9.html` dosyasını tarayıcıda aç.
+1. `index.html` dosyasını tarayıcıda aç.
 2. Sol menüden **Ayarlar** → n8n webhook base URL'sini, Google Sheets API Key + Sheet ID'lerini, YouTube API Key'i ve Upload-Post API Key'i gir.
 3. Ayarlar tarayıcı localStorage'ında kalır — bir daha girmene gerek yok.
 
