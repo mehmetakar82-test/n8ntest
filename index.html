@@ -2521,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.15-47';
+const PANEL_YAPI = 'y2026.08.16-48';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3922,7 +3922,10 @@ async function loadSheetPage(page) {
     const tb=document.getElementById('url-tbody');
     if(tb) tb.innerHTML = urls.length ? urls.map(r => {
       const url = pURL(r), durum = pDurum(r), kaynak = pKaynak(r), tarih = pTarih(r);
-      const durCls = isProcStr(durum) ? 'bw2' : (isDoneStr(durum) ? 'bs2' : 'bi');
+      // 'başarısız' ÖNCE bakılır: isProcStr/isDoneStr ikisi de false döner,
+      // yani düşmüş üretim nötr mavi rozetle normal satır gibi görünüyordu.
+      const durCls = durBasarisizMi(durum) ? 'be'
+                   : (isProcStr(durum) ? 'bw2' : (isDoneStr(durum) ? 'bs2' : 'bi'));
       // KAÇIŞ: tüm hücreler Sheet kaynaklı üçüncü taraf metni.
       return '<tr>'
         + '<td class="uc" title="'+esc0(url)+'">'+(url ? esc0(url.slice(0,35))+(url.length>35?'…':'') : '-')+'</td>'
@@ -13147,7 +13150,12 @@ async function notifCheck(derin){
     try{ let urls=(S._panelCache&&S._panelCache.urls)||(S.sheetData&&S.sheetData.urls)||[];
       if(!urls.length&&getN8N()){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos) urls=d.urls||[]; }
       const st=urls.filter(acIsStuck).length;
-      if(st>0) notifEkle('stuck','⏳',st+' video takılı kalmış (>6 saat)','OpusClip\'ten short dönmedi','urltakip'); else notifSil('stuck'); }catch(e){}
+      if(st>0) notifEkle('stuck','⏳',st+' video takılı kalmış (>6 saat)','OpusClip\'ten short dönmedi','urltakip'); else notifSil('stuck');
+      // BAŞARISIZ ÜRETİM ayrı bildirim: acIsStuck bunları terminal sayıp
+      // eliyor, yani 'takılı' sayısına hiç girmiyorlar. Ayrı sayılmazsa
+      // OpusClip'in düşürdüğü videolar panelde hiçbir yerde görünmüyor.
+      const bsz=urls.filter(r=>durBasarisizMi(satirDurumu(r))).length;
+      if(bsz>0) notifEkle('uretim-basarisiz','✖',bsz+' video üretilemedi','OpusClip klip döndürmedi — yeniden gönderilebilir','urltakip'); else notifSil('uretim-basarisiz'); }catch(e){}
     // Derin kaynaklar (panel açılınca / ilk yükleme)
     if(derin && (S.cfg.blot||getN8N())){
       try{
@@ -14607,6 +14615,20 @@ const PH_META = {
   noaccounts:{ dot:'var(--wn)', txt:'⚠ bağlı sosyal hesap yok' },
   missing:   { dot:'var(--er)', txt:'⚠ Upload-Post\'ta profil yok / bağlantı kopuk' }
 };
+
+// ── ÜRETİM BAŞARISIZ ───────────────────────────────────────
+// n8n'deki 'Uretim Defteri Basarisiz' düğümü, OpusClip tur bütçesi dolunca
+// URL-Takip satırını `durum='başarısız'` yapıyor. Bu TAKILI değil DÜŞMÜŞ
+// bir kayıt: `acIsStuck` onu (haklı olarak) terminal sayıp gizliyor, tablo
+// da nötr mavi rozet basıyordu — yani başarısız üretim hiçbir yerde
+// görünmüyordu. Tek yerden tanımlanıyor ki tablo ile bildirim ayrışmasın.
+// Türkçe tuzağı: 'BAŞARISIZ'.toLowerCase() ile 'başarısız' aynı dizeye
+// inmiyor; önce noktalı/noktasız i ve ş sadeleştiriliyor.
+function durBasarisizMi(d){
+  const s = String(d||'').toLowerCase().replace(/i̇/g,'i').replace(/ı/g,'i').replace(/ş/g,'s');
+  return s.includes('basarisiz') || s.includes('hata') || s.includes('failed') || s.includes('error');
+}
+function satirDurumu(r){ return r['durum']||r['status']||r['Durum']||r['yayin-durumu']||''; }
 
 // ── #4 AKSİYON MERKEZİ ─────────────────────────────────────
 // URL-Takip: OpusClip'e gidip belli sürede (>6s) short dönmeyen takılı video
