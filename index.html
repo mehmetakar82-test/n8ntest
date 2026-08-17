@@ -2521,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.16-48';
+const PANEL_YAPI = 'y2026.08.16-49';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -10565,7 +10565,55 @@ async function opcSendSelected() {
   let delay = parseInt((document.getElementById('opc-delay')||{}).value || 10) * 1000;
   const aciklama = (document.getElementById('opc-aciklama')||{}).value || '';
   const ids = [...OPC.selectedClips];
-  const selectedClipData = OPC.clips.filter(c => ids.includes(c.id || c.clipId || ''));
+  let selectedClipData = OPC.clips.filter(c => ids.includes(c.id || c.clipId || ''));
+
+  // ── KLİP KAPISI ile AYNI ÖLÇÜT ─────────────────────────────────────
+  // n8n'deki 'Klip Kapı' Sheet1'deki `clip-id` / `short-url`e bakıp daha
+  // önce yayınlanmış klipleri engelliyor ve bir kaçış yolu (`_zorla`)
+  // bekliyor — ama bu fonksiyon o bayrağı HİÇ göndermiyordu. Sonuç:
+  // hesap engellenip yenisi bağlanınca panel "gönderildi" diyor, n8n
+  // sessizce engelliyordu. Üretim Kapısı'nda düzeltilen "yalancı düğme"
+  // durumunun klip kolundaki eşi.
+  // Ölçüt n8n tarafıyla BİREBİR aynı olmalı (aynı anahtarlar, aynı URL
+  // sadeleştirmesi), yoksa iki ekran aynı olgu için farklı hüküm verir.
+  let opcZorla = false;
+  try {
+    await ydEnsureShorts();
+    const sadeUrl = u => String(u == null ? '' : u).trim().toLowerCase()
+      .replace(/^https?:\/\//, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
+    const kayitli = new Map();
+    ydShortsAll().forEach(r => {
+      const cid = String(r['clip-id'] || r['clipId'] || '').trim();
+      const su  = sadeUrl(r['short-url'] || r['shortUrl'] || '');
+      const t   = r['created-at'] || r['platform-status'] || '(tarihsiz)';
+      if (cid) kayitli.set('c:' + cid, t);
+      if (su)  kayitli.set('u:' + su, t);
+    });
+    const vuran = c => {
+      const cid = String(c.id || c.clipId || '').trim();
+      const su  = sadeUrl(c.uriForExport || c.exportUrl || c.url || '');
+      return (cid && kayitli.has('c:' + cid)) ? kayitli.get('c:' + cid)
+           : (su && kayitli.has('u:' + su)) ? kayitli.get('u:' + su) : '';
+    };
+    const kopya = selectedClipData.filter(c => vuran(c));
+    if (kopya.length) {
+      const secim = await dupeChoiceModal(kopya.length, selectedClipData.length - kopya.length,
+        kopya.map(c => ({ ad: c.title || c.headline || '', t: vuran(c), kaynak: 'Sheet1' })));
+      if (secim === 'cancel') return showRes('opc-send-res', 'İptal edildi — hiçbir şey gönderilmedi', 'warn');
+      if (secim === 'skip') {
+        selectedClipData = selectedClipData.filter(c => !vuran(c));
+        if (!selectedClipData.length) return showRes('opc-send-res', 'Yeni klip kalmadı — seçilenlerin hepsi zaten yayınlanmış', 'warn');
+      } else {
+        opcZorla = true;   // Klip Kapısı yalnız AÇIK insan onayıyla aşılır
+      }
+    }
+  } catch(e) {
+    // FAIL-SAFE: Sheet1 okunamazsa kopya olanı ayırt edemeyiz. `_zorla`
+    // GÖNDERMİYORUZ — kapı engellemeye devam eder. Yani en kötü ihtimalle
+    // eski davranış olur, asla kopya yayın olmaz.
+    console.warn('[OPC] kopya denetimi atlanamadı, _zorla gönderilmiyor:', e.message);
+  }
+
   const totalSend = selectedClipData.length * cats.length;
   // Büyük batch koruması: çok sayıda gönderim n8n Cloud + Upload-Post'u boğar (524/404)
   if (totalSend > 15) {
@@ -10598,7 +10646,10 @@ async function opcSendSelected() {
             kategori: kat,
             dil: getSelLang('opc-cats'),
             platformlar: getSelPlatforms('opc-cats'),
-            aciklama_notu: aciklama
+            aciklama_notu: aciklama,
+            // Klip Kapısı bunu bekliyor; yalnız kullanıcı "Kopyaları da
+            // gönder" dediyse true olur. Sistem kendiliğinden ASLA göndermez.
+            _zorla: opcZorla
           });
         } catch(err) {
           res = {ok:false, thrown:true, message:err.message||String(err)};
