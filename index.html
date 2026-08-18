@@ -2521,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.16-50';
+const PANEL_YAPI = 'y2026.08.16-51';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -10503,9 +10503,80 @@ function opcKlipYayini(c, harita){
   const su  = opcSadeUrl(c.uriForExport || c.exportUrl || c.url);
   return (cid && harita.get('c:' + cid)) || (su && harita.get('u:' + su)) || null;
 }
+// ── Klibin GERÇEK yayın durumu ─────────────────────────────────────────
+// Sheet1 yalnız "n8n Upload-Post'a YOLLADI"yı bilir. `platform-status`
+// kolonu her satırda sabit "Bekliyor", `ig/yt/tt-schedule` ise sabit
+// "Upload-Post Queue" metni — yani Sheet1 yayınlanıp yayınlanmadığını
+// BİLMİYOR. Gerçek sonucu yalnız Upload-Post söyler:
+//   /uploadposts/history   → yayınlandı (success) / başarısız (error_message)
+//   /uploadposts/schedule  → tarihli planlanmış, takvimde görünür
+// KUYRUK (add_to_queue) HİÇBİR UÇTAN LİSTELENMİYOR. Bu yüzden "izine
+// rastlanmadı" durumunu BAŞARISIZ diye göstermek YANLIŞ olurdu; kuyrukta
+// sırasını bekliyor da olabilir. Ayrı ve açıkça "bilinmiyor" yazılıyor.
+// Anahtar ckKume ile AYNI (ckAnahtar: profil|platform|normalize(başlık)).
+const OPC_DURUM = { t:0, harita:null };
+const OPC_DURUM_TTL = 120000;
+const OPC_PLAT_LISTE = ['instagram','youtube','tiktok','facebook','x'];
+const OPC_DURUM_SIRA = { yayinlandi:3, planli:2, basarisiz:1 };
+
+async function opcDurumHaritasi(){
+  if (OPC_DURUM.harita && Date.now()-OPC_DURUM.t < OPC_DURUM_TTL) return OPC_DURUM.harita;
+  const h = new Map();
+  const koy = (profil, platform, baslik, durum, t, hata) => {
+    const k = ckAnahtar(profil, platform, baslik);
+    if (!k) return;
+    const eski = h.get(k);
+    // Aynı short birden çok kez denenmiş olabilir (başarısız → tekrar → yayın).
+    // SONUCU olan kayıt denemesi olandan üstün: yayınlandı > planlı > başarısız.
+    if (eski && OPC_DURUM_SIRA[eski.durum] >= OPC_DURUM_SIRA[durum]) return;
+    h.set(k, { durum, t: t||'', hata: hata||'' });
+  };
+  try {
+    const onb = await histCek(KAPSAMA_SAYFA);
+    (onb.kayitlar||[]).forEach(x => {
+      const u = x.profile_username || x.user;
+      const np = CK_NP[String(x.platform||'').toLowerCase()];
+      if (!hsSayilir(u, np, x)) return;    // hesap sıfırlandıysa eski kayıt sayılmaz
+      const basarili = x.success !== false && !x.error_message;
+      koy(u, x.platform, x.post_title||x.title||x.post_caption,
+          basarili ? 'yayinlandi' : 'basarisiz',
+          x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'',
+          basarili ? '' : String(x.error_message||x.error||''));
+    });
+  } catch(e){ console.warn('[OPC] geçmiş okunamadı:', e.message); }
+  try {
+    const { data } = await upFetchRetry('/uploadposts/schedule');
+    const s = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
+    s.forEach(x => (x.platforms || (x.platform ? [x.platform] : [])).forEach(z =>
+      koy(x.profile_username, z, x.title||x.post_title, 'planli',
+          x.scheduled_date||x.scheduledDate||x.scheduled_at||x.date||'', '')));
+  } catch(e){ console.warn('[OPC] takvim okunamadı:', e.message); }
+  OPC_DURUM.t = Date.now(); OPC_DURUM.harita = h;
+  return h;
+}
+
+// Sheet1'deki profil(ler) × platformlar için Upload-Post'ta ne bulundu?
+function opcKlipDurumu(baslik, yayin, harita){
+  if (!harita || !yayin || !yayin.profiller.length) return null;
+  const bulgu = [];
+  yayin.profiller.forEach(p => OPC_PLAT_LISTE.forEach(pl => {
+    const k = ckAnahtar(p, pl, baslik);
+    const g = k && harita.get(k);
+    if (g) bulgu.push({ profil:p, platform:pl, durum:g.durum, t:g.t, hata:g.hata });
+  }));
+  return bulgu;
+}
+
 // Sheet1 henüz yüklenmediyse rozet çıkmaz. Bir kez çekip yeniden çiziyoruz;
 // bayrak olmadan her render yeni bir istek doğururdu.
 let OPC_SHEET_DENENDI = false;
+let OPC_DURUM_DENENDI = false;
+function opcDurumGerekli(){
+  if (OPC_DURUM_DENENDI || (!S.cfg.blot && !getN8N())) return;
+  OPC_DURUM_DENENDI = true;
+  opcDurumHaritasi().then(() => opcRenderClips())
+                    .catch(e => console.warn('[OPC] durum haritası:', e.message));
+}
 function opcSheetGerekli(){
   if (OPC_SHEET_DENENDI || ydShortsAll().length) return;
   OPC_SHEET_DENENDI = true;
@@ -10518,7 +10589,9 @@ function opcRenderClips() {
   if (!grid) return;
   opcUpdateSelCount();
   opcSheetGerekli();
+  opcDurumGerekli();
   const yayinHarita = opcYayinHaritasi();
+  const durumHarita = OPC_DURUM.harita;      // hazır değilse null → yalnız Sheet1 rozeti
   const processed = opcProcessedIds();
   grid.innerHTML = OPC.clips.map((c, i) => {
     const id = c.id || c.clipId || '';
@@ -10550,16 +10623,48 @@ function opcRenderClips() {
         ${(() => {
           const y = opcKlipYayini(c, yayinHarita);
           if (!y) return '';
-          const ipucu = 'short-kaydetme tablosuna göre bu klip yayınlandı'
-            + (y.t ? ' — ' + y.t : '')
-            + '.\nYeniden göndermek istersen gönderim sırasında onay istenir.';
-          // Profil kolonu boş kalmış olabilir; o zaman en azından "yayınlanmış"
-          // bilgisini göster, sessizce hiçbir şey gösterme.
+          // 1. SATIR — Sheet1: hangi profil(ler)e GÖNDERİLDİ
           const govde = y.profiller.length
             ? y.profiller.map(p => `<span class="badge bs2" style="font-size:10px;padding:0 5px">${esc0(p)}</span>`).join(' ')
             : `<span class="badge bs2" style="font-size:10px;padding:0 5px">profil yazılmamış</span>`;
-          return `<div style="margin-top:5px;display:flex;align-items:center;gap:4px;flex-wrap:wrap" title="${esc0(ipucu)}">`
-               + `<span style="font-size:10px;color:var(--mt)">📤</span>${govde}</div>`;
+          const gonderimIpucu = 'short-kaydetme tablosuna göre bu klip bu profil(ler)e GÖNDERİLDİ'
+            + (y.t ? ' — ' + y.t : '') + '.\nGönderilmiş olması yayınlandığı anlamına gelmez; alt satır gerçek sonucu gösterir.';
+          const satir1 = `<div style="margin-top:5px;display:flex;align-items:center;gap:4px;flex-wrap:wrap" title="${esc0(gonderimIpucu)}">`
+                       + `<span style="font-size:10px;color:var(--mt)">📤</span>${govde}</div>`;
+
+          // 2. SATIR — Upload-Post: GERÇEKTEN ne oldu
+          if (!durumHarita) return satir1;   // henüz yüklenmedi
+          const b = opcKlipDurumu(title, y, durumHarita) || [];
+          const say = { yayinlandi:0, planli:0, basarisiz:0 };
+          b.forEach(x => say[x.durum]++);
+          const PL = { instagram:'Instagram', youtube:'YouTube', tiktok:'TikTok', facebook:'Facebook', x:'X' };
+          const DR = { yayinlandi:'✓ yayında', planli:'⏰ planlı', basarisiz:'✕ başarısız' };
+          let govde2, renk, ipucu2;
+          if (!b.length) {
+            // KRİTİK DÜRÜSTLÜK: iz yok ≠ başarısız. Upload-Post kuyruğu
+            // (add_to_queue) hiçbir uçtan listelenmiyor — kuyrukta bekliyor
+            // olabilir. "Başarısız" demek uydurma olurdu.
+            govde2 = '? Upload-Post\'ta iz yok';
+            renk = 'var(--mt)';
+            ipucu2 = 'Bu başlık Upload-Post\'un yayın geçmişinde de takviminde de bulunamadı.\n\n'
+                   + 'BU BAŞARISIZ DEMEK DEĞİL: kuyruğa (add_to_queue) atılmış gönderiler hiçbir '
+                   + 'API ucundan listelenmiyor — sırası gelene kadar görünmezler.\n\n'
+                   + 'Diğer ihtimaller: gönderim hiç ulaşmadı, ya da başlık taranan pencerenin '
+                   + '(son ' + (KAPSAMA_SAYFA*100) + ' kayıt) dışında kaldı.';
+          } else {
+            const parca = [];
+            if (say.yayinlandi) parca.push('✓ ' + say.yayinlandi + ' yayında');
+            if (say.planli)     parca.push('⏰ ' + say.planli + ' planlı');
+            if (say.basarisiz)  parca.push('✕ ' + say.basarisiz + ' hata');
+            govde2 = parca.join(' · ');
+            renk = say.yayinlandi ? 'var(--ok)' : (say.planli ? 'var(--acc)' : 'var(--er)');
+            ipucu2 = b.map(x => (PL[x.platform]||x.platform) + ' · ' + x.profil + ' — ' + DR[x.durum]
+                     + (x.t ? ' (' + String(x.t).slice(0,16) + ')' : '')
+                     + (x.hata ? '\n    ' + String(x.hata).slice(0,110) : '')).join('\n')
+                   + '\n\nPlanlı olanlar Takvim sayfasında görünür.';
+          }
+          return satir1
+               + `<div style="margin-top:3px;font-size:10.5px;color:${renk};cursor:help" title="${esc0(ipucu2)}">${esc0(govde2)}</div>`;
         })()}
       </div>
     </div>`;
