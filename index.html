@@ -1449,6 +1449,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <span id="plat-ozet2" style="font-size:12px;color:var(--mt);align-self:center"></span>
     <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
+  <div id="hd-uyari" style="margin-bottom:12px"></div>
   <div id="plat-kapsama" style="margin-bottom:12px"></div>
   <div id="plat-cift" style="margin-bottom:12px"></div>
   <!-- Bu iki kap SAYFANIN İÇİNDE kalmalı: .page{display:none} yalnız .page
@@ -2521,7 +2522,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.16-51';
+const PANEL_YAPI = 'y2026.08.17-52';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -5267,6 +5268,10 @@ async function loadPlatforms(zorla) {
     } catch(e) { addLog('warn','uploadpost','Doğrudan API başarısız (muhtemelen CORS): '+e.message); }
   }
   S.uploadPostAccounts = raw;
+  // HESAP DEĞİŞİMİ TESPİTİ: her yüklemede çalışır. Önbellekten gelen veri
+  // eski handle taşır → temel ile aynıdır → yanlış alarm ÜRETMEZ; değişim
+  // ancak taze veride görünür. İlk görüşte yalnız temel yazılır.
+  try { htTara(raw); hdBanner(); } catch(e){ console.warn('[HT] tarama:', e.message); }
   // Taze veriyi ortak önbelleğe de yaz: Takvim, Raporlar ve profil sağlık
   // kontrolü phFetchAccounts() üzerinden aynı yerden okuyor.
   if (raw && taze){
@@ -7155,6 +7160,351 @@ function kapsamaPlanDus(profil, platform){
 // Eşitleme geçmişi 10 sayfayla sınırlıydı; 15 profile bölünen 1000 kayıt
 // her profilin eskisini görünmez yapıyordu. histCek son sayfaya varınca
 // kendiliğinden durur — bu tavan yalnız sonsuz döngüye karşı.
+// ═══════════════════════════════════════════════════════════════════════
+// HESAP DEĞİŞİMİ TESPİTİ — "yeni hesap bağlandı, eski short'lar planlansın mı?"
+// ───────────────────────────────────────────────────────────────────────
+// Upload-Post profillerindeki sosyal hesap kimliği her yüklemede bir
+// TEMEL kayıtla karşılaştırılır. Değişim görülünce kullanıcıya sorulur;
+// onaylarsa eski hesapta yayınlanmış short'lar yeni hesabın kuyruğuna
+// (sıradaki boş yuvalara → Takvim'de görünür) yeniden planlanır.
+// Motor YENİ DEĞİL: kaynak çözümü ydFindSource + pdKlipDizini,
+// gönderim ydTopluGonder (çift koruması içinde), pacing upSirali —
+// ⚖ Eşitle'nin sınanmış parçaları.
+// ═══════════════════════════════════════════════════════════════════════
+const HT_ANAHTAR = 'op_hesap_temel';     // {profil|plat: {h:handle, t:ilkGorus}}
+const HD_ANAHTAR = 'op_hesap_degisim';   // {profil|plat: {profil, plat, eski, yeni, t}}
+const HD = { acik:'', adaylar:[], calisiyor:false };
+
+function htOku(){ try { const o = JSON.parse(localStorage.getItem(HT_ANAHTAR)||'{}'); return (o && typeof o==='object' && !Array.isArray(o)) ? o : {}; } catch(e){ return {}; } }
+function htYaz(o){ try { localStorage.setItem(HT_ANAHTAR, JSON.stringify(o)); } catch(e){} }
+function hdOku(){ try { const o = JSON.parse(localStorage.getItem(HD_ANAHTAR)||'{}'); return (o && typeof o==='object' && !Array.isArray(o)) ? o : {}; } catch(e){ return {}; } }
+function hdYaz(o){ try { localStorage.setItem(HD_ANAHTAR, JSON.stringify(o)); } catch(e){} }
+
+// Hesap nesnesinden kimlik. handle görünen ad (bluesky 'handle' alanını da
+// dener), id ise platformun KALICI kimliği. İkisi birden saklanır çünkü
+// AYNI hesap kullanıcı adını değiştirebilir: id eşleşiyorsa bu bir hesap
+// TAKASI değil AD değişikliğidir — takas sanmak, aynı hesaba tüm arşivi
+// yeniden kuyruklamak (toplu kopya yayın) demek olurdu.
+function htKimlik(v){
+  const a = Array.isArray(v) ? v[0] : v;
+  if (!a || typeof a !== 'object') return null;
+  const h = String(a.username || a.handle || a.display_name || a.name || a.id || '').trim();
+  return h ? { h, id: String(a.id || '').trim() } : null;
+}
+
+// Profil verisini tara; değişimleri kaydet. İLK GÖRÜŞTE YALNIZ TEMEL YAZILIR
+// (uyarı yok — elde "eski" yoktur). Handle BOŞA düşerse değişim SAYILMAZ:
+// eksik veri, hesap değişimi değildir (bağlantı kopmuş olabilir, o ayrı uyarı).
+function htTara(raw){
+  const profs = (raw && raw.profiles) || [];
+  if (!profs.length) return [];
+  const temel = htOku(), degisim = hdOku();
+  const yeniler = [];
+  let dustu = false;
+  profs.forEach(pr => {
+    const u = pr.username; if (!u) return;
+    const sa = pr.social_accounts || pr.socialAccounts || {};
+    Object.keys(sa).forEach(ham => {
+      const p = RAP_HAREKET_NP[String(ham).toLowerCase()]; if (!p) return;
+      const k = hsAnahtar(u, p); if (!k) return;
+      const kim = htKimlik(sa[ham]); if (!kim) return;
+      const b = temel[k];
+      if (!b){ temel[k] = { h:kim.h, id:kim.id, t: Date.now(), eskiler: [] }; return; }
+      if (b.h === kim.h){
+        // Handle DOĞRULANDI: son görülme anını tazele. Değişim tespit
+        // edilince aday SINIRI bu ana dayanır — tespit anına (panelin ilk
+        // açılışına) dayansaydı, takasla tespit arasında YENİ hesaba
+        // yayınlananlar "eski hesabın yayını" sayılıp kopya üretirdi.
+        b.t = Date.now(); if (kim.id && !b.id) b.id = kim.id;
+        // Handle temele geri döndü ama bekleyen kayıt duruyorsa: yanlış
+        // alarm düzelmiş ya da eski hesap yeniden bağlanmış demektir.
+        // Bekleyen SİLİNMELİ — bayat banner, HÂLÂ BAĞLI hesaba tüm arşivi
+        // yeniden kuyruklamaya davet ederdi (toplu kopya yayın).
+        if (degisim[k]){ delete degisim[k]; dustu = true; addLog('info','uploadpost','Hesap değişimi kendiliğinden düştü (handle temele döndü): '+k); }
+        return;
+      }
+      // AYNI hesap, yalnız AD değişmiş: kalıcı id eşleşiyorsa takas değil.
+      if (b.id && kim.id && b.id === kim.id){
+        addLog('info','uploadpost','Kullanıcı adı değişikliği (hesap aynı): '+k+' @'+b.h+' → @'+kim.h);
+        b.h = kim.h; b.t = Date.now(); return;
+      }
+      // ESKİYE DÖNÜŞ = BAYAT VERİ. Değişim işlendikten sonra temel 'yeni'
+      // olur; n8n/panel-data önbelleği hâlâ eski handle'ı taşıyorsa bu
+      // "yeni değişim" DEĞİLDİR — kullanıcıyı ölü hesaba geri planlamaya
+      // davet ederdi. Daha önce görülmüş handle'a dönüş sessizce atlanır.
+      if ((b.eskiler||[]).indexOf(kim.h) >= 0){ console.warn('[HT] bayat veri atlandı: '+k+' @'+kim.h); return; }
+      // Aynı değişim zaten bekliyorsa üzerine yazma (t korunur)
+      const mevcut = degisim[k];
+      if (mevcut && mevcut.yeni === kim.h) return;
+      // t = eski handle'ın SON DOĞRULANDIĞI an (tespit anı DEĞİL) — temkinli
+      // sınır: aradaki belirsiz pencere "yeni dönem" sayılır, kopya çıkmaz.
+      degisim[k] = { profil:u, plat:p, eski:b.h, yeni:kim.h, t: b.t || Date.now() };
+      yeniler.push(degisim[k]);
+    });
+  });
+  htYaz(temel); hdYaz(degisim);
+  if (dustu){ try { hdBanner(); notifSil('hesap-degisim'); } catch(e){} }
+  if (yeniler.length){
+    yeniler.forEach(d => addLog('warn','uploadpost','Hesap değişimi: '+d.profil+' ['+d.plat+'] @'+d.eski+' → @'+d.yeni));
+    toast('🔁 '+yeniler.length+' hesapta değişim tespit edildi — Platformlar sayfasındaki uyarıya bak', 'warn', 8000);
+  }
+  return yeniler;
+}
+
+function hdBekleyenler(){ const o = hdOku(); return Object.keys(o).map(k => ({ k, ...o[k] })); }
+
+// Platformlar sayfasının üstündeki uyarı şeridi
+function hdBanner(){
+  const el = document.getElementById('hd-uyari'); if (!el) return;
+  const list = hdBekleyenler();
+  if (!list.length){ el.innerHTML = ''; return; }
+  el.innerHTML = list.map(d =>
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin-bottom:6px;'
+    + 'border:1px solid var(--wn);border-left:3px solid var(--wn);border-radius:6px;background:rgba(245,158,11,.07)">'
+    + '<span style="font-size:16px">🔁</span>'
+    + '<div style="flex:1;min-width:220px"><b>'+esc0(d.profil)+'</b> · '+esc0(HS_PLAT_AD[d.plat]||d.plat)
+    +   ' — yeni hesap tespit edildi: <span style="color:var(--er)">@'+esc0(d.eski)+'</span> → <span style="color:var(--ok)">@'+esc0(d.yeni)+'</span>'
+    +   '<div style="font-size:11.5px;color:var(--mt);margin-top:2px">Eski hesapta yayınlanmış short\'lar yeni hesapta yok. İstersen uygun kuyruk tarihlerine yeniden planlanır.</div></div>'
+    + '<button class="btn bp bsm" onclick="hdAc(\''+jsStr(d.k)+'\')">⏰ Yeniden planla</button>'
+    + '<button class="btn bg bsm" onclick="hdYoksay(\''+jsStr(d.k)+'\')" title="Bu değişimi kabul et, yeniden planlama yapma. Uyarı kalkar; sonradan 🔄 Hesap Sıfırlama + ⚖ Eşitle ile elle yapabilirsin.">Yoksay</button>'
+    + '</div>').join('');
+}
+
+function hdYoksay(k){
+  const degisim = hdOku(); const d = degisim[k]; if (!d) return;
+  if (!confirm(d.profil+' · '+(HS_PLAT_AD[d.plat]||d.plat)+' değişimi yok sayılacak.\n\n'
+      + 'Eski short\'lar yeni hesaba OTOMATİK planlanmayacak. Sonradan istersen '
+      + '🔄 Hesap Sıfırlama + ⚖ Eşitle ile elle yapabilirsin.\n\nDevam edilsin mi?')) return;
+  const temel = htOku();
+  temel[k] = { h: d.yeni, t: Date.now(), eskiler: ((temel[k]||{}).eskiler||[]).concat(d.eski).slice(-5) };
+  htYaz(temel);
+  delete degisim[k]; hdYaz(degisim);
+  hdBanner(); notifSil('hesap-degisim');
+  addLog('info','uploadpost','Hesap değişimi yok sayıldı: '+k);
+}
+
+// ── Aday toplama + onay penceresi ─────────────────────────────────────
+async function hdAc(k){
+  const d = hdOku()[k]; if (!d || HD.calisiyor) return;
+  HD.acik = k; HD.adaylar = [];
+  const eskiModal = document.getElementById('hd-modal'); if (eskiModal) eskiModal.remove();
+  const div = document.createElement('div');
+  div.id = 'hd-modal';
+  div.style.cssText = 'position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px';
+  // Kapatma HD durumunu SIFIRLAMALI: bayat HD.adaylar, sonra açılan başka
+  // bir profil modalının gönderimine karışabilirdi (yarış — denetim bulgusu).
+  const hdKapat = () => { HD.acik=''; HD.adaylar=[]; div.remove(); };
+  div.onclick = e => { if (e.target === div && !HD.calisiyor) hdKapat(); };
+  div.innerHTML = '<div style="background:var(--sur);border:1px solid var(--brd);border-radius:10px;max-width:640px;width:100%;max-height:82vh;display:flex;flex-direction:column">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--brd)">'
+    +   '<div style="font-family:var(--fh);font-size:14px;font-weight:700">🔁 '+esc0(d.profil)+' · '+esc0(HS_PLAT_AD[d.plat]||d.plat)+' — yeniden planlama</div>'
+    +   '<button class="btn bg bsm" onclick="if(!HD.calisiyor){HD.acik=\'\';HD.adaylar=[];document.getElementById(\'hd-modal\').remove()}">✕</button></div>'
+    + '<div id="hd-govde" style="padding:12px 14px;overflow-y:auto;flex:1;font-size:12.5px"></div>'
+    + '<div id="hd-alt" style="display:none;padding:10px 14px;border-top:1px solid var(--brd);display:none;gap:8px;align-items:center">'
+    +   '<button class="btn bp bsm" id="hd-planla-btn" onclick="hdPlanla()"></button>'
+    +   '<span id="hd-durum" style="font-size:12px;color:var(--mt)"></span></div></div>';
+  document.body.appendChild(div);
+  const govde = document.getElementById('hd-govde');
+  govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Eski hesabın yayın geçmişi taranıyor…'});
+  // BAYATLIK KORUMASI: her await sırasında kullanıcı bu modalı kapatıp
+  // BAŞKA bir değişimin modalını açmış olabilir. Kontrolsüz devam eden
+  // eski çağrı HD.adaylar'ı ezer ve A profilinin videoları B'nin kuyruğuna
+  // gider (denetim bulgusu). govde.isConnected: yeni modal eskisini DOM'dan
+  // söker, kopan gövde bayat çağrının kesin işaretidir.
+  const bayat = () => HD.acik !== k || !govde.isConnected;
+  try {
+    // SINIR: değişim kaydının t'si (eski handle'ın son doğrulandığı an) ile
+    // sıfırlama işaretinin YENİSİ. Math.max şart: ikinci değişimde ilk
+    // turdan kalan ESKİ işaret sınırı geriye çekip ölü ara hesabın
+    // yayınlarını "yeni dönem" sayardı — özellik ikinci değişimden itibaren
+    // sessizce hiçbir şey bulamazdı (denetim bulgusu).
+    const sinir = Math.max(hsZaman(d.profil, d.plat) || 0, d.t);
+    await ydEnsureShorts();
+    if (bayat()) return;
+    const onb = await histCek(ES_SAYFA);
+    if (bayat()) return;
+    const norm = t => String(t||'').trim().toLowerCase().replace(/\s+/g,' ');
+    // eskiKume: sınırdan ÖNCEKİ başarılı yayınlar (adaylar)
+    // yeniKume: sınırdan SONRAKİ başarılı/planlı her şey (elenecekler).
+    // BİLEREK hsSayilir/ckKume KULLANILMIYOR: onlar sıfırlama işaretine
+    // bağlı; işaret henüz yokken tüm adayları "zaten var" sayarlardı.
+    const eskiler = new Map(), yeniKume = new Set();
+    (onb.kayitlar||[]).forEach(x => {
+      if (String(x.profile_username||x.user||'') !== d.profil) return;
+      const p = CK_NP[String(x.platform||'').toLowerCase()]; if (p !== d.plat) return;
+      if (x.success === false || x.error_message) return;
+      const ham = String(x.post_title || x.title || x.post_caption || '');
+      const n = norm(ham); if (!n || n.length < 6) return;
+      const t = Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0;
+      // TEMKİN KURALI (hsSayilir ile aynı): zamanı OKUNAMAYAN kayıt "yeni
+      // dönemde" sayılır. Tersi, tarihi bozuk bir yeni-hesap yayınını aday
+      // yapıp kopya üretebilirdi (denetim bulgusu).
+      if (!t || t >= sinir) yeniKume.add(n);
+      else { const e = eskiler.get(n); if (!e || t > e.t) eskiler.set(n, { ham, t }); }
+    });
+    try {
+      const { data } = await upFetchRetry('/uploadposts/schedule');
+      const s = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
+      s.forEach(x => {
+        if (String(x.profile_username||'') !== d.profil) return;
+        const pl = (x.platforms || (x.platform?[x.platform]:[])).map(z => CK_NP[String(z).toLowerCase()]);
+        if (pl.indexOf(d.plat) < 0) return;
+        const n = norm(x.title || x.post_title); if (n) yeniKume.add(n);
+      });
+    } catch(e){ console.warn('[HD] schedule:', e.message); }
+    if (bayat()) return;
+    // KUYRUK YUVALARI da "yeni dönem"dir: yarım kalan bir önceki koşunun
+    // kuyruğa aldıkları /schedule'da görünmeyebilir; sorgulanmazsa ikinci
+    // açılışta yeniden aday listelenirler (denetim bulgusu). count=50 sınırı
+    // API'nin kendisinden; kaçanlara karşı ckCiftMi gönderim anında ikinci
+    // kez bakıyor.
+    try {
+      const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(d.profil)+'&count=50');
+      (data.slots||[]).forEach(sl => {
+        const sp = sl.scheduled_post; if (!sp) return;
+        const pl = (sp.platforms||[]).map(z => CK_NP[String(z).toLowerCase()]);
+        if (pl.length && pl.indexOf(d.plat) < 0) return;
+        const n = norm(sp.title); if (n) yeniKume.add(n);
+      });
+    } catch(e){ console.warn('[HD] kuyruk:', e.message); }
+    if (bayat()) return;
+
+    let zaten = 0;
+    const ham = [];
+    eskiler.forEach((v, n) => { if (yeniKume.has(n)) zaten++; else ham.push(v); });
+    ham.sort((a,b) => b.t - a.t);
+
+    // Kaynak çözümü: önce Sheet1; bulunamayanlar OpusClip dizininden.
+    govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:ham.length+' aday bulundu — kaynak videolar çözülüyor…'});
+    ham.forEach(a => { const s = ydFindSource(a.ham, '', d.profil, ''); if (s && s.video){ a.video=s.video; a.caption=s.caption||''; a.clipId=s.clipId||''; a.kaynakTip='Sheet'; } });
+    const kayip = ham.filter(a => !a.video);
+    if (kayip.length){
+      try {
+        const dizin = await pdKlipDizini(m => { if (!bayat()) govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:m}); });
+        kayip.forEach(a => { const c = pdBaslikEslesme(dizin, a.ham); if (c){ a.video=c.url; a.clipId=c.clipId||''; a.kaynakTip='OpusClip'; } });
+      } catch(e){ console.warn('[HD] dizin:', e.message); }
+    }
+    if (bayat()) return;
+    HD.adaylar = ham.map((a,i) => ({ ...a, idx:i, sec: !!a.video }));
+
+    const kaynakli = HD.adaylar.filter(a => a.video).length;
+    const kaynaksiz = HD.adaylar.length - kaynakli;
+    if (!HD.adaylar.length){
+      govde.innerHTML = '<div style="color:var(--mt);padding:8px 2px">Eski hesaba ait yeniden planlanacak short bulunamadı.'
+        + (zaten ? '<br>'+zaten+' short yeni hesapta zaten var/planlı — elendi.' : '')
+        + '<br><br>Geçmiş penceresi son '+((onb.kayitlar||[]).length)+' kayıt'+(onb.kirpik?' (KIRPIK — daha eskisi görünmüyor)':'')+'. '
+        + 'Daha eski yayınlar için 🔄 Hesap Sıfırlama + ⚖ Eşitle kullanılabilir.</div>';
+      const altEl = document.getElementById('hd-alt'); altEl.style.display='flex';
+      document.getElementById('hd-planla-btn').style.display='none';
+      document.getElementById('hd-durum').textContent = '';
+      return;
+    }
+    govde.innerHTML =
+      '<div style="margin-bottom:8px;color:var(--mt)">Eski hesapta (<b style="color:var(--er)">@'+esc0(d.eski)+'</b>) yayınlanmış, '
+      + 'yeni hesapta (<b style="color:var(--ok)">@'+esc0(d.yeni)+'</b>) OLMAYAN short\'lar. '
+      + 'Kuyruğa eklenirler — sıradaki boş yuvalara dağıtılır, Takvim\'de görünürler.'
+      + (zaten ? '<br>'+zaten+' short yeni hesapta zaten var/planlı — listelenmedi.' : '')
+      + (onb.kirpik ? '<br>⚠ Geçmiş penceresi kırpık — daha eski yayınlar bu listede olmayabilir (⚖ Eşitle tamamlar).' : '') + '</div>'
+      + HD.adaylar.map(a =>
+        '<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border:1px solid var(--brd);border-radius:6px;margin-bottom:5px;cursor:'+(a.video?'pointer':'not-allowed')+';opacity:'+(a.video?'1':'.55')+'">'
+        + '<input type="checkbox" style="width:auto;margin-top:2px" '+(a.sec?'checked':'')+(a.video?'':' disabled')
+        + ' onchange="if(HD.adaylar['+a.idx+'])HD.adaylar['+a.idx+'].sec=this.checked;hdSayacTazele()">'
+        + '<div style="flex:1;min-width:0"><div style="color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc0(a.ham.slice(0,90))+'</div>'
+        + '<div style="font-size:11px;color:var(--mt)">'+(a.t?new Date(a.t).toLocaleDateString('tr'):'tarihsiz')
+        + ' · '+(a.video ? 'kaynak: '+(a.kaynakTip||'Sheet')+' ✓' : '<span style="color:var(--er)">kaynak mp4 bulunamadı — gönderilemez</span>')+'</div></div></label>').join('');
+    const altEl = document.getElementById('hd-alt'); altEl.style.display='flex';
+    document.getElementById('hd-planla-btn').style.display='';
+    hdSayacTazele();
+    if (kaynaksiz) document.getElementById('hd-durum').textContent = kaynaksiz+' short kaynaksız (işaretlenemez)';
+  } catch(e){
+    govde.innerHTML = durumHTML('hata',{kompakt:true, alt:'Tarama başarısız: '+e.message});
+  }
+}
+
+function hdSayacTazele(){
+  const n = (HD.adaylar||[]).filter(a => a.sec && a.video).length;
+  const btn = document.getElementById('hd-planla-btn');
+  if (btn){ btn.textContent = '⏰ '+n+' short\'u yeni hesaba planla'; btn.disabled = !n; }
+}
+
+async function hdPlanla(){
+  const k = HD.acik; const d = hdOku()[k]; if (!d || HD.calisiyor) return;
+  if (!document.getElementById('hd-modal')) return;   // modal kapalıyken bayat çağrı
+  const secili = (HD.adaylar||[]).filter(a => a.sec && a.video);
+  if (!secili.length) return;
+  // İşaret d.t'den ESKİYSE İLERİ ALINIR (asla geri değil): ilerletilmezse
+  // ikinci değişimde ckCiftMi ölü ara hesabın yayınlarını "yayınlanmış"
+  // sayar ve hiçbir short taşınamaz (denetim bulgusu). Kullanıcının bilerek
+  // koyduğu daha YENİ bir işaret ise korunur.
+  const isaretGerekli = (hsZaman(d.profil, d.plat) || 0) < d.t;
+  if (!confirm(secili.length+' short, '+d.profil+' · '+(HS_PLAT_AD[d.plat]||d.plat)+' kuyruğuna eklenecek.\n\n'
+      + 'Hepsi aynı anda yayınlanmaz — sıradaki boş yuvalara dağıtılır ve Takvim\'de görünür.\n'
+      + 'Yeni hesapta zaten olanlar çift korumasıyla ayrıca elenir.\n'
+      + (isaretGerekli ? '\nAyrıca bu profil+platform için sıfırlama işareti '
+        + (hsZaman(d.profil,d.plat)?'İLERİ ALINACAK':'konacak')+' (eski hesabın yayınları '
+        + '"yayınlanmış" sayılmayacak) — geri alınabilir.\n' : '')
+      + '\nDevam edilsin mi?')) return;
+  HD.calisiyor = true;
+  const btn = document.getElementById('hd-planla-btn'); if (btn) btn.disabled = true;
+  try {
+    // Sıfırlama işareti: ÇİFT KORUMASININ ÖNKOŞULU. İşaret olmadan ckCiftMi
+    // eski hesabın kayıtlarını görür ve HER adayı "zaten var" diye keserdi.
+    if (isaretGerekli){
+      const o = hsOku();
+      o[hsAnahtar(d.profil, d.plat)] = { t: d.t, tarih: new Date(d.t).toISOString().slice(0,10),
+                                         profil: d.profil, plat: d.plat, ts: Date.now(), kaynak: 'hesap-degisim' };
+      hsYaz(o);
+      CK_ONB.t = 0; CK_ONB.kume = null;    // çift önbelleği eski işaretle kurulmuş olabilir
+      addLog('info','uploadpost','Sıfırlama işareti (otomatik): '+d.profil+' ['+d.plat+'] < '+new Date(d.t).toISOString());
+    }
+    let ok=0, cift=0, hata=0, atlanan=0; const hatalar=[];
+    let dolu = false;
+    await upSirali(secili, async a => {
+      if (dolu){ atlanan++; return; }
+      const s = await ydTopluGonder({ _profil:d.profil, plat:d.plat, platform:d.plat,
+        _video:a.video, _caption:a.caption||'', _clipId:a.clipId||'', title:a.ham });
+      if (s.ok){ ok++; a._ok=true; }
+      else if (s.sebep === 'cift'){ cift++; a._ok=true; }
+      else { hata++; if (hatalar.length<4) hatalar.push(s.mesaj||s.sebep); if (kuyrukDoluMu(s)) dolu = true; }
+      const st = document.getElementById('hd-durum');
+      if (st) st.textContent = '⏳ '+(ok+cift+hata)+'/'+secili.length;
+    }, 2);
+    const ozet = ok+' kuyruğa alındı'+(cift?' · '+cift+' çift önlendi':'')+(hata?' · '+hata+' başarısız':'')
+      + (atlanan?' · '+atlanan+' denenmedi (kuyruk dolu)':'');
+    // TEMİZLİK YALNIZ TAM BİTİŞTE. ok=0 (ağ kesintisi, kuyruk dolu) iken de
+    // bekleyen silinseydi uyarı ve tek-tık yeniden deneme yolu KALICI olarak
+    // kaybolurdu — özellik "hallettim" görüntüsü verip işi yarım bırakırdı
+    // (denetim bulgusu). Eski handle 'eskiler'e girer: bayat önbellek onu
+    // geri getirirse yanlış "değişim" alarmı üretilmez (bkz. htTara).
+    const tamam = (ok + cift) === secili.length;
+    if (tamam){
+      const temel = htOku();
+      temel[k] = { h: d.yeni, t: Date.now(), eskiler: ((temel[k]||{}).eskiler||[]).concat(d.eski).slice(-5) };
+      htYaz(temel);
+      const degisim = hdOku(); delete degisim[k]; hdYaz(degisim);
+      hdBanner(); notifSil('hesap-degisim');
+      if (btn) btn.style.display = 'none';
+    } else {
+      // Gönderilen/elenen işaretsiz kalsın, kalanlar seçili dursun —
+      // kullanıcı aynı modaldan kalanları yeniden deneyebilir. Bekleyen
+      // kayıt ve banner YERİNDE: sonraki açılışta uyarı yine çıkar.
+      secili.forEach(a => { if (a._ok) a.sec = false; });
+      // DOM kutuları da duruma uysun: gönderilen görünürde işaretli kalırsa
+      // kullanıcı ikinci kez gönderileceğini sanır.
+      const kutular = document.querySelectorAll('#hd-govde input[type=checkbox]');
+      (HD.adaylar||[]).forEach((a,i) => { if (a._ok && kutular[i]){ kutular[i].checked = false; kutular[i].disabled = true; } });
+      hdSayacTazele();
+    }
+    const st = document.getElementById('hd-durum');
+    if (st) st.textContent = ozet + (tamam ? '' : ' — kalanlar seçili, tekrar deneyebilirsin');
+    toast((ok?'✓ ':'⚠ ')+d.profil+' yeniden planlama: '+ozet, ok?'ok':'warn', 8000);
+    addLog(hata?'warn':'ok','uploadpost','Hesap değişimi planlaması ('+k+'): '+ozet+(hatalar.length?' | '+hatalar.join(' | '):''));
+  } finally {
+    HD.calisiyor = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
 const ES_SAYFA = 60;                 // 6000 kayda kadar
 const ESITLE = { profil:'', aday:[] };
 function esitleKapat(){ const m = document.getElementById('esitle-modal'); if (m) m.style.display = 'none'; }
@@ -13369,6 +13719,10 @@ async function notifCheck(derin){
       // OpusClip'in düşürdüğü videolar panelde hiçbir yerde görünmüyor.
       const bsz=urls.filter(r=>durBasarisizMi(satirDurumu(r))).length;
       if(bsz>0) notifEkle('uretim-basarisiz','✖',bsz+' video üretilemedi','OpusClip klip döndürmedi — yeniden gönderilebilir','urltakip'); else notifSil('uretim-basarisiz'); }catch(e){}
+    // Hesap değişimi: tespit loadPlatforms'ta yapılır, burada yalnız
+    // bekleyen kayıt bildirime çevrilir (panel açılışında da görünsün).
+    try{ const hd=hdBekleyenler();
+      if(hd.length) notifEkle('hesap-degisim','🔁',hd.length+' hesapta değişim tespit edildi','Eski short\'lar yeni hesaba yeniden planlanabilir','platformlar'); else notifSil('hesap-degisim'); }catch(e){}
     // Derin kaynaklar (panel açılınca / ilk yükleme)
     if(derin && (S.cfg.blot||getN8N())){
       try{
