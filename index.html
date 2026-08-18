@@ -2521,7 +2521,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.16-49';
+const PANEL_YAPI = 'y2026.08.16-50';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -10463,10 +10463,62 @@ async function opcOpenProject(projectId) {
   }
 }
 
+// ── Klip HANGİ PROFİLDE yayınlandı? ────────────────────────────────────
+// Kaynak: Sheet1 (short-kaydetme). Yayınlanan her short orada bir satır ve
+// satırda `profil` kolonu duruyor.
+// ANAHTARLAR n8n'deki 'Klip Kapı' ile BİREBİR AYNI olmalı (c:clip-id /
+// u:short-url + aynı URL sadeleştirmesi). Ayrışırsa kart "yayınlanmamış"
+// derken kapı engeller — iki ekran aynı olgu için farklı hüküm verir; bu
+// hatayı bu projede zaten yaşadık.
+// NOT: yeşil kenarlıklı "işlendi" tiki AYRI bir kaynaktan (opcProcessedIds
+// → localStorage + OpusIslenen sayfası) geliyor ve elle işaretlenebiliyor.
+// Buradaki rozet ise gerçek yayın kaydı; ikisi çelişirse doğru olan budur.
+function opcSadeUrl(u){
+  return String(u == null ? '' : u).trim().toLowerCase()
+    .replace(/^https?:\/\//, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
+}
+function opcYayinHaritasi(){
+  const h = new Map();
+  const ekle = (k, profil, t) => {
+    if (!k) return;
+    let g = h.get(k);
+    if (!g) { g = { profiller: [], t: '' }; h.set(k, g); }
+    // Aynı klip birden çok profile gitmiş olabilir (çoklu kategori gönderimi)
+    if (profil && g.profiller.indexOf(profil) < 0) g.profiller.push(profil);
+    if (t && (!g.t || t > g.t)) g.t = t;
+  };
+  ydShortsAll().forEach(r => {
+    const profil = ydefAl(r, ['profil','profile','profile_username']);
+    const t      = ydefAl(r, ['created-at','createdAt','tarih']);
+    const cid    = String(r['clip-id'] || r['clipId'] || '').trim();
+    const su     = opcSadeUrl(r['short-url'] || r['shortUrl'] || '');
+    if (cid) ekle('c:' + cid, profil, t);
+    if (su)  ekle('u:' + su, profil, t);
+  });
+  return h;
+}
+function opcKlipYayini(c, harita){
+  if (!c || !harita) return null;
+  const cid = String(c.id || c.clipId || '').trim();
+  const su  = opcSadeUrl(c.uriForExport || c.exportUrl || c.url);
+  return (cid && harita.get('c:' + cid)) || (su && harita.get('u:' + su)) || null;
+}
+// Sheet1 henüz yüklenmediyse rozet çıkmaz. Bir kez çekip yeniden çiziyoruz;
+// bayrak olmadan her render yeni bir istek doğururdu.
+let OPC_SHEET_DENENDI = false;
+function opcSheetGerekli(){
+  if (OPC_SHEET_DENENDI || ydShortsAll().length) return;
+  OPC_SHEET_DENENDI = true;
+  ydEnsureShorts().then(() => { if (ydShortsAll().length) opcRenderClips(); })
+                  .catch(e => console.warn('[OPC] short-kaydetme okunamadı:', e.message));
+}
+
 function opcRenderClips() {
   const grid = document.getElementById('opc-clip-grid');
   if (!grid) return;
   opcUpdateSelCount();
+  opcSheetGerekli();
+  const yayinHarita = opcYayinHaritasi();
   const processed = opcProcessedIds();
   grid.innerHTML = OPC.clips.map((c, i) => {
     const id = c.id || c.clipId || '';
@@ -10495,6 +10547,20 @@ function opcRenderClips() {
       </div>
       <div style="padding:8px 10px">
         <div class="opc-ctitle" style="font-size:13px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc0(title)}</div>
+        ${(() => {
+          const y = opcKlipYayini(c, yayinHarita);
+          if (!y) return '';
+          const ipucu = 'short-kaydetme tablosuna göre bu klip yayınlandı'
+            + (y.t ? ' — ' + y.t : '')
+            + '.\nYeniden göndermek istersen gönderim sırasında onay istenir.';
+          // Profil kolonu boş kalmış olabilir; o zaman en azından "yayınlanmış"
+          // bilgisini göster, sessizce hiçbir şey gösterme.
+          const govde = y.profiller.length
+            ? y.profiller.map(p => `<span class="badge bs2" style="font-size:10px;padding:0 5px">${esc0(p)}</span>`).join(' ')
+            : `<span class="badge bs2" style="font-size:10px;padding:0 5px">profil yazılmamış</span>`;
+          return `<div style="margin-top:5px;display:flex;align-items:center;gap:4px;flex-wrap:wrap" title="${esc0(ipucu)}">`
+               + `<span style="font-size:10px;color:var(--mt)">📤</span>${govde}</div>`;
+        })()}
       </div>
     </div>`;
   }).join('');
@@ -10579,26 +10645,17 @@ async function opcSendSelected() {
   let opcZorla = false;
   try {
     await ydEnsureShorts();
-    const sadeUrl = u => String(u == null ? '' : u).trim().toLowerCase()
-      .replace(/^https?:\/\//, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
-    const kayitli = new Map();
-    ydShortsAll().forEach(r => {
-      const cid = String(r['clip-id'] || r['clipId'] || '').trim();
-      const su  = sadeUrl(r['short-url'] || r['shortUrl'] || '');
-      const t   = r['created-at'] || r['platform-status'] || '(tarihsiz)';
-      if (cid) kayitli.set('c:' + cid, t);
-      if (su)  kayitli.set('u:' + su, t);
-    });
-    const vuran = c => {
-      const cid = String(c.id || c.clipId || '').trim();
-      const su  = sadeUrl(c.uriForExport || c.exportUrl || c.url || '');
-      return (cid && kayitli.has('c:' + cid)) ? kayitli.get('c:' + cid)
-           : (su && kayitli.has('u:' + su)) ? kayitli.get('u:' + su) : '';
-    };
+    // Kart rozetiyle AYNI yardımcı: ölçüt tek yerde tanımlı olmalı, yoksa
+    // kart "genel-1-en'de yayınlandı" derken gönderim onu kopya saymayabilir.
+    const yayinHarita = opcYayinHaritasi();
+    const vuran = c => opcKlipYayini(c, yayinHarita);
     const kopya = selectedClipData.filter(c => vuran(c));
     if (kopya.length) {
       const secim = await dupeChoiceModal(kopya.length, selectedClipData.length - kopya.length,
-        kopya.map(c => ({ ad: c.title || c.headline || '', t: vuran(c), kaynak: 'Sheet1' })));
+        kopya.map(c => { const y = vuran(c); return {
+          ad: c.title || c.headline || '',
+          t: y.t || '(tarihsiz)',
+          kaynak: y.profiller.length ? y.profiller.join(', ') : 'Sheet1' }; }));
       if (secim === 'cancel') return showRes('opc-send-res', 'İptal edildi — hiçbir şey gönderilmedi', 'warn');
       if (secim === 'skip') {
         selectedClipData = selectedClipData.filter(c => !vuran(c));
