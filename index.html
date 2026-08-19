@@ -1443,7 +1443,6 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <button class="btn bg bsm" id="plat-sifirla-btn" onclick="hsAc()" title="Bir sosyal medya hesabı engellenip yerine yenisi bağlandıysa: o profil+platformda eski yayınlar 'yayınlanmış' sayılmaz olur, böylece short'lar yeni hesaba tekrar gönderilebilir. Hiçbir kayıt silinmez, geri alınabilir.">🔄 Hesap Sıfırlama</button>
     <button class="btn bg bsm" id="plat-kaynak-btn" onclick="ksAc()" title="Üretilmiş short'ların kaç tanesinin mp4 kaynağına hâlâ ulaşılabiliyor? Yeniden yayın yapabilmenin ön şartı bu — ölçer ve ölü linklerin OpusClip'ten tazelenip tazelenemediğine bakar.">🎬 Kaynak Sağlığı</button>
     <button class="btn bg bsm" id="plat-eksik-btn" onclick="eksikDenetimi()" title="Her profilde, HERHANGİ bir platformda var olup diğerlerinde OLMAYAN short'ları sayar (yayınlanmış + planlı + kuyruk birlikte). Takvimden yanlışlıkla silinen planlar burada 'eksik' olarak görünür; onarım profil satırındaki ⚖ Eşitle ile yapılır.">🧩 Eksik Denetimi</button>
-    <button class="btn bg bsm" id="plat-eksik-btn" onclick="eksikDenetimi()" title="TÜM profilleri tek geçişte tarar: herhangi bir platformda yayınlanmış/planlı olup diğer platformlarda İZİ OLMAYAN short'ları profil × platform kırılımıyla sayar. Takvimden plan silindiyse (kopya temizliği dahil) eksik kalanlar burada görünür; tamamlama her profilin ⚖ Eşitle onay penceresinden yapılır.">🩹 Eksik Denetimi</button>
     <span id="plat-cift-oto-durum" style="font-size:11.5px;color:var(--mt);align-self:center"
           title="Çift kontrolü saatte bir kendiliğinden çalışır: kuyruktaki çift kopyalar silinir (her short'un EN ERKEN kopyası kalır), yayınlanmış gönderilere dokunulmaz, birden çok platforma bağlı işler otomatik silinmez. Çift bulunursa liste aşağıda kendiliğinden açılır. Panel AÇIKKEN çalışır — kapalıyken temizlik yapılmaz."></span>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
@@ -2525,7 +2524,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.19-55';
+const PANEL_YAPI = 'y2026.08.19-56';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
