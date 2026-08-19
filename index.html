@@ -2522,7 +2522,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.17-52';
+const PANEL_YAPI = 'y2026.08.18-53';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -10712,6 +10712,8 @@ function opcStageColor(stage) {
 function opcRenderProjects(projects) {
   const grid = document.getElementById('opc-project-grid');
   if (!grid) return;
+  opcSheetGerekli();                       // Sheet1 gelince kendiliğinden yeniden çizer
+  const projYayin = opcProjeYayinHaritasi();
   const processed = opcProcessedIds();
   grid.innerHTML = projects.map(p => {
     const si = p.sourceInfo || {};
@@ -10754,6 +10756,22 @@ function opcRenderProjects(projects) {
           <span style="color:var(--mt)">${esc0(date)}</span>
           ${stage ? `<span style="color:${statusColor};text-transform:uppercase;letter-spacing:.5px">${esc0(stage)}</span>` : ''}
         </div>
+        ${(() => {
+          // Bu projenin klipleri HANGİ PROFİLLERE gitmiş? Kaynak Sheet1.
+          // Proje kartında görünmesi, projeye girmeden "bu zaten şu hesaba
+          // yayınlanmış" diyebilmek için — kullanıcının istediği buydu.
+          const y = projYayin.get(pid);
+          if (!y) return '';
+          const ipucu = 'short-kaydetme tablosuna göre bu projeden ' + y.adet + ' short yayına gönderildi'
+            + (y.t ? ' (son: ' + y.t + ')' : '') + '.\nProfil dağılımı: '
+            + (y.profiller.length ? y.profiller.join(', ') : 'profil kolonu boş')
+            + '.\nGönderilmiş olması yayınlandığı anlamına gelmez — klip kartlarında gerçek sonuç yazıyor.';
+          const govde = y.profiller.length
+            ? y.profiller.map(p => `<span class="badge bs2" style="font-size:10px;padding:0 5px">${esc0(p)}</span>`).join(' ')
+            : `<span class="badge bs2" style="font-size:10px;padding:0 5px">profil yazılmamış</span>`;
+          return `<div style="margin-top:5px;display:flex;align-items:center;gap:4px;flex-wrap:wrap" title="${esc0(ipucu)}">`
+               + `<span style="font-size:10px;color:var(--mt)">📤 ${y.adet}</span>${govde}</div>`;
+        })()}
       </div>
     </div>`;
   }).join('');
@@ -10852,6 +10870,37 @@ function opcKlipYayini(c, harita){
   const cid = String(c.id || c.clipId || '').trim();
   const su  = opcSadeUrl(c.uriForExport || c.exportUrl || c.url);
   return (cid && harita.get('c:' + cid)) || (su && harita.get('u:' + su)) || null;
+}
+
+// ── PROJE bazında yayın: hangi profillere gitmiş? ──────────────────────
+// Proje kartında (klip kartında değil) gösterilir. Anahtar Sheet1'deki
+// `clip-id`: OpusClip birleşik kimlik kullanıyor ({projectId}.{clipId}),
+// yani proje kimliği klip kimliğinin İÇİNDE — proje listesine bakmadan
+// eşleşme kurulabiliyor (pdProjeKimligi ile aynı ayrıştırma).
+// Birleşik olmayan eski kayıtlar için OPC.projClips önbelleği (kullanıcının
+// daha önce açtığı projelerin klip kimlikleri) yedek yol olarak kullanılır.
+function opcProjeYayinHaritasi(){
+  const h = new Map();
+  // klipId → projeId (yalnız daha önce açılmış projeler için)
+  const tersi = new Map();
+  try {
+    Object.keys(OPC.projClips || {}).forEach(pid =>
+      (OPC.projClips[pid] || []).forEach(cid => { if (cid) tersi.set(String(cid), pid); }));
+  } catch(e) {}
+  ydShortsAll().forEach(r => {
+    const cid = String(r['clip-id'] || r['clipId'] || '').trim();
+    if (!cid) return;
+    const pid = pdProjeKimligi(cid) || tersi.get(cid) || '';
+    if (!pid) return;
+    const profil = ydefAl(r, ['profil','profile','profile_username']);
+    const t = ydefAl(r, ['created-at','createdAt','tarih']);
+    let g = h.get(pid);
+    if (!g) { g = { profiller: [], adet: 0, t: '' }; h.set(pid, g); }
+    g.adet++;
+    if (profil && g.profiller.indexOf(profil) < 0) g.profiller.push(profil);
+    if (t && (!g.t || t > g.t)) g.t = t;
+  });
+  return h;
 }
 // ── Klibin GERÇEK yayın durumu ─────────────────────────────────────────
 // Sheet1 yalnız "n8n Upload-Post'a YOLLADI"yı bilir. `platform-status`
