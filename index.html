@@ -2524,7 +2524,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.19-56';
+const PANEL_YAPI = 'y2026.08.19-57';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -5890,6 +5890,8 @@ const KAPSAMA_SON = { K:null, profs:null, kayit:0, kirpik:false, cozulenTop:0 };
 // yeri Yayın Durumu → Başarısızları Kuyruğa Al.
 // ═══════════════════════════════════════════════════════════════════════
 let EKSIK_CALISIYOR = false;
+let EKSIK_GUN = 14;                  // varsayılan pencere; 0 = tüm ömür
+function eksikGunSec(g){ EKSIK_GUN = g; eksikDenetimi(); }
 async function eksikDenetimi(){
   if (EKSIK_CALISIYOR) return;
   const btn = document.getElementById('plat-eksik-btn');
@@ -5905,6 +5907,9 @@ async function eksikDenetimi(){
     // Geçmiş bir kez, TAM pencereyle (Eşitle ile aynı ES_SAYFA) — profil
     // döngüsündeki pdBasliklar çağrıları aynı önbelleği kullanır.
     const onb = await histCek(ES_SAYFA);
+    // Pencere: pdBasliklar bunu okuyor. finally'de MUTLAKA sıfırlanır —
+    // aksi halde ⚖ Eşitle de pencereli çalışır ve eski eksikleri görmez.
+    window.PD_SINIR = EKSIK_GUN ? (Date.now() - EKSIK_GUN*864e5) : 0;
     const satirlar = [], tekPlatform = [], hatalilar = [];
     let bitti = 0;
     await upSirali(profs, async u => {
@@ -5939,11 +5944,22 @@ async function eksikDenetimi(){
       +     (genelToplam ? genelToplam+' eksik yayın bulundu' : 'eksik yok ✓')+'</span>'
       +   '<span style="font-size:11.5px;color:var(--mt)">'+((onb.kayitlar||[]).length)+' geçmiş kaydı tarandı'
       +     (onb.kirpik ? ' — ⚠ pencere KIRPIK, daha eskiler görünmüyor' : '')+'</span>'
+      +   '<span style="margin-left:auto;display:flex;gap:4px;align-items:center">'
+      +     '<span style="font-size:11px;color:var(--mt)">pencere:</span>'
+      +     [[7,'7 gün'],[14,'14 gün'],[30,'30 gün'],[0,'tüm ömür']].map(([g,ad]) =>
+            '<button class="btn '+(EKSIK_GUN===g?'bp':'bg')+' bsm" onclick="eksikGunSec('+g+')">'+ad+'</button>').join('')
+      +   '</span>'
       + '</div>'
       + '<div style="font-size:11.5px;color:var(--mt);margin-bottom:8px">Ölçüt: bir short HERHANGİ bir platformda '
-      + '(yayınlanmış / planlı / kuyrukta) varsa, diğer bağlı platformlarda da olmalı. Takvimden yanlışlıkla silinen '
-      + 'planlar burada görünür. Onarım: satırdaki <b>⚖ Eşitle</b> — listeyi gösterir, onayından sonra kuyruğa ekler. '
+      + '(yayınlanmış / planlı / kuyrukta) varsa, diğer bağlı platformlarda da olmalı. Onarım: satırdaki '
+      + '<b>⚖ Eşitle</b> — listeyi gösterir, onayından sonra kuyruğa ekler. '
       + 'Başarısız denemeler burada sayılmaz (Yayın Durumu sayfasının işi).</div>'
+      + (EKSIK_GUN
+          ? '<div style="font-size:11.5px;color:var(--acc);margin-bottom:8px">Yalnız <b>son '+EKSIK_GUN+' gün</b> '
+            + 'sayılıyor. Silinen planların izi burada aranır.</div>'
+          : '<div style="font-size:11.5px;color:var(--wn);margin-bottom:8px">⚠ <b>Tüm ömür</b> sayılıyor: bu rakamın '
+            + 'büyük kısmı <b>silinen plan değil</b>, tarihsel birikimdir — Facebook ve X kanalları sonradan eklendi, '
+            + 'ondan önceki her short o platformlarda "eksik" görünür. Silme hasarını görmek için kısa pencere seç.</div>')
       + (satirlar.length ? '<table style="width:100%;border-collapse:collapse;font-size:12.5px">'
         + '<thead><tr style="color:var(--mt);text-align:left"><th style="padding:3px 8px">Profil</th>'
         + '<th style="padding:3px 8px">Küme</th><th style="padding:3px 8px">Platform başına eksik</th>'
@@ -5968,6 +5984,7 @@ async function eksikDenetimi(){
   } catch(e){
     kutu.innerHTML = durumHTML('hata',{kompakt:true, alt:'Denetim başarısız: '+(e.message||e)});
   } finally {
+    window.PD_SINIR = 0;             // Eşitle'yi pencereli bırakma
     EKSIK_CALISIYOR = false;
     if (btn) btn.disabled = false;
   }
@@ -6246,7 +6263,16 @@ function platDoldurKapat(){ const m=document.getElementById('plat-doldur-modal')
 // Denetimi de üçüncü kez isteyince Upload-Post HTTP 429 veriyordu.
 async function pdBasliklar(profil, platlar, sayfa){
   const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook', x:'x', twitter:'x' };
-  const norm = t => String(t||'').trim().toLowerCase().replace(/\s+/g,' ');
+  // ANAHTAR GÖNDERİM YOLUYLA AYNI OLMALI (ckAnahtar = ydNorm(...).slice(0,60)).
+  // Eskiden burada AYRI bir normalizasyon vardı (yalnız trim+lowercase+boşluk;
+  // noktalama korunuyor, kırpma yok) ve KISIR DÖNGÜ üretiyordu:
+  //   ydTopluGonder başlığı `slice(0,95)` ile yolluyor → yeni işin başlığı
+  //   kısalıyor → buradaki anahtar eşleşmiyor → "hâlâ eksik" görünüyor;
+  //   ama ckCiftMi 60'a kırptığı için "zaten var" deyip gönderimi ATLIYOR.
+  //   Sonuç: kullanıcı ⚖ Eşitle'yi çalıştırıyor, hiçbir şey gitmiyor ve
+  //   liste hiç düşmüyor. Noktalama farkı da ikinci ayrışma kaynağıydı
+  //   ("Erdoğan'dan" ↔ "erdogan dan").
+  const norm = t => ydNorm(t).slice(0, 60);
   const out = {};
   platlar.forEach(p => out[p] = { yayinlanan: new Map(), mevcut: new Set() });
   const ekle = (p, b, yayindaMi) => {
@@ -6256,11 +6282,23 @@ async function pdBasliklar(profil, platlar, sayfa){
     if (yayindaMi) out[p].yayinlanan.set(n, b);
   };
   const onb = await histCek(sayfa || KAPSAMA_SAYFA);  // paylaşılan önbellek
+  // PD_SINIR: yalnız bu andan SONRAKİ geçmiş kayıtları "hedef kümeye" girsin.
+  // Eşitle bunu KULLANMAZ (0 → tüm ömür, eski davranış birebir korunur);
+  // yalnız Eksik Denetimi son N günü sormak için doldurur. Sebep: FB ve X
+  // kanalları sonradan eklendi, ondan önceki her short o platformlarda
+  // "eksik" görünüyor ve ömür boyu sayım gerçek sorunu gömüyor.
+  const _sinir = window.PD_SINIR || 0;
   (onb.kayitlar || []).forEach(x => {
     if (String(x.profile_username||x.user||'') !== profil) return;
     const p = NP[String(x.platform||'').toLowerCase()];
     if (!p) return;
     if (!hsSayilir(profil, p, x)) return;      // hesap sıfırlanmış — "eksik" sayılsın ki Eşitle gönderebilsin
+    if (_sinir){
+      const t = Date.parse(x.upload_timestamp||x.uploaded_at||x.created_at||x.timestamp||x.date||'') || 0;
+      // Tarihi okunamayan kaydı ELEME: penceredeymiş gibi say — "mevcut"
+      // tarafını da besliyor, atmak sahte eksik üretirdi.
+      if (t && t < _sinir) return;
+    }
     ekle(p, String(x.post_title || x.title || x.post_caption || ''), x.success !== false && !x.error_message);
   });
   try {
