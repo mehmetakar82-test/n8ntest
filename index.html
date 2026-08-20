@@ -1409,6 +1409,13 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div id="rap-plat" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px"><div style="color:var(--mt);font-size:12px;grid-column:1/-1;text-align:center;padding:10px">↻ Raporu Oluştur'a bas</div></div>
   </div>
 
+  <!-- EN ÇOK İZLENEN SHORT'LAR -->
+  <div class="card">
+    <div class="ct">🏆 En Çok İzlenen Short'lar <span id="rap-top-n" style="letter-spacing:0;text-transform:none;font-size:11px;color:var(--mt)"></span></div>
+    <div id="rap-top-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="rap-top-icerik"><div style="color:var(--mt);font-size:12px;text-align:center;padding:10px">↻ Raporu Oluştur'a bas</div></div>
+  </div>
+
   <!-- PROFİL TABLOSU -->
   <div class="card">
     <div class="ct">📁 Upload-Post Profilleri <span id="rap-prof-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
@@ -2526,7 +2533,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.20-60';
+const PANEL_YAPI = 'y2026.08.21-61';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -4037,6 +4044,7 @@ async function loadReports(){
   })();
   await Promise.all([pHist,pPlan]);
   RAP.hist=hist; RAP.plan=plan; RAP.loaded=true; RAP.analytics={};
+  RAP_TOP.onb={};   // taze gecmis -> eski YouTube taramasi gosterilmesin (denetim bulgusu)
   rapRenderCore();
   // Geçmiş alınamadıysa "hazır" DEME: sayılar sıfır olduğu için rapor
   // "hiçbir profil akmıyor" gibi okunuyor, oysa veri hiç gelmemiş.
@@ -4227,6 +4235,7 @@ function rapRenderCore(){
   if(kEl) kEl.innerHTML=kpi.map(k=>`<div style="background:var(--sur);border:1px solid var(--brd);border-radius:8px;padding:11px 12px"><div style="font-size:9.5px;letter-spacing:1px;color:var(--mt)">${k[0]}</div><div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:2px"><span style="font-family:var(--fh);font-size:21px;font-weight:800;color:${k[2]};font-variant-numeric:tabular-nums">${k[1]}</span>${k[3]||''}</div></div>`).join('');
   rapRenderChart(inP, days);
   rapRenderPlatforms(inP);
+  rapTopRender();
   rapRenderProfiles(inP);
   rapRenderUretim();
 }
@@ -4334,6 +4343,191 @@ function rapGunCiz(k, cols){
         : '<div style="color:var(--mt);font-size:12.5px">Bu güne ait kayıt yok. Not: rapor penceresi son '
           + ((RAP.hist||[]).length)+' kaydı tarıyor — gün pencerenin dışında kalmış olabilir.</div>')
     + '</div>';
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// EN ÇOK İZLENEN SHORT'LAR — platform seçmeli sıralama
+// ───────────────────────────────────────────────────────────────────────
+// GERÇEK video-başına izlenme yalnız YOUTUBE'dan alınabiliyor: geçmişteki
+// post_url'lerden video kimliği çıkarılıp YouTube Data API'den (panelin
+// zaten kullandığı anahtar + çağrı deseniyle) statistics çekiliyor.
+// Instagram/TikTok/Facebook/X için gönderi-başına izlenme HİÇBİR bağlı
+// API'de yok (Upload-Post OpenAPI şemasında gönderi metrik ucu yok; hesap
+// TOPLAMLARI Raporlar kartlarında). Oralarda sahte sıralama üretmek yerine
+// bu sınır açıkça yazılıyor ve gönderiler tarihe göre (linkli) listeleniyor.
+// ═══════════════════════════════════════════════════════════════════════
+const RAP_TOP = { plat:'youtube', onb:{}, yukleniyor:false };
+const RAP_TOP_TTL = 10*60000;      // YouTube istatistikleri 10 dk önbellek
+const RAP_TOP_ADET = 20;           // gösterilen sıra sayısı
+const RAP_TOP_KIMLIK_TAVAN = 500;  // taranacak azami video (10 API çağrısı)
+
+function rapTopYtKimlik(u){
+  const m = String(u||'').match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/);
+  return m ? m[1] : '';
+}
+function rapTopSec(p){ RAP_TOP.plat = p; rapTopRender(); }
+
+function rapTopRender(){
+  const chipsEl = document.getElementById('rap-top-chips');
+  const el = document.getElementById('rap-top-icerik');
+  if (!chipsEl || !el) return;
+  const PLATLAR = [['youtube','YouTube'],['instagram','Instagram'],['tiktok','TikTok'],['facebook','Facebook'],['x','X']];
+  chipsEl.innerHTML = PLATLAR.map(([p,ad]) =>
+    '<button class="btn '+(RAP_TOP.plat===p?'bp':'bg')+' bsm" onclick="rapTopSec(\''+p+'\')">'+ad
+    + (p==='youtube' ? '' : ' <span style="opacity:.6;font-size:9px" title="Bu platformda video başına izlenme verisi API\'lerden alınamıyor">*</span>')
+    + '</button>').join('');
+  const esc = esc0;
+  if (!(RAP.hist||[]).length){
+    // Mesaj DURUMA göre: rapor zaten oluşturulduysa "düğmeye bas" demek
+    // yanlış — geçmiş ya boş döndü ya alınamadı. Başlık da temizlenmeli,
+    // önceki turdan kalan "— N video tarandı" asılı kalıyordu (denetim bulgusu).
+    setEl('rap-top-n','');
+    el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:10px">'
+      + (RAP.histHata ? '⚠ Yayın geçmişi alınamadı ('+esc(RAP.histHata)+') — Raporu Oluştur ile tekrar dene'
+        : (RAP.loaded ? 'Geçmişte yayın kaydı yok' : '↻ Raporu Oluştur\'a bas'))
+      + '</div>';
+    return;
+  }
+  if (RAP_TOP.plat === 'youtube'){
+    const c = RAP_TOP.onb.youtube;
+    if (c && Date.now()-c.t < RAP_TOP_TTL){ rapTopYtCiz(c); return; }
+    rapTopYtYukle();
+    return;
+  }
+  // ── YouTube dışı: dürüst sınır + tarihe göre linkli liste ──
+  const p = RAP_TOP.plat;
+  // rapPlatAnahtar ŞART: Upload-Post geçmişi X'i 'twitter' olarak taşıyor;
+  // ham karşılaştırma X çipinde "0 yayın" gösterirken üstteki platform
+  // kartı aynı kayıtları sayıyordu (denetim bulgusu).
+  const kayitlar = (RAP.hist||[]).filter(h => rapPlatAnahtar(h.platform)===p && rapOk(h))
+    .sort((a,b) => (Date.parse(rapHistTime(b))||0)-(Date.parse(rapHistTime(a))||0));
+  setEl('rap-top-n', '— '+kayitlar.length+' yayın (izlenme verisi yok)');
+  el.innerHTML =
+    '<div style="font-size:11.5px;color:var(--wn);margin-bottom:8px">⚠ '+esc(p.charAt(0).toUpperCase()+p.slice(1))
+    + ' için <b>video başına izlenme</b> bağlı API\'lerin hiçbirinden alınamıyor (Upload-Post gönderi-başına metrik ucu sunmuyor; '
+    + 'hesap TOPLAM izlenmeleri yukarıdaki kartlarda). Aşağıdaki liste <b>sıralama değil</b> — son yayınlar, tarihe göre.</div>'
+    + (kayitlar.length ? kayitlar.slice(0,10).map(h => {
+        const url = h.post_url || h.url || '';
+        const t = String(rapHistTime(h)).slice(0,10);
+        return '<div style="display:flex;gap:8px;align-items:center;padding:5px 6px;border-top:1px solid var(--brd);font-size:12.5px">'
+          + '<span style="color:var(--mt);font-size:11px;white-space:nowrap">'+esc(t)+'</span>'
+          + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)">'+esc(h.post_title||h.title||'(başlıksız)')+'</span>'
+          + '<span class="badge bi" style="font-size:10px">'+esc(h.profile_username||h.user||'')+'</span>'
+          + (url ? '<a href="'+guvenliUrl(url)+'" target="_blank" rel="noopener" style="color:var(--acc);font-size:11px;white-space:nowrap">aç ↗</a>' : '')
+          + '</div>';
+      }).join('') : '<div style="color:var(--mt);font-size:12px;padding:8px 2px">Bu platformda yayınlanmış kayıt yok.</div>');
+}
+
+async function rapTopYtYukle(){
+  const el = document.getElementById('rap-top-icerik'); if (!el) return;
+  // Kilitliyken SESSİZ dönme: çekim sürerken başka platforma geçip YouTube'a
+  // dönen kullanıcı, eski platformun listesini YouTube çipi altında asılı
+  // görüyordu (denetim bulgusu). Yükleme durumu çizilir; çekim bitince
+  // sondaki plat==='youtube' korumalı çizim gerçek listeyi basar.
+  if (RAP_TOP.yukleniyor){
+    el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'İzlenme sayıları çekiliyor…'});
+    setEl('rap-top-n','');
+    return;
+  }
+  const key = S.cfg.ytApiKey || S.cfg.shkey || '';
+  if (!key){
+    el.innerHTML = '<div style="color:var(--wn);font-size:12.5px;padding:8px 2px">YouTube API anahtarı gerekli — '
+      + 'Ayarlar → Google Sheets API Key ya da YT Ara → API Key alanına gir. İzlenme sayıları o anahtarla çekiliyor.</div>';
+    setEl('rap-top-n',''); return;
+  }
+  RAP_TOP.yukleniyor = true;
+  try {
+    // Geçmişteki BAŞARILI YouTube yayınlarından kimlik → meta haritası
+    const meta = new Map();
+    (RAP.hist||[]).forEach(h => {
+      if (String(h.platform||'').toLowerCase() !== 'youtube' || !rapOk(h)) return;
+      const id = rapTopYtKimlik(h.post_url || h.url || ''); if (!id || meta.has(id)) return;
+      meta.set(id, { profil: h.profile_username||h.user||'', tarih: String(rapHistTime(h)).slice(0,10), url: h.post_url||h.url||'' });
+    });
+    const idler = Array.from(meta.keys()).slice(0, RAP_TOP_KIMLIK_TAVAN);
+    if (!idler.length){
+      el.innerHTML = '<div style="color:var(--mt);font-size:12px;padding:8px 2px">Geçmişte kimliği çözülebilen YouTube yayını yok.</div>';
+      setEl('rap-top-n',''); return;
+    }
+    el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:idler.length+' videonun izlenme sayısı çekiliyor…'});
+    // dusen = API yanıt verdi ama kimliği DÖNDÜRMEDİ (silinmiş/gizli video).
+    // hatali = parça İSTEĞİ düştü (kota/ağ) — video hakkında hiçbir şey
+    // bilinmiyor. İkisini tek sayaçta toplamak "450 video silinmiş olabilir"
+    // gibi yanlış bir cümle üretiyordu (denetim bulgusu).
+    const liste = []; let dusen = 0, hatali = 0;
+    for (let i = 0; i < idler.length; i += 50){
+      const parca = idler.slice(i, i+50);
+      try {
+        const r = await fetch('https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&maxResults=50&id='
+          + parca.join(',') + '&key=' + encodeURIComponent(key));
+        const j = await r.json();
+        if (!r.ok) throw new Error((j.error && j.error.message) || ('HTTP '+r.status));
+        (j.items||[]).forEach(v => {
+          const m = meta.get(v.id) || {};
+          // GİZLİ SAYAÇLAR: kanal beğeni/izlenme sayısını gizlemişse API o
+          // alanı HİÇ döndürmüyor. 0 basmak gerçek sıfırdan ayırt edilemez
+          // — null saklanır, ekranda '—' gösterilir (denetim bulgusu).
+          const st = v.statistics || {};
+          liste.push({ id:v.id, baslik:(v.snippet||{}).title||'(başlıksız)',
+            thumb:(((v.snippet||{}).thumbnails||{}).medium||{}).url || (((v.snippet||{}).thumbnails||{}).default||{}).url || '',
+            views:('viewCount' in st) ? (parseInt(st.viewCount)||0) : null,
+            likes:('likeCount' in st) ? (parseInt(st.likeCount)||0) : null,
+            profil:m.profil||'', tarih:m.tarih||'', url:m.url||('https://www.youtube.com/watch?v='+v.id) });
+        });
+        // API'nin DÖNDÜRMEDİĞİ kimlikler silinmiş/gizli videolar — say, gizleme
+        dusen += parca.length - (j.items||[]).length;
+      } catch(e){
+        // İlk parça bile düşerse mesajla çık; sonrakiler düşerse eldekiyle devam.
+        // Yazmadan önce platform kontrolü: await'ler sırasında kullanıcı başka
+        // sekmeye geçtiyse hata mesajı o görünümü ezmesin.
+        if (!liste.length){
+          if (RAP_TOP.plat === 'youtube'){
+            el.innerHTML = '<div style="color:var(--er);font-size:12.5px;padding:8px 2px">YouTube API hatası: '+esc0(e.message)
+              + '<div style="color:var(--mt);font-size:11px;margin-top:3px">Anahtar kısıtlı/kotası dolmuş olabilir — Ayarlar\'daki anahtarı kontrol et.</div></div>';
+            setEl('rap-top-n','');
+          }
+          return;
+        }
+        console.warn('[TOP] parça düştü:', e.message); hatali += parca.length;
+      }
+      if (i+50 < idler.length) await sleep(150);   // hız sınırına nefes payı
+    }
+    // İzlenmesi gizli (null) videolar bilinçli olarak dibe: sıralamanın
+    // ölçütü izlenme, ölçüsü olmayan yarışamaz — satırında '—' yazar.
+    liste.sort((a,b) => ((b.views==null?-1:b.views)) - ((a.views==null?-1:a.views)));
+    // Parça hatası varsa KISA TTL: eksik tablo 10 dk donup kalmasın, bir
+    // sonraki render yeniden denesin (t geçmişe çekilerek).
+    RAP_TOP.onb.youtube = { t: Date.now() - (hatali ? RAP_TOP_TTL - 30000 : 0),
+                            liste, tarama: idler.length - hatali, dusen, hatali };
+    // YARIŞ KORUMASI: çekim sürerken kullanıcı başka platforma geçmiş
+    // olabilir — çizersek YouTube listesi o platformun görünümünü ezer.
+    // Önbellek yine dolu kalır; YouTube'a dönünce anında çizilir.
+    if (RAP_TOP.plat === 'youtube') rapTopYtCiz(RAP_TOP.onb.youtube);
+  } finally { RAP_TOP.yukleniyor = false; }
+}
+
+function rapTopYtCiz(c){
+  const el = document.getElementById('rap-top-icerik'); if (!el) return;
+  const esc = esc0;
+  setEl('rap-top-n', '— '+c.tarama+' video tarandı, ilk '+Math.min(RAP_TOP_ADET,c.liste.length)+' gösteriliyor'
+    + (c.dusen ? ' · '+c.dusen+' video API\'den dönmedi (silinmiş/gizli olabilir)' : '')
+    + (c.hatali ? ' · ⚠ '+c.hatali+' video çekilemedi (API hatası) — sıralama eksik olabilir' : ''));
+  if (!c.liste.length){
+    el.innerHTML = '<div style="color:var(--mt);font-size:12px;padding:8px 2px">İzlenme verisi alınabilen video yok.</div>';
+    return;
+  }
+  el.innerHTML = c.liste.slice(0, RAP_TOP_ADET).map((v,i) =>
+    '<div style="display:flex;gap:10px;align-items:center;padding:6px;border-top:1px solid var(--brd)">'
+    + '<span style="font-family:var(--fh);font-weight:800;font-size:15px;color:'+(i<3?'var(--gld)':'var(--mt)')+';min-width:24px;text-align:right">'+(i+1)+'</span>'
+    + (v.thumb ? '<img src="'+guvenliUrl(v.thumb)+'" style="width:64px;height:36px;object-fit:cover;border-radius:4px;flex:0 0 auto" onerror="this.style.display=\'none\'">' : '')
+    + '<div style="flex:1;min-width:0">'
+    +   '<a href="'+guvenliUrl(v.url)+'" target="_blank" rel="noopener" style="color:var(--tx);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">'+esc(v.baslik)+'</a>'
+    +   '<div style="font-size:11px;color:var(--mt)">'+(v.profil?'<span class="badge bi" style="font-size:10px">'+esc(v.profil)+'</span> ':'')+esc(v.tarih)+'</div>'
+    + '</div>'
+    + '<div style="text-align:right;white-space:nowrap">'
+    +   '<div style="font-family:var(--fh);font-weight:800;color:var(--gld);font-size:14px"'+(v.views==null?' title="Kanal izlenme sayısını gizlemiş — API bu alanı döndürmüyor"':'')+'>'+(v.views==null?'—':ytkFmt(v.views))+'</div>'
+    +   '<div style="font-size:10.5px;color:var(--mt)"'+(v.likes==null?' title="Kanal beğeni sayısını gizlemiş — API bu alanı döndürmüyor"':'')+'>👍 '+(v.likes==null?'—':ytkFmt(v.likes))+'</div>'
+    + '</div></div>').join('');
 }
 
 function rapRenderPlatforms(inP){
