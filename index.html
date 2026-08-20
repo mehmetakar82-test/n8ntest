@@ -2533,7 +2533,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.21-61';
+const PANEL_YAPI = 'y2026.08.21-62';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -4374,7 +4374,6 @@ function rapTopRender(){
   const PLATLAR = [['youtube','YouTube'],['instagram','Instagram'],['tiktok','TikTok'],['facebook','Facebook'],['x','X']];
   chipsEl.innerHTML = PLATLAR.map(([p,ad]) =>
     '<button class="btn '+(RAP_TOP.plat===p?'bp':'bg')+' bsm" onclick="rapTopSec(\''+p+'\')">'+ad
-    + (p==='youtube' ? '' : ' <span style="opacity:.6;font-size:9px" title="Bu platformda video başına izlenme verisi API\'lerden alınamıyor">*</span>')
     + '</button>').join('');
   const esc = esc0;
   if (!(RAP.hist||[]).length){
@@ -4394,28 +4393,103 @@ function rapTopRender(){
     rapTopYtYukle();
     return;
   }
-  // ── YouTube dışı: dürüst sınır + tarihe göre linkli liste ──
+  // ── YouTube dışı: Upload-Post post-analytics (gönderi başına CANLI) ──
+  // İlk sürümde "video başına izlenme alınamıyor" demiştim — YANLIŞTI:
+  // Takvim'in post modalı zaten /uploadposts/post-analytics/{request_id}
+  // ucundan canlı metrik gösteriyor (takLoadMetrics). Aynı uç + aynı
+  // ayrıştırıcı (takParseMetrics) burada toplu kullanılıyor.
   const p = RAP_TOP.plat;
-  // rapPlatAnahtar ŞART: Upload-Post geçmişi X'i 'twitter' olarak taşıyor;
-  // ham karşılaştırma X çipinde "0 yayın" gösterirken üstteki platform
-  // kartı aynı kayıtları sayıyordu (denetim bulgusu).
-  const kayitlar = (RAP.hist||[]).filter(h => rapPlatAnahtar(h.platform)===p && rapOk(h))
+  const c = RAP_TOP.onb[p];
+  if (c && Date.now()-c.t < RAP_TOP_TTL){ rapTopUpCiz(p, c); return; }
+  rapTopUpYukle(p);
+}
+
+// Upload-Post gönderi-başına metrik: HER GÖNDERİ AYRI İSTEK. Kota dostu
+// olması için: yalnız EN YENİ tavan kadar yayın taranır, eşzamanlılık 2,
+// sonuç 10 dk önbellekte. rapPlatAnahtar şart: geçmiş X'i 'twitter' taşır.
+const RAP_TOP_UP_TAVAN = 150;
+async function rapTopUpYukle(p){
+  const el = document.getElementById('rap-top-icerik'); if (!el) return;
+  const esc = esc0;
+  if (RAP_TOP.yukleniyor){
+    el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Metrikler çekiliyor…'});
+    setEl('rap-top-n','');
+    return;
+  }
+  const adaylar = (RAP.hist||[]).filter(h => rapPlatAnahtar(h.platform)===p && rapOk(h))
     .sort((a,b) => (Date.parse(rapHistTime(b))||0)-(Date.parse(rapHistTime(a))||0));
-  setEl('rap-top-n', '— '+kayitlar.length+' yayın (izlenme verisi yok)');
+  const olculebilir = adaylar.filter(h => h.request_id || h.platform_post_id).slice(0, RAP_TOP_UP_TAVAN);
+  if (!olculebilir.length){
+    setEl('rap-top-n', '— '+adaylar.length+' yayın');
+    el.innerHTML = '<div style="color:var(--mt);font-size:12.5px;padding:8px 2px">'
+      + (adaylar.length ? 'Bu yayınların hiçbirinde metrik anahtarı (request_id / platform_post_id) yok — Upload-Post eski kayıtlarda bunu vermeyebilir.'
+                        : 'Bu platformda yayınlanmış kayıt yok.')+'</div>';
+    return;
+  }
+  RAP_TOP.yukleniyor = true;
+  try {
+    const liste = []; let verisiz = 0, hatali = 0, bitti = 0;
+    await upSirali(olculebilir, async h => {
+      bitti++;
+      if (bitti % 10 === 1 && RAP_TOP.plat === p)
+        el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:bitti+'/'+olculebilir.length+' gönderinin metriği çekiliyor…'});
+      let m = null;
+      try {
+        if (h.request_id){
+          const { data } = await upFetch('/uploadposts/post-analytics/' + encodeURIComponent(h.request_id));
+          m = takParseMetrics(data);
+        }
+        if (!m && h.platform_post_id){
+          const { data } = await upFetch('/uploadposts/post-analytics?platform_post_id=' + encodeURIComponent(h.platform_post_id)
+            + '&platform=' + encodeURIComponent(p === 'x' ? 'x' : p));
+          m = takParseMetrics(data);
+        }
+      } catch(e){ hatali++; return; }
+      if (!m){ verisiz++; return; }
+      // İzlenme: views yoksa impressions (Takvim modalı ve hesap kartlarıyla
+      // aynı geriye-uyumluluk kuralı). İkisi de yoksa sıralanamaz → verisiz.
+      const izlenme = (m.views != null) ? m.views : ((m.impressions != null) ? m.impressions : null);
+      if (izlenme == null){ verisiz++; return; }
+      liste.push({ baslik: h.post_title||h.title||h.post_caption||'(başlıksız)',
+        thumb: h.thumbnail||h.preview_url||'', url: h.post_url||'',
+        profil: h.profile_username||h.user||'', tarih: String(rapHistTime(h)).slice(0,10),
+        views: izlenme, likes: (m.likes!=null)?m.likes:null, comments: (m.comments!=null)?m.comments:null });
+    }, 2);
+    liste.sort((a,b) => b.views - a.views);
+    // Hata varsa kısa TTL — eksik sıralama 10 dk donup kalmasın
+    RAP_TOP.onb[p] = { t: Date.now() - (hatali ? RAP_TOP_TTL - 30000 : 0),
+                       liste, tarama: olculebilir.length, toplamYayin: adaylar.length, verisiz, hatali };
+    if (RAP_TOP.plat === p) rapTopUpCiz(p, RAP_TOP.onb[p]);
+  } finally { RAP_TOP.yukleniyor = false; }
+}
+
+function rapTopUpCiz(p, c){
+  const el = document.getElementById('rap-top-icerik'); if (!el) return;
+  const esc = esc0;
+  setEl('rap-top-n', '— son '+c.tarama+' yayın tarandı (toplam '+c.toplamYayin+'), ilk '+Math.min(RAP_TOP_ADET,c.liste.length)+' gösteriliyor'
+    + (c.verisiz ? ' · '+c.verisiz+' gönderide metrik yok' : '')
+    + (c.hatali ? ' · ⚠ '+c.hatali+' çekilemedi (API hatası) — sıralama eksik olabilir' : ''));
+  if (!c.liste.length){
+    el.innerHTML = '<div style="color:var(--mt);font-size:12.5px;padding:8px 2px">Metrik verisi alınabilen gönderi yok'
+      + (c.verisiz ? ' — Upload-Post '+c.verisiz+' gönderi için henüz/hiç metrik döndürmedi.' : '.')+'</div>';
+    return;
+  }
   el.innerHTML =
-    '<div style="font-size:11.5px;color:var(--wn);margin-bottom:8px">⚠ '+esc(p.charAt(0).toUpperCase()+p.slice(1))
-    + ' için <b>video başına izlenme</b> bağlı API\'lerin hiçbirinden alınamıyor (Upload-Post gönderi-başına metrik ucu sunmuyor; '
-    + 'hesap TOPLAM izlenmeleri yukarıdaki kartlarda). Aşağıdaki liste <b>sıralama değil</b> — son yayınlar, tarihe göre.</div>'
-    + (kayitlar.length ? kayitlar.slice(0,10).map(h => {
-        const url = h.post_url || h.url || '';
-        const t = String(rapHistTime(h)).slice(0,10);
-        return '<div style="display:flex;gap:8px;align-items:center;padding:5px 6px;border-top:1px solid var(--brd);font-size:12.5px">'
-          + '<span style="color:var(--mt);font-size:11px;white-space:nowrap">'+esc(t)+'</span>'
-          + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)">'+esc(h.post_title||h.title||'(başlıksız)')+'</span>'
-          + '<span class="badge bi" style="font-size:10px">'+esc(h.profile_username||h.user||'')+'</span>'
-          + (url ? '<a href="'+guvenliUrl(url)+'" target="_blank" rel="noopener" style="color:var(--acc);font-size:11px;white-space:nowrap">aç ↗</a>' : '')
-          + '</div>';
-      }).join('') : '<div style="color:var(--mt);font-size:12px;padding:8px 2px">Bu platformda yayınlanmış kayıt yok.</div>');
+    '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">Kaynak: Upload-Post post-analytics (canlı) — Takvim\'deki post modalıyla aynı veri.'
+    + (c.toplamYayin > c.tarama ? ' Yalnız en yeni '+c.tarama+' yayın tarandı (kota koruması).' : '')+'</div>'
+    + c.liste.slice(0, RAP_TOP_ADET).map((v,i) =>
+    '<div style="display:flex;gap:10px;align-items:center;padding:6px;border-top:1px solid var(--brd)">'
+    + '<span style="font-family:var(--fh);font-weight:800;font-size:15px;color:'+(i<3?'var(--gld)':'var(--mt)')+';min-width:24px;text-align:right">'+(i+1)+'</span>'
+    + (v.thumb ? '<img src="'+guvenliUrl(v.thumb)+'" style="width:64px;height:36px;object-fit:cover;border-radius:4px;flex:0 0 auto" onerror="this.style.display=\'none\'">' : '')
+    + '<div style="flex:1;min-width:0">'
+    +   (v.url ? '<a href="'+guvenliUrl(v.url)+'" target="_blank" rel="noopener" style="color:var(--tx);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">'+esc(v.baslik)+'</a>'
+               : '<div style="color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">'+esc(v.baslik)+'</div>')
+    +   '<div style="font-size:11px;color:var(--mt)">'+(v.profil?'<span class="badge bi" style="font-size:10px">'+esc(v.profil)+'</span> ':'')+esc(v.tarih)+'</div>'
+    + '</div>'
+    + '<div style="text-align:right;white-space:nowrap">'
+    +   '<div style="font-family:var(--fh);font-weight:800;color:var(--gld);font-size:14px">'+ytkFmt(v.views)+'</div>'
+    +   '<div style="font-size:10.5px;color:var(--mt)">👍 '+(v.likes==null?'—':ytkFmt(v.likes))+' · 💬 '+(v.comments==null?'—':ytkFmt(v.comments))+'</div>'
+    + '</div></div>').join('');
 }
 
 async function rapTopYtYukle(){
