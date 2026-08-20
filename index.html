@@ -1523,6 +1523,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <input id="es-limit" type="number" min="1" step="1" placeholder="hepsi"
                style="width:70px;padding:1px 5px;font-size:11.5px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;color:var(--tx)"></label>
       <span id="es-durum" style="font-size:12px;color:var(--mt);margin-left:10px"></span>
+      <div id="es-hata" style="font-size:12px;margin-top:6px"></div>
       <div style="font-size:11.5px;color:var(--mt);margin-top:6px">
         Eksikler <b>kuyruğa</b> eklenir — hepsi aynı anda yayınlanmaz, her profilin kendi yayın ritmine dağılır.
         Zaten var olanlar ve çift riski taşıyanlar gönderilmez.
@@ -2524,7 +2525,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.19-58';
+const PANEL_YAPI = 'y2026.08.19-59';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -7657,6 +7658,9 @@ async function esitleAc(profil){
   const govde = document.getElementById('es-govde');
   ESITLE.profil = profil; ESITLE.aday = [];
   document.getElementById('es-alt').style.display = 'none';
+  // Önceki profilin hata bloğu kalmasın — yanlış profile ait sebep gösterirdi
+  setEl('es-durum', '');
+  const _hEl = document.getElementById('es-hata'); if (_hEl) _hEl.innerHTML = '';
   setEl('es-baslik', '⚖ Eşitle — ' + profil);
   document.getElementById('esitle-modal').style.display = 'flex';
   govde.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Profilin tüm platformları taranıyor…'});
@@ -7854,6 +7858,12 @@ async function esitleGonder(){
   // Çift koruması tarafından elenenler HATA DEĞİL — ayrı sayılır, yoksa
   // "başarısız" sütunu korumanın çalışmasını arıza gibi gösterir.
   let ok=0, hata=0, cift=0, atlanan=0; const hatalar=[];
+  // PLATFORM BAŞINA hata: tek bir platform tamamen düşerken diğerleri
+  // çalışıyorsa (ör. Instagram jetonu ölü, YouTube/Facebook sorunsuz)
+  // toplam "N başarısız" bunu gizler. Sebebi hataCevir ile çevirip
+  // EKRANDA gösteriyoruz — eskiden yalnız ilk hatanın ham metni bir
+  // satırda geçiyordu, asıl sebep Loglar'a gömülüydü.
+  const platHata = {};             // platform -> { n, ham }
   const doluPlat = new Set();      // kuyruğu dolan platformlar — kalanları deneme
   await upSirali(aday, async it => {
     if (doluPlat.has(it.platform)){ atlanan++; return; }
@@ -7862,6 +7872,9 @@ async function esitleGonder(){
     else if (s.sebep === 'cift'){ cift++; it._ok = true; }   // zaten var → listeden düşsün
     else {
       hata++; if (hatalar.length<4) hatalar.push(PD_AD[it.platform]+': '+(s.mesaj||s.sebep));
+      const _ham = String(s.mesaj || s.sebep || '');
+      const _g = platHata[it.platform] || (platHata[it.platform] = { n:0, ham:'' });
+      _g.n++; if (!_g.ham && _ham) _g.ham = _ham;
       // Kuyruk dolduğunda AYNI platformdaki kalanlar da düşer; diğer
       // platformlar etkilenmez, onlar denenmeye devam eder.
       if (kuyrukDoluMu(s)) doluPlat.add(it.platform);
@@ -7871,8 +7884,19 @@ async function esitleGonder(){
   btn.disabled = false;
   const ozet = ok+' kuyruğa alındı'+(cift?' · '+cift+' çift önlendi':'')+(hata?' · '+hata+' başarısız':'')
     + (atlanan?' · '+atlanan+' denenmedi (kuyruk dolu)':'');
-  setEl('es-durum', ozet + (doluPlat.size ? ' — '+hataCevir('No available queue slots found').cozum
-                                          : (hatalar.length ? ' — '+hatalar[0] : '')));
+  setEl('es-durum', ozet + (doluPlat.size ? ' — '+hataCevir('No available queue slots found').cozum : ''));
+  // Platform başına sebep — hangi kolun düştüğü tek bakışta görünsün.
+  const hEl = document.getElementById('es-hata');
+  if (hEl) hEl.innerHTML = Object.keys(platHata).map(p => {
+    const g = platHata[p], c = hataCevir(g.ham);
+    return '<div style="padding:6px 8px;margin-top:4px;border:1px solid var(--er);border-left:3px solid var(--er);'
+      + 'border-radius:5px;background:rgba(248,113,113,.07)">'
+      + '<div style="color:var(--er);font-weight:600">'+(HATA_IKON[c.ciddiyet]||'⚠')+' '+esc0(PD_AD[p]||p)+' — '
+      +   g.n+' gönderim başarısız: '+esc0(c.baslik)+'</div>'
+      + '<div style="color:var(--mt);font-size:11.5px;margin-top:2px">'+esc0(c.cozum)+'</div>'
+      + '<div style="color:var(--mt);opacity:.65;font-size:10px;margin-top:2px" title="Platformdan gelen ham mesaj">'
+      +   esc0(String(c.ham).slice(0,140))+'</div></div>';
+  }).join('');
   toast((ok?'✓ ':(cift?'⚠ ':'✕ '))+ESITLE.profil+' eşitleme: '+ozet, ok?'ok':(cift?'warn':'err'), 7000);
   addLog(hata?'warn':'ok','uploadpost','Eşitle ('+ESITLE.profil+'): '+ozet+(hatalar.length?' | '+hatalar.join(' | '):''));
   // Gönderilen/elenen düşer. TÜMÜ üzerinden süzülür: sınır uygulandıysa
@@ -14172,6 +14196,18 @@ const HATA_KURALLARI = [
   // izin kuralına takılıp "Yayınlama izni yok" diye YANLIŞ sınıflanıyordu
   // (kullanıcının 22 "izin yok" hatasının kaynağı buydu). Çözümü de
   // farklı: izin değil, bağlantıda Sayfa seçilmemiş.
+  // "log in to www.instagram.com" AYRI BİR DURUM: Meta ne izin eksikliği ne
+  // de süre dolması diyor — hesabın TARAYICIDAN giriş yapıp bir doğrulamayı
+  // geçmesini istiyor (genelde şüpheli aktivite kilidi). Aşağıdaki genel
+  // izin kuralına takılıp "Yayınlama izni yok" diye sınıflanıyordu ve
+  // kullanıcıyı yanlış işe yönlendiriyordu: izinleri kurcalamak sorunu
+  // çözmez, Upload-Post'ta yeniden bağlamak da çözmez — önce Instagram'a
+  // girip kilidi kaldırmak gerekir.
+  [/log ?in to (www\.)?instagram|checkpoint_required|challenge_required/i,
+    'Instagram hesabı GİRİŞ/DOĞRULAMA bekliyor',
+    'Instagram bu hesabı kilitlemiş. SIRA ÖNEMLİ: (1) tarayıcıdan instagram.com\'a o hesapla gir ve çıkan doğrulamayı tamamla, '
+    + '(2) Upload-Post → Manage Users\'ta hesabı yeniden bağla (taze jeton alınsın), (3) Platformlar → 🔄 Hesap Sıfırlama ile tarihi işaretle, '
+    + '(4) sonra tekrar gönder. Bu sırayı atlarsan her deneme aynı hatayı alır — yeniden göndermek tek başına ÇÖZMEZ.', 'kritik'],
   // Kuyrukta boş yuva kalmaması bir ARIZA değil, KAPASİTE sınırı: profilin
   // günlük yuva sayısı × aktif günler kadar gönderi alınabiliyor.
   [/no available queue slot|queue is full|no free slot/i,
