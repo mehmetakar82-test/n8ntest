@@ -1400,6 +1400,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     </div>
     <div id="rap-chart" style="display:flex;align-items:flex-end;gap:3px;height:140px;padding-top:6px"></div>
     <div id="rap-chart-lbl" style="display:flex;gap:3px;margin-top:5px"></div>
+    <div id="rap-gun-detay" style="margin-top:8px"></div>
   </div>
 
   <!-- PLATFORM PERFORMANSI -->
@@ -2525,7 +2526,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.19-59';
+const PANEL_YAPI = 'y2026.08.20-60';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -4230,24 +4231,109 @@ function rapRenderCore(){
   rapRenderUretim();
 }
 
+// GÜN ANAHTARI YEREL OLMALI. Eskiden kova anahtarı `toISOString().slice(0,10)`
+// yani UTC günüydü, etiket ise `d.getDate()` yani YEREL gündü — ikisi
+// aynı şeyi söylemiyordu. Türkiye UTC+3 ve profillerin yayın saatleri
+// 00:19 / 00:50 / 01:20 / 01:53; bu yayınların hepsi UTC'de BİR ÖNCEKİ
+// güne düşüyordu. Sonuç: grafiğin "günü" aslında 03:00→03:00 penceresiydi,
+// sabahın erken yayınları dünkü çubuğa yazılıyordu ve günlük sayılar
+// gerçek takvim gününü göstermiyordu.
+function rapYerelGun(t){
+  const d = (t instanceof Date) ? t : new Date(t);
+  if (isNaN(d.getTime())) return '';
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+let RAP_GUN_SECILI = '';
 function rapRenderChart(inP, days){
   const chEl=document.getElementById('rap-chart'), lbEl=document.getElementById('rap-chart-lbl');
   if(!chEl||!lbEl) return;
   const byDay={};
-  inP.forEach(h=>{ const d=new Date(rapHistTime(h)); if(isNaN(d.getTime())) return; const k=d.toISOString().slice(0,10); if(!byDay[k]) byDay[k]={p:0,f:0}; byDay[k][rapOk(h)?'p':'f']++; });
+  inP.forEach(h=>{ const k=rapYerelGun(rapHistTime(h)); if(!k) return; if(!byDay[k]) byDay[k]={p:0,f:0}; byDay[k][rapOk(h)?'p':'f']++; });
   const cols=[]; const now=new Date();
-  for(let i=days-1;i>=0;i--){ const d=new Date(now); d.setDate(d.getDate()-i); const k=d.toISOString().slice(0,10); const b=byDay[k]||{p:0,f:0}; cols.push({d, p:b.p, f:b.f}); }
+  for(let i=days-1;i>=0;i--){ const d=new Date(now); d.setDate(d.getDate()-i); const k=rapYerelGun(d); const b=byDay[k]||{p:0,f:0}; cols.push({d, k, p:b.p, f:b.f}); }
   const max=Math.max(1,...cols.map(c=>c.p+c.f));
-  chEl.innerHTML=cols.map(c=>{
+  chEl.innerHTML=cols.map((c,i)=>{
     const hP=c.p/max*100, hF=c.f/max*100;
     const segs = (c.p||c.f)
       ? (c.f?`<div style="height:${Math.max(3,hF)}%;background:var(--er);border-radius:3px 3px 0 0"></div>`:'')
         + (c.p?`<div style="height:${Math.max(3,hP)}%;background:var(--ok);border-radius:${c.f?'0':'3px 3px 0 0'}"></div>`:'')
       : '<div style="height:2px;background:var(--brd)"></div>';
-    return `<div title="${c.d.getDate()}.${String(c.d.getMonth()+1).padStart(2,'0')} — ${c.p} yayın, ${c.f} başarısız" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:2px;min-width:6px;cursor:default">${segs}</div>`;
+    const bugun = i === cols.length-1;
+    return `<div onclick="rapGunAc('${jsStr(c.k)}')" title="${c.d.getDate()}.${String(c.d.getMonth()+1).padStart(2,'0')} — ${c.p} yayın, ${c.f} başarısız${bugun?' (BUGÜN — gün henüz bitmedi)':''}\nAyrıntı için tıkla" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:2px;min-width:6px;cursor:pointer${RAP_GUN_SECILI===c.k?';outline:1px solid var(--acc);outline-offset:1px':''}${bugun?';opacity:.72':''}">${segs}</div>`;
   }).join('');
+  // BUGÜN yarım: ortalamayla kıyaslanırsa "düşüş" gibi okunur. Çubuk soluk
+  // ve ipucu bunu söylüyor; seçili gün detayında da ayrıca yazılıyor.
   const every=days>14?5:(days>7?2:1);
   lbEl.innerHTML=cols.map((c,i)=>`<div style="flex:1;text-align:center;font-size:9.5px;color:var(--mt);min-width:6px">${i%every===0?c.d.getDate():''}</div>`).join('');
+  // KOŞULSUZ çağrı: seçim boşaldıysa paneli TEMİZLEMESİ gerekiyor.
+  // `if (RAP_GUN_SECILI)` ile sarmalanınca aynı güne ikinci tıklama
+  // seçimi kaldırıyor ama panel ekranda kalıyordu.
+  rapGunCiz(RAP_GUN_SECILI, cols);
+}
+
+// ── GÜN AYRINTISI ───────────────────────────────────────────────────────
+// "Dün neden 59, ortalama 70?" sorusu ancak o günün platform × profil
+// kırılımı görülerek cevaplanır. Ek API çağrısı YOK: RAP.hist zaten
+// yüklü, hepsi istemcide hesaplanıyor.
+function rapGunAc(k){
+  RAP_GUN_SECILI = (RAP_GUN_SECILI === k) ? '' : k;
+  if (RAP.loaded) rapRenderCore();
+  else rapGunCiz(RAP_GUN_SECILI, null);
+}
+function rapGunCiz(k, cols){
+  const el = document.getElementById('rap-gun-detay'); if (!el) return;
+  if (!k){ el.innerHTML = ''; return; }
+  const gun = (RAP.hist||[]).filter(h => rapYerelGun(rapHistTime(h)) === k);
+  const esc = esc0;
+  // Dönem ortalaması: BUGÜN hariç (yarım gün ortalamayı aşağı çeker) ve
+  // hiç yayın olmayan günler hariç (sistem kapalıysa ortalama yanıltır).
+  const bugunK = rapYerelGun(new Date());
+  let ort = 0, ortN = 0;
+  if (cols) cols.forEach(c => { if (c.k !== bugunK && (c.p+c.f) > 0){ ort += c.p; ortN++; } });
+  const ortalama = ortN ? Math.round(ort/ortN) : 0;
+  const basarili = gun.filter(rapOk).length, dusen = gun.length - basarili;
+  const fark = ortalama ? basarili - ortalama : 0;
+
+  const grupla = (fn) => { const m = {}; gun.forEach(h => { const g = fn(h) || '(bilinmiyor)';
+      const o = m[g] || (m[g] = {ok:0, hata:0}); rapOk(h) ? o.ok++ : o.hata++; }); return m; };
+  const platlar = grupla(h => String(h.platform||'').toLowerCase());
+  const profiller = grupla(h => h.profile_username || h.user || '');
+  const PL = { instagram:'Instagram', youtube:'YouTube', tiktok:'TikTok', facebook:'Facebook', x:'X' };
+  const satir = (m, ad) => '<div style="flex:1;min-width:210px"><div style="font-size:11px;color:var(--mt);margin-bottom:3px">'+ad+'</div>'
+    + Object.keys(m).sort((a,b)=>(m[b].ok+m[b].hata)-(m[a].ok+m[a].hata)).map(g =>
+        '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-size:12px">'
+        + '<span style="color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(PL[g]||g)+'</span>'
+        + '<span style="white-space:nowrap"><span style="color:var(--ok)">✓'+m[g].ok+'</span>'
+        +   (m[g].hata?' <span style="color:var(--er)">✕'+m[g].hata+'</span>':'')+'</span></div>').join('')
+    + '</div>';
+
+  // Hata sebepleri — asıl "neden az?" cevabı çoğu zaman burada
+  const sebep = {};
+  gun.filter(h=>!rapOk(h)).forEach(h => { const c = hataCevir(h.error_message||h.error||'');
+    const o = sebep[c.baslik] || (sebep[c.baslik] = {n:0, cozum:c.cozum}); o.n++; });
+
+  el.innerHTML = '<div style="border:1px solid var(--acc);border-radius:8px;padding:10px 12px;background:var(--sur)">'
+    + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">'
+    +   '<b style="font-family:var(--fh)">📅 '+esc(k)+'</b>'
+    +   '<span style="font-size:13px"><span style="color:var(--ok)">✓ '+basarili+' yayın</span>'
+    +     (dusen?' · <span style="color:var(--er)">✕ '+dusen+' başarısız</span>':'')+'</span>'
+    +   (ortalama ? '<span style="font-size:12px;color:'+(fark<0?'var(--wn)':'var(--mt)')+'">dönem ortalaması '+ortalama
+        +' · fark '+(fark>0?'+':'')+fark+'</span>' : '')
+    +   (k===bugunK ? '<span class="badge bw2" style="font-size:10.5px">BUGÜN — gün henüz bitmedi</span>' : '')
+    +   '<button class="btn bg bsm" style="margin-left:auto" onclick="rapGunAc(\''+jsStr(k)+'\')">✕ kapat</button>'
+    + '</div>'
+    + (gun.length
+        ? '<div style="display:flex;gap:18px;flex-wrap:wrap">'+satir(platlar,'Platform')+satir(profiller,'Profil')+'</div>'
+          + (Object.keys(sebep).length
+              ? '<div style="margin-top:8px;border-top:1px solid var(--brd);padding-top:6px">'
+                + '<div style="font-size:11px;color:var(--mt);margin-bottom:3px">Başarısızlık sebepleri</div>'
+                + Object.keys(sebep).sort((a,b)=>sebep[b].n-sebep[a].n).map(b =>
+                    '<div style="font-size:12px;margin-bottom:3px"><span style="color:var(--er)">✕ '+sebep[b].n+'</span> '
+                    + esc(b)+'<div style="font-size:11px;color:var(--mt)">'+esc(String(sebep[b].cozum).slice(0,150))+'</div></div>').join('')
+                + '</div>' : '')
+        : '<div style="color:var(--mt);font-size:12.5px">Bu güne ait kayıt yok. Not: rapor penceresi son '
+          + ((RAP.hist||[]).length)+' kaydı tarıyor — gün pencerenin dışında kalmış olabilir.</div>')
+    + '</div>';
 }
 
 function rapRenderPlatforms(inP){
