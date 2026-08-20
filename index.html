@@ -2524,7 +2524,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.19-57';
+const PANEL_YAPI = 'y2026.08.19-58';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -6274,10 +6274,16 @@ async function pdBasliklar(profil, platlar, sayfa){
   //   ("Erdoğan'dan" ↔ "erdogan dan").
   const norm = t => ydNorm(t).slice(0, 60);
   const out = {};
-  platlar.forEach(p => out[p] = { yayinlanan: new Map(), mevcut: new Set() });
-  const ekle = (p, b, yayindaMi) => {
+  // kaynak: her başlığın NEREDEN geldiği (gecmis / plan / kuyruk). Teşhis için
+  // şart: "dün kuyruğa aldım ama yine eksik görünüyor" sorusunun cevabı ancak
+  // kuyruk sayısına bakılarak verilebilir — gönderim gerçekten kuyruğa
+  // düştüyse burada görünür, düşmediyse görünmez.
+  platlar.forEach(p => out[p] = { yayinlanan: new Map(), mevcut: new Set(),
+                                  kaynak: { gecmis:0, plan:0, kuyruk:0 } });
+  const ekle = (p, b, yayindaMi, nereden) => {
     if (!out[p]) return;
     const n = norm(b); if (!n || n.length < 6) return;
+    if (!out[p].mevcut.has(n) && nereden) out[p].kaynak[nereden]++;
     out[p].mevcut.add(n);
     if (yayindaMi) out[p].yayinlanan.set(n, b);
   };
@@ -6299,7 +6305,7 @@ async function pdBasliklar(profil, platlar, sayfa){
       // tarafını da besliyor, atmak sahte eksik üretirdi.
       if (t && t < _sinir) return;
     }
-    ekle(p, String(x.post_title || x.title || x.post_caption || ''), x.success !== false && !x.error_message);
+    ekle(p, String(x.post_title || x.title || x.post_caption || ''), x.success !== false && !x.error_message, 'gecmis');
   });
   try {
     const { data } = await upFetchRetry('/uploadposts/schedule');
@@ -6307,14 +6313,14 @@ async function pdBasliklar(profil, platlar, sayfa){
     s.forEach(x => {
       if (String(x.profile_username||'') !== profil) return;
       (x.platforms || (x.platform?[x.platform]:[])).forEach(z =>
-        ekle(NP[String(z).toLowerCase()], String(x.title || x.post_title || ''), true));
+        ekle(NP[String(z).toLowerCase()], String(x.title || x.post_title || ''), true, 'plan'));
     });
   } catch(e){ console.warn('[PD] schedule:', e.message); }
   try {
     const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(profil)+'&count=50');
     (data.slots||[]).forEach(sl => {
       const sp = sl.scheduled_post; if (!sp) return;
-      (sp.platforms||[]).forEach(z => ekle(NP[String(z).toLowerCase()], String(sp.title||''), true));
+      (sp.platforms||[]).forEach(z => ekle(NP[String(z).toLowerCase()], String(sp.title||''), true, 'kuyruk'));
     });
   } catch(e){ console.warn('[PD] queue:', e.message); }
   return out;
@@ -7766,7 +7772,18 @@ async function esitleAc(profil){
       if (o.belirsiz)  parca.push(o.belirsiz+' pencere dışı');
       if (o.olu)       parca.push(o.olu+' kaynağı indirilemedi');
       return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--brd);font-size:12.5px">'
-        + '<div style="color:var(--tx)">'+PD_IKON[p]+' '+PD_AD[p]+' <span style="color:var(--mt)">('+ikili[p].mevcut.size+' mevcut)</span></div>'
+        + '<div style="color:var(--tx)">'+PD_IKON[p]+' '+PD_AD[p]+' <span style="color:var(--mt)">('+ikili[p].mevcut.size+' mevcut'
+        +   (() => { const k = ikili[p].kaynak || {};
+              const par = [];
+              if (k.gecmis) par.push(k.gecmis+' geçmiş');
+              if (k.plan)   par.push(k.plan+' planlı');
+              if (k.kuyruk) par.push(k.kuyruk+' kuyrukta');
+              // Kuyruk sayısı TEŞHİS: bir önceki eşitleme gerçekten kuyruğa
+              // düştüyse burada görünür. 0 ise gönderim ya hiç gitmedi ya da
+              // Upload-Post kabul etmedi — "yine eksik görünüyor" şikâyetinin
+              // ayırt edici işareti budur.
+              return par.length ? ': '+par.join(' · ') : ''; })()
+        +   ')</span></div>'
         + '<div style="color:var(--mt);text-align:right">'+(o.eksik ? parca.join(' · ') : '<span style="color:var(--ok)">eşit ✓</span>')+'</div></div>';
     }).join('');
     const grup = {};
