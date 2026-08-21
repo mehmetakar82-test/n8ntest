@@ -2533,7 +2533,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.21-63';
+const PANEL_YAPI = 'y2026.08.21-64';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3981,7 +3981,7 @@ async function loadSheetPage(page) {
 // RAPORLAR
 // ═══════════════════════════════════════════════════════════
 // ═══ RAPORLAR — yayın performansı + canlı sosyal metrikler ═══
-const RAP = { period:7, hist:[], plan:[], analytics:{}, profRaw:null, shorts:[], urls:[], loaded:false };
+const RAP = { period:7, hist:[], plan:[], analytics:{}, analyticsDurum:{}, profRaw:null, shorts:[], urls:[], loaded:false };
 
 function rapSetPeriod(d){
   RAP.period = d;
@@ -4015,20 +4015,32 @@ async function loadReports(){
   const hist=[], plan=[]; const seenJobs=new Set();
   // Gecmis penceresi: 3 sayfa (300 kayit) cok profilli hesapta birkac gunu ancak
   // kapsiyordu; seyrek yayinlayan profiller pencere disina dusup SIFIR gorunuyordu.
-  const HIST_MAX_SAYFA = 10;   // 10 x 100 = 1000 kayit
+  // SONRA sabit 10 sayfa (1000 kayit) yapildi — o da yetmedi: gunde ~70 yayinla
+  // 14 gun tam sinirda, 30 gun kesin eksik (kullanici "kirpildi" uyarisini gordu).
+  // ARTIK TARIHE GORE: en uzun secilebilir donem (30 gun) kapanana kadar sayfa
+  // cekilir; sert tavan yalniz sonsuz dongu sigortasi. "Kirpik" yalniz tavana
+  // 30 gune varmadan carpilinca isaretlenir — uyari artik dogru soyler.
+  const HIST_TAVAN_SAYFA = 40;                      // 4000 kayit sigortasi
+  const HIST_KESIM = Date.now() - 30*864e5;         // RAP.period'in azami degeri
   RAP.histKirpik = false;
   // upFetchRetry: çıplak upFetch tek bir 429'da fırlatıyor, catch{break} da
   // onu yutuyordu → RAP.hist boş kalıyor ama ekran "✓ rapor hazır" diyordu.
   // Sonuç daha da yanıltıcıydı: geçmiş boş olunca rapRenderProfiles kuyruğu
   // dolu her profile "⚠ hiç akmamış" damgası basıyordu.
   RAP.histHata = '';
-  const pHist=(async()=>{ for(let pg=1;pg<=HIST_MAX_SAYFA;pg++){
+  const pHist=(async()=>{ for(let pg=1;pg<=HIST_TAVAN_SAYFA;pg++){
     try{
       const {data}=await upFetchRetry('/uploadposts/history?limit=100&page='+pg);
       const h=Array.isArray(data)?data:(data.history||data.data||[]);
       h.forEach(x=>hist.push(x));
-      if(h.length<100) break;
-      if(pg===HIST_MAX_SAYFA) RAP.histKirpik=true;
+      if(h.length<100) break;                      // son sayfa
+      // Sayfanin EN ESKI kaydi 30 gunu gectiyse yeter — API en yeniden
+      // eskiye veriyor, sonraki sayfalar tamamen pencere disi.
+      let enEski = 0;
+      h.forEach(x=>{ const t=Date.parse(rapHistTime(x))||0; if(t && (!enEski || t<enEski)) enEski=t; });
+      if(enEski && enEski < HIST_KESIM) break;
+      if(pg===HIST_TAVAN_SAYFA) RAP.histKirpik=true;  // 30 gune varamadan tavan
+      await sleep(150);                             // hiz sinirina nefes payi
     }catch(e){
       // İlk sayfa düşerse geçmiş YOK demektir — sessizce "boş" sayma, söyle.
       if (pg === 1) RAP.histHata = histHataMetni(e);
@@ -4043,7 +4055,7 @@ async function loadReports(){
     }).catch(e=>null)));
   })();
   await Promise.all([pHist,pPlan]);
-  RAP.hist=hist; RAP.plan=plan; RAP.loaded=true; RAP.analytics={};
+  RAP.hist=hist; RAP.plan=plan; RAP.loaded=true; RAP.analytics={}; RAP.analyticsDurum={};
   RAP_TOP.onb={};   // taze gecmis -> eski YouTube taramasi gosterilmesin (denetim bulgusu)
   rapRenderCore();
   // Geçmiş alınamadıysa "hazır" DEME: sayılar sıfır olduğu için rapor
@@ -4665,7 +4677,7 @@ function rapRenderProfiles(inP){
   const akmayan = rows.filter(u=>by[u].plan>0 && by[u].tumP===0 && by[u].tumF===0);
   setEl('rap-prof-n', '— '+rows.length+' profil'
     + (akmayan.length ? ' · ⚠ '+akmayan.length+' profilin kuyruğu akmıyor' : '')
-    + (RAP.histKirpik ? ' · geçmiş penceresi kırpıldı (ilk 1000 kayıt)' : ''));
+    + (RAP.histKirpik ? ' · ⚠ geçmiş penceresi kırpıldı: '+(RAP.hist||[]).length+' kayıt çekildi ama 30 güne yetmedi' : ''));
   const PI={instagram:PFAV('instagram.com'),youtube:PFAV('youtube.com'),tiktok:PFAV('tiktok.com'),facebook:PFAV('facebook.com'),x:PFAV('x.com'),twitter:PFAV('x.com'),threads:PFAV('threads.net'),linkedin:PFAV('linkedin.com'),pinterest:PFAV('pinterest.com')};
   const platIcons=u=>{ const pr=profs.find(x=>x.username===u); if(!pr) return '—'; const sa=pr.social_accounts||pr.socialAccounts||{};
     // Sabit sıra: Instagram → YouTube → TikTok → X. Simge tek başına belirsiz
@@ -4675,8 +4687,23 @@ function rapRenderProfiles(inP){
         return '<span title="'+esc(ad)+'">'+(PI[k]||'▪')+'</span>'; });
     return ic.length?ic.join(' '):'—'; };
   tb.innerHTML=rows.map(u=>{
-    const b=by[u], a=RAP.analytics[u];
-    const sum=f=>a?ytkFmt(Math.round(Object.values(a).reduce((s,m)=>s+(m&&typeof m==='object'?(parseFloat(f(m))||0):0),0))):'…';
+    const b=by[u], a=RAP.analytics[u], dr=RAP.analyticsDurum[u];
+    // ÜÇ DURUM, ÜÇ GÖRÜNÜM: '…' henüz çekilmedi · '—' çekildi ama hiçbir
+    // platformdan sayı gelmedi (eskiden burada 0 basılıyor, gerçek sıfırla
+    // karışıyordu) · sayı (+ ⚠ bazı platformlar eksikse, toplam eksik demek).
+    const sum=f=>{
+      if (!a){
+        if (!dr) return '…';
+        const seb = dr.topluHata || Object.values(dr.hata||{})[0] || 'metrik dönmedi';
+        return '<span style="color:var(--mt);cursor:help" title="Metrik alınamadı ('+esc(String(seb).slice(0,120))+'). Bu 0 DEĞİL, veri gelmedi.">—</span>';
+      }
+      const v = ytkFmt(Math.round(Object.values(a).reduce((s,m)=>s+(m&&typeof m==='object'?(parseFloat(f(m))||0):0),0)));
+      if (dr && dr.eksik && dr.eksik.length){
+        const ad = dr.eksik.map(p=>RAP_PLAT_AD[p]||p).join(', ');
+        return v+' <span style="color:var(--wn);cursor:help;font-size:10px" title="'+esc(ad)+' metriği alınamadı — bu toplam o platform(lar)ı İÇERMİYOR.">⚠</span>';
+      }
+      return v;
+    };
     return `<tr>
       <td style="font-family:var(--fm);color:var(--tx)">${esc(u)}</td>
       <td>${(()=>{ const k=profilKategori(u); return k?`<span class="badge bi" style="font-size:11px">${esc(katLabel(k))}</span>`:'<span class="badge be" style="font-size:11px" title="Hiçbir kategoriye bağlı değil — bu profile içerik gitmez">⚠ bağsız</span>'; })()}</td>
@@ -4987,6 +5014,13 @@ function rapSpark(ts){
 // yerine "0" yazıyordu. Artık YALNIZ tanınan platform anahtarları alınır.
 const RAP_PLAT_BILINEN = ['instagram','youtube','tiktok','x','twitter','facebook',
                           'linkedin','threads','pinterest','bluesky','reddit'];
+// Bir platform nesnesinde GERÇEK sayı var mı? (boş nesne / yalnız hata
+// alanı / {followers:null} → yok). "0 ölçüldü" ile "hiç veri gelmedi"
+// ayrımı bunun üstüne kurulu.
+function rapSayisalVar(m){
+  if (!m || typeof m !== 'object') return false;
+  return ['followers','views','impressions','likes','reach','comments'].some(k => m[k] != null && !isNaN(parseFloat(m[k])));
+}
 function rapAnalyticsNormal(data){
   if (!data || typeof data !== 'object') return {};
   // Sarmalayıcı alanları aç
@@ -5497,14 +5531,46 @@ async function rapLoadAnalytics(profs){
         throw new Error('Facebook sayfa kimliği bulunamadı — analitik istenemedi');
       // 6 deneme: 15 profil × (analitik + FB sayfa) tek turda çok istek
       // demek; sınıra çarpanın vazgeçmemesi için sabır yüksek tutuluyor.
-      const { data } = await upFetchRetry('/analytics/'+encodeURIComponent(t.u)+'?platforms='+t.plats.join(',')+ek, null, 6);
-      // Toplamlar da normalleştirilmiş veriden hesaplanmalı; ham dizi biçimi
-      // rapAnalyticsTotals'da 0 üretiyordu.
-      const norm = rapAnalyticsNormal(data);
-      RAP.analytics[t.u]=norm;
-      rapRenderLiveCard(t.u, norm);
+      let norm = {};
+      let topluHata = '';
+      try {
+        const { data } = await upFetchRetry('/analytics/'+encodeURIComponent(t.u)+'?platforms='+t.plats.join(',')+ek, null, 6);
+        // Toplamlar da normalleştirilmiş veriden hesaplanmalı; ham dizi biçimi
+        // rapAnalyticsTotals'da 0 üretiyordu.
+        norm = rapAnalyticsNormal(data) || {};
+      } catch(e){ topluHata = String(e.message||e); if(/429|too many/i.test(topluHata)) hizSiniri++; }
+      // PLATFORM-PLATFORM YEDEK. Toplu istek tek çağrıda tüm platformları
+      // soruyor; bir platformun oturumu ölüyse (Instagram "log in" kilidi)
+      // Upload-Post ya hata dönüyor ya da profilin TÜM metriklerini boş
+      // bırakıyordu → tabloda takipçi/izlenme 0 görünüyordu, oysa YouTube
+      // tarafı sağlamdı (kullanıcının 4 profilde gördüğü sıfırlar).
+      // Sayısal veri gelmeyen her platform ayrıca tek başına sorulur.
+      const eksikPlat = t.plats.filter(p => !rapSayisalVar(norm[p]));
+      const platHata = {};
+      if (eksikPlat.length && (t.plats.length > 1 || topluHata)){
+        for (const p of eksikPlat){
+          try {
+            const { data: d2 } = await upFetchRetry('/analytics/'+encodeURIComponent(t.u)+'?platforms='+p+(p==='facebook'?ek:''), null, 2);
+            const n2 = rapAnalyticsNormal(d2) || {};
+            if (rapSayisalVar(n2[p])) norm[p] = n2[p];
+            else platHata[p] = 'metrik dönmedi';
+          } catch(e2){ platHata[p] = String(e2.message||e2); if(/429|too many/i.test(platHata[p])) hizSiniri++; }
+        }
+      }
+      const kalanEksik = t.plats.filter(p => !rapSayisalVar(norm[p]));
+      RAP.analyticsDurum[t.u] = { eksik: kalanEksik, hata: platHata, topluHata };
+      if (kalanEksik.length === t.plats.length){
+        // Hiçbir platformdan sayı gelmedi: analytics[u] YAZILMAZ ki tablo
+        // "0" değil "—" göstersin; kart hata metniyle çizilir.
+        delete RAP.analytics[t.u];
+        rapRenderLiveCard(t.u, null, topluHata || Object.values(platHata)[0] || 'metrik dönmedi');
+      } else {
+        RAP.analytics[t.u]=norm;
+        rapRenderLiveCard(t.u, norm);
+      }
     }catch(e){
       if(/429|too many/i.test(String(e.message))) hizSiniri++;
+      RAP.analyticsDurum[t.u] = { eksik: t.plats.slice(), hata: {}, topluHata: String(e.message||e) };
       rapRenderLiveCard(t.u, null, e.message);
     }
     done++;
