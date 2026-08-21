@@ -2533,7 +2533,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.21-65';
+const PANEL_YAPI = 'y2026.08.21-66';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12956,7 +12956,19 @@ async function loadTakvim() {
     setEl('tak-title', 'Upload-Post API Key gerekli');
     TAK.items = []; renderTakvim(); return;
   }
-  TAK.items = [];
+  // YENİDEN GİRİŞ KİLİDİ: derin geçmiş 30+ sayfa sürebiliyor ve ay
+  // gezinmesi otomatik yükleme tetikliyor. Kullanıcı hızlıca birkaç ay
+  // geri giderse üst üste yükleme başlar; her biri `TAK.items = []` yazdığı
+  // için biten koşum ötekinin verisini eziyor ve takvim yarım kalıyordu.
+  // İstek gelmişse bayrağa yazılır; çalışan koşum bitince BİR KEZ tekrarlar.
+  if (TAK.yukleniyor){ TAK.tekrarIstendi = true; return; }
+  TAK.yukleniyor = true; TAK.tekrarIstendi = false;
+  try {
+  // ESKİ VERİYİ YÜKLEME BİTENE KADAR TUT: `TAK.items = []` başta yapılıyordu
+  // ve derin çekim 20-40 sn sürdüğü için bu arada herhangi bir etkileşim
+  // (ay değiştirme, filtre, profil seçimi) takvimi BOMBOŞ çiziyordu — yani
+  // düzeltilmek istenen belirtinin ta kendisi. Yeni liste ancak hazır olunca
+  // TAK.items'a yazılır (aşağıda takTekille sonrası).
   setEl('tak-title', '⏳ Yükleniyor…');
   const items = [];
   const platMap = {instagram:'ig',youtube:'yt',tiktok:'tt',facebook:'fb',x:'x',twitter:'x',threads:'ig',linkedin:'fb'};
@@ -12996,7 +13008,12 @@ async function loadTakvim() {
     });
   } catch(e) { console.warn('[TAK] schedule hata:', e.message); }
 
-  // 2) Yayın geçmişi — sayfalı (en fazla 3×100)
+  // 2) Yayın geçmişi — TARİHE GÖRE derin (eskiden sabit 3×100 = 300 kayıt)
+  // KUSUR: 3 sayfa sabitti. Günde ~70 yayınla bu YALNIZ SON 4 GÜNÜ kapsıyor;
+  // kullanıcı Temmuz'a gidince takvim bomboş görünüyordu ve başlıkta
+  // "265 yayınlanmış" yazıyordu (265+35=300, tam sayfa sınırı — kanıt).
+  // Artık ufka (TAK.histUfuk) inene kadar sayfa çekilir; ufuk, görüntülenen
+  // aya göre genişler (takStep geriye gidince derinleştirip yeniden yükler).
   // SIRA ÖNEMLİ: bu blok eskiden 15 profillik kuyruk patlamasından SONRA
   // çalışıyordu; Upload-Post 429 verince tek try/catch tüm geçmişi düşürüyor
   // ve takvimde yalnız planlı postlar kalıyordu (yayınlanmışlar kayboluyordu).
@@ -13004,14 +13021,29 @@ async function loadTakvim() {
   let gecmisHata = '';
   let gecmisN = 0;
   try {
-    for (let pg = 1; pg <= 3; pg++) {
+    // Ufuk: görüntülenen ayın başı ile "son 60 gün"ün ESKİ olanı. Ay
+    // gezinmesi geriye gidince TAK.histUfuk daha da geriye çekilir.
+    const _ayBasi = new Date(TAK.year, TAK.month, 1).getTime();
+    // UFUK HER KOŞUMDA YENİDEN: eskiden Math.min ile eski değere mandallanıyordu,
+    // bir kez Mart'a bakınca Ağustos'a dönüp Yenile'ye basmak bile 80 sayfa
+    // çekiyordu. Artık istek varsa (histIstenenAy) o kullanılır, yoksa
+    // görüntülenen ay + 60 günlük taban.
+    const _ufuk = Math.min(TAK.histIstenenAy || Infinity, _ayBasi, Date.now() - 60*864e5);
+    TAK.histUfuk = _ufuk;
+    TAK.histIstenenAy = 0;                       // tek seferlik, mandallanmaz
+    TAK.histKirpik = false; TAK.histEnEski = 0;
+    TAK.histTukendi = false; TAK.histGeciciHata = false;
+    const TAK_HIST_TAVAN = 80;                     // 8000 kayıt — runaway sigortası
+    for (let pg = 1; pg <= TAK_HIST_TAVAN; pg++) {
       let data;
       try {
         ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page=' + pg));
       } catch (e) {
-        // Sayfa 1 düşerse geçmiş yok demektir; 2-3 düşerse elimizdekiyle devam
+        // Sayfa 1 düşerse geçmiş yok demektir; sonrakiler düşerse elimizdekiyle devam
         if (pg === 1) gecmisHata = e.message || 'bilinmeyen hata';
-        else console.warn('[TAK] history sayfa ' + pg + ':', e.message);
+        // GEÇİCİ hata ile TAVAN ayrı: ikisi de histKirpik olsaydı tek bir
+        // 429 sonrası derinleştirme kalıcı kapanıyordu (denetim bulgusu).
+        else { console.warn('[TAK] history sayfa ' + pg + ':', e.message); TAK.histGeciciHata = true; }
         break;
       }
       const hist = Array.isArray(data) ? data : (data.history || data.data || data.results || data.posts || data.items || []);
@@ -13028,7 +13060,24 @@ async function loadTakvim() {
           kategori: (h.profile_username || '')
         }});
       });
-      if (hist.length < 100) break;
+      // Derin çekim saniyeler sürebiliyor (50 günlük geçmiş ≈ 35 sayfa);
+      // sessiz beklemek "takvim dondu" izlenimi veriyordu.
+      // EN ESKİ HESABI HER İKİ BREAK'TEN ÖNCE: eskiden `hist.length < 100`
+      // break'inden SONRAydı, yani son (kısmi) sayfanın kayıtları takvime
+      // giriyor ama histEnEski'ye işlenmiyordu — "geçmiş: X'e kadar" gerçekte
+      // çekilenden yeni bir tarih yazıyor, geçmiş tek sayfaya sığıyorsa satır
+      // hiç çıkmıyordu (denetim bulgusu).
+      let _enEski = 0;
+      hist.forEach(h => { const t = Date.parse(h.upload_timestamp||h.uploaded_at||h.created_at||h.timestamp||h.date||'')||0;
+        if (t && (!_enEski || t < _enEski)) _enEski = t; });
+      if (_enEski) TAK.histEnEski = TAK.histEnEski ? Math.min(TAK.histEnEski, _enEski) : _enEski;
+      if (pg % 5 === 0) setEl('tak-ozet', '⏳ geçmiş okunuyor… ' + (pg*100) + ' kayıt');
+      // TÜKENDİ: API'de daha eski kayıt yok. Bayrak şart — yoksa hesabın ilk
+      // yayınından eski her aya gidişte tüm geçmiş boşuna baştan çekiliyordu.
+      if (hist.length < 100) { TAK.histTukendi = true; break; }
+      if (_enEski && _enEski < _ufuk) break;      // ufka inildi
+      if (pg === TAK_HIST_TAVAN) TAK.histKirpik = true;
+      await new Promise(r => setTimeout(r, 180));  // hız sınırına nefes payı
     }
     // Takvim ROZETİ YAZMAZ: kendi penceresi (3 sayfa) ve kendi ölçütü var,
     // çözülmüşleri de düşmüyordu. Rozeti Yayın Durumu sahipleniyor —
@@ -13108,11 +13157,27 @@ async function loadTakvim() {
       uyari.style.display = 'none';
     }
   }
-  setEl('tak-ozet', gecmisHata ? ''
-    : (pubN + ' yayınlanmış' + (failN2 ? ' · ' + failN2 + ' başarısız' : '') + ' · ' + planN + ' planlı'));
+  // KAPSAM ŞART: "boş ay" ile "veri o kadar geriye çekilmedi" ayrımı ancak
+  // geçmişin nereye kadar indiği yazılırsa yapılabilir (kullanıcı Temmuz'u
+  // boş görüp yayın yok sandı — oysa 300 kayıt sınırı vardı).
+  setEl('tak-ozet', gecmisHata ? '⚠ geçmiş alınamadı — sayılar EKSİK'
+    : (pubN + ' yayınlanmış' + (failN2 ? ' · ' + failN2 + ' başarısız' : '') + ' · ' + planN + ' planlı'
+       + (TAK.histEnEski ? ' · geçmiş: ' + new Date(TAK.histEnEski).toLocaleDateString('tr') + '\'e kadar' : '')
+       // TÜKENDİ bilgisi şart: kapsam eki histEnEski'ye bağlıydı ve geçmiş tek
+       // sayfaya sığdığında hiç yazılmıyordu — "boş ay mı, çekilmedi mi"
+       // belirsizliği tam da küçük hesaplarda geri geliyordu.
+       + (TAK.histTukendi ? ' (tümü)' : '')
+       + (TAK.histKirpik ? ' ⚠ sayfa sınırına takıldı' : '')
+       + (TAK.histGeciciHata ? ' ⚠ bazı sayfalar alınamadı — ↻ Yenile' : '')));
   if (!items.length) addLog('warn','sistem','Takvim: Upload-Post API\'den kayıt gelmedi (konsola bak: [TAK])');
   if (gecmisHata) addLog('err','uploadpost','Takvim yayın geçmişi alınamadı: ' + gecmisHata);
   renderTakvim();
+  } finally {
+    TAK.yukleniyor = false;
+    // Yükleme sürerken gelen istek varsa bir kez tekrarla — kullanıcının
+    // gittiği ay, bekleyen değil ÇALIŞAN koşumun ufkuyla yüklenmiş olabilir.
+    if (TAK.tekrarIstendi){ TAK.tekrarIstendi = false; loadTakvim(); }
+  }
 }
 
 function takFilter(f) {
@@ -13136,6 +13201,35 @@ function takStep(dir) {
     TAK.year = TAK.cur.getFullYear(); TAK.month = TAK.cur.getMonth();
   }
   renderTakvim();
+  takDerinGerekli();
+}
+
+// Görüntülenen aralık çekilmiş geçmişten ESKİYSE veriyi derinleştir.
+// Olmadan: kullanıcı Temmuz'a gidiyor, takvim bomboş görünüyor ve bunun
+// "o ay hiç yayın yok" mu yoksa "veri o kadar geriye çekilmedi" mi olduğu
+// anlaşılmıyordu. Tek seferlik: aynı ay için tekrar yüklemez.
+let TAK_DERIN_ISTEK = 0;     // şimdiye kadar istenen EN ESKİ ay
+function takDerinGerekli(){
+  if (TAK.yukleniyor) return;                                   // koşum sürüyor
+  const ayBasi = new Date(TAK.year, TAK.month, 1).getTime();
+  // TÜKENİŞ FRENİ: API'de daha eski kayıt yok — boş ay GERÇEKTEN boş.
+  // Bu olmadan hesabın ilk yayınından eski her aya gidişte tüm geçmiş
+  // baştan çekiliyordu (iki ay arası gidiş-gelişte tıklama başına ~35 sayfa).
+  if (TAK.histTukendi) return;
+  if (TAK.histEnEski && ayBasi >= TAK.histEnEski) return;        // veri zaten kapsıyor
+  // Tavan farklı: daha derine inmek fiilen imkânsız, ama SESSİZ kalma.
+  if (TAK.histKirpik){
+    setEl('tak-ozet', '⚠ geçmiş ' + (TAK.histEnEski ? new Date(TAK.histEnEski).toLocaleDateString('tr') : '?')
+      + '\'e kadar inebildi (sayfa sınırı) — daha eskisi için ↻ Yenile');
+    return;
+  }
+  // İSTENEN EN ESKİ AY: tek ay hatırlamak yetmiyordu — Haziran↔Temmuz
+  // arasında gidip gelmek her tıklamada yeniden çekim başlatıyordu.
+  if (TAK_DERIN_ISTEK && ayBasi >= TAK_DERIN_ISTEK && !TAK.histGeciciHata) return;
+  TAK_DERIN_ISTEK = TAK_DERIN_ISTEK ? Math.min(TAK_DERIN_ISTEK, ayBasi) : ayBasi;
+  TAK.histIstenenAy = ayBasi;     // tek seferlik ufuk isteği (mandallanmaz)
+  setEl('tak-ozet','⏳ geçmiş derinleştiriliyor…');
+  loadTakvim();
 }
 function takPrev() { takStep(-1); }
 function takNext() { takStep(1); }
