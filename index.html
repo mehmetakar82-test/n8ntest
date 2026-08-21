@@ -2533,7 +2533,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.21-64';
+const PANEL_YAPI = 'y2026.08.21-65';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -6399,9 +6399,16 @@ async function eksikDenetimi(){
       + '(yayınlanmış / planlı / kuyrukta) varsa, diğer bağlı platformlarda da olmalı. Onarım: satırdaki '
       + '<b>⚖ Eşitle</b> — listeyi gösterir, onayından sonra kuyruğa ekler. '
       + 'Başarısız denemeler burada sayılmaz (Yayın Durumu sayfasının işi).</div>'
+      + '<div style="font-size:11.5px;color:var(--mt);margin-bottom:8px;border-left:2px solid var(--brd);padding-left:8px">'
+      +   '<b>Veri kaynağı:</b> Instagram/YouTube/TikTok\'a <b>gidilmiyor</b> — <b>Upload-Post\'un kendi kayıtları</b> okunuyor: '
+      +   '<code>/history</code> (yayınlanmış + başarısız), <code>/schedule</code> (planlı), <code>/queue/preview</code> (kuyruk). '
+      +   'Yani ölçülen şey “Upload-Post bu short\'u bu platforma gönderdi mi”. Eşleştirme <b>başlıkla</b> yapılıyor '
+      +   '(sadeleştirilmiş, ilk 60 karakter) — gönderim yolundaki çift kontrolüyle aynı anahtar. '
+      +   'Platformda elle silinen bir gönderi burada hâlâ “var” görünür.</div>'
       + (EKSIK_GUN
-          ? '<div style="font-size:11.5px;color:var(--acc);margin-bottom:8px">Yalnız <b>son '+EKSIK_GUN+' gün</b> '
-            + 'sayılıyor. Silinen planların izi burada aranır.</div>'
+          ? '<div style="font-size:11.5px;color:var(--acc);margin-bottom:8px">Yalnız <b>son '+EKSIK_GUN+' gün içinde YAYINLANMIŞ</b> '
+            + 'short\'lar hedef sayılıyor. İleri tarihli planlar ve kuyruktakiler hedef değil — ama karşı platformda '
+            + 'varlarsa “mevcut” sayılırlar. Silinen planların izi burada aranır.</div>'
           : '<div style="font-size:11.5px;color:var(--wn);margin-bottom:8px">⚠ <b>Tüm ömür</b> sayılıyor: bu rakamın '
             + 'büyük kısmı <b>silinen plan değil</b>, tarihsel birikimdir — Facebook ve X kanalları sonradan eklendi, '
             + 'ondan önceki her short o platformlarda "eksik" görünür. Silme hasarını görmek için kısa pencere seç.</div>')
@@ -6752,20 +6759,30 @@ async function pdBasliklar(profil, platlar, sayfa){
     }
     ekle(p, String(x.post_title || x.title || x.post_caption || ''), x.success !== false && !x.error_message, 'gecmis');
   });
+  // PLAN/KUYRUK PENCEREYE TABİ DEĞİL — tarihleri GELECEKTE olduğu için
+  // hiçbir "son N gün" süzgeci onları elemez. Bu yüzden pencere açıkken
+  // HEDEF KÜMEYE GİRMEZLER (yayindaMi=false), yalnız "mevcut" sayılırlar.
+  // Neden: pencereli denetim "son N günde YAYINLANMIŞ short'ların karşılığı
+  // var mı" sorusunu sorar. Gelecek planları hedef sayınca takvimdeki ~2100
+  // planlı işin tamamı diğer platformlarda "eksik" görünüyor ve sayı şişiyor
+  // (kullanıcı 14 günde 4018 eksik gördü — gerçek olamaz).
+  // 'Tüm ömür' seçiliyken (pencere yok) eski davranış aynen sürer: planlar
+  // da hedeftir, çünkü orada soru "her şey her platformda var mı".
+  const planHedef = !_sinir;
   try {
     const { data } = await upFetchRetry('/uploadposts/schedule');
     const s = Array.isArray(data) ? data : (data.scheduled_posts||data.scheduled||[]);
     s.forEach(x => {
       if (String(x.profile_username||'') !== profil) return;
       (x.platforms || (x.platform?[x.platform]:[])).forEach(z =>
-        ekle(NP[String(z).toLowerCase()], String(x.title || x.post_title || ''), true, 'plan'));
+        ekle(NP[String(z).toLowerCase()], String(x.title || x.post_title || ''), planHedef, 'plan'));
     });
   } catch(e){ console.warn('[PD] schedule:', e.message); }
   try {
     const { data } = await upFetchRetry('/uploadposts/queue/preview?profile_username='+encodeURIComponent(profil)+'&count=50');
     (data.slots||[]).forEach(sl => {
       const sp = sl.scheduled_post; if (!sp) return;
-      (sp.platforms||[]).forEach(z => ekle(NP[String(z).toLowerCase()], String(sp.title||''), true, 'kuyruk'));
+      (sp.platforms||[]).forEach(z => ekle(NP[String(z).toLowerCase()], String(sp.title||''), planHedef, 'kuyruk'));
     });
   } catch(e){ console.warn('[PD] queue:', e.message); }
   return out;
