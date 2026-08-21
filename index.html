@@ -2533,7 +2533,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.21-62';
+const PANEL_YAPI = 'y2026.08.21-63';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -4356,7 +4356,9 @@ function rapGunCiz(k, cols){
 // TOPLAMLARI Raporlar kartlarında). Oralarda sahte sıralama üretmek yerine
 // bu sınır açıkça yazılıyor ve gönderiler tarihe göre (linkli) listeleniyor.
 // ═══════════════════════════════════════════════════════════════════════
-const RAP_TOP = { plat:'youtube', onb:{}, yukleniyor:false };
+// plat BOŞ başlar: kullanıcı isteği — Raporlar açılınca kendiliğinden
+// YouTube/Upload-Post API'sine gidilmesin, yalnız çipe tıklanınca çekilsin.
+const RAP_TOP = { plat:'', onb:{}, yukleniyor:false };
 const RAP_TOP_TTL = 10*60000;      // YouTube istatistikleri 10 dk önbellek
 const RAP_TOP_ADET = 20;           // gösterilen sıra sayısı
 const RAP_TOP_KIMLIK_TAVAN = 500;  // taranacak azami video (10 API çağrısı)
@@ -4365,9 +4367,13 @@ function rapTopYtKimlik(u){
   const m = String(u||'').match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/);
   return m ? m[1] : '';
 }
-function rapTopSec(p){ RAP_TOP.plat = p; rapTopRender(); }
+// Çip tıklaması = TEK çekim tetikleyicisi. rapRenderCore'dan gelen çağrılar
+// pasiftir (aktif=false): önbellekte veri varsa çizer, yoksa "tıkla" der,
+// API'ye ASLA gitmez. Böylece rapor oluşturma / dönem değişimi / sayfa
+// açılışı hiçbir istek doğurmaz.
+function rapTopSec(p){ RAP_TOP.plat = p; rapTopRender(true); }
 
-function rapTopRender(){
+function rapTopRender(aktif){
   const chipsEl = document.getElementById('rap-top-chips');
   const el = document.getElementById('rap-top-icerik');
   if (!chipsEl || !el) return;
@@ -4385,6 +4391,24 @@ function rapTopRender(){
       + (RAP.histHata ? '⚠ Yayın geçmişi alınamadı ('+esc(RAP.histHata)+') — Raporu Oluştur ile tekrar dene'
         : (RAP.loaded ? 'Geçmişte yayın kaydı yok' : '↻ Raporu Oluştur\'a bas'))
       + '</div>';
+    return;
+  }
+  // Platform seçilmemiş: istek yok, yalnız yönlendirme.
+  if (!RAP_TOP.plat){
+    setEl('rap-top-n','');
+    el.innerHTML = '<div style="color:var(--mt);font-size:12.5px;text-align:center;padding:12px">'
+      + 'Bir platform seç — izlenme sayıları yalnız tıkladığında çekilir (YouTube: Data API · diğerleri: Upload-Post, gönderi başına istek).</div>';
+    return;
+  }
+  // Pasif çağrı + önbellek yok/eski → çekme, tıklamayı iste. (Rapor yeniden
+  // oluşturulunca önbellek boşalır; eski sıralamayı göstermek de yanlış,
+  // kendiliğinden çekmek de kullanıcının istemediği şey.)
+  const onbVar = p => { const c = RAP_TOP.onb[p]; return c && Date.now()-c.t < RAP_TOP_TTL; };
+  if (!aktif && !onbVar(RAP_TOP.plat)){
+    setEl('rap-top-n','');
+    el.innerHTML = '<div style="color:var(--mt);font-size:12.5px;text-align:center;padding:12px">'
+      + esc(RAP_TOP.plat==='youtube'?'YouTube':RAP_TOP.plat.charAt(0).toUpperCase()+RAP_TOP.plat.slice(1))
+      + ' için güncel sıralama çekilmedi — çipe tıklayınca yüklenir.</div>';
     return;
   }
   if (RAP_TOP.plat === 'youtube'){
@@ -4479,7 +4503,7 @@ function rapTopUpCiz(p, c){
     + (c.toplamYayin > c.tarama ? ' Yalnız en yeni '+c.tarama+' yayın tarandı (kota koruması).' : '')+'</div>'
     + c.liste.slice(0, RAP_TOP_ADET).map((v,i) =>
     '<div style="display:flex;gap:10px;align-items:center;padding:6px;border-top:1px solid var(--brd)">'
-    + '<span style="font-family:var(--fh);font-weight:800;font-size:15px;color:'+(i<3?'var(--gld)':'var(--mt)')+';min-width:24px;text-align:right">'+(i+1)+'</span>'
+    + '<span style="font-family:var(--ft);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;color:'+(i<3?'var(--gld)':'var(--mt)')+';min-width:24px;text-align:right">'+(i+1)+'</span>'
     + (v.thumb ? '<img src="'+guvenliUrl(v.thumb)+'" style="width:64px;height:36px;object-fit:cover;border-radius:4px;flex:0 0 auto" onerror="this.style.display=\'none\'">' : '')
     + '<div style="flex:1;min-width:0">'
     +   (v.url ? '<a href="'+guvenliUrl(v.url)+'" target="_blank" rel="noopener" style="color:var(--tx);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">'+esc(v.baslik)+'</a>'
@@ -4487,7 +4511,7 @@ function rapTopUpCiz(p, c){
     +   '<div style="font-size:11px;color:var(--mt)">'+(v.profil?'<span class="badge bi" style="font-size:10px">'+esc(v.profil)+'</span> ':'')+esc(v.tarih)+'</div>'
     + '</div>'
     + '<div style="text-align:right;white-space:nowrap">'
-    +   '<div style="font-family:var(--fh);font-weight:800;color:var(--gld);font-size:14px">'+ytkFmt(v.views)+'</div>'
+    +   '<div style="font-family:var(--ft);font-weight:700;color:var(--gld);font-size:15px;font-variant-numeric:tabular-nums;letter-spacing:.2px">'+ytkFmt(v.views)+'</div>'
     +   '<div style="font-size:10.5px;color:var(--mt)">👍 '+(v.likes==null?'—':ytkFmt(v.likes))+' · 💬 '+(v.comments==null?'—':ytkFmt(v.comments))+'</div>'
     + '</div></div>').join('');
 }
@@ -4592,14 +4616,14 @@ function rapTopYtCiz(c){
   }
   el.innerHTML = c.liste.slice(0, RAP_TOP_ADET).map((v,i) =>
     '<div style="display:flex;gap:10px;align-items:center;padding:6px;border-top:1px solid var(--brd)">'
-    + '<span style="font-family:var(--fh);font-weight:800;font-size:15px;color:'+(i<3?'var(--gld)':'var(--mt)')+';min-width:24px;text-align:right">'+(i+1)+'</span>'
+    + '<span style="font-family:var(--ft);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;color:'+(i<3?'var(--gld)':'var(--mt)')+';min-width:24px;text-align:right">'+(i+1)+'</span>'
     + (v.thumb ? '<img src="'+guvenliUrl(v.thumb)+'" style="width:64px;height:36px;object-fit:cover;border-radius:4px;flex:0 0 auto" onerror="this.style.display=\'none\'">' : '')
     + '<div style="flex:1;min-width:0">'
     +   '<a href="'+guvenliUrl(v.url)+'" target="_blank" rel="noopener" style="color:var(--tx);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">'+esc(v.baslik)+'</a>'
     +   '<div style="font-size:11px;color:var(--mt)">'+(v.profil?'<span class="badge bi" style="font-size:10px">'+esc(v.profil)+'</span> ':'')+esc(v.tarih)+'</div>'
     + '</div>'
     + '<div style="text-align:right;white-space:nowrap">'
-    +   '<div style="font-family:var(--fh);font-weight:800;color:var(--gld);font-size:14px"'+(v.views==null?' title="Kanal izlenme sayısını gizlemiş — API bu alanı döndürmüyor"':'')+'>'+(v.views==null?'—':ytkFmt(v.views))+'</div>'
+    +   '<div style="font-family:var(--ft);font-weight:700;color:var(--gld);font-size:15px;font-variant-numeric:tabular-nums;letter-spacing:.2px"'+(v.views==null?' title="Kanal izlenme sayısını gizlemiş — API bu alanı döndürmüyor"':'')+'>'+(v.views==null?'—':ytkFmt(v.views))+'</div>'
     +   '<div style="font-size:10.5px;color:var(--mt)"'+(v.likes==null?' title="Kanal beğeni sayısını gizlemiş — API bu alanı döndürmüyor"':'')+'>👍 '+(v.likes==null?'—':ytkFmt(v.likes))+'</div>'
     + '</div></div>').join('');
 }
