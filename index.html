@@ -2533,7 +2533,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.21-66';
+const PANEL_YAPI = 'y2026.08.21-67';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -4057,6 +4057,8 @@ async function loadReports(){
   await Promise.all([pHist,pPlan]);
   RAP.hist=hist; RAP.plan=plan; RAP.loaded=true; RAP.analytics={}; RAP.analyticsDurum={};
   RAP_TOP.onb={};   // taze gecmis -> eski YouTube taramasi gosterilmesin (denetim bulgusu)
+  RAP_TOP.gecmis=null;  // "Raporu Olustur" TAM gecmisi de tazelesin (olculen
+                        // metrikler localStorage'da KALIR — birikim kaybolmaz)
   rapRenderCore();
   // Geçmiş alınamadıysa "hazır" DEME: sayılar sıfır olduğu için rapor
   // "hiçbir profil akmıyor" gibi okunuyor, oysa veri hiç gelmemiş.
@@ -4370,10 +4372,58 @@ function rapGunCiz(k, cols){
 // ═══════════════════════════════════════════════════════════════════════
 // plat BOŞ başlar: kullanıcı isteği — Raporlar açılınca kendiliğinden
 // YouTube/Upload-Post API'sine gidilmesin, yalnız çipe tıklanınca çekilsin.
-const RAP_TOP = { plat:'', onb:{}, yukleniyor:false };
-const RAP_TOP_TTL = 10*60000;      // YouTube istatistikleri 10 dk önbellek
+const RAP_TOP = { plat:'', onb:{}, yukleniyor:false, gecmis:null };
+const RAP_TOP_TTL = 10*60000;      // çizim önbelleği (aynı oturumda sekme gezinmesi)
 const RAP_TOP_ADET = 20;           // gösterilen sıra sayısı
-const RAP_TOP_KIMLIK_TAVAN = 500;  // taranacak azami video (10 API çağrısı)
+// Tarama artık İLK SHORT'A KADAR gidiyor. İki platform sınıfı farklı maliyette:
+//   YouTube      — videos.list 50'lik parti, tüm geçmiş tek turda taranabilir
+//   Upload-Post  — gönderi BAŞINA 1 istek; binlerce short tek turda çekilemez
+// Bu yüzden ölçülen metrikler KALICI ÖNBELLEĞE yazılıyor: her tur yalnız
+// önbellekte OLMAYANLARI çeker, sıralama önbellekteki HER ŞEY üzerinden
+// yapılır. Böylece birkaç turda tüm geçmiş kapsanır ve tekrar açılışta
+// beklemek gerekmez.
+const RAP_TOP_METRIK_ANAHTAR = 'op_top_metrik';
+const RAP_TOP_METRIK_TTL = 7*864e5;   // 7 gün sonra tazelenir (izlenme artar)
+const RAP_TOP_TUR_BUTCE = 400;        // tur başına YENİ ölçüm (Upload-Post)
+function ttMetrikOku(){
+  try { const o = JSON.parse(localStorage.getItem(RAP_TOP_METRIK_ANAHTAR)||'{}'); return (o&&typeof o==='object'&&!Array.isArray(o))?o:{}; }
+  catch(e){ return {}; }
+}
+function ttMetrikYaz(o){
+  try { localStorage.setItem(RAP_TOP_METRIK_ANAHTAR, JSON.stringify(o)); }
+  catch(e){
+    // Kota dolduysa en eski yarıyı at, bir kez daha dene — sessizce
+    // kaybetmek sıralamayı bozar, hepsini silmek de gereksiz.
+    try {
+      const ks = Object.keys(o).sort((a,b)=>(o[a].t||0)-(o[b].t||0));
+      ks.slice(0, Math.floor(ks.length/2)).forEach(k=>delete o[k]);
+      localStorage.setItem(RAP_TOP_METRIK_ANAHTAR, JSON.stringify(o));
+    } catch(e2){ console.warn('[TOP] metrik önbelleği yazılamadı:', e2.message); }
+  }
+}
+function ttTaze(kayit){ return kayit && kayit.t && (Date.now()-kayit.t) < RAP_TOP_METRIK_TTL; }
+// Rapor penceresi 30 günle sınırlı (RAP.hist); "en çok izlenen" ise İLK
+// SHORT'A kadar TÜM geçmişi ister. Bu yüzden burada ES_SAYFA (60) değil
+// daha derin bir tavan kullanılıyor. histCek geçmiş bitince (h.length<100)
+// kendiliğinden duruyor — yüksek tavan boşa istek DOĞURMAZ, yalnız gerçek
+// geçmiş uzunsa devam eder.
+const RAP_TOP_HIST_SAYFA = 150;       // 15000 kayda kadar (~210 gün @70/gün)
+const RAP_TOP_HIST_TTL = 10*60000;    // histCek'in 2 dk'sı platform başına
+                                      // tam geçmişi yeniden okuturdu
+async function rapTopGecmis(){
+  const g = RAP_TOP.gecmis;
+  if (g && g.kayitlar && Date.now()-g.t < RAP_TOP_HIST_TTL) return g;
+  try {
+    const onb = await histCek(RAP_TOP_HIST_SAYFA);
+    RAP_TOP.gecmis = { t: Date.now(), kayitlar: (onb.kayitlar||[]), kirpik: !!onb.kirpik };
+  } catch(e){
+    // Geçmiş hiç okunamadıysa rapor penceresi (30 gün) ile devam — eksik
+    // olduğu KIRPIK bayrağıyla ekranda söyleniyor, sessizce kısaltılmıyor.
+    console.warn('[TOP] geçmiş:', e.message);
+    RAP_TOP.gecmis = { t: Date.now(), kayitlar: (RAP.hist||[]), kirpik: true, hata: e.message };
+  }
+  return RAP_TOP.gecmis;
+}
 
 function rapTopYtKimlik(u){
   const m = String(u||'').match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/);
@@ -4440,10 +4490,19 @@ function rapTopRender(aktif){
   rapTopUpYukle(p);
 }
 
-// Upload-Post gönderi-başına metrik: HER GÖNDERİ AYRI İSTEK. Kota dostu
-// olması için: yalnız EN YENİ tavan kadar yayın taranır, eşzamanlılık 2,
-// sonuç 10 dk önbellekte. rapPlatAnahtar şart: geçmiş X'i 'twitter' taşır.
-const RAP_TOP_UP_TAVAN = 150;
+// Upload-Post gönderi-başına metrik: HER GÖNDERİ AYRI İSTEK. Tavan KALKTI —
+// tüm geçmiş hedefleniyor; kota koruması artık kalıcı önbellek + tur bütçesi
+// (RAP_TOP_TUR_BUTCE) ile sağlanıyor, eşzamanlılık 2.
+// rapPlatAnahtar şart: geçmiş X'i 'twitter' taşır.
+// "Kalanları tara" — ölçülmemişleri kaldığı yerden sürdürür. Önbellekteki
+// ölçümler yeniden istek doğurmaz, bu yüzden tur tur ilerlemek ücretsizdir.
+function rapTopDevam(p){
+  if (RAP_TOP.yukleniyor) return;   // çekim sürerken önbelleği silip
+                                    // ekranı boş bırakma
+  delete RAP_TOP.onb[p];
+  RAP_TOP.plat = p;
+  rapTopUpYukle(p);
+}
 async function rapTopUpYukle(p){
   const el = document.getElementById('rap-top-icerik'); if (!el) return;
   const esc = esc0;
@@ -4452,23 +4511,56 @@ async function rapTopUpYukle(p){
     setEl('rap-top-n','');
     return;
   }
-  const adaylar = (RAP.hist||[]).filter(h => rapPlatAnahtar(h.platform)===p && rapOk(h))
-    .sort((a,b) => (Date.parse(rapHistTime(b))||0)-(Date.parse(rapHistTime(a))||0));
-  const olculebilir = adaylar.filter(h => h.request_id || h.platform_post_id).slice(0, RAP_TOP_UP_TAVAN);
-  if (!olculebilir.length){
-    setEl('rap-top-n', '— '+adaylar.length+' yayın');
-    el.innerHTML = '<div style="color:var(--mt);font-size:12.5px;padding:8px 2px">'
-      + (adaylar.length ? 'Bu yayınların hiçbirinde metrik anahtarı (request_id / platform_post_id) yok — Upload-Post eski kayıtlarda bunu vermeyebilir.'
-                        : 'Bu platformda yayınlanmış kayıt yok.')+'</div>';
-    return;
-  }
+  // KİLİT geçmiş okumasından ÖNCE: aynı çipe iki kez basılırsa ilk sürüm
+  // henüz kilidi almadan ikincisi de geçiyordu → iki tarama aynı anda
+  // koşuyor, ikisi de aynı önbelleği yazıyor ve biri diğerinin ölçümlerini
+  // eziyordu. Kilit artık ilk await'ten önce alınır.
   RAP_TOP.yukleniyor = true;
   try {
-    const liste = []; let verisiz = 0, hatali = 0, bitti = 0;
-    await upSirali(olculebilir, async h => {
+    // TÜM geçmiş (ilk short'a kadar), rapor penceresiyle sınırlı değil
+    el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Tüm yayın geçmişi okunuyor (ilk short\'a kadar)…'});
+    const gec = await rapTopGecmis();
+    const tumGecmis = gec.kayitlar || [];
+    if (RAP_TOP.plat !== p) return;
+    const adaylar = tumGecmis.filter(h => rapPlatAnahtar(h.platform)===p && rapOk(h))
+      .sort((a,b) => (Date.parse(rapHistTime(b))||0)-(Date.parse(rapHistTime(a))||0));
+    const olculebilir = adaylar.filter(h => h.request_id || h.platform_post_id);
+    if (!olculebilir.length){
+      setEl('rap-top-n', '— '+adaylar.length+' yayın');
+      el.innerHTML = '<div style="color:var(--mt);font-size:12.5px;padding:8px 2px">'
+        + (adaylar.length ? 'Bu yayınların hiçbirinde metrik anahtarı (request_id / platform_post_id) yok — Upload-Post eski kayıtlarda bunu vermeyebilir.'
+                          : 'Bu platformda yayınlanmış kayıt yok.')+'</div>';
+      return;
+    }
+    const liste = []; let verisiz = 0, hatali = 0, bitti = 0, atlanan = 0;
+    // ÖNBELLEK: gönderi başına 1 istek olduğu için tüm geçmiş tek turda
+    // çekilemez. Ölçülenler kalıcı saklanır; bu tur yalnız ölçülmemişleri
+    // çeker (bütçe kadar), sıralama önbellekteki HER ŞEY üzerinden yapılır.
+    const onbellek = ttMetrikOku();
+    const ttAnahtar = h => p+':'+(h.request_id || ('pid_'+h.platform_post_id));
+    const yeniler = [];
+    olculebilir.forEach(h => {
+      const k = onbellek[ttAnahtar(h)];
+      if (ttTaze(k)){
+        if (k.v == null){ verisiz++; return; }
+        liste.push({ baslik: h.post_title||h.title||h.post_caption||'(başlıksız)',
+          thumb: h.thumbnail||h.preview_url||'', url: h.post_url||'',
+          profil: h.profile_username||h.user||'', tarih: String(rapHistTime(h)).slice(0,10),
+          views: k.v, likes: (k.l==null?null:k.l), comments: (k.c==null?null:k.c) });
+      } else yeniler.push(h);
+    });
+    const buTur = yeniler.slice(0, RAP_TOP_TUR_BUTCE);
+    const kalan = yeniler.length - buTur.length;
+    await upSirali(buTur, async h => {
       bitti++;
-      if (bitti % 10 === 1 && RAP_TOP.plat === p)
-        el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:bitti+'/'+olculebilir.length+' gönderinin metriği çekiliyor…'});
+      // Kullanıcı başka platforma geçtiyse KOTA HARCAMA — kalan sayısına
+      // eklensin ki "kalan" gerçeği söylesin.
+      if (RAP_TOP.plat !== p){ atlanan++; return; }
+      // Ara kayıt: 400 ölçüm uzun sürüyor, sekme kapanırsa emek kaybolmasın.
+      if (bitti % 50 === 0) ttMetrikYaz(onbellek);
+      if (bitti % 10 === 1)
+        el.innerHTML = durumHTML('yukleniyor',{kompakt:true,
+          alt:bitti+'/'+buTur.length+' gönderi ölçülüyor…'+(liste.length?' ('+liste.length+' önbellekten)':'')});
       let m = null;
       try {
         if (h.request_id){
@@ -4481,20 +4573,27 @@ async function rapTopUpYukle(p){
           m = takParseMetrics(data);
         }
       } catch(e){ hatali++; return; }
-      if (!m){ verisiz++; return; }
       // İzlenme: views yoksa impressions (Takvim modalı ve hesap kartlarıyla
       // aynı geriye-uyumluluk kuralı). İkisi de yoksa sıralanamaz → verisiz.
-      const izlenme = (m.views != null) ? m.views : ((m.impressions != null) ? m.impressions : null);
+      const izlenme = m ? ((m.views != null) ? m.views : ((m.impressions != null) ? m.impressions : null)) : null;
+      // "Metrik yok" da ÖNBELLEĞE yazılır — yoksa her turda aynı boş
+      // gönderiler yeniden sorulur ve bütçe onlara harcanır.
+      onbellek[ttAnahtar(h)] = { v: izlenme, l:(m&&m.likes!=null)?m.likes:null,
+                                 c:(m&&m.comments!=null)?m.comments:null, t: Date.now() };
       if (izlenme == null){ verisiz++; return; }
       liste.push({ baslik: h.post_title||h.title||h.post_caption||'(başlıksız)',
         thumb: h.thumbnail||h.preview_url||'', url: h.post_url||'',
         profil: h.profile_username||h.user||'', tarih: String(rapHistTime(h)).slice(0,10),
         views: izlenme, likes: (m.likes!=null)?m.likes:null, comments: (m.comments!=null)?m.comments:null });
     }, 2);
+    ttMetrikYaz(onbellek);          // ölçülenler kalıcı — sonraki tur kaldığı yerden
     liste.sort((a,b) => b.views - a.views);
     // Hata varsa kısa TTL — eksik sıralama 10 dk donup kalmasın
     RAP_TOP.onb[p] = { t: Date.now() - (hatali ? RAP_TOP_TTL - 30000 : 0),
-                       liste, tarama: olculebilir.length, toplamYayin: adaylar.length, verisiz, hatali };
+                       liste, tarama: liste.length + verisiz, toplamYayin: adaylar.length,
+                       olculebilirN: olculebilir.length, verisiz, hatali,
+                       kalan: kalan + atlanan,
+                       histKirpik: !!gec.kirpik, histKayit: tumGecmis.length };
     if (RAP_TOP.plat === p) rapTopUpCiz(p, RAP_TOP.onb[p]);
   } finally { RAP_TOP.yukleniyor = false; }
 }
@@ -4502,17 +4601,27 @@ async function rapTopUpYukle(p){
 function rapTopUpCiz(p, c){
   const el = document.getElementById('rap-top-icerik'); if (!el) return;
   const esc = esc0;
-  setEl('rap-top-n', '— son '+c.tarama+' yayın tarandı (toplam '+c.toplamYayin+'), ilk '+Math.min(RAP_TOP_ADET,c.liste.length)+' gösteriliyor'
+  // Kapsam DÜRÜST yazılıyor: kaç yayın var, kaçı ölçüldü, kaçı bekliyor.
+  // "kalan" > 0 iken sıralama HENÜZ kesin değil — bunu gizlemek yanlış olur.
+  const olcN = (c.olculebilirN != null) ? c.olculebilirN : c.tarama;
+  setEl('rap-top-n', '— '+c.toplamYayin+' yayın · '+c.tarama+'/'+olcN+' ölçüldü'
+    + (c.kalan ? ' · '+c.kalan+' bekliyor' : ' · tamamı tarandı')
+    + ' · ilk '+Math.min(RAP_TOP_ADET,c.liste.length)+' gösteriliyor'
     + (c.verisiz ? ' · '+c.verisiz+' gönderide metrik yok' : '')
     + (c.hatali ? ' · ⚠ '+c.hatali+' çekilemedi (API hatası) — sıralama eksik olabilir' : ''));
+  const devamBtn = c.kalan
+    ? ' <button class="btn bg bsm" style="margin-left:6px" onclick="rapTopDevam(\''+p+'\')">↻ Kalanları tara ('+c.kalan+')</button>'
+    : '';
   if (!c.liste.length){
     el.innerHTML = '<div style="color:var(--mt);font-size:12.5px;padding:8px 2px">Metrik verisi alınabilen gönderi yok'
-      + (c.verisiz ? ' — Upload-Post '+c.verisiz+' gönderi için henüz/hiç metrik döndürmedi.' : '.')+'</div>';
+      + (c.verisiz ? ' — Upload-Post '+c.verisiz+' gönderi için henüz/hiç metrik döndürmedi.' : '.')
+      + devamBtn+'</div>';
     return;
   }
   el.innerHTML =
-    '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">Kaynak: Upload-Post post-analytics (canlı) — Takvim\'deki post modalıyla aynı veri.'
-    + (c.toplamYayin > c.tarama ? ' Yalnız en yeni '+c.tarama+' yayın tarandı (kota koruması).' : '')+'</div>'
+    '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">Kaynak: Upload-Post post-analytics (canlı) — Takvim\'deki post modalıyla aynı veri. Ölçümler 7 gün önbelleklenir.'
+    + (c.histKirpik ? ' <b style="color:var(--wn)">⚠ geçmiş penceresi kırpık:</b> daha eski shortlar bu sıralamada YOK.' : '')
+    + (c.kalan ? ' <b style="color:var(--wn)">Sıralama HENÜZ eksik:</b> '+c.kalan+' gönderi ölçülmedi (tur başına '+RAP_TOP_TUR_BUTCE+' ölçüm).'+devamBtn : ' Ölçülebilen tüm geçmiş tarandı.')+'</div>'
     + c.liste.slice(0, RAP_TOP_ADET).map((v,i) =>
     '<div style="display:flex;gap:10px;align-items:center;padding:6px;border-top:1px solid var(--brd)">'
     + '<span style="font-family:var(--ft);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;color:'+(i<3?'var(--gld)':'var(--mt)')+';min-width:24px;text-align:right">'+(i+1)+'</span>'
@@ -4547,14 +4656,20 @@ async function rapTopYtYukle(){
   }
   RAP_TOP.yukleniyor = true;
   try {
+    // TÜM geçmiş (ilk short'a kadar) — rapor penceresi 30 günle sınırlı
+    el.innerHTML = durumHTML('yukleniyor',{kompakt:true, alt:'Tüm yayın geçmişi okunuyor (ilk short\'a kadar)…'});
+    const gec = await rapTopGecmis();
+    const tumGecmis = gec.kayitlar || [];
+    if (RAP_TOP.plat !== 'youtube') return;
     // Geçmişteki BAŞARILI YouTube yayınlarından kimlik → meta haritası
     const meta = new Map();
-    (RAP.hist||[]).forEach(h => {
-      if (String(h.platform||'').toLowerCase() !== 'youtube' || !rapOk(h)) return;
+    tumGecmis.forEach(h => {
+      if (rapPlatAnahtar(h.platform) !== 'youtube' || !rapOk(h)) return;
       const id = rapTopYtKimlik(h.post_url || h.url || ''); if (!id || meta.has(id)) return;
       meta.set(id, { profil: h.profile_username||h.user||'', tarih: String(rapHistTime(h)).slice(0,10), url: h.post_url||h.url||'' });
     });
-    const idler = Array.from(meta.keys()).slice(0, RAP_TOP_KIMLIK_TAVAN);
+    // TAVAN KALDIRILDI: videos.list 50'lik parti alıyor, tüm geçmiş ucuz.
+    const idler = Array.from(meta.keys());
     if (!idler.length){
       el.innerHTML = '<div style="color:var(--mt);font-size:12px;padding:8px 2px">Geçmişte kimliği çözülebilen YouTube yayını yok.</div>';
       setEl('rap-top-n',''); return;
@@ -4565,8 +4680,22 @@ async function rapTopYtYukle(){
     // bilinmiyor. İkisini tek sayaçta toplamak "450 video silinmiş olabilir"
     // gibi yanlış bir cümle üretiyordu (denetim bulgusu).
     const liste = []; let dusen = 0, hatali = 0;
-    for (let i = 0; i < idler.length; i += 50){
-      const parca = idler.slice(i, i+50);
+    // ÖNBELLEKTEN GELENLER: taze kayıtlar yeniden çekilmez. Tüm geçmiş
+    // tarandığında bile ikinci açılış anında gelir.
+    const onbellek = ttMetrikOku();
+    const cekilecek = [];
+    idler.forEach(id => {
+      const k = onbellek['yt:'+id];
+      if (ttTaze(k)){
+        const m = meta.get(id) || {};
+        liste.push({ id, baslik:k.b||'(başlıksız)', thumb:k.th||'', views:(k.v==null?null:k.v), likes:(k.l==null?null:k.l),
+          profil:m.profil||'', tarih:m.tarih||'', url:m.url||('https://www.youtube.com/watch?v='+id) });
+      } else cekilecek.push(id);
+    });
+    for (let i = 0; i < cekilecek.length; i += 50){
+      const parca = cekilecek.slice(i, i+50);
+      if (RAP_TOP.plat !== 'youtube') return;      // kullanıcı sekme değiştirdi
+      setEl('rap-top-n', '⏳ ' + Math.min(i+50, cekilecek.length) + '/' + cekilecek.length + ' video ölçülüyor…');
       try {
         const r = await fetch('https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&maxResults=50&id='
           + parca.join(',') + '&key=' + encodeURIComponent(key));
@@ -4578,10 +4707,12 @@ async function rapTopYtYukle(){
           // alanı HİÇ döndürmüyor. 0 basmak gerçek sıfırdan ayırt edilemez
           // — null saklanır, ekranda '—' gösterilir (denetim bulgusu).
           const st = v.statistics || {};
-          liste.push({ id:v.id, baslik:(v.snippet||{}).title||'(başlıksız)',
-            thumb:(((v.snippet||{}).thumbnails||{}).medium||{}).url || (((v.snippet||{}).thumbnails||{}).default||{}).url || '',
-            views:('viewCount' in st) ? (parseInt(st.viewCount)||0) : null,
-            likes:('likeCount' in st) ? (parseInt(st.likeCount)||0) : null,
+          const baslik = (v.snippet||{}).title||'(başlıksız)';
+          const thumb = (((v.snippet||{}).thumbnails||{}).medium||{}).url || (((v.snippet||{}).thumbnails||{}).default||{}).url || '';
+          const views = ('viewCount' in st) ? (parseInt(st.viewCount)||0) : null;
+          const likes = ('likeCount' in st) ? (parseInt(st.likeCount)||0) : null;
+          onbellek['yt:'+v.id] = { v:views, l:likes, b:baslik, th:thumb, t:Date.now() };
+          liste.push({ id:v.id, baslik, thumb, views, likes,
             profil:m.profil||'', tarih:m.tarih||'', url:m.url||('https://www.youtube.com/watch?v='+v.id) });
         });
         // API'nin DÖNDÜRMEDİĞİ kimlikler silinmiş/gizli videolar — say, gizleme
@@ -4600,15 +4731,18 @@ async function rapTopYtYukle(){
         }
         console.warn('[TOP] parça düştü:', e.message); hatali += parca.length;
       }
-      if (i+50 < idler.length) await sleep(150);   // hız sınırına nefes payı
+      if (i+50 < cekilecek.length) await sleep(150);   // hız sınırına nefes payı
     }
     // İzlenmesi gizli (null) videolar bilinçli olarak dibe: sıralamanın
     // ölçütü izlenme, ölçüsü olmayan yarışamaz — satırında '—' yazar.
+    ttMetrikYaz(onbellek);          // ölçülenler kalıcı — ikinci açılış anında gelir
     liste.sort((a,b) => ((b.views==null?-1:b.views)) - ((a.views==null?-1:a.views)));
     // Parça hatası varsa KISA TTL: eksik tablo 10 dk donup kalmasın, bir
     // sonraki render yeniden denesin (t geçmişe çekilerek).
     RAP_TOP.onb.youtube = { t: Date.now() - (hatali ? RAP_TOP_TTL - 30000 : 0),
-                            liste, tarama: idler.length - hatali, dusen, hatali };
+                            liste, tarama: idler.length - hatali, dusen, hatali,
+                            toplam: idler.length,
+                            histKirpik: !!gec.kirpik, histKayit: tumGecmis.length };
     // YARIŞ KORUMASI: çekim sürerken kullanıcı başka platforma geçmiş
     // olabilir — çizersek YouTube listesi o platformun görünümünü ezer.
     // Önbellek yine dolu kalır; YouTube'a dönünce anında çizilir.
@@ -4619,14 +4753,19 @@ async function rapTopYtYukle(){
 function rapTopYtCiz(c){
   const el = document.getElementById('rap-top-icerik'); if (!el) return;
   const esc = esc0;
-  setEl('rap-top-n', '— '+c.tarama+' video tarandı, ilk '+Math.min(RAP_TOP_ADET,c.liste.length)+' gösteriliyor'
+  setEl('rap-top-n', '— tüm geçmiş: '+c.tarama+' video tarandı, ilk '+Math.min(RAP_TOP_ADET,c.liste.length)+' gösteriliyor'
     + (c.dusen ? ' · '+c.dusen+' video API\'den dönmedi (silinmiş/gizli olabilir)' : '')
     + (c.hatali ? ' · ⚠ '+c.hatali+' video çekilemedi (API hatası) — sıralama eksik olabilir' : ''));
   if (!c.liste.length){
     el.innerHTML = '<div style="color:var(--mt);font-size:12px;padding:8px 2px">İzlenme verisi alınabilen video yok.</div>';
     return;
   }
-  el.innerHTML = c.liste.slice(0, RAP_TOP_ADET).map((v,i) =>
+  el.innerHTML =
+    '<div style="font-size:11px;color:var(--mt);margin-bottom:6px">Kaynak: YouTube Data API (canlı) · '
+    + (c.histKayit||0)+' yayın kaydı okundu'
+    + (c.histKirpik ? ' — <b style="color:var(--wn)">⚠ geçmiş penceresi kırpık:</b> daha eski shortlar bu sıralamada YOK'
+                    : ' — ilk short\'tan bugüne tamamı')+'</div>'
+    + c.liste.slice(0, RAP_TOP_ADET).map((v,i) =>
     '<div style="display:flex;gap:10px;align-items:center;padding:6px;border-top:1px solid var(--brd)">'
     + '<span style="font-family:var(--ft);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums;color:'+(i<3?'var(--gld)':'var(--mt)')+';min-width:24px;text-align:right">'+(i+1)+'</span>'
     + (v.thumb ? '<img src="'+guvenliUrl(v.thumb)+'" style="width:64px;height:36px;object-fit:cover;border-radius:4px;flex:0 0 auto" onerror="this.style.display=\'none\'">' : '')
@@ -5908,7 +6047,9 @@ async function histCek(sayfa){
   for (let pg = 1; pg <= sayfa; pg++){
     let data;
     try { ({ data } = await upFetchRetry('/uploadposts/history?limit=100&page='+pg)); }
-    catch(e){ if (pg === 1) throw e; console.warn('[HIST] s'+pg+':', e.message); break; }
+    // Sayfa düşerse döngü kırılır ama DAHA ESKİLER OKUNAMADI demektir —
+    // kirpik=false bırakmak "tam geçmiş" yalanı üretiyordu.
+    catch(e){ if (pg === 1) throw e; console.warn('[HIST] s'+pg+':', e.message); kirpik = true; break; }
     const h = Array.isArray(data) ? data : (data.history||data.data||data.results||data.items||[]);
     h.forEach(x => kayitlar.push(x));
     if (h.length < 100) break;
