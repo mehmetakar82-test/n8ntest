@@ -2533,7 +2533,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.21-67';
+const PANEL_YAPI = 'y2026.08.22-68';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -7939,6 +7939,24 @@ function htKimlik(v){
   return h ? { h, id: String(a.id || '').trim() } : null;
 }
 
+// Profil+platform için ŞU ANDA bağlı hesabın kalıcı id'si. hdPlanla/hdYoksay
+// temeli yeni handle'a taşırken id'yi de taşımak zorunda: id olmadan sonraki
+// bir KULLANICI ADI değişikliği takas sanılır ve tüm arşiv aynı hesaba
+// yeniden kuyruklanmaya davet edilir. Kaynak, htTara'nın okuduğu veriyle aynı.
+function htYeniKimlik(profil, plat){
+  const raw = S.uploadPostAccounts || (S._panelCache && S._panelCache.accounts) || null;
+  const profs = (raw && raw.profiles) || [];
+  const pr = profs.find(x => x && x.username === profil);
+  if (!pr) return '';
+  const sa = pr.social_accounts || pr.socialAccounts || {};
+  for (const ham of Object.keys(sa)){
+    if (RAP_HAREKET_NP[String(ham).toLowerCase()] !== plat) continue;
+    const kim = htKimlik(sa[ham]);
+    if (kim && kim.id) return kim.id;
+  }
+  return '';
+}
+
 // Profil verisini tara; değişimleri kaydet. İLK GÖRÜŞTE YALNIZ TEMEL YAZILIR
 // (uyarı yok — elde "eski" yoktur). Handle BOŞA düşerse değişim SAYILMAZ:
 // eksik veri, hesap değişimi değildir (bağlantı kopmuş olabilir, o ayrı uyarı).
@@ -7985,7 +8003,11 @@ function htTara(raw){
       if (mevcut && mevcut.yeni === kim.h) return;
       // t = eski handle'ın SON DOĞRULANDIĞI an (tespit anı DEĞİL) — temkinli
       // sınır: aradaki belirsiz pencere "yeni dönem" sayılır, kopya çıkmaz.
-      degisim[k] = { profil:u, plat:p, eski:b.h, yeni:kim.h, t: b.t || Date.now() };
+      // yeniId TESPİT ANINDA saklanır. Sonradan S.uploadPostAccounts'tan
+      // okumaya çalışmak kırılgan: Platformlar sayfası API'ye ulaşamazsa
+      // (CORS, anahtar, ağ) o alan null olur ve id kaybolur — kaybolan id
+      // bir sonraki AD değişikliğini TAKAS gösterip toplu kopyaya davet eder.
+      degisim[k] = { profil:u, plat:p, eski:b.h, yeni:kim.h, yeniId:kim.id||'', t: b.t || Date.now() };
       yeniler.push(degisim[k]);
     });
   });
@@ -8023,7 +8045,10 @@ function hdYoksay(k){
       + 'Eski short\'lar yeni hesaba OTOMATİK planlanmayacak. Sonradan istersen '
       + '🔄 Hesap Sıfırlama + ⚖ Eşitle ile elle yapabilirsin.\n\nDevam edilsin mi?')) return;
   const temel = htOku();
-  temel[k] = { h: d.yeni, t: Date.now(), eskiler: ((temel[k]||{}).eskiler||[]).concat(d.eski).slice(-5) };
+  // id TAŞINIR — bkz. hdPlanla'daki aynı düzeltme (id düşerse sonraki ad
+  // değişikliği TAKAS sanılıp toplu kopya yayına davet ediyordu).
+  temel[k] = { h: d.yeni, id: d.yeniId || htYeniKimlik(d.profil, d.plat) || '',
+               t: Date.now(), eskiler: ((temel[k]||{}).eskiler||[]).concat(d.eski).slice(-5) };
   htYaz(temel);
   delete degisim[k]; hdYaz(degisim);
   hdBanner(); notifSil('hesap-degisim');
@@ -8047,7 +8072,12 @@ async function hdAc(k){
     +   '<div style="font-family:var(--fh);font-size:14px;font-weight:700">🔁 '+esc0(d.profil)+' · '+esc0(HS_PLAT_AD[d.plat]||d.plat)+' — yeniden planlama</div>'
     +   '<button class="btn bg bsm" onclick="if(!HD.calisiyor){HD.acik=\'\';HD.adaylar=[];document.getElementById(\'hd-modal\').remove()}">✕</button></div>'
     + '<div id="hd-govde" style="padding:12px 14px;overflow-y:auto;flex:1;font-size:12.5px"></div>'
-    + '<div id="hd-alt" style="display:none;padding:10px 14px;border-top:1px solid var(--brd);display:none;gap:8px;align-items:center">'
+    // hd-hata: gönderim SEBEBİ ekranda. Eskiden yalnız "N başarısız" yazıyor,
+    // gerçek sebep (ör. Instagram girişi bekliyor) SADECE loga gidiyordu —
+    // kullanıcı hatayı görüyor ama ne yapacağını bilmiyordu. ⚖ Eşitle'deki
+    // es-hata kutusuyla aynı desen (hataCevir + HATA_IKON).
+    + '<div id="hd-hata" style="padding:0 14px 4px;font-size:12px"></div>'
+    + '<div id="hd-alt" style="display:none;padding:10px 14px;border-top:1px solid var(--brd);gap:8px;align-items:center">'
     +   '<button class="btn bp bsm" id="hd-planla-btn" onclick="hdPlanla()"></button>'
     +   '<span id="hd-durum" style="font-size:12px;color:var(--mt)"></span></div></div>';
   document.body.appendChild(div);
@@ -8193,6 +8223,9 @@ async function hdPlanla(){
       + '\nDevam edilsin mi?')) return;
   HD.calisiyor = true;
   const btn = document.getElementById('hd-planla-btn'); if (btn) btn.disabled = true;
+  // Önceki turun sebep kutusu kalmasın — düzeltilmiş bir hata ekranda
+  // asılı kalırsa kullanıcı hâlâ bozuk sanır.
+  const _hTemiz = document.getElementById('hd-hata'); if (_hTemiz) _hTemiz.innerHTML = '';
   try {
     // Sıfırlama işareti: ÇİFT KORUMASININ ÖNKOŞULU. İşaret olmadan ckCiftMi
     // eski hesabın kayıtlarını görür ve HER adayı "zaten var" diye keserdi.
@@ -8205,6 +8238,9 @@ async function hdPlanla(){
       addLog('info','uploadpost','Sıfırlama işareti (otomatik): '+d.profil+' ['+d.plat+'] < '+new Date(d.t).toISOString());
     }
     let ok=0, cift=0, hata=0, atlanan=0; const hatalar=[];
+    // Sebep KIRILIMI: aynı sebepten düşenler tek kutuda toplanır. Ham mesajı
+    // saklıyoruz ki hataCevir kuralları üzerinde çalışsın.
+    const sebepler = {};
     let dolu = false;
     await upSirali(secili, async a => {
       if (dolu){ atlanan++; return; }
@@ -8212,12 +8248,35 @@ async function hdPlanla(){
         _video:a.video, _caption:a.caption||'', _clipId:a.clipId||'', title:a.ham });
       if (s.ok){ ok++; a._ok=true; }
       else if (s.sebep === 'cift'){ cift++; a._ok=true; }
-      else { hata++; if (hatalar.length<4) hatalar.push(s.mesaj||s.sebep); if (kuyrukDoluMu(s)) dolu = true; }
+      else {
+        hata++;
+        const ham = s.mesaj || s.sebep || 'bilinmeyen';
+        const c = hataCevir(ham);
+        const g = sebepler[c.baslik] || (sebepler[c.baslik] = { n:0, ham, c });
+        g.n++;
+        if (hatalar.length<4) hatalar.push(ham);
+        if (kuyrukDoluMu(s)) dolu = true;
+      }
       const st = document.getElementById('hd-durum');
       if (st) st.textContent = '⏳ '+(ok+cift+hata)+'/'+secili.length;
     }, 2);
+    // Sebepleri ekrana bas — kullanıcı ne yapacağını buradan öğrenir.
+    const hEl = document.getElementById('hd-hata');
+    if (hEl) hEl.innerHTML = Object.keys(sebepler).map(b => {
+      const g = sebepler[b], c = g.c;
+      return '<div style="padding:6px 8px;margin-top:4px;border:1px solid var(--er);border-left:3px solid var(--er);'
+        + 'border-radius:5px;background:rgba(248,113,113,.07)">'
+        + '<div style="color:var(--er);font-weight:600">'+(HATA_IKON[c.ciddiyet]||'⚠')+' '
+        +   g.n+' gönderim başarısız: '+esc0(c.baslik)+'</div>'
+        + '<div style="color:var(--mt);font-size:11.5px;margin-top:2px">'+esc0(c.cozum)+'</div>'
+        + '<div style="color:var(--mt);opacity:.65;font-size:10px;margin-top:2px" title="Platformdan gelen ham mesaj">'
+        +   esc0(String(c.ham).slice(0,140))+'</div></div>';
+    }).join('');
     const ozet = ok+' kuyruğa alındı'+(cift?' · '+cift+' çift önlendi':'')+(hata?' · '+hata+' başarısız':'')
-      + (atlanan?' · '+atlanan+' denenmedi (kuyruk dolu)':'');
+      + (atlanan?' · '+atlanan+' denenmedi (kuyruk dolu)':'')
+      // ok=0 & hepsi çift: iş "başarılı" ama HİÇBİR ŞEY taşınmadı — bunu
+      // açıkça söyle, yoksa banner sessizce kaybolur ve kullanıcı taşındığını sanır.
+      + ((!ok && cift && !hata) ? ' — hepsi yeni hesapta zaten vardı, taşınacak short yoktu' : '');
     // TEMİZLİK YALNIZ TAM BİTİŞTE. ok=0 (ağ kesintisi, kuyruk dolu) iken de
     // bekleyen silinseydi uyarı ve tek-tık yeniden deneme yolu KALICI olarak
     // kaybolurdu — özellik "hallettim" görüntüsü verip işi yarım bırakırdı
@@ -8226,7 +8285,14 @@ async function hdPlanla(){
     const tamam = (ok + cift) === secili.length;
     if (tamam){
       const temel = htOku();
-      temel[k] = { h: d.yeni, t: Date.now(), eskiler: ((temel[k]||{}).eskiler||[]).concat(d.eski).slice(-5) };
+      // YENİ hesabın KALICI id'si TAŞINMALI. Eskiden yalnız {h,t,eskiler}
+      // yazılıyordu; id düşünce htKimlik'in "aynı hesap, yalnız ad değişmiş"
+      // dalı çalışamaz hale geliyordu (b.id boş → koşul asla tutmaz). Sonuç:
+      // yeni hesap kullanıcı adını değiştirdiğinde panel bunu TAKAS sanıp
+      // "yeni hesap tespit edildi" diyor ve tüm arşivi AYNI hesaba yeniden
+      // kuyruklamaya davet ediyordu — toplu kopya yayın.
+      temel[k] = { h: d.yeni, id: d.yeniId || htYeniKimlik(d.profil, d.plat) || '',
+                   t: Date.now(), eskiler: ((temel[k]||{}).eskiler||[]).concat(d.eski).slice(-5) };
       htYaz(temel);
       const degisim = hdOku(); delete degisim[k]; hdYaz(degisim);
       hdBanner(); notifSil('hesap-degisim');
