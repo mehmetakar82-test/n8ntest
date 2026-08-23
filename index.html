@@ -765,7 +765,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div class="fg"><label>Kaynak Notu</label><input id="sv-note" type="text" placeholder="manuel, kampanya..."/></div>
         <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı — short açıklamasına eklenir)</span></label><input id="sv-aciklama" type="text" placeholder="örn. Excalibur Kanalı, Bölüm 1..."/></div>
         <div style="margin:8px 0;padding:8px 10px;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:6px;display:flex;align-items:center;gap:8px">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap"><input id="sv-direkt" type="checkbox" style="width:auto;margin:0;accent-color:var(--acc)"> <b>Direkt Yayınla</b> <span style="color:var(--mt)">(OpusClip'i atla — video olduğu gibi yayınlanır)</span></label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;white-space:nowrap"><input id="sv-direkt" type="checkbox" style="width:auto;margin:0;accent-color:var(--acc)" onchange="toast(this.checked?'⚡ Direkt mod AÇIK — OpusClip atlanır, klip üretilmez; video tek parça yayınlanır (çerçeve açıksa yine işlenir)':'🎬 Direkt mod KAPALI — video OpusClip\'te kliplere bölünür', this.checked?'warn':'ok', 5000)"> <b>Direkt Yayınla</b> <span style="color:var(--mt)">(OpusClip'i atla — video olduğu gibi yayınlanır)</span></label>
         </div>
         <span id="sv-wh-display" style="display:none">/webhook/video-gonder</span>
         <div style="display:flex;gap:8px">
@@ -2053,6 +2053,10 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
           <div class="tg" id="cer-genel-tg" onclick="cerGenelToggle()"></div>
           <span><b>Çerçeve sistemi</b> — kapalıyken hiçbir klibe çerçeve eklenmez (profil ayarları saklanır)</span>
         </div>
+        <!-- GERÇEK durum: toggle'lar niyettir; n8n'in çerçeveyi gerçekten
+             uygulaması için banner yayını + urlModu + senkron da gerekir.
+             Bu şerit n8n'deki kapı koşulunun BİREBİR aynısını hesaplar. -->
+        <div id="cer-durum-serit" style="margin-bottom:10px"></div>
         <div id="cer-profil-liste"></div>
       </div>
       <div class="card" id="cer-editor-card" style="display:none">
@@ -2533,7 +2537,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.22-68';
+const PANEL_YAPI = 'y2026.08.22-69';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -9883,14 +9887,18 @@ function exportLogs(){dl('opus_logs.txt',S.logs.map(l=>l.t+' ['+l.cat+'] ['+l.se
 // düşüyordu — yani log göstermek yerine log SİLDİRİYORDU. Etiket de yaptığı
 // işi yanlış anlatıyordu. Artık yalnızca tabloyu tazeliyor ve bunu YALNIZCA
 // Loglar sayfası açıkken yapıyor.
-function toggleAutoLog(){
+function toggleAutoLog(sessiz){
   clearInterval(S.logTimer);
-  if((document.getElementById('log-auto')||{}).checked)
+  const acik = (document.getElementById('log-auto')||{}).checked;
+  if(acik)
     S.logTimer = setInterval(()=>{
       const p = document.getElementById('page-loglar');
       if (!p || !p.classList.contains('active')) return;
       try { renderLogs(); updateLogStats(); } catch(e){}
     }, 5000);
+  // sessiz: açılış rutini de bu fonksiyonu çağırıyor — kullanıcı hiçbir şeye
+  // dokunmamışken her sayfa yüklemesinde toast basılırdı (denetim bulgusu).
+  if (!sessiz) toast(acik ? '▶ Canlı görünüm açık — tablo 5 sn\'de bir tazelenir' : '⏸ Canlı görünüm kapalı', 'ok', 2500);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -12197,7 +12205,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setEl('panel-surum', PANEL_YAPI);
     setEl('dr-sent-cnt', S.sentURLs.size);
     addLog('ok','sistem','Panel v9 baslatildi ('+PANEL_YAPI+') — Kanal Listesi Arama/Video Detay/Kworb');
-    toggleAutoLog();
+    toggleAutoLog(true);   // acilis — toast yok
     // YENİ: hızlı gönder, servis durumu, rozetler
     try { renderUretimTabs(); } catch(e){}
     setTimeout(()=>{ try{ svcCheck(); }catch(e){} try{ refreshBadges(); }catch(e){} }, 800);
@@ -12311,13 +12319,14 @@ function cerOku(){
     const j = JSON.parse(localStorage.getItem('opus_cerceve')||'{}');
     CER.p = j.p||{}; CER.aktif = !!j.aktif; CER.urlModu = j.urlModu||'';
     CER.ghRepo = j.ghRepo||CER.ghRepo; CER.ghPat = j.ghPat||''; CER.syncSon = j.syncSon||'';
+    CER.syncKirli = !!j.syncKirli;
   }catch(e){}
 }
 function cerYaz(){
   try{
     localStorage.setItem('opus_cerceve', JSON.stringify({
       p:CER.p, aktif:CER.aktif, urlModu:CER.urlModu,
-      ghRepo:CER.ghRepo, ghPat:CER.ghPat, syncSon:CER.syncSon
+      ghRepo:CER.ghRepo, ghPat:CER.ghPat, syncSon:CER.syncSon, syncKirli:!!CER.syncKirli
     }));
   }catch(e){ addLog('err','cerceve','Kaydedilemedi (localStorage dolu olabilir): '+e.message); }
 }
@@ -12346,6 +12355,7 @@ async function initCerceve(){
   const p = document.getElementById('cer-gh-pat');  if (p && !p.value && CER.ghPat) p.value = CER.ghPat;
   const t = document.getElementById('cer-genel-tg'); if (t) t.classList.toggle('on', CER.aktif);
   setEl('cer-sync-son', CER.syncSon ? new Date(CER.syncSon).toLocaleString('tr') : '—');
+  cerDurumSerit();   // profiller yüklenmeden önce de gerçek durumu göster
   cerFontYukle();
   cerProfilleriYukle();
   if (S.cfg.blot) cerKota();
@@ -12362,15 +12372,114 @@ function cerGhKaydet(){
   CER.ghPat  = _p;
   cerYaz();
 }
-function cerGenelToggle(){
+// n8n "Çerçeve Hazırla" kapısının BİREBİR aynısı — bir profilin klibine
+// çerçevenin GERÇEKTEN işlenip işlenmeyeceğini söyler. Toggle'lar tek
+// başına yetmez: banner yayını + urlModu ölçümü + n8n senkronu da şart.
+function cerEngeller(u){
+  const eksik = [];
+  if (!CER.aktif) eksik.push('sistem kapalı');
+  const c = CER.p[u] || {};
+  if (c.aktif === false) eksik.push('profil kapalı');
+  if (!c.bannerUrl) eksik.push('banner yayınlanmadı (✎ Özelleştir → 🚀 Yayınla)');
+  // 'header' AYRI durum: test KOŞULDU ama sonuç n8n'in kullanamadığı mod —
+  // "ölçülmedi" demek kullanıcıyı testi boşuna yeniden koşmaya gönderir.
+  if (CER.urlModu === 'header') eksik.push('erişim modu \'header\' — n8n bu modda çerçeveyi atlar');
+  else if (['public','query','query2'].indexOf(CER.urlModu) < 0) eksik.push('erişim modu ölçülmedi (▶ Uçtan Uca Test)');
+  if (!CER.syncSon) eksik.push('ayar n8n\'e hiç gönderilmedi');
+  else if (CER.syncKirli) eksik.push('son ayar n8n\'e ULAŞMADI — n8n eski ayarla çalışıyor (⇪ Şimdi Gönder)');
+  return eksik;
+}
+function cerDurumSerit(){
+  const el = document.getElementById('cer-durum-serit'); if (!el) return;
+  const esc = esc0;
+  const kutu = (renk, ikon, metin) =>
+    '<div style="padding:8px 10px;border:1px solid '+renk+';border-left:3px solid '+renk+';border-radius:6px;'
+    + 'background:color-mix(in srgb, '+renk+' 7%, transparent);font-size:12px;margin-bottom:5px">'+ikon+' '+metin+'</div>';
+  if (!CER.aktif){
+    // KAPALI + senkron düşmüşse gerçek tehlikeyi söyle: n8n hâlâ AÇIK
+    // sanıyor ve çerçeve BASMAYA devam ediyor olabilir (denetim bulgusu).
+    el.innerHTML = kutu('var(--mt)','⏸','<b>Sistem kapalı</b> — hiçbir klibe çerçeve eklenmez. Profil ayarları saklandı.')
+      + (CER.syncKirli ? kutu('var(--er)','🔴','<b>Ama bu kapatma n8n\'e ULAŞMADI</b> — n8n hâlâ eski (açık) ayarla çerçeve basıyor olabilir. Sağdaki <b>⇪ Şimdi Gönder</b>\'e bas.') : '');
+    return;
+  }
+  const adlar = cerProfilAdlari();
+  const hazir = [], bannersiz = [], kapali = [];
+  adlar.forEach(u => {
+    const c = CER.p[u] || {};
+    if (c.aktif === false) kapali.push(u);
+    else if (!c.bannerUrl) bannersiz.push(u);
+    else hazir.push(u);
+  });
+  const urlModuYok = ['public','query','query2'].indexOf(CER.urlModu) < 0;
+  const parcalar = [];
+  // urlModu TÜM profilleri keser — en üstte, en sert uyarı.
+  // 'header' ayrı mesaj: test koşuldu ama sonuç n8n'in kullanamadığı mod;
+  // "hiç ölçülmedi" demek testi boşuna yeniden koşturur (denetim bulgusu).
+  if (CER.urlModu === 'header')
+    parcalar.push(kutu('var(--er)','🔴','<b>Hiçbir klibe çerçeve eklenmiyor:</b> erişim modu <b>header</b> çıktı — '
+      + 'Upload-Post indirme linki yalnız Authorization başlığıyla açılıyor ve n8n bu modda çerçeveyi atlıyor. '
+      + 'Testi yeniden koşmak çözmez; n8n tarafında başlıklı indirme düğümü gerekir.'));
+  else if (urlModuYok)
+    parcalar.push(kutu('var(--er)','🔴','<b>Hiçbir klibe çerçeve eklenmiyor:</b> erişim modu hiç ölçülmedi. '
+      + 'Sağdaki <b>Uçtan Uca Test</b>\'i bir kez çalıştır — sonuç n8n\'e otomatik gönderilir.'));
+  if (!CER.syncSon)
+    parcalar.push(kutu('var(--er)','🔴','<b>Ayarlar n8n\'e hiç gönderilmedi</b> — n8n çerçeveden habersiz. '
+      + 'Ayarlar\'a n8n URL girildiğinden emin ol, sonra sağdaki <b>⇪ Şimdi Gönder</b>\'e bas.'));
+  else if (CER.syncKirli)
+    parcalar.push(kutu('var(--er)','🔴','<b>Son ayar n8n\'e ULAŞMADI</b> — n8n eski ayarla çalışıyor; ekranda gördüğün '
+      + 'toggle durumları n8n\'dekiyle AYNI OLMAYABİLİR. Sağdaki <b>⇪ Şimdi Gönder</b>\'e bas.'));
+  if (bannersiz.length)
+    parcalar.push(kutu('var(--wn)','⚠', bannersiz.length+' profil açık ama <b>banner yayınlanmadı</b> — '
+      + 'bu profillerin short\'ları ÇERÇEVESİZ çıkar: <b>'+esc(bannersiz.slice(0,6).join(', '))+(bannersiz.length>6?' +'+(bannersiz.length-6):'')+'</b>. '
+      + 'Her biri için ✎ Özelleştir → 🚀 Banner\'ı Yayınla.'));
+  if (hazir.length && !urlModuYok && CER.syncSon && !CER.syncKirli)
+    parcalar.push(kutu('var(--ok)','✓','<b>'+hazir.length+' profil çerçeveli yayına hazır</b>'
+      + (kapali.length ? ' · '+kapali.length+' profil bilerek kapalı' : '')));
+  else if (hazir.length)
+    parcalar.push(kutu('var(--mt)','◐',hazir.length+' profilin banner\'ı hazır — üstteki engel(ler) giderilince çerçeve işlenmeye başlar.'));
+  if (!parcalar.length)
+    parcalar.push(kutu('var(--wn)','⚠','Sistem açık ama hiçbir profil hazır değil.'));
+  el.innerHTML = parcalar.join('');
+}
+async function cerGenelToggle(){
   CER.aktif = !CER.aktif;
   const t = document.getElementById('cer-genel-tg'); if (t) t.classList.toggle('on', CER.aktif);
-  cerYaz(); cerAyarGonder();
+  cerYaz(); cerDurumSerit();
+  // GERİ BİLDİRİM: durum + varsa İLK engel. "Açtım ama çerçeve gelmiyor"
+  // şaşkınlığının kaynağı, toggle'ın niyeti kaydedip gerçeği söylememesiydi.
+  const adlar = cerProfilAdlari();
+  const bannersiz = adlar.filter(u => (CER.p[u]||{}).aktif !== false && !(CER.p[u]||{}).bannerUrl).length;
+  const urlModuYok = ['public','query','query2'].indexOf(CER.urlModu) < 0;
+  if (CER.aktif){
+    const uyari = urlModuYok ? ' — ⚠ erişim modu ölçülmedi, n8n çerçeveyi ATLAR (Uçtan Uca Test çalıştır)'
+      : (bannersiz ? ' — ⚠ '+bannersiz+' profilde banner yayınlanmadı, onlar çerçevesiz çıkar' : '');
+    toast('🖼 Çerçeve sistemi AÇIK'+uyari, uyari?'warn':'ok', uyari?8000:4000);
+  } else {
+    toast('⏸ Çerçeve sistemi KAPALI — hiçbir klibe çerçeve eklenmez', 'warn', 4000);
+  }
+  const s = await cerAyarGonder();
+  if (s === 'gonderildi') toast('✓ Ayar n8n\'e iletildi', 'ok', 2500);
+  else if (s === 'belirsiz') toast('⚠ Ayar gönderildi ama n8n yanıt vermedi — ulaştığı doğrulanamadı', 'warn', 5000);
+  else if (s === 'n8n-yok') toast('⚠ n8n URL yok — ayar yalnız bu tarayıcıda kaldı, n8n hâlâ eski ayarla çalışıyor', 'err', 7000);
+  cerDurumSerit();
 }
-function cerProfilToggle(u){
+async function cerProfilToggle(u){
   const c = CER.p[u] = CER.p[u]||{};
   c.aktif = c.aktif === false;   // false ise aç, değilse kapat
-  cerYaz(); cerProfilRender(); cerAyarGonder();
+  cerYaz(); cerProfilRender();
+  const acik = c.aktif !== false;
+  if (acik){
+    const eksik = cerEngeller(u);
+    toast('🖼 '+u+' çerçeve AÇIK'+(eksik.length?' — ⚠ ama işlenmez: '+eksik[0]:' — bu profilin yeni short\'larına işlenecek'),
+          eksik.length?'warn':'ok', eksik.length?8000:4000);
+  } else {
+    toast('⏸ '+u+' çerçeve KAPALI — bu profilin short\'ları çerçevesiz çıkar', 'warn', 4000);
+  }
+  const s = await cerAyarGonder();
+  if (s === 'gonderildi') toast('✓ Ayar n8n\'e iletildi', 'ok', 2500);
+  else if (s === 'belirsiz') toast('⚠ Ayar gönderildi ama n8n yanıt vermedi — ulaştığı doğrulanamadı', 'warn', 5000);
+  else if (s === 'n8n-yok') toast('⚠ n8n URL yok — ayar yalnız bu tarayıcıda kaldı, n8n hâlâ eski ayarla çalışıyor', 'err', 7000);
+  cerDurumSerit();
 }
 
 // ── Profil listesi ──
@@ -12420,8 +12529,10 @@ function cerProfilRender(){
       + '<span style="width:9px;height:9px;border-radius:50%;background:'+dot+';flex-shrink:0"></span>'
       + '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">'+esc(c.ad||u)+'</div>'
       + '<div style="font-size:11px;color:var(--mt)">'+esc(u)+' · '+durum+'</div></div>'
-      + '<div class="tg'+(aktif?' on':'')+'" onclick="cerProfilToggle(\''+esc(u)+'\')" title="Bu profilde çerçeve"></div>'
-      + '<button class="btn bsm" onclick="cerDuzenle(\''+esc(u)+'\')">✎ Özelleştir</button>'
+      // inline onclick'te esc DEĞİL jsStr — kaçış standardı: HTML çözümleyici
+      // &#39;'ı JS ayrıştırmasından ÖNCE ' yapar, esc tek başına kırılabilir.
+      + '<div class="tg'+(aktif?' on':'')+'" onclick="cerProfilToggle(\''+jsStr(u)+'\')" title="Bu profilde çerçeve"></div>'
+      + '<button class="btn bsm" onclick="cerDuzenle(\''+jsStr(u)+'\')">✎ Özelleştir</button>'
       + '</div>';
   }).join('');
   // Test banner listesi
@@ -12431,6 +12542,7 @@ function cerProfilRender(){
     opts.unshift('<option value="'+esc(cerVarlik('banner-ornek.png'))+'">Örnek banner (repo)</option>');
     sel.innerHTML = opts.join('');
   }
+  cerDurumSerit();   // liste her çizildiğinde (kaydet/yayınla dahil) gerçek durum tazelensin
 }
 
 // ── Editör ──
@@ -12691,8 +12803,15 @@ async function cerYayinla(){
     cfg.bannerUrl = cerVarlik('banner-'+cerSlug(u)+'.png')+'?v='+Date.now();
     cerYaz(); cerProfilRender();
     durum('<span style="color:var(--ok)">✓ Yayınlandı</span> — n8n\'e bildiriliyor…');
-    await cerAyarGonder();
-    durum('<span style="color:var(--ok)">✓ Yayınlandı ve n8n\'e bildirildi</span>');
+    // Dönüş kontrolü ŞART (denetim bulgusu): banner GitHub'a çıkar ama
+    // bildirim düşerse n8n'deki bannerUrl boş/bayat kalır → kapı bu profili
+    // atlar; "bildirildi" yazmak kullanıcıya bittiğini söylerdi.
+    const sy = await cerAyarGonder();
+    if (sy === 'gonderildi') durum('<span style="color:var(--ok)">✓ Yayınlandı ve n8n\'e bildirildi</span>');
+    else if (sy === 'belirsiz') durum('<span style="color:var(--ok)">✓ Yayınlandı</span> — ⚠ n8n yanıt vermedi, bildirimin ulaştığı doğrulanamadı');
+    else durum('<span style="color:var(--ok)">✓ Yayınlandı</span> — <span style="color:var(--er)">✗ n8n\'e BİLDİRİLEMEDİ'
+      + (sy==='n8n-yok' ? ' (n8n URL girilmemiş)' : '')
+      + ' — n8n bu banner\'ı görmüyor, çerçeve işlenmez. Sağdaki ⇪ Şimdi Gönder ile tekrar dene.</span>');
     addLog('ok','cerceve','Banner yayınlandı: '+u);
   }catch(e){
     durum('<span style="color:var(--er)">✗ '+e.message+'</span>');
@@ -12701,9 +12820,26 @@ async function cerYayinla(){
 }
 
 // ── n8n senkron ──
+// Dönüş: 'gonderildi' | 'belirsiz' | 'hata' | 'n8n-yok' — toggle'lar bu
+// değerle geri bildirim veriyor. Eskiden n8n URL yokken SESSİZCE dönüyordu:
+// kullanıcı toggle'ı açıyor, panel kaydediyor ama n8n hiç haber almıyordu.
+// SIRALAMA: eşzamanlı iki gönderim yarışırsa n8n'de SON GELEN kazanır —
+// hızlı çift tıklamada eski durum yeniyi ezebilirdi (denetim bulgusu).
+// Her çağrı bir öncekinin bitmesini bekler; payload gönderim ANINDA
+// kurulduğu için sıradaki daima en güncel durumu taşır.
 async function cerAyarGonder(manuel){
+  const onceki = CER._gonderim || Promise.resolve();
+  const is_ = onceki.catch(()=>{}).then(() => cerAyarGonderCek(manuel));
+  CER._gonderim = is_;
+  return is_;
+}
+async function cerAyarGonderCek(manuel){
   const base = getN8N();
-  if (!base){ if (manuel) alert('Önce Ayarlar\'dan n8n URL girin'); return; }
+  if (!base){
+    CER.syncKirli = !!CER.syncSon; cerYaz();   // daha önce senkron OLDUYSA n8n artık bayat demektir
+    if (manuel) alert('Önce Ayarlar\'dan n8n URL girin');
+    return 'n8n-yok';
+  }
   const profiller = {};
   Object.keys(CER.p).forEach(u=>{
     const c = CER.p[u];
@@ -12718,18 +12854,30 @@ async function cerAyarGonder(manuel){
   // manuel && corsOrNetwork durumunda çıkıyordu. Yani toggle'lardan yapılan
   // gönderimlerde hata tamamen sessizdi.
   if (!s.ok && !s.belirsiz){
+    // KİRLİ bayrağı: n8n'in elindeki ayar artık panelinkiyle AYNI DEĞİL.
+    // Şerit ve cerEngeller bunu engel sayar; başarılı gönderim temizler.
+    CER.syncKirli = true; cerYaz();
     setEl('cer-sync-son', 'gönderilemedi');
     addLog('err','webhook','Çerçeve ayarı gönderilemedi: '+s.mesaj);
     if (manuel) alert('Çerçeve ayarı n8n\'e gönderilemedi — '+s.mesaj);
     else toast('⚠ Çerçeve ayarı n8n\'e gönderilemedi — '+s.mesaj, 'err', 7000);
-    return;
+    cerDurumSerit();
+    return 'hata';
   }
+  // 'belirsiz' kirli SAYILMAZ: panelin yerleşik sözleşmesi (sendSingle,
+  // Drive) belirsizi "gönderildi, şerhli" kabul ediyor — CORS başlığı
+  // vermeyen n8n kurulumunda HER gönderim belirsizdir, kirli saymak şeridi
+  // kalıcı kırmızıya çakardı. Şerh zaten etikette ve toast'ta görünür.
+  CER.syncKirli = false;
   CER.syncSon = new Date().toISOString(); cerYaz();
   setEl('cer-sync-son', new Date().toLocaleString('tr') + (s.belirsiz ? ' (yanıt alınamadı)' : ''));
+  cerDurumSerit();
   if (s.belirsiz){
     addLog('warn','webhook','Çerçeve ayarı: '+s.mesaj);
     if (manuel) alert('Gönderildi ama yanıt alınamadı — '+s.mesaj);
+    return 'belirsiz';
   }
+  return 'gonderildi';
 }
 
 // ── FFmpeg komutu (n8n "Çerçeve Hazırla" ile BİREBİR aynı mantık) ──
@@ -12852,8 +13000,14 @@ async function cerTest(){
     CER.urlModu = (modu==='query2') ? 'query2' : modu;
     cerYaz();
     adim('⏳ n8n\'e bildiriliyor…');
-    await cerAyarGonder();
-    son('✓ Ayar n8n\'e gönderildi (urlModu: '+CER.urlModu+')');
+    // KOŞULSUZ ✓ YASAK (denetim bulgusu): testin bütün amacı urlModu'yu
+    // n8n'e taşımak. Gönderim düşerse n8n'de urlModu boş kalır, kapı TÜM
+    // profillerde kapanır ve her klip çerçevesiz çıkar — ekranda ✓ dururken.
+    const sg = await cerAyarGonder();
+    if (sg === 'gonderildi') son('✓ Ayar n8n\'e gönderildi (urlModu: '+CER.urlModu+')');
+    else if (sg === 'belirsiz') son('⚠ Gönderildi ama n8n yanıt vermedi (urlModu: '+CER.urlModu+') — ulaştığı doğrulanamadı');
+    else if (sg === 'n8n-yok') son('<span style="color:var(--er)">✗ n8n URL girilmemiş — ölçülen mod n8n\'e GİDEMEDİ, çerçeve çalışmayacak (Ayarlar → n8n URL, sonra ⇪ Şimdi Gönder)</span>');
+    else son('<span style="color:var(--er)">✗ Ayar n8n\'e GÖNDERİLEMEDİ — ölçülen mod n8n\'e ulaşmadı, çerçeve çalışmayacak (⇪ Şimdi Gönder ile tekrar dene)</span>');
     if (blob){
       const src = URL.createObjectURL(blob);
       adimlar.push('<video controls src="'+src+'" style="width:200px;border-radius:8px;margin-top:6px"></video>'
@@ -12861,6 +13015,7 @@ async function cerTest(){
       ciz();
     }
     cerKota();
+    cerDurumSerit();   // urlModu değişti — şeritteki kırmızı uyarı düşsün
     addLog('ok','cerceve','Uçtan uca test tamam — urlModu: '+CER.urlModu);
   }catch(e){
     adim('<span style="color:var(--er)">✗ '+esc(e.message)+'</span>');
