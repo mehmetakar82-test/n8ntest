@@ -21,7 +21,7 @@
      sinirlandirdim - duz metin http'yi keser, keyfi origin'i kesmez.
      NOT: bu yorumda etiket adlarini acili parantezsiz yaziyorum - yorum icinde
      bile olsa arac zincirini (sozdizimi cikarici) yaniltiyorlar. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src https://www.youtube.com; connect-src https:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://raw.githubusercontent.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; frame-src https://www.youtube.com; connect-src https:; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>OPUS PRO v9</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -2537,7 +2537,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.24-70';
+const PANEL_YAPI = 'y2026.08.24-71';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12345,7 +12345,15 @@ function cerFontYukle(){
     new FontFace('InterXB','url('+cerVarlik('Inter-ExtraBold.ttf')+')').load(),
     new FontFace('InterSB','url('+cerVarlik('Inter-SemiBold.ttf')+')').load()
   ]).then(fs=>{ fs.forEach(f=>document.fonts.add(f)); return true; })
-    .catch(e=>{ addLog('warn','cerceve','Web fontu yüklenemedi, sistem fontuyla çizilecek: '+e.message); return false; });
+    // Font YÜKLENEMEZSE sessizce sistem fontuna düşmek YANILTICI: üretilen
+    // banner PNG'si (ad/handle/buton) yedek fontla, ffmpeg'in yazdığı başlık
+    // ise gerçek Inter ile çizilir — iki farklı yazı tipi. CSP font-src'ye
+    // raw.githubusercontent.com eklendi (24 Ağu 2026); yine düşerse söyle.
+    .catch(e=>{ addLog('warn','cerceve','Web fontu yüklenemedi — banner sistem fontuyla çizilecek, '
+      + 'ffmpeg başlığı ise Inter kullanacak (iki font karışır): '+e.message);
+      toast('⚠ Banner fontu (Inter) yüklenemedi — önizleme ve üretilen PNG sistem fontuyla çizilir, '
+        + 'video başlığıyla aynı görünmez', 'warn', 7000);
+      return false; });
   return cerFontSoz;
 }
 
@@ -12428,10 +12436,19 @@ function cerDurumSerit(){
   else if (CER.syncKirli)
     parcalar.push(kutu('var(--er)','🔴','<b>Son ayar n8n\'e ULAŞMADI</b> — n8n eski ayarla çalışıyor; ekranda gördüğün '
       + 'toggle durumları n8n\'dekiyle AYNI OLMAYABİLİR. Sağdaki <b>⇪ Şimdi Gönder</b>\'e bas.'));
-  if (bannersiz.length)
+  if (bannersiz.length){
+    // KÖK ENGEL ÖNCE: token yoksa 15 profili tek tek denemek boşuna —
+    // hepsi "GitHub token gerekli" ile düşer (yaşandı).
+    if (!CER.ghPat)
+      parcalar.push(kutu('var(--er)','🔴','<b>GitHub token girilmemiş</b> — banner PNG\'leri herkese açık bir adreste durmak '
+        + 'zorunda (ffmpeg oradan çeker) ve panel onları GitHub\'a yüklüyor. Token olmadan <b>hiçbir profilin banner\'ı '
+        + 'yayınlanamaz</b>. Sağdaki <b>GitHub Yayınlama</b> kartına <code>github_pat_</code> ile başlayan bir '
+        + 'fine-grained token gir (Repository access: Only select repositories → '+esc(String(CER.ghRepo||'').split('/')[1]||'repo')
+        + ', Contents: Read and write), sonra <b>Bağlantıyı Sına</b>.'));
     parcalar.push(kutu('var(--wn)','⚠', bannersiz.length+' profil açık ama <b>banner yayınlanmadı</b> — '
       + 'bu profillerin short\'ları ÇERÇEVESİZ çıkar: <b>'+esc(bannersiz.slice(0,6).join(', '))+(bannersiz.length>6?' +'+(bannersiz.length-6):'')+'</b>. '
       + 'Her biri için ✎ Özelleştir → 🚀 Banner\'ı Yayınla.'));
+  }
   if (hazir.length && !urlModuYok && CER.syncSon && !CER.syncKirli)
     parcalar.push(kutu('var(--ok)','✓','<b>'+hazir.length+' profil çerçeveli yayına hazır</b>'
       + (kapali.length ? ' · '+kapali.length+' profil bilerek kapalı' : '')));
@@ -12744,7 +12761,10 @@ function cerKaydet(sessiz){
 // ── GitHub yayınlama ──
 async function cerGhIstek(yol, metod, govde){
   cerGhKaydet();
-  if (!CER.ghPat) throw new Error('GitHub token gerekli (sağdaki GitHub Yayınlama kartı)');
+  if (!CER.ghPat) throw new Error('GitHub token gerekli — banner PNG\'si ffmpeg\'in çekebileceği herkese açık '
+    + 'bir adreste durmalı, panel bunu GitHub\'a yüklüyor. Sağdaki "GitHub Yayınlama" kartına github_pat_ ile '
+    + 'başlayan fine-grained token gir (Only select repositories → '+(String(CER.ghRepo||'').split('/')[1]||'repo')
+    + ', Contents: Read and write), "Bağlantıyı Sına" ile doğrula, sonra tekrar Yayınla');
   const r = await fetch('https://api.github.com/repos/'+CER.ghRepo+'/contents/'+yol, {
     method: metod||'GET',
     headers: { 'Authorization':'Bearer '+CER.ghPat, 'Accept':'application/vnd.github+json' },
@@ -12942,6 +12962,74 @@ async function cerKota(){
 }
 
 // ── Uçtan uca test ──
+// OpenAPI "PENDING/PROCESSING/FINISHED/ERROR" diyor ama API gerçekte FAILED
+// de döndürüyor (24 Ağu 2026 canlı gözlem). Belgeye değil gözleme güven.
+const CER_BITMIS = ['FINISHED','ERROR','FAILED','CANCELLED','CANCELED'];
+// Durum yanıtındaki sebebi bul — alan adı sürüme göre değişiyor.
+function cerIsHatasi(j){
+  if (!j || typeof j !== 'object') return '';
+  const anahtarlar = ['error','error_message','errorMessage','message','detail','details','reason','stderr','output','log'];
+  for (const k of anahtarlar){
+    const v = j[k];
+    if (typeof v === 'string' && v.trim() && v.trim().toUpperCase() !== (j.status||'').toUpperCase())
+      return v.trim().slice(0, 400);
+  }
+  // bir düzey içeride olabilir
+  for (const k in j){
+    const v = j[k];
+    if (v && typeof v === 'object' && !Array.isArray(v)){
+      const i = cerIsHatasi(v);
+      if (i) return i;
+    }
+  }
+  return '';
+}
+// Üç girdinin İNDİRİLEBİLİRLİĞİ. Upload-Post'un işçisi de aynı adresleri
+// kendisi çeker; buradan geçen bir adres orada da çoğunlukla geçer.
+// Yöntemler CSP'ye göre seçildi: video→<video> (media-src), banner→Image
+// (img-src), font→fetch (connect-src). Hiçbiri CORS gerektirmiyor.
+async function cerGirdiKontrol(videoUrl, bannerUrl, fontUrl){
+  const zamanAsimi = (sozP, ms, msj) => Promise.race([sozP,
+    new Promise(r => setTimeout(()=>r({durum:'yok', mesaj:msj}), ms))]);
+  const videoDene = () => new Promise(r => {
+    const v = document.createElement('video');
+    v.preload = 'metadata'; v.muted = true;
+    v.onloadedmetadata = () => { r({durum:'var', mesaj:'okunabiliyor', w:v.videoWidth, h:v.videoHeight}); v.src=''; };
+    v.onerror = () => r({durum:'yok', mesaj:'indirilemiyor veya video değil (link süresi dolmuş olabilir)'});
+    v.src = videoUrl;
+  });
+  const resimDene = (u) => new Promise(r => {
+    const i = new Image();
+    i.onload = () => {
+      // Banner ölçüsü CER_SPEC ile tutmalı: drawtext y değerleri (l1Y/l2Y/
+      // tekY) bant yüksekliğine göre seçildi. Repodaki örnek banner 400 px
+      // kalmış, panel 550 px üretiyor — 400'lük bantta başlık bandın ALTINA,
+      // videonun üstüne düşer (ölçüldü, 24 Ağu 2026).
+      const uyum = (i.naturalWidth === CER_SPEC.W && i.naturalHeight === CER_SPEC.BANT);
+      r({durum:'var', uyum, w:i.naturalWidth, h:i.naturalHeight,
+         mesaj: i.naturalWidth+'×'+i.naturalHeight+' PNG'
+           + (uyum ? '' : ' — ⚠ beklenen '+CER_SPEC.W+'×'+CER_SPEC.BANT+', başlık bandın dışına düşebilir')});
+    };
+    i.onerror = () => r({durum:'yok', mesaj:'indirilemiyor (404 ya da depo herkese açık değil)'});
+    i.src = u;
+  });
+  const fontDene = async (u) => {
+    try {
+      const r = await fetch(u, { method:'GET' });
+      if (!r.ok) return {durum:'yok', mesaj:'HTTP '+r.status+' — depoda yok ya da erişilemiyor'};
+      const b = await r.blob();
+      if (b.size < 1000) return {durum:'yok', mesaj:'dosya çok küçük ('+b.size+' bayt) — bozuk olabilir'};
+      return {durum:'var', mesaj:Math.round(b.size/1024)+' KB'};
+    } catch(e){ return {durum:'yok', mesaj:'çekilemedi: '+(e.message||'ağ hatası')}; }
+  };
+  const [v, b, f] = await Promise.all([
+    zamanAsimi(videoDene(), 15000, 'yanıt vermedi (15 sn) — büyük dosya ya da erişilemez adres'),
+    zamanAsimi(resimDene(bannerUrl), 12000, 'yanıt vermedi (12 sn)'),
+    zamanAsimi(fontDene(fontUrl), 12000, 'yanıt vermedi (12 sn)'),
+  ]);
+  return [ {ad:'Video', ...v}, {ad:'Banner', ...b}, {ad:'Font', ...f} ];
+}
+
 async function cerTest(){
   if (CER._test) return;
   const kutu = document.getElementById('cer-test-sonuc');
@@ -12966,24 +13054,66 @@ async function cerTest(){
   const son = m=>{ adimlar[adimlar.length-1] = m; ciz(); };
   const t0 = Date.now();
   try{
+    // ── ÖN KONTROL: üç girdi de İNDİRİLEBİLİR mi? ────────────────────
+    // Upload-Post'un ffmpeg işçisi dosyaları kendisi indirir; biri
+    // erişilemezse iş 3 DAKİKA sürünüp FAILED verir ve SEBEP söylenmez
+    // (yaşandı). OpusClip'in signed-ext linkleri süreli — en sık düşen bu.
+    // CSP izinleri: img-src https: (banner), media-src https: (video),
+    // connect-src https: (font). Üçü de saniyeler içinde yanıt verir.
+    adim('⏳ Girdiler kontrol ediliyor (video / banner / font)…');
+    const fontUrl = cerVarlik('Inter-ExtraBold.ttf');
+    const onKontrol = await cerGirdiKontrol(videoUrl, bannerUrl, fontUrl);
+    const dusenler = onKontrol.filter(x => x.durum === 'yok');
+    if (dusenler.length){
+      son('<span style="color:var(--er)">✗ '+dusenler.length+' girdi indirilemiyor — iş açılmadı (boşuna 3 dk beklemek yerine)</span>'
+        + onKontrol.map(x => '<div style="font-size:11.5px;margin-top:3px;color:'+(x.durum==='var'?'var(--ok)':'var(--er)')+'">'
+            + (x.durum==='var'?'✓':'✗')+' <b>'+esc(x.ad)+'</b>: '+esc(x.mesaj)+'</div>').join('')
+        + '<div style="font-size:11.5px;color:var(--mt);margin-top:6px">OpusClip mp4 linkleri <b>süreli</b>dir — '
+        + 'Galeri\'den taze bir short-url kopyala. Banner/font düşüyorsa GitHub deposundaki '
+        + '<code>cerceve/</code> klasörünü kontrol et.</div>');
+      return;
+    }
+    // Boyut uyarısı: banner 1080 genişlik varsayar; overlay scale'den ÖNCE
+    // uygulandığı için farklı boyutlu kaynakta banner kayabilir.
+    const vid = onKontrol.find(x => x.ad === 'Video');
+    const ban = onKontrol.find(x => x.ad === 'Banner');
+    const boyutNotu = ((vid && vid.w && (vid.w !== 1080 || vid.h !== 1920))
+      ? '<div style="font-size:11.5px;color:var(--wn);margin-top:3px">⚠ Kaynak '+vid.w+'×'+vid.h
+        + ' (1080×1920 değil) — banner bu videoda kayabilir; gerçek OpusClip short\'ları 1080×1920\'dir.</div>' : '')
+      + ((ban && ban.uyum === false)
+      ? '<div style="font-size:11.5px;color:var(--wn);margin-top:3px">⚠ Banner '+ban.w+'×'+ban.h
+        + ', beklenen '+CER_SPEC.W+'×'+CER_SPEC.BANT+' — başlık yazısı bandın dışına, videonun üstüne düşer. '
+        + 'Depodaki örnek banner eski ölçüde; kendi profilinin banner\'ını yayınlayınca doğru ölçüde üretilir.</div>' : '');
+    son('✓ Üç girdi de erişilebilir'+(vid&&vid.w?' · kaynak '+vid.w+'×'+vid.h:'')+boyutNotu);
     adim('⏳ FFmpeg işi açılıyor…');
     const komut = cerFfKomut('Çerçeve testi — Türkçe ğüşiöç ĞÜŞİÖÇ çalışıyor mu?', '@cerceve-test');
     const { data: is } = await upFetch('/uploadposts/ffmpeg/jobs/upload', { method:'POST', body:{
-      files: [videoUrl, bannerUrl, cerVarlik('Inter-ExtraBold.ttf')],
+      files: [videoUrl, bannerUrl, fontUrl],
       full_command: komut, output_extension: 'mp4'
     }});
     if (!is.job_id) throw new Error('job_id dönmedi: '+JSON.stringify(is).slice(0,200));
     son('✓ İş açıldı: <code>'+esc(is.job_id)+'</code>');
     adim('⏳ İşleniyor (5 sn\'de bir yoklanıyor)…');
-    let durum = '';
+    let durum = '', sonYanit = null;
     for (let i=0; i<36; i++){
       await new Promise(r=>setTimeout(r, 5000));
       const { data: j } = await upFetch('/uploadposts/ffmpeg/jobs/'+is.job_id);
+      sonYanit = j;
       durum = (j.status||'').toUpperCase();
       son('⏳ İşleniyor… '+Math.round((Date.now()-t0)/1000)+' sn — durum: '+esc(durum||'?'));
-      if (durum === 'FINISHED' || durum === 'ERROR') break;
+      // TERMİNAL DURUMLAR: şema yalnız PENDING/PROCESSING/FINISHED/ERROR
+      // yazıyor ama API gerçekte FAILED de döndürüyor (yaşandı: 179 sn
+      // boyunca FAILED yazarken yoklamaya devam edip "zaman aşımı" dedi).
+      if (CER_BITMIS.indexOf(durum) >= 0) break;
     }
-    if (durum !== 'FINISHED') throw new Error(durum==='ERROR' ? 'İş ERROR verdi — komut veya girdiler sorunlu (font {input2} desteklenmiyor olabilir)' : 'Zaman aşımı (3 dk) — iş hâlâ bitmedi');
+    if (durum !== 'FINISHED'){
+      const sebep = cerIsHatasi(sonYanit);
+      throw new Error(
+        (CER_BITMIS.indexOf(durum) >= 0 ? 'İş '+durum+' ile bitti' : 'Zaman aşımı (3 dk) — iş hâlâ bitmedi')
+        + (sebep ? ' — ' + sebep : '')
+        + (sebep ? '' : '. Girdiler erişilebilirdi, demek ki ffmpeg komutu bu kaynakta çalışmadı — '
+            + 'ham yanıt: ' + JSON.stringify(sonYanit||{}).slice(0,300)));
+    }
     son('✓ İş bitti ('+Math.round((Date.now()-t0)/1000)+' sn)');
     // URL erişim modu — n8n'in video URL'sini Upload-Post'a nasıl vereceğini belirler
     adim('⏳ Sonuç URL erişim modu ölçülüyor…');
