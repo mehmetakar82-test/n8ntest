@@ -2537,7 +2537,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.22-69';
+const PANEL_YAPI = 'y2026.08.24-70';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12900,14 +12900,20 @@ function cerBaslikBol(t){
 }
 function cerFfKomut(baslik, filigran){
   const C = CER_SPEC;
-  const p = ['[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920[v0]','[v0][1:v]overlay=0:0[v1]'];
-  let son = 'v1', i = 2;
-  const dt = (metin,boy,renk,y)=>{ p.push('['+son+']drawtext=fontfile={input2}:text=\''+cerDtEsc(metin)+'\':fontsize='+boy+':fontcolor='+renk+':x=(w-text_w)/2:y='+y+'[v'+i+']'); son='v'+(i++); };
+  // NOKTALI VİRGÜL YASAK (24 Ağu 2026): Upload-Post, full_command içindeki
+  // ';' karakterini reddetmeye başladı ("Comando contiene caracteres o
+  // patrones no permitidos: ;"). filter_complex bu yüzden TEK ZİNCİR —
+  // çok girişli overlay yalnız zincir BAŞINDA durabilir, scale/crop sonra.
+  // Kaynak 1080x1920 (OpusClip standardı) iken sonuç eski iki-zincirli
+  // komutla piksel piksel aynı; farklı boyutlu kaynakta banner overlay'i
+  // scale'den önce bindiği için kenardan kırpılabilir (bilinen sınır).
+  const p = ['[0:v][1:v]overlay=0:0','scale=1080:1920:force_original_aspect_ratio=increase','crop=1080:1920'];
+  const dt = (metin,boy,renk,y)=>{ p.push('drawtext=fontfile={input2}:text=\''+cerDtEsc(metin)+'\':fontsize='+boy+':fontcolor='+renk+':x=(w-text_w)/2:y='+y); };
   const [l1,l2] = cerBaslikBol(baslik);
   if (l2){ dt(l1,C.fontPx,C.renk,C.l1Y); dt(l2,C.fontPx,C.renk,C.l2Y); }
   else if (l1) dt(l1,C.fontPx,C.renk,C.tekY);
   if (filigran) dt(filigran,C.wmPx,'white@0.6','h-'+C.wmAlt);
-  return 'ffmpeg -y -i {input0} -i {input1} -filter_complex "'+p.join(';')+'" -map "['+son+']" -map 0:a? -c:v libx264 -preset veryfast -crf 21 -c:a copy -movflags +faststart {output}';
+  return 'ffmpeg -y -i {input0} -i {input1} -filter_complex "'+p.join(',')+'[vout]" -map "[vout]" -map 0:a? -c:v libx264 -preset veryfast -crf 21 -c:a copy -movflags +faststart {output}';
 }
 
 // ── Kota ──
@@ -12945,6 +12951,14 @@ async function cerTest(){
   const bannerUrl = (document.getElementById('cer-test-banner')||{}).value||'';
   if (!S.cfg.blot){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Upload-Post API Key gerekli (Ayarlar)'}); return; }
   if (!/^https?:\/\//.test(videoUrl)){ kutu.innerHTML = durumHTML('kurulum',{kompakt:true, alt:'Bir mp4 URL yapıştır (OpusClip Galeri\'den bir short-url kopyalanabilir)'}); return; }
+  // SAYFA linki ≠ video dosyası: youtube.com/shorts/... bir HTML sayfasıdır,
+  // ffmpeg'e girince iş 3 dk sürünüp ERROR verir. Baştan engelle (yaşandı).
+  if (/(youtube\.com|youtu\.be|instagram\.com|tiktok\.com|facebook\.com|x\.com|twitter\.com)\//i.test(videoUrl)){
+    kutu.innerHTML = durumHTML('kurulum',{kompakt:true,
+      alt:'Bu bir platform SAYFASI linki, video dosyası değil — ffmpeg indirip işleyemez. '
+        + 'OpusClip Galeri\'den bir short\'un mp4 adresini (short-url) kopyalayıp yapıştır.'});
+    return;
+  }
   CER._test = true; btn.disabled = true;
   const adimlar = [];
   const ciz = ()=>{ kutu.innerHTML = adimlar.map(a=>'<div style="font-size:12px;padding:3px 0">'+a+'</div>').join(''); };
@@ -13018,7 +13032,14 @@ async function cerTest(){
     cerDurumSerit();   // urlModu değişti — şeritteki kırmızı uyarı düşsün
     addLog('ok','cerceve','Uçtan uca test tamam — urlModu: '+CER.urlModu);
   }catch(e){
-    adim('<span style="color:var(--er)">✗ '+esc(e.message)+'</span>');
+    // Upload-Post'un komut doğrulayıcısı yasaklı karakter bulursa İspanyolca
+    // "Comando contiene caracteres o patrones no permitidos: X" döndürüyor.
+    // 24 Ağu 2026'da ';' bu listeye girdi ve komut tek-zincire çevrildi;
+    // bu hata YİNE görünüyorsa yasak listesi yeniden değişmiş demektir.
+    const m = String(e.message||'').match(/caracteres o patrones no permitidos:?\s*(.*)$/i);
+    adim('<span style="color:var(--er)">✗ '+esc(e.message)+'</span>'
+      + (m ? '<div style="color:var(--mt);font-size:11px;margin-top:3px">Upload-Post, komuttaki <b>'+esc(m[1]||'?')+'</b> karakterini/desenini yasaklamış. '
+           + 'Panel komutu zaten noktalı virgülsüz üretiyor — bu hatayı görüyorsan yasak listesi yine değişmiş demektir, komutun güncellenmesi gerekiyor.</div>' : ''));
     addLog('err','cerceve','Test başarısız: '+e.message);
   }finally{ CER._test = false; btn.disabled = false; }
 }
