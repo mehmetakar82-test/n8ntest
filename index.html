@@ -2105,9 +2105,13 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <div class="card">
         <div class="ct">Uçtan Uca Test</div>
         <div style="font-size:12px;color:var(--mt);margin-bottom:8px">Küçük bir <b>gerçek işle</b> dört şeyi ölçer: iş açma, Türkçe başlık + font, işlem süresi ve sonuç URL'sinin <b>erişim modu</b> (n8n'in çalışma şeklini bu belirler).</div>
-        <div class="fg"><label>Test videosu (mp4 URL)</label><input id="cer-test-url" type="text" placeholder="Bir short-url yapıştır (OpusClip Galeri → kopyala)"/></div>
+        <div class="fg"><label>Test videosu (mp4 URL)</label><input id="cer-test-url" type="text" placeholder="Bir short-url yapıştır (OpusClip Galeri → kopyala)"/>
+          <div style="font-size:11px;color:var(--mt);margin-top:3px">OpusClip mp4 linkleri <b>sürelidir</b> — eski bir link kopyalarsan iş indirme aşamasında düşer.</div></div>
         <div class="fg"><label>Banner</label><select id="cer-test-banner"></select></div>
-        <button class="btn bp bsm" id="cer-test-btn" onclick="cerTest()">▶ Testi Çalıştır</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bp bsm" id="cer-test-btn" onclick="cerTest()">▶ Testi Çalıştır</button>
+          <button class="btn bsm" onclick="cerTazeLinkAl()" title="OpusClip dizininden en yeni klibin güncel mp4 adresini alanı doldurur">🔄 Galeri'den taze link al</button>
+        </div>
         <div id="cer-test-sonuc" style="margin-top:10px"></div>
       </div>
       <div class="card">
@@ -2537,7 +2541,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.24-71';
+const PANEL_YAPI = 'y2026.08.24-72';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -13030,6 +13034,33 @@ async function cerGirdiKontrol(videoUrl, bannerUrl, fontUrl){
   return [ {ad:'Video', ...v}, {ad:'Banner', ...b}, {ad:'Font', ...f} ];
 }
 
+// Testin en sık düşen girdisi süresi dolmuş OpusClip mp4 linki. Kullanıcıyı
+// Galeri'ye gönderip elle kopyalatmak yerine taze bir link doğrudan alınır:
+// pdKlipDizini zaten OpusClip API'sinden GÜNCEL uriForExport döndürüyor.
+async function cerTazeLinkAl(){
+  const kutu = document.getElementById('cer-test-sonuc');
+  const alan = document.getElementById('cer-test-url');
+  if (!kutu || !alan || CER._tazeAliniyor) return;
+  CER._tazeAliniyor = true;
+  const yaz = m => { kutu.innerHTML = '<div style="font-size:12px;padding:3px 0">'+m+'</div>'; };
+  try {
+    yaz(durumHTML('yukleniyor',{kompakt:true, alt:'OpusClip dizini taranıyor…'}));
+    const dizin = await pdKlipDizini(m => yaz('⏳ '+esc0(m)));
+    if (!dizin.length){ yaz('<span style="color:var(--er)">✗ OpusClip\'te klip bulunamadı</span>'); return; }
+    // En YENİsi: süreli linklerde en taze olan en uzun ömürlüdür
+    const sirali = dizin.slice().sort((a,b) => (Date.parse(b.tarih)||0) - (Date.parse(a.tarih)||0));
+    const k = sirali[0];
+    alan.value = k.url;
+    yaz('<span style="color:var(--ok)">✓ Taze link alındı</span> — <b>'+esc0(k.baslik.slice(0,60))+'</b>'
+      + (k.tarih ? ' · '+esc0(String(k.tarih).slice(0,10)) : '')
+      + '<div style="font-size:11.5px;color:var(--mt);margin-top:4px">Şimdi ▶ Testi Çalıştır\'a bas.</div>');
+  } catch(e){
+    yaz('<span style="color:var(--er)">✗ Taze link alınamadı: '+esc0(e.message)+'</span>'
+      + '<div style="font-size:11.5px;color:var(--mt);margin-top:4px">OpusClip API Key gerekiyor (Ayarlar). '
+      + 'Alternatif: OpusClip Galeri sayfasından bir short\'un mp4 adresini elle kopyala.</div>');
+  } finally { CER._tazeAliniyor = false; }
+}
+
 async function cerTest(){
   if (CER._test) return;
   const kutu = document.getElementById('cer-test-sonuc');
@@ -13063,16 +13094,35 @@ async function cerTest(){
     adim('⏳ Girdiler kontrol ediliyor (video / banner / font)…');
     const fontUrl = cerVarlik('Inter-ExtraBold.ttf');
     const onKontrol = await cerGirdiKontrol(videoUrl, bannerUrl, fontUrl);
-    const dusenler = onKontrol.filter(x => x.durum === 'yok');
-    if (dusenler.length){
-      son('<span style="color:var(--er)">✗ '+dusenler.length+' girdi indirilemiyor — iş açılmadı (boşuna 3 dk beklemek yerine)</span>'
-        + onKontrol.map(x => '<div style="font-size:11.5px;margin-top:3px;color:'+(x.durum==='var'?'var(--ok)':'var(--er)')+'">'
-            + (x.durum==='var'?'✓':'✗')+' <b>'+esc(x.ad)+'</b>: '+esc(x.mesaj)+'</div>').join('')
-        + '<div style="font-size:11.5px;color:var(--mt);margin-top:6px">OpusClip mp4 linkleri <b>süreli</b>dir — '
-        + 'Galeri\'den taze bir short-url kopyala. Banner/font düşüyorsa GitHub deposundaki '
-        + '<code>cerceve/</code> klasörünü kontrol et.</div>');
+    const satirlar = onKontrol.map(x => '<div style="font-size:11.5px;margin-top:3px;color:'+(x.durum==='var'?'var(--ok)':'var(--er)')+'">'
+        + (x.durum==='var'?'✓':'✗')+' <b>'+esc(x.ad)+'</b>: '+esc(x.mesaj)+'</div>').join('');
+    // BANNER/FONT kesin kanıt: kendi depomuzda, herkese açık, tarayıcı ile
+    // Upload-Post aynı adresi görür. Düşerse iş kesinlikle başarısız olur.
+    const kesinDusen = onKontrol.filter(x => x.durum === 'yok' && x.ad !== 'Video');
+    if (kesinDusen.length){
+      son('<span style="color:var(--er)">✗ Banner/font indirilemiyor — iş açılmadı</span>' + satirlar
+        + '<div style="font-size:11.5px;color:var(--mt);margin-top:6px">GitHub deposundaki '
+        + '<code>cerceve/</code> klasörünü ve deponun herkese açık olduğunu kontrol et.</div>');
       return;
     }
+    // VİDEO kontrolü KANIT DEĞİL, İPUCU (ölçüldü: bilinen-çalışan bir public
+    // mp4 tarayıcıda "Format error" verebiliyor). Tarayıcı ile Upload-Post
+    // sunucusu farklı ağ/UA/Referer kullanır; hotlink koruması, codec desteği
+    // ya da CORS-dışı kısıtlar tarayıcıyı yanıltır. Bu yüzden ENGELLEMİYOR:
+    // uyarıyor ve "yine de dene" bırakıyor — yoksa çalışacak bir testi
+    // kendi kontrolümüz yüzünden yasaklamış oluruz.
+    const videoDustu = onKontrol.some(x => x.ad === 'Video' && x.durum === 'yok');
+    if (videoDustu && !CER._testZorla){
+      son('<span style="color:var(--wn)">⚠ Video tarayıcıda açılamadı — iş açılmadı</span>' + satirlar
+        + '<div style="font-size:11.5px;color:var(--mt);margin-top:6px">İki olasılık var: (1) OpusClip mp4 linkleri '
+        + '<b>sürelidir</b> ve bu linkin süresi dolmuş — aşağıdaki düğmeyle Galeri\'den taze bir link al; '
+        + '(2) link geçerli ama tarayıcıdan açılamıyor (hotlink/codec) — Upload-Post sunucusu yine de indirebilir.</div>'
+        + '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+        + '<button class="btn bp bsm" onclick="cerTazeLinkAl()">🔄 Galeri\'den taze link al</button>'
+        + '<button class="btn bg bsm" onclick="CER._testZorla=true;cerTest()">▶ Yine de dene</button></div>');
+      return;
+    }
+    CER._testZorla = false;
     // Boyut uyarısı: banner 1080 genişlik varsayar; overlay scale'den ÖNCE
     // uygulandığı için farklı boyutlu kaynakta banner kayabilir.
     const vid = onKontrol.find(x => x.ad === 'Video');
@@ -13084,7 +13134,9 @@ async function cerTest(){
       ? '<div style="font-size:11.5px;color:var(--wn);margin-top:3px">⚠ Banner '+ban.w+'×'+ban.h
         + ', beklenen '+CER_SPEC.W+'×'+CER_SPEC.BANT+' — başlık yazısı bandın dışına, videonun üstüne düşer. '
         + 'Depodaki örnek banner eski ölçüde; kendi profilinin banner\'ını yayınlayınca doğru ölçüde üretilir.</div>' : '');
-    son('✓ Üç girdi de erişilebilir'+(vid&&vid.w?' · kaynak '+vid.w+'×'+vid.h:'')+boyutNotu);
+    son((videoDustu
+        ? '<span style="color:var(--wn)">⚠ Video tarayıcıda açılamadı — yine de deneniyor (sunucu indirebilir)</span>'
+        : '✓ Üç girdi de erişilebilir'+(vid&&vid.w?' · kaynak '+vid.w+'×'+vid.h:''))+boyutNotu);
     adim('⏳ FFmpeg işi açılıyor…');
     const komut = cerFfKomut('Çerçeve testi — Türkçe ğüşiöç ĞÜŞİÖÇ çalışıyor mu?', '@cerceve-test');
     const { data: is } = await upFetch('/uploadposts/ffmpeg/jobs/upload', { method:'POST', body:{
