@@ -761,7 +761,9 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <div class="card" style="margin-bottom:0">
         <div class="ct">Tekli URL</div>
         <div class="fg"><label>YouTube URL</label><input id="sv-url" type="url" placeholder="https://www.youtube.com/watch?v=..."/></div>
-        <div class="fg"><label>Kategori</label><div class="cat-chips" id="sv-cats"></div></div>
+        <div class="fg"><label>Kategori <span style="color:var(--mt);font-weight:400">(birden çok seçebilirsin — her kategori kendi havuzundan ayrı profil alır)</span></label>
+          <div class="cat-chips" id="sv-cats"></div>
+          <div id="sv-kat-ipucu" style="font-size:11px;color:var(--mt);margin-top:4px"></div></div>
         <div class="fg"><label>Kaynak Notu</label><input id="sv-note" type="text" placeholder="manuel, kampanya..."/></div>
         <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı — short açıklamasına eklenir)</span></label><input id="sv-aciklama" type="text" placeholder="örn. Excalibur Kanalı, Bölüm 1..."/></div>
         <div style="margin:8px 0;padding:8px 10px;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:6px;display:flex;align-items:center;gap:8px">
@@ -2593,7 +2595,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.25-77';
+const PANEL_YAPI = 'y2026.08.25-78';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3102,36 +3104,56 @@ async function sendSingle() {
   const selCats = getSelCatList('sv-cats');
   const selCat  = selCats[0] || 'genel';
   const direkt = (document.getElementById('sv-direkt')||{}).checked;
+  // DİREKT KOLDA ÇOKLU KATEGORİ YOK: n8n'de kategori dağıtımı (fan-out)
+  // yalnız 'Clips Parse Et' düğümünde — OpusClip klipleri üzerinden.
+  // Direkt yayın OpusClip'e uğramadığı için oraya hiç uğramıyor. Sessizce
+  // ilk kategoriyi kullanmak tam da düzeltmeye çalıştığımız kayıp olurdu.
+  if (direkt && selCats.length > 1)
+    return showRes('sv-res','✕ Direkt yayın çoklu kategori desteklemiyor — n8n\'in direkt kolunda '
+      + 'kategori dağıtımı yok. Tek kategori seç ya da Direkt modu kapat ('+selCats.join(', ')+' seçili).','err');
   const base = getN8N();
   if (!base) return showRes('sv-res','Ayarlar\'dan n8n URL girin','warn');
   const svAciklama = (document.getElementById('sv-aciklama')||{}).value||'';
-  const payload = {'Youtube linki': url, channelTitle: await ytKanalAdi(url), kaynak:(document.getElementById('sv-note')||{}).value||'panel', kategori:selCat, dil:getSelLang('sv-cats'), platformlar:getSelPlatforms('sv-cats'), aciklama_notu:svAciklama};
+  // mcFields: tek kategoride {kategori}, çoklu kategoride {kategori, kategoriler}
+  // — n8n 'Clips Parse Et' kategoriler'i görünce KATEGORİ BAŞINA ayrı profil
+  // seçip klipleri her biri için ayrı yayınlıyor (video OpusClip'e bir kez gider).
+  const payload = {'Youtube linki': url, channelTitle: await ytKanalAdi(url), kaynak:(document.getElementById('sv-note')||{}).value||'panel', ...mcFields(selCats), dil:getSelLang('sv-cats'), platformlar:getSelPlatforms('sv-cats'), aciklama_notu:svAciklama};
+  const katAd = selCats.join(', ');
   let path;
   if (direkt) {
     path = '/webhook/video-direkt';
     payload.direkt_yayinla = true;
     payload.cobalt_key = S.cfg.cobalt || '';
-    showRes('sv-res','⏳ Direkt yayın — video indiriliyor ve yayınlanıyor... ['+selCat+']','info');
-    addLog('info','webhook','Direkt yayın ['+selCat+']: '+url.slice(0,60));
+    showRes('sv-res','⏳ Direkt yayın — video indiriliyor ve yayınlanıyor... ['+katAd+']','info');
+    addLog('info','webhook','Direkt yayın ['+katAd+']: '+url.slice(0,60));
   } else {
-    const CAT_WH = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-    path = CAT_WH[selCat] || '/webhook/video-gonder';
-    showRes('sv-res','⏳ Gonderiliyor... ['+selCat+']','info');
-    addLog('info','webhook','Video gonderiliyor ['+selCat+']: '+url.slice(0,60));
+    // mcPath: çoklu kategoride GENEL uca gider (kategoriye özel uçlar
+    // kategoriyi sabitliyor ve fan-out'u imkânsız kılıyor).
+    path = mcPath(selCats);
+    showRes('sv-res','⏳ Gonderiliyor... ['+katAd+']'
+      + (selCats.length>1 ? ' — '+selCats.length+' kategori, her biri için ayrı profil seçilecek' : ''),'info');
+    addLog('info','webhook','Video gonderiliyor ['+katAd+']: '+url.slice(0,60));
   }
   const s = fafSonuc(await faf(base + path, payload));
   if (!s.ok && !s.belirsiz){
     // KESİN hata: "gönderildi" deme, recordSend'e de yazma — yoksa hiç
     // gitmemiş video kalıcı olarak "gönderilmiş" sayılırdı.
     showRes('sv-res','✕ Gönderilemedi — '+s.mesaj,'err');
-    addLog('err','webhook','Video gonderilemedi ['+selCat+']: '+s.mesaj);
+    addLog('err','webhook','Video gonderilemedi ['+katAd+']: '+s.mesaj);
     return;
   }
+  // Hangi profil havuzlarına gideceğini SÖYLE: kullanıcı kategori değil
+  // profil düşünüyor ("General-1 ile General-3'ü birlikte al").
+  const havuzlar = selCats.map(k => {
+    const p = (KATEGORI_PROFIL_POOL[(k==='genel' && getSelLang('sv-cats')==='en') ? 'genel_en' : k]||[]);
+    return katLabel(k)+' → '+(p.length ? p.join('/') : '?');
+  }).join(' · ');
   showRes('sv-res', (s.belirsiz ? '⚠ ' : '✓ ')
-    + (direkt ? 'Direkt yayın başlatıldı' : 'n8n\'e gönderildi') + ' ['+selCat+']'
+    + (direkt ? 'Direkt yayın başlatıldı' : 'n8n\'e gönderildi') + ' ['+katAd+']'
+    + (selCats.length>1 ? ' — '+selCats.length+' kategori: '+havuzlar+' (her havuzdan en az yüklü profil seçilir)' : '')
     + (s.belirsiz ? ' — ama ' + s.mesaj : ''), s.belirsiz ? 'warn' : 'ok');
-  recordSend(url, selCat);
-  addLog(s.belirsiz?'warn':'ok','webhook',(direkt?'Direkt yayın':'Video gonderildi')+' ['+selCat+']'+(s.belirsiz?' (belirsiz: '+s.mesaj+')':''));
+  recordSend(url, selCats.join(','));
+  addLog(s.belirsiz?'warn':'ok','webhook',(direkt?'Direkt yayın':'Video gonderildi')+' ['+katAd+']'+(s.belirsiz?' (belirsiz: '+s.mesaj+')':''));
   await oncelikIsaretle('sv-cats', url.slice(0,60));
 }
 
@@ -3465,8 +3487,14 @@ function renderCatGrid() {
 function renderCatChips(id) {
   const el=document.getElementById(id);
   if(!el)return;
-  // sv-cats tek seçim (webhook URL gösterimi için), diğerleri çoklu seçim
-  const single = id==='sv-cats';
+  // ÇOKLU SEÇİM HER YERDE. sv-cats eskiden TEK seçimdi ("webhook URL
+  // gösterimi için") — o gösterge zaten display:none, yani gerekçe ölmüştü.
+  // Sonuç: Tekli URL formundan iki kategori seçilemiyordu; kullanıcı ikinci
+  // kategoriye tıklayınca birincisi sessizce kalkıyor, iki kez göndermeye
+  // kalkınca da ikinci gönderim Üretim Kapısı'na (kopya koruması) takılıyordu.
+  // Diğer ekranlar (bv/ya/ytk/str/vp/rd) zaten mcPath+mcFields ile çoklu
+  // kategoriyi destekliyordu; tek istisna buydu.
+  const single = false;
   el.innerHTML=Object.entries(getCats()).map(([k,c])=>{
     const fn = single ? 'catChipSingle(this,\''+id+'\')' : 'catChipToggle(this,\''+id+'\')';
     return '<span class="cat-chip" data-cat="'+k+'" onclick="'+fn+'">'+c.label+'</span>';
@@ -3488,7 +3516,9 @@ function catChipSingle(el, containerId) {
 
 function catChipToggle(el, containerId) {
   el.classList.toggle('sel');
-  // bv-cats için webhook display güncelle
+  // sv-cats artık çoklu seçim — hedef profil ipucu ve webhook yolu her
+  // tıklamada tazelenmeli (eskiden yalnız catChipSingle çağırıyordu).
+  if (containerId === 'sv-cats') updateSVWHDisplay();
   updateLangVisibility(containerId);
 }
 
@@ -9726,11 +9756,22 @@ function updateWHs() {
 
 function updateSVWHDisplay() {
   const b=getN8N();
-  const selCat=(getSelCatList('sv-cats'))[0]||'genel';
-  const CAT_WH={film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  const path=CAT_WH[selCat]||'/webhook/video-gonder';
+  const cats=getSelCatList('sv-cats');
+  const path=mcPath(cats);          // çoklu seçimde genel uç
   const sv=document.getElementById('sv-wh-display');
   if(sv)sv.textContent=b?b+path:path;
+  // Seçilen kategorilerin hangi profil havuzlarına denk geldiğini göster —
+  // kullanıcı kategori değil PROFİL düşünüyor.
+  const ip=document.getElementById('sv-kat-ipucu');
+  if(ip){
+    const dil=getSelLang('sv-cats');
+    ip.innerHTML = cats.map(k=>{
+      const pk=(k==='genel'&&dil==='en')?'genel_en':k;
+      const p=KATEGORI_PROFIL_POOL[pk]||[];
+      return '<b>'+esc0(katLabel(k))+'</b> → '+esc0(p.join(' / ')||'?');
+    }).join(' &nbsp;·&nbsp; ')
+      + (cats.length>1 ? ' <span style="color:var(--ok)">— '+cats.length+' kategori seçili, her biri için ayrı profil</span>' : '');
+  }
 }
 
 // Sır tutan TÜM alanlar — göster/gizle ve silme bu listeden yürür.
