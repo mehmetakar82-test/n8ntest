@@ -2057,6 +2057,19 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
              uygulaması için banner yayını + urlModu + senkron da gerekir.
              Bu şerit n8n'deki kapı koşulunun BİREBİR aynısını hesaplar. -->
         <div id="cer-durum-serit" style="margin-bottom:10px"></div>
+        <!-- Bant kalınlığı: videonun üstünü ne kadar kapatacağı. Ayar
+             değişince yayınlanmış banner'lar ESKİ ölçüde kalır — yeniden
+             yayınlanmaları gerekir; altındaki satır bunu söylüyor. -->
+        <div style="border:1px solid var(--brd);border-radius:6px;padding:8px 10px;margin-bottom:10px;background:var(--bg)">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span style="font-size:12px;white-space:nowrap"><b>Bant kalınlığı</b></span>
+            <input id="cer-ust" type="range" min="0" max="220" step="10" value="150"
+                   oninput="cerUstDegis(this.value)" style="flex:1;min-width:160px;accent-color:var(--acc)">
+            <span id="cer-ust-ozet" style="font-size:12px;color:var(--mt);white-space:nowrap;font-variant-numeric:tabular-nums"></span>
+            <button class="btn bsm" onclick="cerUstDegis(CER_UST_VARSAYILAN,true)" title="Varsayılana dön (550 px)">↺</button>
+          </div>
+          <div id="cer-ust-not" style="font-size:11px;color:var(--mt);margin-top:4px"></div>
+        </div>
         <div id="cer-profil-liste"></div>
       </div>
       <div class="card" id="cer-editor-card" style="display:none">
@@ -2541,7 +2554,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.24-72';
+const PANEL_YAPI = 'y2026.08.24-73';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12316,7 +12329,35 @@ const CER_SPEC = {
   satirMax:32,                              // başlık bu uzunluğu aşarsa 2 satıra bölünür
   renk:'0x0B0B0E'
 };
-const CER = { p:{}, aktif:false, urlModu:'', ghRepo:'mehmetakar82-test/n8ntest', ghPat:'', syncSon:'', _sec:null, _test:false };
+const CER = { p:{}, aktif:false, urlModu:'', ghRepo:'mehmetakar82-test/n8ntest', ghPat:'', syncSon:'', ust:150, _sec:null, _test:false };
+
+// ── BANT YÜKSEKLİĞİ AYARLANABİLİR ────────────────────────────────────
+// Bant videonun ÜSTÜNÜ tamamen kapatır (opak beyaz). Yüksekliği tek bir
+// değere bağlı: UST = içeriğin (logo/ad/buton) üstten boşluğu. Başlık
+// satırları ve bant sonu bundan TÜRETİLİR, böylece ayar değişince yazı
+// bandın dışına taşmaz:
+//     l1Y = UST+242 · l2Y = l1Y+70 · tekY = l1Y+30 · BANT = UST+400
+// UST=150 (varsayılan) → BANT=550, yani 1920'lik karenin %28,6'sı.
+// UST düşürmek bandı inceltir ama içeriği platformun kendi üst arayüzüne
+// (Reels/Shorts/TikTok üst şeridi) yaklaştırır — 0'a inmek logo/adı o
+// arayüzün altında bırakabilir.
+const CER_UST_VARSAYILAN = 150;
+function cerSpecUygula(ust){
+  const U = Math.max(0, Math.min(220, Math.round(Number(ust))||0));
+  CER_SPEC.UST  = U;
+  CER_SPEC.l1Y  = U + 242;
+  CER_SPEC.l2Y  = CER_SPEC.l1Y + 70;
+  CER_SPEC.tekY = CER_SPEC.l1Y + 30;
+  CER_SPEC.BANT = U + 400;
+  return CER_SPEC;
+}
+// n8n'e giden geometri — orada da AYNI değerler kullanılmalı
+function cerSpecGonderilecek(){
+  const C = CER_SPEC;
+  return { BANT:C.BANT, UST:C.UST, fontPx:C.fontPx, l1Y:C.l1Y, l2Y:C.l2Y,
+           tekY:C.tekY, wmPx:C.wmPx, wmAlt:C.wmAlt, satirMax:C.satirMax, renk:C.renk };
+}
+function cerKapanmaYuzde(){ return (CER_SPEC.BANT / CER_SPEC.H * 100).toFixed(1); }
 
 function cerOku(){
   try{
@@ -12324,13 +12365,16 @@ function cerOku(){
     CER.p = j.p||{}; CER.aktif = !!j.aktif; CER.urlModu = j.urlModu||'';
     CER.ghRepo = j.ghRepo||CER.ghRepo; CER.ghPat = j.ghPat||''; CER.syncSon = j.syncSon||'';
     CER.syncKirli = !!j.syncKirli;
+    CER.ust = (j.ust == null) ? CER_UST_VARSAYILAN : Number(j.ust);
   }catch(e){}
+  cerSpecUygula(CER.ust);   // okunan değer TÜM çizim/komut yollarına uygulansın
 }
 function cerYaz(){
   try{
     localStorage.setItem('opus_cerceve', JSON.stringify({
       p:CER.p, aktif:CER.aktif, urlModu:CER.urlModu,
-      ghRepo:CER.ghRepo, ghPat:CER.ghPat, syncSon:CER.syncSon, syncKirli:!!CER.syncKirli
+      ghRepo:CER.ghRepo, ghPat:CER.ghPat, syncSon:CER.syncSon, syncKirli:!!CER.syncKirli,
+      ust:CER.ust
     }));
   }catch(e){ addLog('err','cerceve','Kaydedilemedi (localStorage dolu olabilir): '+e.message); }
 }
@@ -12366,6 +12410,8 @@ async function initCerceve(){
   const g = document.getElementById('cer-gh-repo'); if (g && !g.value) g.value = CER.ghRepo;
   const p = document.getElementById('cer-gh-pat');  if (p && !p.value && CER.ghPat) p.value = CER.ghPat;
   const t = document.getElementById('cer-genel-tg'); if (t) t.classList.toggle('on', CER.aktif);
+  const su = document.getElementById('cer-ust'); if (su) su.value = CER.ust;
+  cerUstOzet();
   setEl('cer-sync-son', CER.syncSon ? new Date(CER.syncSon).toLocaleString('tr') : '—');
   cerDurumSerit();   // profiller yüklenmeden önce de gerçek durumu göster
   cerFontYukle();
@@ -12401,6 +12447,36 @@ function cerEngeller(u){
   else if (CER.syncKirli) eksik.push('son ayar n8n\'e ULAŞMADI — n8n eski ayarla çalışıyor (⇪ Şimdi Gönder)');
   return eksik;
 }
+// Bant kalınlığı değişti: spec yeniden türetilir, önizleme tazelenir ve
+// ARTIK ESKİ ÖLÇÜDE olan yayınlanmış banner'lar işaretlenir.
+function cerUstDegis(v, kaydirmaGuncelle){
+  CER.ust = Math.max(0, Math.min(220, Math.round(Number(v))||0));
+  cerSpecUygula(CER.ust);
+  cerYaz();
+  const sl = document.getElementById('cer-ust');
+  if (sl && kaydirmaGuncelle) sl.value = CER.ust;
+  cerUstOzet();
+  if (CER._sec) cerOnizle();        // editör açıksa önizleme anında uysun
+  cerProfilRender();                // "ölçü eski" rozetleri tazelensin
+}
+function cerUstOzet(){
+  const oz = document.getElementById('cer-ust-ozet');
+  const not = document.getElementById('cer-ust-not');
+  if (oz) oz.textContent = CER_SPEC.BANT + ' px · videonun üst %' + cerKapanmaYuzde() + '\'i kapanır';
+  if (!not) return;
+  // Yayınlanmış ama ARTIK farklı ölçüde olan banner'lar
+  const eski = cerProfilAdlari().filter(u => { const c = CER.p[u]||{};
+    return c.bannerUrl && c.bantYuk && c.bantYuk !== CER_SPEC.BANT; });
+  const uyari = (CER.ust < 90)
+    ? '<span style="color:var(--wn)">⚠ 90 px altında logo/ad, platformun kendi üst şeridinin (Reels/Shorts/TikTok) altında kalabilir.</span> ' : '';
+  not.innerHTML = uyari
+    + 'Bant videonun üstünü opak kapatır; ince bant = daha çok video görünür. '
+    + 'İçerik üstten ' + CER_SPEC.UST + ' px aşağıda başlar.'
+    + (eski.length ? '<br><span style="color:var(--wn)">⚠ '+eski.length+' profilin yayınlanmış banner\'ı eski ölçüde ('
+        + esc0(eski.slice(0,5).join(', '))+(eski.length>5?' +'+(eski.length-5):'')
+        + ') — yeni ölçü için ✎ Özelleştir → 🚀 Banner\'ı Yayınla ile tekrar yayınla.</span>' : '');
+}
+
 function cerDurumSerit(){
   const el = document.getElementById('cer-durum-serit'); if (!el) return;
   const esc = esc0;
@@ -12544,8 +12620,13 @@ function cerProfilRender(){
     const c = CER.p[u]||{};
     const yayinli = !!c.bannerUrl;
     const aktif = c.aktif !== false;
-    const dot = yayinli ? (aktif?'var(--ok)':'var(--mt)') : 'var(--er)';
-    const durum = yayinli ? (aktif?'yayınlı · aktif':'yayınlı · kapalı') : 'banner yayınlanmadı';
+    // Yayınlanmış banner ARTIK farklı bant ölçüsündeyse söyle: başlık yazısı
+    // bandın dışına düşer, kullanıcı sebebini bilmeden bozuk video üretir.
+    const olcuEski = yayinli && c.bantYuk && c.bantYuk !== CER_SPEC.BANT;
+    const dot = yayinli ? (olcuEski?'var(--wn)':(aktif?'var(--ok)':'var(--mt)')) : 'var(--er)';
+    const durum = yayinli
+      ? (aktif?'yayınlı · aktif':'yayınlı · kapalı') + (olcuEski?' · ⚠ eski ölçü ('+c.bantYuk+' px)':'')
+      : 'banner yayınlanmadı';
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--brd);border-radius:6px;margin-bottom:6px;background:var(--bg)">'
       + '<span style="width:9px;height:9px;border-radius:50%;background:'+dot+';flex-shrink:0"></span>'
       + '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">'+esc(c.ad||u)+'</div>'
@@ -12564,6 +12645,7 @@ function cerProfilRender(){
     sel.innerHTML = opts.join('');
   }
   cerDurumSerit();   // liste her çizildiğinde (kaydet/yayınla dahil) gerçek durum tazelensin
+  cerUstOzet();      // "eski ölçü" uyarısı yayınlama sonrası da tazelensin
 }
 
 // ── Editör ──
@@ -12825,6 +12907,7 @@ async function cerYayinla(){
       sha: mevcut ? mevcut.sha : undefined
     });
     cfg.bannerUrl = cerVarlik('banner-'+cerSlug(u)+'.png')+'?v='+Date.now();
+    cfg.bantYuk = CER_SPEC.BANT;   // hangi ölçüde yayınlandı — sonra ayar değişirse fark edilsin
     cerYaz(); cerProfilRender();
     durum('<span style="color:var(--ok)">✓ Yayınlandı</span> — n8n\'e bildiriliyor…');
     // Dönüş kontrolü ŞART (denetim bulgusu): banner GitHub'a çıkar ama
@@ -12871,7 +12954,10 @@ async function cerAyarGonderCek(manuel){
   });
   const s = fafSonuc(await faf(base+'/webhook/cerceve-ayar', {
     aktif: CER.aktif, urlModu: CER.urlModu, apikey: S.cfg.blot||'',
-    fontUrl: cerVarlik('Inter-ExtraBold.ttf'), profiller: profiller
+    fontUrl: cerVarlik('Inter-ExtraBold.ttf'), profiller: profiller,
+    // GEOMETRİ n8n'e de gitmeli: bant kalınlığı panelden değiştirilebiliyor,
+    // n8n'deki sabit değerler kalırsa başlık bandın dışına düşer.
+    spec: cerSpecGonderilecek()
   }));
   // "Son gönderim" damgası KOŞULSUZ yazılıyordu: HTTP 404/500 (workflow pasif,
   // yanlış yol) hâlinde bile "şimdi" görünüyor, üstelik uyarı yalnız
