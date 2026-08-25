@@ -2595,7 +2595,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.25-78';
+const PANEL_YAPI = 'y2026.08.25-79';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12114,13 +12114,39 @@ async function opcSendSelected() {
   // Ölçüt n8n tarafıyla BİREBİR aynı olmalı (aynı anahtarlar, aynı URL
   // sadeleştirmesi), yoksa iki ekran aynı olgu için farklı hüküm verir.
   let opcZorla = false;
+  let opcBaskaProfil = 0;   // baska profillerde yayinlanmis ama hedef havuzla cakismayan
   try {
     await ydEnsureShorts();
     // Kart rozetiyle AYNI yardımcı: ölçüt tek yerde tanımlı olmalı, yoksa
     // kart "genel-1-en'de yayınlandı" derken gönderim onu kopya saymayabilir.
     const yayinHarita = opcYayinHaritasi();
     const vuran = c => opcKlipYayini(c, yayinHarita);
-    const kopya = selectedClipData.filter(c => vuran(c));
+    // ── KOPYA ÖLÇÜTÜ PROFİL DUYARLI ────────────────────────────────────
+    // Eskiden "bu klip daha önce yayınlandı mı?" diye bakılıyordu; klip
+    // General-1'e gitmişken Eğlence kategorisi (General-3/eglence-1-tr)
+    // seçilse bile KOPYA sayılıp uyarı çıkıyordu. Oysa farklı profile
+    // yayınlamak kopya değil — kullanıcının asıl yapmak istediği şey.
+    // Hedef havuz: seçilen kategorilerin profil havuzlarının birleşimi
+    // (n8n hangisini seçeceğini round-robin ile belirler, panel bilemez;
+    // bu yüzden HAVUZ ile karşılaştırıyoruz).
+    const opcDil = getSelLang('opc-cats');
+    const hedefHavuz = new Set();
+    cats.forEach(k => {
+      const pk = (k === 'genel' && opcDil === 'en') ? 'genel_en' : k;
+      (KATEGORI_PROFIL_POOL[pk] || []).forEach(p => hedefHavuz.add(p));
+    });
+    const cakisan = y => {
+      if (!y) return false;
+      // Profil kolonu boşsa hangi hesaba gittiği bilinmiyor → TEMKİNLİ:
+      // kopya say. (Kopya yayın geri alınamaz, gereksiz uyarı alınabilir.)
+      if (!y.profiller.length) return true;
+      return y.profiller.some(p => hedefHavuz.has(p));
+    };
+    const kopya = selectedClipData.filter(c => cakisan(vuran(c)));
+    // Başka profillerde yayınlanmış ama hedef havuzla çakışmayanlar —
+    // sessizce geçmek yerine sayısını söyle, "kontrol ediliyor mu?" sorusu kalmasın.
+    const baskaProfil = selectedClipData.filter(c => { const y = vuran(c); return y && !cakisan(y); }).length;
+    opcBaskaProfil = baskaProfil;
     if (kopya.length) {
       const secim = await dupeChoiceModal(kopya.length, selectedClipData.length - kopya.length,
         kopya.map(c => { const y = vuran(c); return {
@@ -12129,11 +12155,14 @@ async function opcSendSelected() {
           kaynak: y.profiller.length ? y.profiller.join(', ') : 'Sheet1' }; }));
       if (secim === 'cancel') return showRes('opc-send-res', 'İptal edildi — hiçbir şey gönderilmedi', 'warn');
       if (secim === 'skip') {
-        selectedClipData = selectedClipData.filter(c => !vuran(c));
-        if (!selectedClipData.length) return showRes('opc-send-res', 'Yeni klip kalmadı — seçilenlerin hepsi zaten yayınlanmış', 'warn');
+        selectedClipData = selectedClipData.filter(c => !cakisan(vuran(c)));
+        if (!selectedClipData.length) return showRes('opc-send-res', 'Yeni klip kalmadı — seçilenlerin hepsi hedef havuzda zaten yayınlanmış', 'warn');
       } else {
         opcZorla = true;   // Klip Kapısı yalnız AÇIK insan onayıyla aşılır
       }
+    } else if (baskaProfil) {
+      showRes('opc-send-res', 'ℹ '+baskaProfil+' klip başka profillerde yayınlanmış ama hedef havuzla ('
+        + [...hedefHavuz].join(', ') + ') çakışmıyor — kopya sayılmadı, gönderiliyor…', 'info');
     }
   } catch(e) {
     // FAIL-SAFE: Sheet1 okunamazsa kopya olanı ayırt edemeyiz. `_zorla`
@@ -12207,7 +12236,10 @@ async function opcSendSelected() {
       showRes('opc-send-res', `⚠ ${done}/${selectedClipData.length} clip işlendi · ${failCount} gönderim başarısız (son: ${lastErr}). Başarısız clipler işaretlenmedi — tekrar deneyebilir veya elle işaretleyebilirsin.`, 'warn');
       if(typeof toast==='function') toast(`OpusClip: ${done} clip işlendi · ${failCount} başarısız`,'warn');
     } else {
-      showRes('opc-send-res', `✓ ${done} clip × ${cats.length} kategori gönderildi [${cats.join(', ')}]`, 'ok');
+      // Kopya denetiminin ÇALIŞTIĞI son mesajda da görünsün: sessiz geçmek
+      // "acaba kontrol etti mi?" sorusunu bırakıyordu.
+      showRes('opc-send-res', `✓ ${done} clip × ${cats.length} kategori gönderildi [${cats.join(', ')}]`
+        + (opcBaskaProfil ? ` · ${opcBaskaProfil} klip başka profillerde yayınlanmıştı, hedef havuzla çakışmadığı için kopya sayılmadı` : ''), 'ok');
       if(typeof toast==='function') toast(`OpusClip: ${done} clip gönderildi [${cats.join(', ')}]`,'ok');
     }
     addLog(failCount?'warn':'ok', 'webhook', `OpusClip Galeri: ${done}/${selectedClipData.length} clip işlendi, ${failCount} hata [${cats.join(',')}]`);
