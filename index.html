@@ -2065,21 +2065,27 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
              değişince yayınlanmış banner'lar ESKİ ölçüde kalır — yeniden
              yayınlanmaları gerekir; altındaki satır bunu söylüyor. -->
         <div style="border:1px solid var(--brd);border-radius:6px;padding:8px 10px;margin-bottom:10px;background:var(--bg)">
-          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <!-- Kaydırıcı yerine SAYI KUTUSU: kaydırarak tam değere gelmek
+               zordu. Girilen değer 2 SATIRLIK (en kalın) bant; üst boşluk
+               ondan türetiliyor (UST = bant - 400). -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-size:12px;white-space:nowrap"><b>Bant kalınlığı</b></span>
-            <input id="cer-ust" type="range" min="0" max="220" step="10" value="150"
-                   oninput="cerUstDegis(this.value)" style="flex:1;min-width:160px;accent-color:var(--acc)">
-            <span id="cer-ust-ozet" style="font-size:12px;color:var(--mt);white-space:nowrap;font-variant-numeric:tabular-nums"></span>
-            <button class="btn bsm" onclick="cerUstDegis(CER_UST_VARSAYILAN,true)" title="Varsayılana dön (550 px)">↺</button>
+            <input id="cer-bant" type="number" min="400" max="620" step="1" value="550"
+                   onchange="cerBantDegis(this.value)" onkeydown="if(event.key==='Enter'){cerBantDegis(this.value);this.blur();}"
+                   style="width:92px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">
+            <span style="font-size:12px;color:var(--mt)">px <span style="opacity:.7">(400–620)</span></span>
+            <button class="btn bsm" onclick="cerBantDegis(CER_UST_VARSAYILAN+400)" title="Varsayılana dön (550 px)">↺</button>
           </div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
-            <span style="font-size:12px;white-space:nowrap"><b>Yerleşim</b></span>
-            <select id="cer-mod" onchange="cerModDegis(this.value)" style="flex:1;min-width:190px;height:30px;font-size:12px">
+          <div id="cer-ust-ozet" style="font-size:11.5px;color:var(--mt);margin-top:5px;font-variant-numeric:tabular-nums"></div>
+          <div style="margin-top:9px">
+            <div style="font-size:12px;margin-bottom:4px"><b>Yerleşim</b></div>
+            <select id="cer-mod" onchange="cerModDegis(this.value)"
+                    style="width:100%;padding:6px 8px;font-size:12px;line-height:1.35">
               <option value="bindir">Üstüne bindir — bant videonun üstünü örter</option>
-              <option value="olcekli">Videoyu küçült — hiçbir kare kaybolmaz (Upload-Post izin verirse)</option>
+              <option value="olcekli">Videoyu küçült — hiçbir kare kaybolmaz</option>
             </select>
           </div>
-          <div id="cer-ust-not" style="font-size:11px;color:var(--mt);margin-top:4px"></div>
+          <div id="cer-ust-not" style="font-size:11px;color:var(--mt);margin-top:7px;line-height:1.5"></div>
         </div>
         <div id="cer-profil-liste"></div>
       </div>
@@ -2575,7 +2581,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.25-75';
+const PANEL_YAPI = 'y2026.08.25-76';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12503,7 +12509,7 @@ async function initCerceve(){
   const g = document.getElementById('cer-gh-repo'); if (g && !g.value) g.value = CER.ghRepo;
   const p = document.getElementById('cer-gh-pat');  if (p && !p.value && CER.ghPat) p.value = CER.ghPat;
   const t = document.getElementById('cer-genel-tg'); if (t) t.classList.toggle('on', CER.aktif);
-  const su = document.getElementById('cer-ust'); if (su) su.value = CER.ust;
+  const su = document.getElementById('cer-bant'); if (su) su.value = CER.ust + 400;
   const sm = document.getElementById('cer-mod'); if (sm) sm.value = CER.mod;
   cerUstOzet();
   setEl('cer-sync-son', CER.syncSon ? new Date(CER.syncSon).toLocaleString('tr') : '—');
@@ -12574,12 +12580,25 @@ function cerModDegis(m){
     toast('✓ Videoyu küçült — hiçbir kare kaybolmaz, yanlarda bant renginde şerit kalır', 'ok', 5000);
   cerUstOzet(); if (CER._sec) cerOnizle(); cerProfilRender(); cerGeometriGonder();
 }
-function cerUstDegis(v, kaydirmaGuncelle){
+// Kutuya girilen değer 2 SATIRLIK bant yüksekliği; UST ondan türetilir.
+function cerBantDegis(v){
+  const n = Number(String(v).trim().replace(',','.'));
+  // Geçersiz girdi MEVCUT değeri korur; 400'e düşürmek kullanıcının ayarını
+  // sessizce sıfırlamak olurdu (yazarken bir an boş kalması bile yeter).
+  if (!isFinite(n) || String(v).trim() === ''){
+    const k = document.getElementById('cer-bant'); if (k) k.value = CER.ust + 400;
+    return;
+  }
+  cerUstDegis(Math.max(400, Math.min(620, Math.round(n))) - 400, true);
+}
+function cerUstDegis(v, kutuGuncelle){
   CER.ust = Math.max(0, Math.min(220, Math.round(Number(v))||0));
   cerSpecUygula(CER.ust);
   cerYaz();
-  const sl = document.getElementById('cer-ust');
-  if (sl && kaydirmaGuncelle) sl.value = CER.ust;
+  // Kutu daima geçerli/kırpılmış değeri göstersin (kullanıcı 9999 yazarsa
+  // ekranda 620 görünmeli, yoksa panel ile gerçek ayar ayrışır).
+  const sl = document.getElementById('cer-bant');
+  if (sl && kutuGuncelle) sl.value = CER.ust + 400;
   cerUstOzet();
   if (CER._sec) cerOnizle();        // editör açıksa önizleme anında uysun
   cerProfilRender();                // "ölçü eski" rozetleri tazelensin
@@ -12588,8 +12607,9 @@ function cerUstDegis(v, kaydirmaGuncelle){
 function cerUstOzet(){
   const oz = document.getElementById('cer-ust-ozet');
   const not = document.getElementById('cer-ust-not');
-  if (oz) oz.textContent = 'bant ' + cerBantYuk('') + '–' + cerBantYuk('x'.repeat(60))
-    + ' px (başlığa göre) · en fazla %' + cerKapanmaYuzde();
+  if (oz) oz.textContent = 'Gerçek bant başlığa göre ' + cerBantYuk('') + '–' + cerBantYuk('x'.repeat(60))
+    + ' px arasında değişir (girilen değer 2 satırlık en kalın hâl) · kare yüksekliğinin en fazla %'
+    + cerKapanmaYuzde() + '\'i · içerik üstten ' + CER_SPEC.UST + ' px aşağıda';
   if (!not) return;
   // Yayınlanmış ama ARTIK farklı ölçüde olan banner'lar
   const eski = cerProfilAdlari().filter(u => { const c = CER.p[u]||{};
@@ -12838,12 +12858,23 @@ function cerKimlikGibi(h){
   if (/^\d+$/.test(h)) return true;
   return (String(h).match(/\d/g)||[]).length >= 6;
 }
+// Türkçe duyarlı ilk harf büyütme ('istanbul' → 'İstanbul', 'i' → 'I' DEĞİL)
+function cerBasHarf(s){
+  s = String(s||''); if (!s) return '';
+  const ilk = s[0] === 'i' ? 'İ' : s[0].toLocaleUpperCase('tr');
+  return ilk + s.slice(1);
+}
 function cerHesapBilgi(u){
   const list = cerHesapListesi(u);
   const bul = (sira, alan) => {
     for (const p of sira){ const h = list.find(x=>x.plat===p && x[alan]); if (h) return h; }
     return null;
   };
+  // 1. KAYNAK: kullanıcı adı planı (AD_HEDEF) — Platformlar'da profil
+  //    başlığında "→ @handle" olarak görünen MARKA adı. Sosyal hesaplardaki
+  //    ad/handle hesap sahibinin kişisel adı olabiliyor (ör. "Eray Zelkoglu")
+  //    ya da otomatik üretilmiş oluyor; marka planı tek tutarlı kaynak.
+  const marka = (typeof AD_HEDEF === 'object' && AD_HEDEF) ? (AD_HEDEF[u] || '') : '';
   const adH = bul(CER_AD_SIRA,'ad') || list.find(x=>x.ad) || null;
   // Önce "kimlik gibi olmayan" bir handle ara; yoksa herhangi biri
   let hH = null;
@@ -12854,11 +12885,14 @@ function cerHesapBilgi(u){
   if (!hH) hH = bul(CER_HANDLE_SIRA,'handle') || list.find(x=>x.handle) || null;
   const kat = (typeof profilKategori === 'function') ? profilKategori(u) : '';
   return {
-    ad: (adH && adH.ad) || '',
-    adPlat: adH ? adH.plat : '',
-    handle: (hH && hH.handle) ? '@'+hH.handle : '',
-    handlePlat: hH ? hH.plat : '',
-    handleZayif: !!(hH && cerKimlikGibi(hH.handle)),
+    ad: marka ? cerBasHarf(marka) : ((adH && adH.ad) || ''),
+    adPlat: marka ? 'ad planı' : (adH ? adH.plat : ''),
+    handle: marka ? '@'+marka : ((hH && hH.handle) ? '@'+hH.handle : ''),
+    handlePlat: marka ? 'ad planı' : (hH ? hH.plat : ''),
+    handleZayif: marka ? false : !!(hH && cerKimlikGibi(hH.handle)),
+    marka,
+    // Plan dışı kalırsa sosyal hesap önerisi yine görünsün
+    hesapAd: (adH && adH.ad) || '', hesapHandle: (hH && hH.handle) ? '@'+hH.handle : '',
     kat, katAd: (typeof katLabel === 'function') ? katLabel(kat) : '',
     hesapSayisi: list.length
   };
@@ -12965,13 +12999,14 @@ function cerDuzenle(u){
   const hb = cerHesapBilgi(u), hn = document.getElementById('cer-hesap-not');
   // TÜM adaylar listelenir: hangi platformda hangi ad/handle var — "hesaptan
   // al" tek bir tahmin yapıyor, doğrusunu kullanıcı görüp elle yazabilsin.
-  if (hn) hn.innerHTML = hb.hesapSayisi
+  if (hn) hn.innerHTML = (hb.marka ? '<span style="color:var(--ok)">Ad planı: <b>@'+esc0(hb.marka)+'</b></span><br>' : '')
+    + (hb.hesapSayisi
     ? 'Hesaplar: ' + cerHesapListesi(u).map(h =>
         '<span style="white-space:nowrap">'+esc0(h.plat)+': <b>'+esc0(h.ad||'—')+'</b>'
         + (h.handle?' @'+esc0(h.handle):'')+'</span>').join(' &nbsp;·&nbsp; ')
       + (hb.katAd?'<br>Kategori: '+esc0(hb.katAd):'')
       + (hb.handleZayif?'<br><span style="color:var(--wn)">⚠ önerilen @handle otomatik üretilmiş görünüyor</span>':'')
-    : '<span style="color:var(--wn)">Bu profilde bağlı sosyal hesap görünmüyor (Platformlar → ↻ Yenile)</span>';
+    : '<span style="color:var(--wn)">Bağlı sosyal hesap görünmüyor (Platformlar → ↻ Yenile)</span>');
   cerFontYukle().then(()=>cerOnizle());
   kart.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
