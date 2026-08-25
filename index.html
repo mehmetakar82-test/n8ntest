@@ -2048,7 +2048,11 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div class="g2" style="align-items:start">
     <div>
       <div class="card">
-        <div class="ct">Profiller <button class="btn bsm" style="float:right" onclick="cerProfilleriYukle()">↻ Yenile</button></div>
+        <div class="ct">Profiller
+          <button class="btn bsm" style="float:right" onclick="cerProfilleriYukle()">↻ Yenile</button>
+          <button class="btn bsm" style="float:right;margin-right:6px" onclick="cerAdSenkronAc()"
+                  title="Görünen ad ve @handle'ı Platformlar'daki sosyal hesaplardan al (önce ne değişeceğini gösterir)">🔄 Adları hesaplardan al</button>
+        </div>
         <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mt);margin-bottom:10px">
           <div class="tg" id="cer-genel-tg" onclick="cerGenelToggle()"></div>
           <span><b>Çerçeve sistemi</b> — kapalıyken hiçbir klibe çerçeve eklenmez (profil ayarları saklanır)</span>
@@ -2084,12 +2088,19 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
           <button class="btn bsm" style="float:right" onclick="cerEditorKapat()">✕ Kapat</button></div>
         <div style="display:flex;gap:14px;flex-wrap:wrap">
           <div style="flex:1;min-width:260px">
-            <div class="fg"><label>Görünen ad</label><input id="cer-f-ad" type="text" oninput="cerOnizle()"/></div>
+            <div class="fg"><label>Görünen ad
+              <button class="btn bsm" style="float:right;padding:1px 6px;font-size:10px" onclick="cerAlanHesaptan('ad')"
+                      title="Bu profilin sosyal hesabındaki adı al">hesaptan al</button></label>
+              <input id="cer-f-ad" type="text" oninput="cerOnizle()"/>
+              <div id="cer-hesap-not" style="font-size:10.5px;color:var(--mt);margin-top:3px"></div></div>
             <div style="display:flex;align-items:center;gap:8px;margin:-4px 0 10px">
               <div class="tg on" id="cer-f-tik" onclick="this.classList.toggle('on');cerOnizle()"></div>
               <span style="font-size:12px;color:var(--mt)">Adın yanına <b>onay tiki</b> rozeti koy</span>
             </div>
-            <div class="fg"><label>@handle</label><input id="cer-f-handle" type="text" oninput="cerOnizle()"/></div>
+            <div class="fg"><label>@handle
+              <button class="btn bsm" style="float:right;padding:1px 6px;font-size:10px" onclick="cerAlanHesaptan('handle')"
+                      title="Bu profilin sosyal hesabındaki @handle'ı al">hesaptan al</button></label>
+              <input id="cer-f-handle" type="text" oninput="cerOnizle()"/></div>
             <div class="fg"><label>Buton metni <span style="color:var(--mt)">(boş = buton yok)</span></label><input id="cer-f-buton" type="text" oninput="cerOnizle()"/></div>
             <div style="display:flex;gap:8px">
               <div class="fg" style="flex:1"><label>Bant</label><input id="cer-f-bant" type="color" value="#ffffff" oninput="cerOnizle()" style="height:34px;padding:2px"/></div>
@@ -2564,7 +2575,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.25-74';
+const PANEL_YAPI = 'y2026.08.25-75';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12700,6 +12711,79 @@ async function cerProfilToggle(u){
   cerDurumSerit();
 }
 
+// ── Adları hesaplardan güncelle ──────────────────────────────────────
+// SESSİZ EZME YOK: önce ne değişeceği listelenir, kullanıcı seçer. Elle
+// yazılmış adları toptan silmek geri alınamaz bir kayıp olurdu.
+const CAD = { oneri: [] };
+function cerAdOnerileri(){
+  return cerProfilAdlari().map(u => {
+    const c = CER.p[u] || {};
+    const b = cerHesapBilgi(u);
+    const mevcutAd = c.ad || u, mevcutH = c.handle || '';
+    const yeniAd = b.ad || '', yeniH = b.handle || '';
+    return { u, b,
+      adDegisir: !!yeniAd && yeniAd !== mevcutAd,
+      hDegisir:  !!yeniH  && yeniH  !== mevcutH,
+      mevcutAd, mevcutH, yeniAd, yeniH };
+  }).filter(x => x.adDegisir || x.hDegisir);
+}
+function cerAdSenkronAc(){
+  const esc = esc0;
+  if (!S.uploadPostAccounts){
+    toast('Önce Platformlar sayfasını yükle (↻ Yenile) — hesap verisi olmadan ad çözülemez','warn',6000);
+    return;
+  }
+  CAD.oneri = cerAdOnerileri();
+  const eski = document.getElementById('cad-modal'); if (eski) eski.remove();
+  const div = document.createElement('div');
+  div.id = 'cad-modal';
+  div.style.cssText = 'position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;padding:20px';
+  div.onclick = e => { if (e.target === div) div.remove(); };
+  const govde = !CAD.oneri.length
+    ? '<div style="color:var(--mt);padding:10px 2px;font-size:12.5px">Tüm profillerin adı ve @handle\'ı sosyal hesaplarla zaten aynı — değişecek bir şey yok.</div>'
+    : CAD.oneri.map((o,i) =>
+      '<label style="display:flex;gap:8px;align-items:flex-start;padding:7px 8px;border:1px solid var(--brd);border-radius:6px;margin-bottom:5px;cursor:pointer">'
+      + '<input type="checkbox" checked data-i="'+i+'" style="width:auto;margin-top:3px">'
+      + '<div style="flex:1;min-width:0;font-size:12px">'
+      +   '<div style="font-weight:600">'+esc(o.u)+(o.b.katAd?' <span class="badge bi" style="font-size:10px">'+esc(o.b.katAd)+'</span>':'')+'</div>'
+      +   (o.adDegisir ? '<div style="color:var(--mt)">ad: <span style="color:var(--er)">'+esc(o.mevcutAd)+'</span> → <span style="color:var(--ok)">'+esc(o.yeniAd)+'</span> <span style="opacity:.6">('+esc(o.b.adPlat)+')</span></div>' : '')
+      +   (o.hDegisir ? '<div style="color:var(--mt)">handle: <span style="color:var(--er)">'+esc(o.mevcutH||'(boş)')+'</span> → <span style="color:var(--ok)">'+esc(o.yeniH)+'</span> <span style="opacity:.6">('+esc(o.b.handlePlat)+')</span>'
+        + (o.b.handleZayif ? ' <span style="color:var(--wn)">⚠ kimlik gibi görünüyor, elle düzeltmek isteyebilirsin</span>' : '')+'</div>' : '')
+      + '</div></label>').join('');
+  div.innerHTML = '<div style="background:var(--sur);border:1px solid var(--brd);border-radius:10px;max-width:640px;width:100%;max-height:82vh;display:flex;flex-direction:column">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--brd)">'
+    +   '<div style="font-family:var(--fh);font-size:14px;font-weight:700">🔄 Adları sosyal hesaplardan güncelle</div>'
+    +   '<button class="btn bg bsm" onclick="document.getElementById(\'cad-modal\').remove()">✕</button></div>'
+    + '<div style="padding:10px 14px 4px;font-size:11.5px;color:var(--mt)">Kaynak Platformlar sekmesiyle aynı: görünen ad, @handle ve YouTube için canlı okunan kanal adı. '
+    +   'Filigran boşsa @handle ile doldurulur. <b>Değişen profillerin banner\'ı yeniden yayınlanmalı</b> — liste bunu işaretler.</div>'
+    + '<div id="cad-govde" style="padding:8px 14px 12px;overflow-y:auto;flex:1">'+govde+'</div>'
+    + (CAD.oneri.length ? '<div style="padding:10px 14px;border-top:1px solid var(--brd);display:flex;gap:8px;align-items:center">'
+        + '<button class="btn bp bsm" onclick="cerAdSenkronUygula()">✓ Seçilenleri uygula</button>'
+        + '<span style="font-size:11.5px;color:var(--mt)">'+CAD.oneri.length+' profilde fark var</span></div>' : '')
+    + '</div>';
+  document.body.appendChild(div);
+}
+function cerAdSenkronUygula(){
+  const kutular = document.querySelectorAll('#cad-govde input[type=checkbox]');
+  let n = 0;
+  kutular.forEach(k => {
+    if (!k.checked) return;
+    const o = CAD.oneri[Number(k.dataset.i)]; if (!o) return;
+    const c = CER.p[o.u] = CER.p[o.u] || {};
+    if (o.adDegisir) c.ad = o.yeniAd;
+    if (o.hDegisir)  c.handle = o.yeniH;
+    // Filigran BOŞSA doldur; kullanıcının yazdığını ezme.
+    if (!c.filigran && o.yeniH) c.filigran = o.yeniH;
+    n++;
+  });
+  cerYaz(); cerProfilRender();
+  if (CER._sec) cerDuzenle(CER._sec);     // editör açıksa alanlar tazelensin
+  const m = document.getElementById('cad-modal'); if (m) m.remove();
+  toast(n ? '✓ '+n+' profilin adı güncellendi — banner\'larını yeniden yayınla (içerik değişti)' : 'Hiçbir profil seçilmedi',
+        n?'ok':'warn', n?8000:4000);
+  addLog('ok','cerceve',n+' profil adı sosyal hesaplardan güncellendi');
+}
+
 // ── Profil listesi ──
 async function cerProfilleriYukle(){
   const kutu = document.getElementById('cer-profil-liste');
@@ -12715,6 +12799,81 @@ function cerProfilAdlari(){
   // localStorage'da olup API'de artık görünmeyenler de listede kalsın (yanlışlıkla silinmesin)
   Object.keys(CER.p).forEach(u=>{ if (adlar.indexOf(u)<0) adlar.push(u); });
   return adlar;
+}
+// ── PROFİL ADINI SOSYAL HESAPTAN TÜRET ───────────────────────────────
+// Kaynak Platformlar sekmesiyle AYNI: platAccName (display_name → name →
+// username → …), cleanHandle ve YouTube için canlı okunan YT_CANLI.
+// Ayrı bir çözümleme yazmak iki sekmenin farklı ad göstermesi demek olurdu.
+const CER_AD_SIRA   = ['youtube','instagram','tiktok','twitter','x','facebook'];
+const CER_HANDLE_SIRA = ['instagram','tiktok','twitter','x','youtube','facebook'];
+function cerHesapListesi(u){
+  const d = S.uploadPostAccounts;
+  const pr = (d && Array.isArray(d.profiles)) ? d.profiles.find(x=>x && x.username===u) : null;
+  if (!pr) return [];
+  const sa = pr.social_accounts || pr.socialAccounts || {};
+  const out = [];
+  Object.keys(sa).forEach(ham => {
+    const a = Array.isArray(sa[ham]) ? sa[ham][0] : sa[ham];
+    if (!a || typeof a !== 'object') return;
+    const k = String(ham).toLowerCase();
+    let ad = a.display_name || a.displayName || a.name || '';
+    let handle = cleanHandle(a.username || a.handle || a.custom_url || '');
+    // YouTube adı Upload-Post'ta BAĞLAMA ANINDA donuyor; canlı okunan varsa o.
+    if (k === 'youtube'){
+      const c = YT_CANLI[ytKanalIdBul(a)];
+      if (c && c.ad) ad = c.ad;
+      if (c && c.handle) handle = cleanHandle(c.handle);
+    }
+    out.push({ plat:k, ad, handle });
+  });
+  return out;
+}
+// Otomatik ad/handle önerisi. Kimlik gibi görünen (rakam yığını) handle'ları
+// son sıraya atıyoruz — "@7836okhavaf7603" gibi bir öneri işe yaramıyor.
+// Otomatik üretilmiş kullanıcı adı sezgisi. ÖLÇÜLEREK kalibre edildi:
+// '7836okhavaf7603' (8 rakam) yakalanmalı, 'kardanun72003' (5 rakam)
+// yakalanmamalı — gerçek marka handle'larında 6+ rakam neredeyse görülmüyor.
+function cerKimlikGibi(h){
+  if (!h) return true;
+  if (/^\d+$/.test(h)) return true;
+  return (String(h).match(/\d/g)||[]).length >= 6;
+}
+function cerHesapBilgi(u){
+  const list = cerHesapListesi(u);
+  const bul = (sira, alan) => {
+    for (const p of sira){ const h = list.find(x=>x.plat===p && x[alan]); if (h) return h; }
+    return null;
+  };
+  const adH = bul(CER_AD_SIRA,'ad') || list.find(x=>x.ad) || null;
+  // Önce "kimlik gibi olmayan" bir handle ara; yoksa herhangi biri
+  let hH = null;
+  for (const p of CER_HANDLE_SIRA){
+    const h = list.find(x=>x.plat===p && x.handle && !cerKimlikGibi(x.handle));
+    if (h){ hH = h; break; }
+  }
+  if (!hH) hH = bul(CER_HANDLE_SIRA,'handle') || list.find(x=>x.handle) || null;
+  const kat = (typeof profilKategori === 'function') ? profilKategori(u) : '';
+  return {
+    ad: (adH && adH.ad) || '',
+    adPlat: adH ? adH.plat : '',
+    handle: (hH && hH.handle) ? '@'+hH.handle : '',
+    handlePlat: hH ? hH.plat : '',
+    handleZayif: !!(hH && cerKimlikGibi(hH.handle)),
+    kat, katAd: (typeof katLabel === 'function') ? katLabel(kat) : '',
+    hesapSayisi: list.length
+  };
+}
+// Banner PNG'sinin İÇERİĞİNİ belirleyen alanların imzası. Ad/handle/buton/
+// renk değişince PNG bayatlar; ölçü imzası (yükseklik) bunu yakalamıyordu,
+// yani ad güncellemesi yayınlanmadan çıktıya HİÇ yansımazdı.
+function cerIcerikImza(c){
+  c = c || {};
+  const s = [c.ad||'', c.handle||'', c.buton===undefined?'TAKİP ET ✋':c.buton,
+             c.bantRenk||'', c.butonRenk||'', c.yaziRenk||'', c.tikRenk||'',
+             (c.tik===false?'0':'1'), (c.logo?'L':'-')].join('');
+  let h = 5381;
+  for (let i=0;i<s.length;i++){ h = ((h*33) ^ s.charCodeAt(i)) >>> 0; }
+  return h.toString(36);
 }
 function cerElHazir(u){
   // Upload-Post'taki sosyal hesaplardan ilk kullanıcı adını @handle önerisi yap
@@ -12744,14 +12903,28 @@ function cerProfilRender(){
     // Yayınlanmış banner ARTIK farklı bant ölçüsündeyse söyle: başlık yazısı
     // bandın dışına düşer, kullanıcı sebebini bilmeden bozuk video üretir.
     const olcuEski = yayinli && c.bannerImza && c.bannerImza !== cerBannerImza();
-    const dot = yayinli ? (olcuEski?'var(--wn)':(aktif?'var(--ok)':'var(--mt)')) : 'var(--er)';
+    // İÇERİK bayatlığı: ad/handle/renk değişti ama banner yeniden
+    // yayınlanmadıysa çıktı hâlâ ESKİ adı taşır (ad senkronundan sonra
+    // en sık düşülen tuzak).
+    const icerikEski = yayinli && c.icerikImza && c.icerikImza !== cerIcerikImza(c);
+    const bayat = olcuEski || icerikEski;
+    const dot = yayinli ? (bayat?'var(--wn)':(aktif?'var(--ok)':'var(--mt)')) : 'var(--er)';
+    const b = cerHesapBilgi(u);
     const durum = yayinli
-      ? (aktif?'yayınlı · aktif':'yayınlı · kapalı') + (olcuEski?' · ⚠ eski ölçü/mod ('+esc(String(c.bannerImza||''))+')':'')
+      ? (aktif?'yayınlı · aktif':'yayınlı · kapalı')
+        + (olcuEski?' · ⚠ eski ölçü ('+esc(String(c.bannerImza||''))+')':'')
+        + (icerikEski?' · ⚠ ad/renk değişti, yeniden yayınla':'')
       : 'banner yayınlanmadı';
+    // Hesaptaki ad panelinkinden farklıysa görünsün — "otomatik güncelle"
+    // düğmesine basmadan da fark edilsin.
+    const adFark = b.ad && b.ad !== (c.ad||u);
     return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--brd);border-radius:6px;margin-bottom:6px;background:var(--bg)">'
       + '<span style="width:9px;height:9px;border-radius:50%;background:'+dot+';flex-shrink:0"></span>'
-      + '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">'+esc(c.ad||u)+'</div>'
-      + '<div style="font-size:11px;color:var(--mt)">'+esc(u)+' · '+durum+'</div></div>'
+      + '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px">'+esc(c.ad||u)
+      +   (b.katAd ? ' <span class="badge bi" style="font-size:10px;font-weight:500">'+esc(b.katAd)+'</span>' : '')
+      +   (adFark ? ' <span style="font-size:10px;color:var(--wn)" title="Sosyal hesaptaki ad farklı — ↻ Adları güncelle">≠ '+esc(b.ad)+'</span>' : '')+'</div>'
+      + '<div style="font-size:11px;color:var(--mt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(u)
+      +   (c.handle ? ' · '+esc(c.handle) : '')+' · '+durum+'</div></div>'
       // inline onclick'te esc DEĞİL jsStr — kaçış standardı: HTML çözümleyici
       // &#39;'ı JS ayrıştırmasından ÖNCE ' yapar, esc tek başına kırılabilir.
       + '<div class="tg'+(aktif?' on':'')+'" onclick="cerProfilToggle(\''+jsStr(u)+'\')" title="Bu profilde çerçeve"></div>'
@@ -12788,8 +12961,30 @@ function cerDuzenle(u){
   const tk = document.getElementById('cer-f-tik'); if (tk) tk.classList.toggle('on', c.tik !== false);
   const tg = document.getElementById('cer-f-aktif'); if (tg) tg.classList.toggle('on', c.aktif !== false);
   cerDurumYaz('');
+  // Hesap özeti: hangi platformdan ne çözüldü — "hesaptan al" neyi getirecek
+  const hb = cerHesapBilgi(u), hn = document.getElementById('cer-hesap-not');
+  // TÜM adaylar listelenir: hangi platformda hangi ad/handle var — "hesaptan
+  // al" tek bir tahmin yapıyor, doğrusunu kullanıcı görüp elle yazabilsin.
+  if (hn) hn.innerHTML = hb.hesapSayisi
+    ? 'Hesaplar: ' + cerHesapListesi(u).map(h =>
+        '<span style="white-space:nowrap">'+esc0(h.plat)+': <b>'+esc0(h.ad||'—')+'</b>'
+        + (h.handle?' @'+esc0(h.handle):'')+'</span>').join(' &nbsp;·&nbsp; ')
+      + (hb.katAd?'<br>Kategori: '+esc0(hb.katAd):'')
+      + (hb.handleZayif?'<br><span style="color:var(--wn)">⚠ önerilen @handle otomatik üretilmiş görünüyor</span>':'')
+    : '<span style="color:var(--wn)">Bu profilde bağlı sosyal hesap görünmüyor (Platformlar → ↻ Yenile)</span>';
   cerFontYukle().then(()=>cerOnizle());
   kart.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+// Tek alanı hesaptan doldur (editördeki küçük "hesaptan al" düğmeleri)
+function cerAlanHesaptan(alan){
+  const u = CER._sec; if (!u) return;
+  const b = cerHesapBilgi(u);
+  const deger = (alan === 'ad') ? b.ad : b.handle;
+  if (!deger){ toast('Hesaplarda '+(alan==='ad'?'görünen ad':'@handle')+' bulunamadı — Platformlar → ↻ Yenile', 'warn', 5000); return; }
+  const el = document.getElementById(alan === 'ad' ? 'cer-f-ad' : 'cer-f-handle');
+  if (el){ el.value = deger; cerOnizle(); }
+  if (alan === 'handle' && b.handleZayif)
+    toast('⚠ Bu @handle kimlik gibi görünüyor ('+deger+') — platformda gerçek bir kullanıcı adı varsa elle yaz', 'warn', 7000);
 }
 function cerEditorKapat(){ CER._sec=null; document.getElementById('cer-editor-card').style.display='none'; }
 function cerFormOku(){
@@ -13067,7 +13262,8 @@ async function cerYayinla(){
       sha: mevcut ? mevcut.sha : undefined
     });
     cfg.bannerUrl = cerVarlik('banner-'+cerSlug(u)+'.png')+'?v='+Date.now();
-    cfg.bannerImza = cerBannerImza();   // hangi mod+ölçüde yayınlandı
+    cfg.bannerImza = cerBannerImza();     // hangi ölçüde yayınlandı
+    cfg.icerikImza = cerIcerikImza(cfg);  // hangi ad/handle/renklerle yayınlandı
     cerYaz(); cerProfilRender();
     durum('<span style="color:var(--ok)">✓ Yayınlandı</span> — n8n\'e bildiriliyor…');
     // Dönüş kontrolü ŞART (denetim bulgusu): banner GitHub'a çıkar ama
