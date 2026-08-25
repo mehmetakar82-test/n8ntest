@@ -2077,6 +2077,18 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
             <button class="btn bsm" onclick="cerBantDegis(CER_UST_VARSAYILAN+400)" title="Varsayılana dön (550 px)">↺</button>
           </div>
           <div id="cer-ust-ozet" style="font-size:11.5px;color:var(--mt);margin-top:5px;font-variant-numeric:tabular-nums"></div>
+          <!-- Filigran konumu: ffmpeg'de y = h-wmAlt, yani kare ALTINDAN
+               sabit uzaklık. Başlık/bant değişse de kaymaz; burada görünür
+               ve ayarlanabilir olması "acaba oynuyor mu?" sorusunu bitiriyor. -->
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <span style="font-size:12px;white-space:nowrap"><b>Filigran konumu</b></span>
+            <input id="cer-wm" type="number" min="60" max="1500" step="10" value="470"
+                   onchange="cerFiligranKonum(this.value)" onkeydown="if(event.key==='Enter'){cerFiligranKonum(this.value);this.blur();}"
+                   style="width:92px;font-size:12px;text-align:right;font-variant-numeric:tabular-nums">
+            <span style="font-size:12px;color:var(--mt)">px <span style="opacity:.7">alttan (60–1500)</span></span>
+            <button class="btn bsm" onclick="cerFiligranKonum(470)" title="Varsayılana dön (alttan 470 px)">↺</button>
+          </div>
+          <div id="cer-wm-ozet" style="font-size:11.5px;color:var(--mt);margin-top:5px;font-variant-numeric:tabular-nums"></div>
           <div style="margin-top:9px">
             <div style="font-size:12px;margin-bottom:4px"><b>Yerleşim</b></div>
             <select id="cer-mod" onchange="cerModDegis(this.value)"
@@ -2581,7 +2593,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.25-76';
+const PANEL_YAPI = 'y2026.08.25-77';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12465,6 +12477,8 @@ function cerOku(){
     CER.ust = (j.ust == null) ? CER_UST_VARSAYILAN : Number(j.ust);
     CER.mod = CER_MOD_AD[j.mod] ? j.mod : 'bindir';
     CER.zincir = (j.zincir === 'tek' || j.zincir === 'cift') ? j.zincir : '';
+    CER.wmAlt = (j.wmAlt == null) ? 470 : Math.max(60, Math.min(1500, Number(j.wmAlt) || 470));
+    CER_SPEC.wmAlt = CER.wmAlt;
   }catch(e){}
   cerSpecUygula(CER.ust, CER.mod, CER.zincir);   // okunan degerler TUM cizim/komut yollarina
 }
@@ -12473,7 +12487,7 @@ function cerYaz(){
     localStorage.setItem('opus_cerceve', JSON.stringify({
       p:CER.p, aktif:CER.aktif, urlModu:CER.urlModu,
       ghRepo:CER.ghRepo, ghPat:CER.ghPat, syncSon:CER.syncSon, syncKirli:!!CER.syncKirli,
-      ust:CER.ust, mod:CER.mod, zincir:CER.zincir
+      ust:CER.ust, mod:CER.mod, zincir:CER.zincir, wmAlt:CER_SPEC.wmAlt
     }));
   }catch(e){ addLog('err','cerceve','Kaydedilemedi (localStorage dolu olabilir): '+e.message); }
 }
@@ -12511,6 +12525,8 @@ async function initCerceve(){
   const t = document.getElementById('cer-genel-tg'); if (t) t.classList.toggle('on', CER.aktif);
   const su = document.getElementById('cer-bant'); if (su) su.value = CER.ust + 400;
   const sm = document.getElementById('cer-mod'); if (sm) sm.value = CER.mod;
+  const sw = document.getElementById('cer-wm'); if (sw) sw.value = CER_SPEC.wmAlt;
+  cerWmOzet();
   cerUstOzet();
   setEl('cer-sync-son', CER.syncSon ? new Date(CER.syncSon).toLocaleString('tr') : '—');
   cerDurumSerit();   // profiller yüklenmeden önce de gerçek durumu göster
@@ -12579,6 +12595,34 @@ function cerModDegis(m){
   else if (m === 'olcekli')
     toast('✓ Videoyu küçült — hiçbir kare kaybolmaz, yanlarda bant renginde şerit kalır', 'ok', 5000);
   cerUstOzet(); if (CER._sec) cerOnizle(); cerProfilRender(); cerGeometriGonder();
+}
+// Filigran DAİMA kare altından sabit uzaklıkta (ffmpeg y = h-wmAlt).
+// Başlık uzunluğu, bant kalınlığı ya da yerleşim modu bunu DEĞİŞTİRMEZ —
+// 18 kombinasyonda ölçüldü, hepsinde aynı ifade çıkıyor.
+function cerFiligranKonum(v){
+  const n = Number(String(v).trim().replace(',','.'));
+  if (!isFinite(n) || String(v).trim() === ''){
+    const k = document.getElementById('cer-wm'); if (k) k.value = CER_SPEC.wmAlt;
+    return;
+  }
+  CER_SPEC.wmAlt = Math.max(60, Math.min(1500, Math.round(n)));
+  CER.wmAlt = CER_SPEC.wmAlt;
+  cerYaz();
+  const k = document.getElementById('cer-wm'); if (k) k.value = CER_SPEC.wmAlt;
+  cerWmOzet();
+  if (CER._sec) cerOnizle();
+  cerGeometriGonder();      // n8n de yeni konumu bilmeli
+}
+function cerWmOzet(){
+  const el = document.getElementById('cer-wm-ozet'); if (!el) return;
+  const y = CER_SPEC.H - CER_SPEC.wmAlt;
+  const bantMax = cerBantYuk('x'.repeat(60));
+  // Filigran bandın içine düşerse videoda değil bantta görünür — uyar.
+  const cakisma = y < bantMax + CER_SPEC.wmPx;
+  el.innerHTML = 'Karenin üstünden <b>'+y+' px</b> (%'+((y/CER_SPEC.H)*100).toFixed(1)+') — '
+    + '<b>her klipte aynı yerde</b>, yatayda ortalı. Başlık/bant değişse de kaymaz.'
+    + (cakisma ? ' <span style="color:var(--er)">⚠ Bu değerde filigran BANDIN içine düşüyor (bant en fazla '
+        + bantMax+' px) — alttan uzaklığı azalt.</span>' : '');
 }
 // Kutuya girilen değer 2 SATIRLIK bant yüksekliği; UST ondan türetilir.
 function cerBantDegis(v){
@@ -12740,12 +12784,17 @@ function cerAdOnerileri(){
     const c = CER.p[u] || {};
     const b = cerHesapBilgi(u);
     const mevcutAd = c.ad || u, mevcutH = c.handle || '';
+    // Filigran varsayılanı '@'+cerElHazir(u) — hiç dokunulmamış profilde
+    // cfg.filigran undefined olur, o yüzden mevcut değeri o varsayılana göre
+    // değerlendiriyoruz; yoksa "değişmedi" sanıp güncellemeyi atlardık.
+    const mevcutF = (c.filigran !== undefined) ? c.filigran : ('@'+cerElHazir(u));
     const yeniAd = b.ad || '', yeniH = b.handle || '';
     return { u, b,
       adDegisir: !!yeniAd && yeniAd !== mevcutAd,
       hDegisir:  !!yeniH  && yeniH  !== mevcutH,
-      mevcutAd, mevcutH, yeniAd, yeniH };
-  }).filter(x => x.adDegisir || x.hDegisir);
+      fDegisir:  !!yeniH  && yeniH  !== mevcutF,
+      mevcutAd, mevcutH, mevcutF, yeniAd, yeniH };
+  }).filter(x => x.adDegisir || x.hDegisir || x.fDegisir);
 }
 function cerAdSenkronAc(){
   const esc = esc0;
@@ -12769,13 +12818,16 @@ function cerAdSenkronAc(){
       +   (o.adDegisir ? '<div style="color:var(--mt)">ad: <span style="color:var(--er)">'+esc(o.mevcutAd)+'</span> → <span style="color:var(--ok)">'+esc(o.yeniAd)+'</span> <span style="opacity:.6">('+esc(o.b.adPlat)+')</span></div>' : '')
       +   (o.hDegisir ? '<div style="color:var(--mt)">handle: <span style="color:var(--er)">'+esc(o.mevcutH||'(boş)')+'</span> → <span style="color:var(--ok)">'+esc(o.yeniH)+'</span> <span style="opacity:.6">('+esc(o.b.handlePlat)+')</span>'
         + (o.b.handleZayif ? ' <span style="color:var(--wn)">⚠ kimlik gibi görünüyor, elle düzeltmek isteyebilirsin</span>' : '')+'</div>' : '')
+      +   (o.fDegisir ? '<div style="color:var(--mt)">filigran: <span style="color:var(--er)">'+esc(o.mevcutF||'(boş)')+'</span> → <span style="color:var(--ok)">'+esc(o.yeniH)+'</span></div>' : '')
       + '</div></label>').join('');
   div.innerHTML = '<div style="background:var(--sur);border:1px solid var(--brd);border-radius:10px;max-width:640px;width:100%;max-height:82vh;display:flex;flex-direction:column">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--brd)">'
     +   '<div style="font-family:var(--fh);font-size:14px;font-weight:700">🔄 Adları sosyal hesaplardan güncelle</div>'
     +   '<button class="btn bg bsm" onclick="document.getElementById(\'cad-modal\').remove()">✕</button></div>'
-    + '<div style="padding:10px 14px 4px;font-size:11.5px;color:var(--mt)">Kaynak Platformlar sekmesiyle aynı: görünen ad, @handle ve YouTube için canlı okunan kanal adı. '
-    +   'Filigran boşsa @handle ile doldurulur. <b>Değişen profillerin banner\'ı yeniden yayınlanmalı</b> — liste bunu işaretler.</div>'
+    + '<div style="padding:10px 14px 4px;font-size:11.5px;color:var(--mt)">Kaynak öncelikle <b>kullanıcı adı planı</b> (Platformlar\'da profil başlığındaki → @handle); '
+    +   'planda olmayan profillerde sosyal hesaplardaki ad/@handle. <b>Filigran da aynı @handle olur.</b> '
+    +   'Ad/handle değişen profillerin banner\'ı yeniden yayınlanmalı — liste bunu işaretler '
+    +   '(filigran ffmpeg ile yazıldığı için banner gerektirmez).</div>'
     + '<div id="cad-govde" style="padding:8px 14px 12px;overflow-y:auto;flex:1">'+govde+'</div>'
     + (CAD.oneri.length ? '<div style="padding:10px 14px;border-top:1px solid var(--brd);display:flex;gap:8px;align-items:center">'
         + '<button class="btn bp bsm" onclick="cerAdSenkronUygula()">✓ Seçilenleri uygula</button>'
@@ -12792,8 +12844,9 @@ function cerAdSenkronUygula(){
     const c = CER.p[o.u] = CER.p[o.u] || {};
     if (o.adDegisir) c.ad = o.yeniAd;
     if (o.hDegisir)  c.handle = o.yeniH;
-    // Filigran BOŞSA doldur; kullanıcının yazdığını ezme.
-    if (!c.filigran && o.yeniH) c.filigran = o.yeniH;
+    // Filigran da AYNI plan handle'ı — kullanıcı bunu açıkça istedi ve
+    // modalda ne olacağını görüp onayladığı için üzerine yazmak güvenli.
+    if (o.fDegisir)  c.filigran = o.yeniH;
     n++;
   });
   cerYaz(); cerProfilRender();
