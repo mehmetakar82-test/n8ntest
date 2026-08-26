@@ -2595,7 +2595,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.25-79';
+const PANEL_YAPI = 'y2026.08.26-80';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12273,20 +12273,42 @@ function renderOPCHist() {
   const el = document.getElementById('opc-hist');
   if (!el) return;
   if (!OPC.hist.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Henüz gönderim yok</div>'; return; }
-  // Clip başına grupla: aynı clip'in gönderildiği tüm kategorileri topla
-  // (OPC.hist en yeni başta olduğundan ilk görülen = en yeni; sıralama korunur)
+  // PROJE başına grupla (eskiden klip başınaydı). 38 klibi 38 satır olarak
+  // okumak "hepsi gitti mi?" sorusuna cevap vermiyordu; tek satırda
+  // "P… · 38 klip · Eğlence · son saat" bir bakışta doğrulanıyor.
+  // OPC.hist en yeni başta → ilk görülen SON gönderim, son görülen İLK.
   const groups = new Map();
   OPC.hist.forEach(h => {
     if (!h.id) return;
-    if (!groups.has(h.id)) groups.set(h.id, { id: h.id, kats: [], t: h.t });
-    const g = groups.get(h.id);
+    const pid = pdProjeKimligi(h.id) || h.id;      // 'proje.klip' → 'proje'
+    if (!groups.has(pid)) groups.set(pid, { pid, kats: [], klipler: new Set(), son: h.t, ilk: h.t, gonderim: 0 });
+    const g = groups.get(pid);
     if (h.kat && !g.kats.includes(h.kat)) g.kats.push(h.kat);
+    g.klipler.add(h.id);
+    g.gonderim++;                                   // klip × kategori
+    g.ilk = h.t;                                    // liste eskiye doğru gidiyor
   });
-  el.innerHTML = [...groups.values()].slice(0,30).map(g => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:12px">
-    <span style="color:var(--acc);font-family:var(--fm);flex-shrink:0">${g.id}</span>
-    <span style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;flex:1">${g.kats.map(opcCatChip).join('')}</span>
-    <span style="color:var(--mt);flex-shrink:0;white-space:nowrap">${g.t}</span>
-  </div>`).join('');
+  el.innerHTML = [...groups.values()].slice(0,30).map(g => {
+    const n = g.klipler.size;
+    const ipucu = g.pid + ' — ' + n + ' klip · ' + g.gonderim + ' gönderim ('
+      + (g.kats.join(', ') || 'kategori yok') + ')'
+      + '\nİlk: ' + g.ilk + '\nSon: ' + g.son
+      + '\n\nTıkla → bu projeyi aç.';
+    return `<div title="${esc0(ipucu)}" onclick="opcGecmisAc('${jsStr(g.pid)}')"
+      style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--brd);font-size:12px;cursor:pointer">
+      <span style="color:var(--acc);font-family:var(--fm);flex-shrink:0">${esc0(g.pid)}</span>
+      <span style="color:var(--mt);flex-shrink:0;white-space:nowrap;font-variant-numeric:tabular-nums">${n} klip${g.gonderim > n ? ' · '+g.gonderim+' gönderim' : ''}</span>
+      <span style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;flex:1">${g.kats.map(opcCatChip).join('')}</span>
+      <span style="color:var(--mt);flex-shrink:0;white-space:nowrap">${esc0(g.son)}</span>
+    </div>`;
+  }).join('');
+}
+// Geçmiş satırına tıklayınca o projeyi aç — "hangi klipler gitmiş?" sorusu
+// arama kutusuna elle kimlik yapıştırmadan cevaplanabilsin.
+function opcGecmisAc(pid){
+  const inp = document.getElementById('opc-pid-search');
+  if (inp) inp.value = pid;
+  if (typeof opcSearchById === 'function') opcSearchById();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -12386,7 +12408,7 @@ document.addEventListener('DOMContentLoaded', function() {
       renderLangToggle,langChipToggle,updateLangVisibility,getSelLang,
       renderPlatToggle,platChipToggle,getSelPlatforms,
       toggleTheme,applyTheme,
-      opcFetchProjects,opcSearchById,opcOpenProject,opcToggleClip,opcSelectAll,opcDeselectAll,opcBackToProjects,opcSendSelected,
+      opcFetchProjects,opcSearchById,opcOpenProject,opcToggleClip,opcSelectAll,opcDeselectAll,opcBackToProjects,opcSendSelected,opcGecmisAc,
       opcMarkSelectedDone,opcUnmarkSelectedDone,
       initTrendOnay,trFetchPending,trApprove,trReject,
       parseDriveSheetID,addSearchHist,
