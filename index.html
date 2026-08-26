@@ -2598,7 +2598,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.26-83';
+const PANEL_YAPI = 'y2026.08.26-84';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -2874,7 +2874,13 @@ async function refreshDash() {
 
   if (n8n) {
     const d = await n8nGetCached('/webhook/panel-data');
-    if (d) {
+    // !d._bos ZORUNLU. n8nGet, HTTP 200 + 0 bayt durumunda {_bos:true} doner
+    // ve o bir NESNE, yani truthy — eski 'if (d)' bunu BASARI sayiyordu:
+    // Sheets yedegi hic calismiyor, ustelik log 'ok' seviyesinde
+    // "Panel data: 0 short, 0 URL" yaziyordu. Panelde 14 n8nGet cagrisinin
+    // 11'inde bu kontrol acikca var; panelin EN MERKEZI veri yolunda
+    // unutulmustu (kalan 2'si _bos'ta zaten zararsiz sekilde bos donuyor).
+    if (d && !d._bos) {
       shorts = d.shorts||[]; urls = d.urls||[]; sched = d.scheduled||[];
       S._panelCache = d;
       addLog('ok','webhook','Panel data: '+shorts.length+' short, '+urls.length+' URL');
@@ -2882,6 +2888,16 @@ async function refreshDash() {
       const sid = S.cfg.sheet||'';
       const [sv,uv] = await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid,'URL-Takip!A:Z')]);
       shorts = parseSheet(sv); urls = parseSheet(uv);
+      // Yedege dusuldugunu SOYLE — bos dashboard'un sebebi gorunur olsun.
+      const sebep = (d && d._bos) ? 'n8n boş yanıt döndü (HTTP 200, 0 bayt)' : 'n8n\'e ulaşılamadı';
+      if (shorts.length || urls.length) {
+        addLog('warn','webhook', sebep+' — Sheets yedeğine düşüldü: '+shorts.length+' short, '+urls.length+' URL');
+      } else {
+        // 'err' seviyesi YETERLI: addLog zaten sev==='err' oldugunda toast atiyor.
+        // Ayrica toast() cagirmak ekrana ayni seyi IKI KEZ basiyordu (olculdu).
+        addLog('err','webhook', sebep+' ve Sheets yedeği de boş — Dashboard veri gösteremiyor. '
+          +'Ayarlar\'da Sheet ID / Sheets API anahtarı dolu mu?');
+      }
     }
   } else {
     const sid = S.cfg.sheet||'';
@@ -4097,7 +4113,9 @@ async function loadReports(){
   let urls  =(S._panelCache&&S._panelCache.urls)||(S.sheetData&&S.sheetData.urls)||[];
   if (!shorts.length){
     const base=getN8N();
-    if (base){ const d=await n8nGetCached('/webhook/panel-data'); if(d){ shorts=d.shorts||[]; urls=d.urls||[]; S.sheetData={shorts,urls}; } }
+    // !d._bos: bos yanitta S.sheetData'yi {[],[]} ile ezip birakiyordu; asagidaki
+    // Sheets yedegi yerel degiskenleri duzeltiyor ama S.sheetData bayat kaliyordu.
+    if (base){ const d=await n8nGetCached('/webhook/panel-data'); if(d && !d._bos){ shorts=d.shorts||[]; urls=d.urls||[]; S.sheetData={shorts,urls}; } }
     if (!shorts.length && (S.cfg.sheet||S.cfg.shkey)){ try{ const sid=S.cfg.sheet||''; const [sv,uv]=await Promise.all([sheetsGet(sid,'Sheet1!A:Z'),sheetsGet(sid,'URL-Takip!A:Z')]); shorts=parseSheet(sv)||[]; urls=parseSheet(uv)||[]; }catch(e){} }
   }
   RAP.shorts=shorts; RAP.urls=urls;
