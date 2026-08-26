@@ -2598,7 +2598,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.26-82';
+const PANEL_YAPI = 'y2026.08.26-83';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -9481,7 +9481,13 @@ async function upFetch(path, opts) {
   if (base) {
     const r = await fetch(base + '/webhook/uploadpost-proxy?path=' + encodeURIComponent(path), {headers:n8nBaslik()});
     if (r.ok) return { data: await r.json(), src: 'n8n proxy' };
-    const e = new Error('Proxy hatası: HTTP ' + r.status); e.status = r.status; throw e;
+    // 'Proxy hatasi: HTTP 404' kullaniciya hicbir sey soylemiyordu. Bu uc
+    // OPUSPRO workflow'unda YOK; buraya yalnizca Upload-Post API Key BOSKEN
+    // dusuluyor, yani gercek cozum anahtari girmek.
+    const e = new Error(r.status === 404
+      ? 'n8n proxy ucu kurulu degil (/webhook/uploadpost-proxy yok) — Ayarlar\'dan Upload-Post API Key gir'
+      : 'Proxy hatası: HTTP ' + r.status);
+    e.status = r.status; throw e;
   }
   throw new Error('Upload-Post API Key yok (Ayarlar → Upload-Post API Key)');
 }
@@ -10662,10 +10668,16 @@ async function ytkAddToSheet() {
   if (!base) return showRes('ytk-res', 'n8n URL girin — yazma işlemi için n8n proxy gerekli', 'warn');
 
   showRes('ytk-res', `⏳ ${sel.length} video Sheet'e ekleniyor...`, 'info');
-  let added = 0;
+  // faf() DONUSU OKUNMALI. Eskiden donus atiliyordu ve added++ kosulsuz
+  // calisiyordu: her tik, uc olmasa bile "N video Sheet'e eklendi" yaziyordu.
+  // NOT: n8n kayitli olmayan bir webhook'a 404 doner ama o yanita CORS
+  // basligi EKLEMEZ — tarayici cogu zaman durum kodunu goremez, faf()
+  // {ok:false,corsOrNetwork:true} dondurur. Bu yuzden mesaj iki ihtimali de
+  // ayni anda anlatiyor; "404 gormedim" diye basari yazmak yasak.
+  let added = 0, hata = 0, ilkteDurdu = false, sonSebep = '';
   for (const v of sel) {
     const url = 'https://www.youtube.com/watch?v=' + v.id;
-    await faf(base + '/webhook/sheet-ekle', {
+    const r = await faf(base + '/webhook/sheet-ekle', {
       sheetId,
       url,
       kategori: kat,
@@ -10673,8 +10685,30 @@ async function ytkAddToSheet() {
       title: v.snippet.title,
       channelTitle: YTK.channelInfo?.channelTitle || ''
     });
-    added++;
+    if (r && r.ok) { added++; }
+    else {
+      hata++;
+      sonSebep = (r && typeof r.status === 'number') ? ('HTTP ' + r.status)
+               : (r && r.corsOrNetwork) ? 'ağ/CORS engeli'
+               : (r && r.invalidUrl)    ? 'geçersiz n8n adresi' : 'bilinmeyen hata';
+      // Ilk istek dustuyse uc muhtemelen hic yok — 12 kez denemenin anlami yok.
+      if (added === 0) { ilkteDurdu = true; break; }
+    }
     await sleep(200);
+  }
+
+  if (ilkteDurdu) {
+    // showRes textContent kullaniyor — burada HTML etiketi DUZ METIN gorunur.
+    showRes('ytk-res', `✗ Hiçbiri eklenemedi (${sonSebep}). ` +
+      `Bu düğme /webhook/sheet-ekle ucuna yazıyor; o uç OPUSPRO workflow'unda YOK — ` +
+      `n8n'de oluşturulmadan bu özellik çalışmaz.`, 'err');
+    addLog('err', 'sheets', `Sheet'e Ekle basarisiz (${sonSebep}) — /webhook/sheet-ekle n8n'de kayitli degil`);
+    return;
+  }
+  if (hata) {
+    showRes('ytk-res', `⚠ ${added} eklendi, ${hata} başarısız (${sonSebep})`, 'warn');
+    addLog('warn', 'sheets', `Sheet'e Ekle: ${added} ok, ${hata} hata — ${sonSebep}`);
+    return;
   }
   showRes('ytk-res', `✓ ${added} video Sheet'e eklendi. n8n'den de gönderebilirsiniz.`, 'ok');
   addLog('ok', 'sheets', `YT Kanal ${added} URL sheet'e eklendi`);
