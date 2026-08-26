@@ -2313,7 +2313,10 @@ function findDupeSend(url) {
 function recordSend(url, kategori) {
   if (!url) return;
   const key = vidKey(url);
-  S.sentLog[key] = { url: String(url).trim(), t: new Date().toLocaleString('tr'), kategori: kategori||'' };
+  // ts: SIRALANABILIR zaman. 't' insan icin ('26.08.2026 17:15:30') ama
+  // new Date() o bicimi AYRISTIRAMIYOR (Invalid Date) — Gonderim Gecmisi
+  // sondugu icin sirasiz kaliyordu. Bkz. gcZaman().
+  S.sentLog[key] = { url: String(url).trim(), t: new Date().toLocaleString('tr'), ts: Date.now(), kategori: kategori||'' };
   try { localStorage.setItem('op_sent_log', JSON.stringify(S.sentLog)); } catch(e) {}
   S.sentURLs.add(String(url).trim());
   saveSent();
@@ -2595,7 +2598,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.26-81';
+const PANEL_YAPI = 'y2026.08.26-82';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -15961,18 +15964,48 @@ function initGecmis() {
   if(f){ const cats=[...new Set(Object.values(S.sentLog).map(x=>(x.kategori||'').split(/[, ]+/)[0]).filter(Boolean))]; f.innerHTML='<option value="">Tüm kategoriler</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join(''); }
   renderGecmis();
 }
+// Bir gecmis kaydinin SIRALANABILIR zamani (epoch ms).
+//
+// NEDEN GEREKLI: recordSend eskiden yalniz t:'26.08.2026 17:15:30' yaziyordu.
+// V8'de new Date('26.08.2026 17:15:30') = Invalid Date; ustelik `|| 0` de
+// KURTARMIYOR cunku Invalid Date bir NESNE, yani truthy. Karsilastirici
+// NaN donduruyor, sort hicbir sey yapmiyor, liste ekleme sirasinda
+// (EN ESKI USTTE) kaliyor ve slice(0,300) EN ESKI 300'u kesiyordu —
+// yani 300 kaydi asinca yeni gonderimler bu ekranda hic gorunmuyordu.
+//
+// Yeni kayitlarda ts var. ESKI kayitlar icin 't' metnini burada cozuyoruz;
+// diske geri YAZMIYORUZ — op_sent_log cift yayin korumasinin tek kaynagi,
+// gereksiz her yazma sekmeler arasi kayip guncelleme riski demek.
+function gcZaman(r){
+  if (!r) return 0;
+  const n = Number(r.ts);
+  if (n > 0) return n;
+  const t = String(r.t || '').trim();
+  if (!t) return 0;
+  // 'GG.AA.YYYY SS:DD[:SS]' — toLocaleString('tr') bicimi
+  const m = t.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1], +m[4], +m[5], +(m[6]||0)).getTime() || 0;
+  const iso = Date.parse(t);           // '2026-08-26T17:15' gibi defter kayitlari
+  return isNaN(iso) ? 0 : iso;
+}
+const GC_TAVAN = 300;
 function renderGecmis() {
   const list=document.getElementById('gc-list'), empty=document.getElementById('gc-empty'); if(!list) return;
   const q=((document.getElementById('gc-search')||{}).value||'').toLowerCase();
   const fk=(document.getElementById('gc-filter')||{}).value||'';
   let rows=Object.entries(S.sentLog).map(([k,v])=>({key:k,...v}));
-  rows.sort((a,b)=> (new Date(b.t)||0)-(new Date(a.t)||0));
+  rows.sort((a,b)=> gcZaman(b) - gcZaman(a));
   if(q) rows=rows.filter(r=>(r.url||'').toLowerCase().includes(q)||(r.kategori||'').toLowerCase().includes(q));
   if(fk) rows=rows.filter(r=>String(r.kategori||'').split(/[, ]+/).includes(fk));
-  const cnt=document.getElementById('gc-count'); if(cnt) cnt.textContent=rows.length+' kayıt';
+  // Kesildigini SOYLE: 'N kayit' yazip 300 satir cizmek, aradigini bulamayan
+  // kullaniciya "kayit yok" izlenimi veriyordu. Arama/filtre kutulari zaten var.
+  const cnt=document.getElementById('gc-count');
+  if(cnt) cnt.textContent = rows.length>GC_TAVAN
+    ? (rows.length+' kayıt · en yeni '+GC_TAVAN+' gösteriliyor (arama ile daralt)')
+    : (rows.length+' kayıt');
   if(!rows.length){ list.innerHTML=''; if(empty) empty.style.display='block'; return; }
   if(empty) empty.style.display='none';
-  list.innerHTML=rows.slice(0,300).map(r=>`<div class="card" style="padding:8px 12px;display:flex;align-items:center;gap:10px">
+  list.innerHTML=rows.slice(0,GC_TAVAN).map(r=>`<div class="card" style="padding:8px 12px;display:flex;align-items:center;gap:10px">
     <div style="flex:1;min-width:0"><div style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${guvenliUrl(r.url)}" target="_blank" rel="noopener" style="color:var(--acc)">${esc0(r.url)}</a></div><div style="font-size:11px;color:var(--mt);margin-top:2px">${esc0(r.kategori||'')} · ${esc0(r.t||'')}</div></div>
     <button class="btn bg bsm" onclick="gcResend('${encodeURIComponent(r.url)}','${jsStr((r.kategori||'genel').split(/[, ]+/)[0])}')">↻ Tekrar</button>
   </div>`).join('');
