@@ -1933,7 +1933,6 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div class="fg"><label>Webhook: Oyun</label><div id="wh-oyun" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-oyun</div></div>
         <div class="fg"><label>Webhook: Spor</label><div id="wh-spor" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/video-gonder-spor</div></div>
         <div class="fg"><label>Webhook: OpusClip Direkt</label><div id="wh-opusclip" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/opus-clip-direkt</div></div>
-        <div class="fg"><label>Webhook: YouTube Ara</label><div id="wh-ytara" style="font-size:12px;color:var(--acc);padding:5px 8px;background:var(--bg);border:1px solid var(--brd);border-radius:3px;word-break:break-all">/webhook/youtube-ara</div></div>
       </div>
       <div class="card">
         <div class="ct" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -2598,7 +2597,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.26-86';
+const PANEL_YAPI = 'y2026.08.26-87';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3440,36 +3439,6 @@ async function yarSendSelected() {
   addLog('ok', 'webhook', `YouTube arama ${sent} video gönderildi [${cats.join(',')}]`);
 }
 
-// Eski fire-and-forget: geriye uyumluluk için tutuluyor ama yeni buton çağırmıyor
-async function sendSearch() {
-  const kw   = (document.getElementById('ya-kw')||{}).value||'';
-  const dur  = (document.getElementById('ya-dur')||{}).value||'600';
-  const lang = (document.getElementById('ya-lang')||{}).value||'tr';
-  const selCats = getSelCatList('ya-cats');
-  const CAT_WH  = {film:'/webhook/video-gonder-film',eglence:'/webhook/video-gonder-eglence',bilim:'/webhook/video-gonder-bilim',vlog:'/webhook/video-gonder-vlog',komedi:'/webhook/video-gonder-komedi',oyun:'/webhook/video-gonder-oyun',spor:'/webhook/video-gonder-spor'};
-  const base = getN8N();
-  if (!kw.trim()) return showRes('ya-res','Anahtar kelime girin','err');
-  if (!base) return showRes('ya-res','Ayarlar\'dan n8n URL girin','warn');
-  showRes('ya-res','⏳ Gonderiliyor... ['+selCats.join(',')+']','info');
-  addLog('info','webhook','YouTube arama ['+selCats.join(',')+']:'+kw);
-  // Çoklu kategoride bile TEK gönderim (kategoriler dizisi ile)
-  const path = selCats.length>1 ? '/webhook/youtube-ara' : (CAT_WH[selCats[0]] || '/webhook/youtube-ara');
-  const yaAciklama = (document.getElementById('ya-aciklama')||{}).value||'';
-  faf(base+path,{anahtar_kelime:kw, minDurationSec:parseInt(dur), lang, ...mcFields(selCats), dil:getSelLang('ya-cats'), platformlar:getSelPlatforms('ya-cats'), categories:selCats, aciklama_notu:yaAciklama});
-  setTimeout(()=>showRes('ya-res','✓ Arama ['+selCats.join(',')+'] baslatildi — n8n arka planda calisiyor','ok'), 1500);
-  S.searchHist.unshift({kw, kat:selCats.join(','), t:new Date().toLocaleString('tr')});
-  S.searchHist = S.searchHist.slice(0,20);
-  localStorage.setItem('op_srch',JSON.stringify(S.searchHist));
-  renderSearchHist();
-}
-
-function addSearchHist() {
-  const kw = (document.getElementById('ya-kw')||{}).value||'';
-  if (!kw) return;
-  S.searchHist.unshift({kw, t:new Date().toLocaleString('tr')});
-  localStorage.setItem('op_srch',JSON.stringify(S.searchHist));
-  renderSearchHist();
-}
 
 function renderSearchHist() {
   const el = document.getElementById('ya-hist');
@@ -9801,8 +9770,13 @@ function updateWHs() {
     'wh-komedi':   '/webhook/video-gonder-komedi',
     'wh-oyun':     '/webhook/video-gonder-oyun',
     'wh-spor':     '/webhook/video-gonder-spor',
-    'wh-opusclip': '/webhook/opus-clip-direkt',
-    'wh-ytara':    '/webhook/youtube-ara'
+    'wh-opusclip': '/webhook/opus-clip-direkt'
+    // 'wh-ytara' KALDIRILDI: /webhook/youtube-ara ucu n8n'de YOK (8 workflow
+    // JSON'unun yalnizca eski bir YEDEGINDE geciyor, aktifte 0 eslesme).
+    // Ayarlar sayfasinda sahte bir adres gosterip "kurulumum bozuk mu?"
+    // sorusuna sebep oluyordu. Tek kullanicisi olan sendSearch de olu koddu
+    // ve birlikte silindi. YouTube Ara sayfasinin GERCEK gonderimi
+    // yarSendSelected -> mcPath(cats) uzerinden gidiyor, o calisiyor.
   };
   Object.entries(map).forEach(([id,p])=>{const el=document.getElementById(id);if(el)el.textContent=b?b+p:p;});
   // 'cat-wh-list' bloğu KALDIRILDI: o eleman arayüzde yok (yorumu da yanlış
@@ -12526,7 +12500,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // görünürlüğünden bağımsız çalışsın diye açılışta bir kez kurulur.
     setTimeout(()=>{ try{ ciftOtoKur(); }catch(e){ console.warn('[boot] ciftOtoKur:', e.message); } }, 2500);
     // Tüm global fonksiyonları window'a bağla
-    const globals = [go,showTab,goUretim,renderUretimTabs,trTabCount,refreshDash,sendSingle,sendBulkURLs,sendSearch,
+    const globals = [go,showTab,goUretim,renderUretimTabs,trTabCount,refreshDash,sendSingle,sendBulkURLs,
       loadDriveSheet,sendDriveURLs,clearSentURLs,
       filterTbl,exportCSV,loadReports,loadPlatforms,
       saveSettings,updateWHs,copyText,renderLogs,
@@ -12551,7 +12525,7 @@ document.addEventListener('DOMContentLoaded', function() {
       opcFetchProjects,opcSearchById,opcOpenProject,opcToggleClip,opcSelectAll,opcDeselectAll,opcBackToProjects,opcSendSelected,opcGecmisAc,
       opcMarkSelectedDone,opcUnmarkSelectedDone,
       initTrendOnay,trFetchPending,trApprove,trReject,
-      parseDriveSheetID,addSearchHist,
+      parseDriveSheetID,
       toggleAutoLog,addCustomCat,saveCats,genLimCode,
       loadAllSheetData,loadSheetPage,
       // UX paketi yardımcıları (onclick'lerden çağrılıyor)
