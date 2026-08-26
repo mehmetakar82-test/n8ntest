@@ -784,7 +784,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div class="fg"><label>Kategori <span style="color:var(--mt)">(birden fazla seçebilirsin)</span></label><div class="cat-chips" id="bv-cats"></div></div>
         <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı — tüm URL'ler için aynı)</span></label><input id="bv-aciklama" type="text" placeholder="örn. Excalibur Kanalı"/></div>
         <div class="fg"><label>Gönderim Aralığı (dakika)</label><input id="bv-delay" type="number" value="1" min="1"/></div>
-        <button class="btn bp" onclick="sendBulkURLs()">▶ Tümünü Gönder</button>
+        <button class="btn bp" id="bv-send-btn" onclick="sendBulkURLs()">▶ Tümünü Gönder</button>
         <div id="bv-prog" style="display:none;margin-top:8px">
           <div id="bv-st" style="font-size:12px;color:var(--mt);margin-bottom:4px"></div>
           <div class="prog"><div class="pf" id="bv-bar" style="background:var(--acc);width:0%"></div></div>
@@ -939,7 +939,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <div class="fg"><button class="btn bp bsm" onclick="vpComputeSegments()">▤ Parçaları Hesapla</button></div>
         <div class="fg"><label>Kategori</label><div class="cat-chips" id="vp-cats"></div></div>
         <div class="fg"><label>Açıklama Notu <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="vp-aciklama" type="text" placeholder="örn. Bölüm serisi"/></div>
-        <div class="fg"><button class="btn bs bsm" onclick="vpSend()">▶ Tüm Parçaları Gönder</button></div>
+        <div class="fg"><button class="btn bs bsm" id="vp-send-btn" onclick="vpSend()">▶ Tüm Parçaları Gönder</button></div>
         <div id="vp-res" class="res"></div>
       </div>
     </div>
@@ -1088,7 +1088,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
         <button class="btn bg bsm" onclick="ytkSelectAll()">Tümünü Seç</button>
         <button class="btn bg bsm" onclick="ytkClearAll()">Seçimi Temizle</button>
-        <button class="btn bs bsm" onclick="ytkSendSelected()">▶ Seçilenleri Gönder</button>
+        <button class="btn bs bsm" id="ytk-send-btn" onclick="ytkSendSelected()">▶ Seçilenleri Gönder</button>
         <button class="btn bp bsm" onclick="ytkAddToSheet()">📋 Sheet'e Ekle</button>
       </div>
       <div id="ytk-video-list" style="max-height:calc(55vh / var(--pz));overflow-y:auto"></div>
@@ -1250,7 +1250,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         <span id="ya-sel-count" style="color:var(--acc);font-size:13px">(0 seçili)</span>
         <button class="btn bg bsm" onclick="yarSelectAll()">Tümünü Seç</button>
         <button class="btn bg bsm" onclick="yarClearAll()">Seçimi Temizle</button>
-        <button class="btn bs bsm" onclick="yarSendSelected()" style="margin-left:auto">▶ Seçilenleri Gönder</button>
+        <button class="btn bs bsm" id="ya-send-btn" onclick="yarSendSelected()" style="margin-left:auto">▶ Seçilenleri Gönder</button>
       </div>
       <div id="ya-video-list" style="max-height:calc(60vh / var(--pz));overflow-y:auto"></div>
     </div>
@@ -1679,7 +1679,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <span id="rd-status" style="font-size:12px;color:var(--mt)"></span>
     <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
       <div class="cat-chips" id="rd-cats" style="margin:0"></div>
-      <button class="btn bs bsm" onclick="rdSendSelected()">▶ Seçilenleri İşleme Al (<span id="rd-selcount">0</span>)</button>
+      <button class="btn bs bsm" id="rd-send-btn" onclick="rdSendSelected()">▶ Seçilenleri İşleme Al (<span id="rd-selcount">0</span>)</button>
     </div>
   </div>
   <div id="rd-res" class="res"></div>
@@ -2598,7 +2598,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.26-85';
+const PANEL_YAPI = 'y2026.08.26-86';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3211,8 +3211,13 @@ async function sendBulkURLs() {
   if (!urls.length) return setEl('bv-st','Gönderilecek yeni video kalmadı');
   addLog('info','webhook','Toplu gonderim ['+selCats.join(',')+']:'+urls.length+' URL');
   let sent = 0, hata = 0, belirsiz = 0; const sebepler = [];
+  // Kilit TUM erken return'lerden SONRA alinir: kopya modali iptal edilirse
+  // veya gonderilecek video kalmazsa buton kilitli kalmasin.
+  const kilit = btnKilitle('bv-send-btn');
+  try {
   for (let i=0;i<urls.length;i++) {
     const u=urls[i];
+    kilit.ilerleme(i+1, urls.length);
     // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
     // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
     setEl('bv-st',(i+1)+'/'+urls.length+' ['+selCats.join(',')+']: '+u.slice(0,40));
@@ -3228,6 +3233,7 @@ async function sendBulkURLs() {
     }
     if (i<urls.length-1) await sleep(delay);
   }
+  } finally { kilit.ac(); }
   // Özet GERÇEĞİ yazsın: eskiden hata olsa da "N URL × M kategori gonderildi"
   // yazıyordu. "× kategori" ifadesi de yanlıştı — kod URL başına TEK istek
   // atıyor, çoklu kategori tek gönderimde diziyle taşınıyor.
@@ -3414,8 +3420,11 @@ async function yarSendSelected() {
   const base = getN8N();
   if (!base) return showRes('ya-res', 'Ayarlar\'dan n8n URL girin', 'warn');
   let sent = 0;
+  const kilit = btnKilitle('ya-send-btn');
+  try {
   for (const raw of sel) {
     const v = yarNormalizeVideo(raw);
+    kilit.ilerleme(sent+1, sel.length);
     showRes('ya-res', `⏳ ${sent+1}/${sel.length} gönderiliyor: ${(v.title||'').slice(0,40)}...`, 'info');
     const url = 'https://www.youtube.com/watch?v=' + v.id;
     // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler,
@@ -3426,6 +3435,7 @@ async function yarSendSelected() {
     sent++;
     await sleep(500);
   }
+  } finally { kilit.ac(); }
   showRes('ya-res', `✓ ${sent} video [${cats.join(',')}] gönderildi`, 'ok');
   addLog('ok', 'webhook', `YouTube arama ${sent} video gönderildi [${cats.join(',')}]`);
 }
@@ -10057,6 +10067,28 @@ function setEl(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
 function setStyle(id,prop,v){const e=document.getElementById(id);if(e)e.style[prop]=v;}
 function showRes(id,msg,type){const e=document.getElementById(id);if(!e)return;e.className='res '+type;e.textContent=msg;e.style.display='block';}
 function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ── UZUN GONDERIM DONGULERI ICIN ORTAK BUTON KILIDI ────────────────────────
+// Panelde 301 onclick'e karsilik yalnizca 26 'disabled = true' vardi ve
+// kilitsiz olanlar tam da EN UZUN bes yoldu (sendBulkURLs'te gecikme DAKIKA
+// cinsinden: 20 URL x varsayilan 1 dk = 20 dakikalik dongu). Ikinci tik
+// PARALEL bir dongu baslatiyor, ayni videolar iki kez OpusClip'e gidiyor ve
+// hem ucretli kota hem "10 aktif proje" siniri iki kat yaniyordu.
+//
+// innerHTML SAKLANIR: bazi butonlarin icinde canli sayac var
+// (orn. rd-send-btn -> <span id="rd-selcount">), textContent ile ilerleme
+// yazmak o span'i yok eder; finally'de birebir geri konur.
+// Buton bulunamazsa sessiz bir sahte nesne doner — cagrilan yer dallanmasin.
+function btnKilitle(id){
+  const b = document.getElementById(id);
+  if (!b) return { ilerleme(){}, ac(){} };
+  const eskiHTML = b.innerHTML;
+  b.disabled = true;
+  return {
+    ilerleme(i, n){ try { b.textContent = '⏳ ' + i + '/' + n; } catch(e){} },
+    ac(){ try { b.disabled = false; b.innerHTML = eskiHTML; } catch(e){} }
+  };
+}
 function copyText(txt){navigator.clipboard.writeText(txt).then(()=>addLog('ok','sistem','Kopyalandi'));}
 function dl(name,content){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'text/plain'}));a.download=name;a.click();}
 
@@ -10683,7 +10715,10 @@ async function ytkSendSelected() {
   const base = getN8N();
   if (!base) return showRes('ytk-res', 'Ayarlardan n8n URL girin', 'warn');
   let sent = 0;
+  const kilit = btnKilitle('ytk-send-btn');
+  try {
   for (const v of sel) {
+    kilit.ilerleme(sent+1, sel.length);
     showRes('ytk-res', `⏳ ${sent+1}/${sel.length} gönderiliyor: ${v.snippet.title.slice(0,40)}...`, 'info');
     const url = 'https://www.youtube.com/watch?v=' + v.id;
     // Çoklu kategoride bile TEK gönderim — OpusClip aynı videoyu bir kez işler.
@@ -10693,6 +10728,7 @@ async function ytkSendSelected() {
     sent++;
     await sleep(500);
   }
+  } finally { kilit.ac(); }
   showRes('ytk-res', `✓ ${sent} video [${cats.join(',')}] tek tek gönderildi`, 'ok');
   addLog('ok', 'webhook', `YT Kanal ${sent} video gönderildi [${cats.join(',')}]`);
 }
@@ -11063,6 +11099,11 @@ async function vpSend() {
   const platformlar = getSelPlatforms('vp-cats');
   const aciklama_notu = (document.getElementById('vp-aciklama')||{}).value||'';
   showRes('vp-res','⏳ '+VP.segments.length+' parça gönderiliyor…','info');
+  // Dongu yok ama kilit ZORUNLU: cift tik iki kez /webhook/video-parcala
+  // gonderir, her segment ICIN AYRI bir OpusClip projesi acilir (n8n tarafinda
+  // SEGMENT_MAX=24) — yani tek yanlis tikta 24'e kadar ucretli is iki katina cikar.
+  const kilit = btnKilitle('vp-send-btn');
+  try {
   // Çoklu kategoride bile TEK gönderim — her parça OpusClip'te bir kez işlenir,
   // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
   await faf(base+'/webhook/video-parcala', {
@@ -11070,6 +11111,7 @@ async function vpSend() {
     ...mcFields(cats), dil, platformlar, aciklama_notu,
     segments: VP.segments,
   });
+  } finally { kilit.ac(); }
   showRes('vp-res','✓ '+VP.segments.length+' parça n8n\'e gönderildi ['+cats.join(', ')+(dil==='en'?'/EN':'')+']','ok');
   recordSend(url, cats.join(',')+' (parçalı)');
   addLog('ok','webhook','Video Parçala: '+VP.segments.length+' parça gönderildi — '+url.slice(0,50));
@@ -18224,7 +18266,12 @@ async function rdSendSelected(){
   if(!sel.length) return showRes('rd-res','Gönderilecek yeni video kalmadı','warn');
   const genelCats=getSelCatList('rd-cats');
   let sent=0, bekleyen=0, sonCats=genelCats;
+  // rd-send-btn icinde canli <span id="rd-selcount"> var — btnKilitle
+  // innerHTML'i saklayip finally'de birebir geri koyuyor.
+  const kilit = btnKilitle('rd-send-btn');
+  try {
   for(const x of sel){
+    kilit.ilerleme(sent+1, sel.length);
     // Video basina kategori: senin secimin > yuksek guvenli tahmin > global secim
     const secilen=(RD.katSecim&&RD.katSecim[x.id]) || (x.katGuven>=55?x.katTahmin:'') || '';
     const cats=secilen?[secilen]:genelCats;
@@ -18237,6 +18284,7 @@ async function rdSendSelected(){
     }
     await sleep(600);
   }
+  } finally { kilit.ac(); }
   const ek = bekleyen ? ' — n8n işliyor (OpusClip klip üretimi birkaç dakika sürer)' : '';
   showRes('rd-res',(sent===sel.length?'✓ ':'')+sent+'/'+sel.length+' video işleme alındı ['+sonCats.join(', ')+']'+ek, sent?'ok':'err');
   if(sent) toast('✓ '+sent+' video işleme alındı'+(bekleyen?' (n8n işliyor)':''),'ok');
