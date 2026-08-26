@@ -2315,8 +2315,11 @@ function recordSend(url, kategori) {
   // ts: SIRALANABILIR zaman. 't' insan icin ('26.08.2026 17:15:30') ama
   // new Date() o bicimi AYRISTIRAMIYOR (Invalid Date) — Gonderim Gecmisi
   // sondugu icin sirasiz kaliyordu. Bkz. gcZaman().
-  S.sentLog[key] = { url: String(url).trim(), t: new Date().toLocaleString('tr'), ts: Date.now(), kategori: kategori||'' };
-  try { localStorage.setItem('op_sent_log', JSON.stringify(S.sentLog)); } catch(e) {}
+  const kayit = { url: String(url).trim(), t: new Date().toLocaleString('tr'), ts: Date.now(), kategori: kategori||'' };
+  S.sentLog[key] = kayit;
+  // Yalniz BU kaydi taze diskin uzerine ekle — tum nesneyi yazmak baska
+  // sekmenin bu arada ekledigi gonderimleri siliyordu.
+  S.sentLog = lsNesneYaz('op_sent_log', { [key]: kayit });
   S.sentURLs.add(String(url).trim());
   saveSent();
 }
@@ -2597,7 +2600,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.26-87';
+const PANEL_YAPI = 'y2026.08.26-88';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3785,7 +3788,10 @@ function clearSentURLs() {
   // çıkıyordu. (Gönderim Geçmişi sayfasının temizleme düğmesi ikisini de siler.)
   S.sentLog = {};
   try { localStorage.removeItem('op_sent_log'); } catch(e){}
-  saveSent(); renderSentURLs();
+  // DOGRUDAN yaz — saveSent() birlestirdigi icin buradan gecerse az once
+  // silinen URL'ler diskten geri gelirdi. Kullanici bilerek siliyor.
+  try { localStorage.setItem('op_sent','[]'); } catch(e){}
+  renderSentURLs();
   setEl('dr-sent-cnt','0');
   addLog('ok','drive','Gonderim gecmisi temizlendi (isaretler + tekrar uyarisi)');
 }
@@ -10063,6 +10069,44 @@ function btnKilitle(id){
     ac(){ try { b.disabled = false; b.innerHTML = eskiHTML; } catch(e){} }
   };
 }
+
+// ── SEKMELER ARASI KAYIP GUNCELLEME KORUMASI ──────────────────────────────
+// Panelde hicbir sekmeler-arasi senkron YOK — olculdu:
+//   addEventListener('storage') = 0 · BroadcastChannel = 0 · navigator.locks = 0
+// Kritik kumeler/nesneler acilista BIR KEZ okunuyor, sonra her yazma TUM
+// yapiyi diske eziyor. Iki sekme acikken A sekmesi 10 klip isaretler, B
+// sekmesi (bellegi acilis anindan kalma) bir sonraki yazmada A'nin 10 kaydini
+// DISKTEN SILER. Klipler n8n'e gonderilmis ama "islenmemis" gorunur ve tekrar
+// gonderilir — cift yayin kapilarinin DORDU DE bu kayitlara dayaniyor.
+//
+// Cozum: yazmadan once diski TAZE oku, degisikligi onun uzerine uygula, yaz.
+// Donen deger bellege geri konur; boylece diger sekmenin eklemeleri de gelir.
+//
+// DIKKAT — kullanicinin bilerek yaptigi TOPTAN TEMIZLEME bu yoldan GECMEZ
+// (clearSentURLs / gcClearAll dogrudan setItem yapar), yoksa silinen kayitlar
+// diskten geri gelirdi.
+//
+// Kota hatasi artik SESSIZ degil: op_sent/op_opc_processed yazilamiyorsa
+// kopya korumasi korlesiyor demektir, kullanici bunu bilmeli.
+function lsKumeYaz(anahtar, ekle, cikar){
+  let disk = [];
+  try { const h = JSON.parse(localStorage.getItem(anahtar) || '[]'); if (Array.isArray(h)) disk = h; } catch(e){}
+  const k = new Set(disk.map(String));
+  if (ekle)  (Array.isArray(ekle)  ? ekle  : [ekle] ).forEach(x => { if (x) k.add(String(x)); });
+  if (cikar) (Array.isArray(cikar) ? cikar : [cikar]).forEach(x => { if (x) k.delete(String(x)); });
+  try { localStorage.setItem(anahtar, JSON.stringify([...k])); }
+  catch(e){ addLog('err','sistem','Depolama yazilamadi ('+anahtar+') — kopya koruması körleşebilir: '+(e.message||e.name)); }
+  return k;
+}
+function lsNesneYaz(anahtar, yeniAlanlar){
+  let disk = {};
+  try { const h = JSON.parse(localStorage.getItem(anahtar) || '{}');
+        if (h && typeof h === 'object' && !Array.isArray(h)) disk = h; } catch(e){}
+  Object.assign(disk, yeniAlanlar || {});
+  try { localStorage.setItem(anahtar, JSON.stringify(disk)); }
+  catch(e){ addLog('err','sistem','Depolama yazilamadi ('+anahtar+') — kopya koruması körleşebilir: '+(e.message||e.name)); }
+  return disk;
+}
 function copyText(txt){navigator.clipboard.writeText(txt).then(()=>addLog('ok','sistem','Kopyalandi'));}
 function dl(name,content){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([content],{type:'text/plain'}));a.download=name;a.click();}
 
@@ -10214,7 +10258,9 @@ function slFiltrele(){
 }
 function filterTbl(tbodyId,searchId){const q=(document.getElementById(searchId)||{}).value||'';document.querySelectorAll('#'+tbodyId+' tr').forEach(tr=>{tr.style.display=tr.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
 function exportCSV(tbodyId,name){const rows=[];const tb=document.getElementById(tbodyId);if(!tb)return;const ths=tb.closest('table')?.querySelectorAll('thead th');if(ths)rows.push([...ths].map(t=>t.textContent).join(','));tb.querySelectorAll('tr').forEach(tr=>{if(tr.style.display==='none')return;rows.push([...tr.querySelectorAll('td')].map(t=>'"'+t.textContent.replace(/"/g,'""')+'"').join(','));});dl(name+'.csv',rows.join('\n'));}
-function saveSent(){try{localStorage.setItem('op_sent',JSON.stringify([...S.sentURLs]));}catch(e){}setEl('dr-sent-cnt',S.sentURLs.size);}
+// op_sent CIFT YAYIN KORUMASININ TEK KAYNAGI — birlestirerek yazilir.
+// TOPTAN TEMIZLEME buradan GECMEZ (clearSentURLs dogrudan '[]' yazar).
+function saveSent(){ S.sentURLs = lsKumeYaz('op_sent', [...S.sentURLs]); setEl('dr-sent-cnt',S.sentURLs.size); }
 
 
 // ═══════════════════════════════════════════════════════════
@@ -11616,14 +11662,15 @@ function opcProcessedIds() {
 }
 function opcMarkProcessed(clipId) {
   if (!clipId) return;
-  OPC.processed.add(clipId);
-  localStorage.setItem('op_opc_processed', JSON.stringify([...OPC.processed]));
+  // Diski tazele + birlestir: baska sekmenin isaretledikleri silinmesin.
+  OPC.processed = lsKumeYaz('op_opc_processed', clipId);
   opcSyncProcessed(clipId, 'islendi');
 }
 function opcUnmarkProcessed(clipId) {
   if (!clipId) return;
-  OPC.processed.delete(clipId);
-  localStorage.setItem('op_opc_processed', JSON.stringify([...OPC.processed]));
+  // Kaldirma da taze disk uzerinde yapilir — aksi hâlde bellekteki eski
+  // kume yazilip diger sekmenin eklemeleri ucardi.
+  OPC.processed = lsKumeYaz('op_opc_processed', null, clipId);
   opcSyncProcessed(clipId, 'kaldirildi');
 }
 // #5 KALICI CLIP TAKİBİ — n8n/Sheets'e best-effort senkron (localStorage birincil kalır)
@@ -11637,8 +11684,7 @@ async function opcLoadProcessedRemote() {
     const d = await n8nGetCached('/webhook/opus-islenen');
     const ids = d && (d.ids || d.list || (Array.isArray(d)?d:[]));
     if (Array.isArray(ids) && ids.length) {
-      ids.forEach(id => OPC.processed.add(String(id)));
-      localStorage.setItem('op_opc_processed', JSON.stringify([...OPC.processed]));
+      OPC.processed = lsKumeYaz('op_opc_processed', ids.map(String));
     }
   } catch(e) {}
 }
@@ -11880,7 +11926,9 @@ async function opcOpenProject(projectId) {
 
     // Bu projeye ait clip id listesini cache'le (proje kartı yeşil tik için)
     OPC.projClips[projectId] = clips.map(c => c.id || c.clipId || '').filter(Boolean);
-    localStorage.setItem('op_opc_projclips', JSON.stringify(OPC.projClips));
+    // Yalniz bu projeyi taze diskin uzerine yaz — baska sekmede acilan
+    // projelerin onbellegi silinmesin (proje karti yesil tiki onu kullaniyor).
+    OPC.projClips = lsNesneYaz('op_opc_projclips', { [projectId]: OPC.projClips[projectId] });
 
     if (projGrid) projGrid.style.display = 'none';
     if (projEmpty) projEmpty.style.display = 'none';
