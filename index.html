@@ -2598,7 +2598,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.26-84';
+const PANEL_YAPI = 'y2026.08.26-85';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -7928,6 +7928,31 @@ async function ciftOtoTik(){
     return;
   }
   if (Date.now() - ciftOtoSon() < CIFT_OTO_ARALIK){ ciftOtoDurumYaz(); return; }
+
+  // ── SEKMELER ARASI TEK TUR GARANTISI ───────────────────────────────────
+  // Eskiden saat damgasi (_t) turun SONUNDA yaziliyordu: kapiyi gectikten
+  // sonra ciftTara() + en fazla 25 silme kadar bir pencere aciliyordu.
+  // CIFT_OTO_CALISIYOR yalniz BU sekmeyi korur (duz JS degiskeni), panelde
+  // hicbir sekmeler-arasi kilit yok. Iki sekme ayni dakikada kapidan
+  // gecip turda 25 degil 50 silebiliyordu — ustelik yon "kopya temizligi"
+  // oldugu icin fazla silme sessiz kaliyordu.
+  //
+  // Cozum: slotu ISTEN ONCE rezerve et, sonra SON YAZAN KAZANIR jetonuyla
+  // dogrula. Iki sekme de yazar, 60 ms sonra ikisi de okur, jetonu ayakta
+  // kalan TEK sekme devam eder. navigator.locks gerektirmez.
+  const _jeton = Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+  try {
+    localStorage.setItem(CIFT_OTO_ANAHTAR + '_t', String(Date.now()));
+    localStorage.setItem(CIFT_OTO_ANAHTAR + '_j', _jeton);
+  } catch(e){}
+  await new Promise(r => setTimeout(r, 60));
+  let _bizimMi = true;
+  try { _bizimMi = (localStorage.getItem(CIFT_OTO_ANAHTAR + '_j') === _jeton); } catch(e){}
+  if (!_bizimMi){
+    addLog('info','uploadpost','Çift kontrolü: bu turu başka bir sekme aldı, atlandı');
+    ciftOtoDurumYaz();
+    return;
+  }
   await ciftOtoCalis();
 }
 
