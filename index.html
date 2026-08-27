@@ -2600,7 +2600,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.26-88';
+const PANEL_YAPI = 'y2026.08.26-89';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -6157,9 +6157,25 @@ async function histCek(sayfa){
 }
 // 429'u diğer hatalardan ayır — çözümü farklı (bekle ve tekrar dene)
 function histHataMetni(e){
-  return /429|too many/i.test(String(e && e.message))
-    ? 'Upload-Post hız sınırı (429) — 1-2 dakika bekleyip tekrar dene. Aynı anda birden fazla tarama çalıştırma.'
-    : ((e && e.message) || 'bilinmeyen hata');
+  const m = String((e && e.message) || '');
+  if (/429|too many/i.test(m))
+    return 'Upload-Post hız sınırı (429) — 1-2 dakika bekleyip tekrar dene. Aynı anda birden fazla tarama çalıştırma.';
+  // 'Failed to fetch' istegin TARAYICIDAN CIKAMADIGINI soyler: ag kesintisi,
+  // VPN/guvenlik duvari/reklam engelleyici, ya da CORS basligi olmayan bir
+  // hata yaniti (Upload-Post'un 429'u boyle gorunebilir). Durum kodu YOKTUR,
+  // o yuzden 429'dan ayri ele alinir. Ham metin kullaniciya hicbir sey
+  // soylemiyordu — panelde 'hata: Failed to fetch' diye asili kaliyordu.
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(m))
+    return 'Upload-Post\'a ulaşılamadı (ağ/CORS) — internet, VPN veya reklam engelleyiciyi kontrol et. '
+         + 'Hız sınırına takılmış da olabilir; genelde birkaç dakikada kendiliğinden düzelir.';
+  return m || 'bilinmeyen hata';
+}
+// Durum seridi icin KISA karsilik (uzun metin serittte tasiyor)
+function histHataKisa(e){
+  const m = String((e && e.message) || '');
+  if (/429|too many/i.test(m)) return 'hız sınırı (429)';
+  if (/failed to fetch|networkerror|load failed|network request failed/i.test(m)) return 'ağ/CORS — yeniden denenecek';
+  return m.slice(0, 40) || 'bilinmeyen';
 }
 
 // ── YENİDEN GÖNDERİLENLER — ekranlar arası ortak hafıza ────────────────
@@ -7876,6 +7892,7 @@ function ciftYoksayTemizle(){
 const CIFT_OTO_ANAHTAR = 'op_cift_oto';
 const CIFT_OTO_ARALIK  = 3600000;     // 1 saat
 const CIFT_OTO_TAVAN   = 25;          // tek turda azami silme — kaçak koruması
+const CIFT_OTO_HATA_BEKLE = 600000;   // 10 dk: HATALI tur tam saati yakmasin
 let CIFT_OTO_ZAMANLAYICI = null;
 let CIFT_OTO_CALISIYOR = false;
 
@@ -7997,10 +8014,15 @@ async function ciftOtoCalis(){
     return { ok, hata, kalan };
   } catch(e){
     console.error('[CIFT-OTO]', e);
-    addLog('err','uploadpost','Çift kontrolü başarısız: '+(e.message||'bilinmeyen'));
-    // Hata turu da "çalıştı" sayılır ki her dakika yeniden denenmesin
-    try { localStorage.setItem(CIFT_OTO_ANAHTAR+'_t', String(Date.now()));
-          localStorage.setItem(CIFT_OTO_ANAHTAR+'_s', 'hata: '+(e.message||'bilinmeyen').slice(0,40)); } catch(x){}
+    // Ham 'Failed to fetch' kullaniciya hicbir sey soylemiyordu — seritte
+    // oylece asili kaliyordu. Log TAM aciklamayi, serit KISA halini alir.
+    addLog('err','uploadpost','Çift kontrolü başarısız: '+histHataMetni(e));
+    // Hata turu "çalıştı" sayılır ki her dakika yeniden denenmesin — AMA tam
+    // saati de YAKMASIN: gecici bir ag hatasi yuzunden cift kontrolu 1 saat
+    // boyunca hic kosmuyordu. Damgayi geri sararak ~10 dk sonrasina kur.
+    try { localStorage.setItem(CIFT_OTO_ANAHTAR+'_t',
+            String(Date.now() - CIFT_OTO_ARALIK + CIFT_OTO_HATA_BEKLE));
+          localStorage.setItem(CIFT_OTO_ANAHTAR+'_s', 'hata: '+histHataKisa(e)); } catch(x){}
     return null;
   } finally {
     CIFT_OTO_CALISIYOR = false;
@@ -9534,8 +9556,16 @@ async function upFetchRetry(path, opts, deneme) {
       // Durum kodu artık hataya iliştirilmiş; metinden çıkarım yedek yol
       const m = /HTTP (\d+)/.exec(e.message || '');
       const kod = e.status || (m ? parseInt(m[1]) : 0);
+      // AG SEVIYESI HATA (kod === 0): fetch'in KENDISI firlamis
+      // ('TypeError: Failed to fetch'). Boyle bir hatanin .status'u YOKTUR ve
+      // eski kosul onu 404 ile ayni kefeye koyup HIC denemiyordu — oysa en
+      // gecici hata sinifi budur. CORS basligi olmayan bir 429 yaniti da
+      // tarayiciya tam olarak boyle gorunur (durum kodu okunamaz).
+      // Belirti: 'Cift kontrolu: hata: Failed to fetch' ve tur komple duser
+      // (histCek ilk sayfada throw ediyor, ciftTara yakalamiyor).
+      const agHatasi = (kod === 0);
       // Yalnız geçici hatalarda tekrar dene; 401/403/404 tekrarlamaya değmez
-      if (kod !== 429 && kod < 500) throw e;
+      if (!agHatasi && kod !== 429 && kod < 500) throw e;
       // 429'da ORTAK kapı kapanır: bu isteğin beklemesi yetmez, diğer
       // eşzamanlı workerlar da beklemeli, yoksa sınır sürekli tazelenir.
       if (kod === 429) upKapiKapat(e.retryAfter, i);
