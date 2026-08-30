@@ -1414,6 +1414,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <!-- EN ÇOK İZLENEN SHORT'LAR -->
   <div class="card">
     <div class="ct">🏆 En Çok İzlenen Short'lar <span id="rap-top-n" style="letter-spacing:0;text-transform:none;font-size:11px;color:var(--mt)"></span></div>
+    <div id="klip-seri-durum" style="font-size:11px;color:var(--mt);margin-bottom:8px"></div>
     <div id="rap-top-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
     <div id="rap-top-icerik"><div style="color:var(--mt);font-size:12px;text-align:center;padding:10px">↻ Raporu Oluştur'a bas</div></div>
   </div>
@@ -2523,7 +2524,7 @@ function go(id, el) {
     shortlist:  ()=>loadSheetPage('shortlist'),
     urltakip:   ()=>loadSheetPage('urltakip'),
     arsiv:      ()=>loadSheetPage('arsiv'),
-    raporlar:   loadReports,
+    raporlar:   ()=>{ loadReports(); try{ klipSeriDurumYaz(); }catch(e){} },
     ytkanal:    initYTKanal,
     yayin:      initYayin,
     parcala:    initParcala,
@@ -2600,7 +2601,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.08.28-90';
+const PANEL_YAPI = 'y2026.08.30-91';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -4498,6 +4499,133 @@ function ttMetrikYaz(o){
   }
 }
 function ttTaze(kayit){ return kayit && kayit.t && (Date.now()-kayit.t) < RAP_TOP_METRIK_TTL; }
+
+// ── KLIP BAZLI KALICI IZLENME SERISI (izlenme arastirmasi 2026-08) ─────────
+// op_top_metrik TTL'li ve GECICI: 7 gunde ucup gidiyor, tarih serisi yok.
+// Oysa "hangi degisiklik ise yaradi" sorusu klip basina TARIHLI seri ister.
+// Bicim: { "<plat>:<anahtar>": [[gunNo, izlenme], ...] }  gunNo = gun(epoch).
+// Ayni gun icin tek nokta tutulur (gunun son olcumu kazanir).
+// Kota: anahtar 1200 / seri 24 nokta / son noktasi 120 gunden eski anahtar
+// budanir (~350 KB tavan; op_rap_snap'in yaninda guvenli).
+const KLIP_SERI_ANAHTAR = 'op_klip_seri';
+const KLIP_SERI_OTO_ANAHTAR = 'op_klip_seri_oto';
+const KLIP_SERI_MAX_ANAHTAR = 1200, KLIP_SERI_MAX_NOKTA = 24, KLIP_SERI_ESKI_GUN = 120;
+let KLIP_SERI_BUF = {}, KLIP_SERI_TID = null;
+function klipSeriEkle(anahtar, izlenme){
+  if (!anahtar || izlenme == null || !isFinite(izlenme)) return;
+  KLIP_SERI_BUF[anahtar] = Math.round(izlenme);
+  if (!KLIP_SERI_TID) KLIP_SERI_TID = setTimeout(klipSeriFlush, 4000);
+}
+function klipSeriFlush(){
+  KLIP_SERI_TID = null;
+  const buf = KLIP_SERI_BUF; KLIP_SERI_BUF = {};
+  const adlar = Object.keys(buf);
+  if (!adlar.length) return;
+  // yazmadan once diski TAZE oku (7 no'lu duzeltmenin kurali: kayip guncelleme yok)
+  let disk = {};
+  try { const h = JSON.parse(localStorage.getItem(KLIP_SERI_ANAHTAR) || '{}');
+        if (h && typeof h === 'object' && !Array.isArray(h)) disk = h; } catch(e){}
+  const gun = Math.floor(Date.now() / 864e5);
+  for (const k of adlar){
+    const d = Array.isArray(disk[k]) ? disk[k] : [];
+    if (d.length && d[d.length-1][0] === gun) d[d.length-1][1] = buf[k];
+    else d.push([gun, buf[k]]);
+    while (d.length > KLIP_SERI_MAX_NOKTA) d.shift();
+    disk[k] = d;
+  }
+  // budama: bayat anahtarlar + toplam tavan (en eski son-noktalilar gider)
+  const esik = gun - KLIP_SERI_ESKI_GUN;
+  for (const k of Object.keys(disk)){
+    const d = disk[k];
+    if (!Array.isArray(d) || !d.length || d[d.length-1][0] < esik) delete disk[k];
+  }
+  let kalan = Object.keys(disk);
+  if (kalan.length > KLIP_SERI_MAX_ANAHTAR){
+    kalan.sort((a,b) => disk[a][disk[a].length-1][0] - disk[b][disk[b].length-1][0]);
+    kalan.slice(0, kalan.length - KLIP_SERI_MAX_ANAHTAR).forEach(k => delete disk[k]);
+  }
+  try { localStorage.setItem(KLIP_SERI_ANAHTAR, JSON.stringify(disk)); }
+  catch(e){
+    // kota: en eski yari gider, bir kez daha denenir (ttMetrikYaz kalibi)
+    try {
+      const ks = Object.keys(disk).sort((a,b) => disk[a][disk[a].length-1][0] - disk[b][disk[b].length-1][0]);
+      ks.slice(0, Math.floor(ks.length/2)).forEach(k => delete disk[k]);
+      localStorage.setItem(KLIP_SERI_ANAHTAR, JSON.stringify(disk));
+      addLog('warn','sistem','Klip serisi kotaya carpti — en eski yarisi budandi');
+    } catch(e2){ addLog('err','sistem','Klip serisi yazilamadi: ' + (e2.message || e2.name)); }
+  }
+  klipSeriDurumYaz();
+}
+function klipSeriDurumYaz(){
+  const el = document.getElementById('klip-seri-durum'); if (!el) return;
+  try {
+    const disk = JSON.parse(localStorage.getItem(KLIP_SERI_ANAHTAR) || '{}');
+    const n = Object.keys(disk).length;
+    const son = parseInt(localStorage.getItem(KLIP_SERI_OTO_ANAHTAR) || '0', 10);
+    el.textContent = n
+      ? ('📈 Kalıcı izlenme serisi: ' + n + ' gönderi izleniyor · son otomatik tur: '
+         + (son ? new Date(son).toLocaleString('tr') : 'henüz yok') + ' (günde 1, panel açıkken)')
+      : '📈 Kalıcı izlenme serisi boş — ilk otomatik tur panel açıldıktan ~90 sn sonra başlar (Upload-Post API Key gerekli)';
+  } catch(e){}
+}
+// Gunluk otomatik tur: son 10 gunun gonderilerini olcer (butce 150),
+// hem op_top_metrik onbellegini besler (manuel tur butcesi korunur)
+// hem kalici seriye yazar. Panel ACIKKEN gunde bir kez kosar.
+const KLIP_SERI_TUR_BUTCE = 150, KLIP_SERI_PENCERE_GUN = 10;
+let KLIP_SERI_KOSUYOR = false;
+async function klipSeriOtoTur(){
+  if (KLIP_SERI_KOSUYOR) return;
+  if (!S.cfg.blot) { klipSeriDurumYaz(); return; }
+  const son = parseInt(localStorage.getItem(KLIP_SERI_OTO_ANAHTAR) || '0', 10) || 0;
+  if (Date.now() - son < 20 * 3600000) { klipSeriDurumYaz(); return; }
+  // REZERVASYON ISTEN ONCE (ciftOto dersi): iki sekme ayni turu kosmasin.
+  try { localStorage.setItem(KLIP_SERI_OTO_ANAHTAR, String(Date.now())); } catch(e){}
+  KLIP_SERI_KOSUYOR = true;
+  try {
+    const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook', x:'x', twitter:'x' };
+    const onb = await histCek(KAPSAMA_SAYFA);
+    const sinir = Date.now() - KLIP_SERI_PENCERE_GUN * 864e5;
+    const metrikOnb = ttMetrikOku();
+    const adaylar = [];
+    (onb.kayitlar || []).forEach(h => {
+      if (h.success === false || h.error_message) return;
+      const p = NP[String(h.platform || '').toLowerCase()]; if (!p) return;
+      if (!h.request_id && !h.platform_post_id) return;
+      const t = Date.parse(rapHistTime(h)) || 0;
+      if (!t || t < sinir) return;
+      adaylar.push({ h, p, k: p + ':' + (h.request_id || ('pid_' + h.platform_post_id)) });
+    });
+    const buTur = adaylar.slice(0, KLIP_SERI_TUR_BUTCE);
+    let olculen = 0, hatali = 0;
+    await upSirali(buTur, async a => {
+      let m = null;
+      try {
+        if (a.h.request_id){
+          const { data } = await upFetch('/uploadposts/post-analytics/' + encodeURIComponent(a.h.request_id));
+          m = takParseMetrics(data);
+        }
+        if (!m && a.h.platform_post_id){
+          const { data } = await upFetch('/uploadposts/post-analytics?platform_post_id=' + encodeURIComponent(a.h.platform_post_id)
+            + '&platform=' + encodeURIComponent(a.p));
+          m = takParseMetrics(data);
+        }
+      } catch(e){ hatali++; return; }
+      const izlenme = m ? ((m.views != null) ? m.views : ((m.impressions != null) ? m.impressions : null)) : null;
+      metrikOnb[a.k] = { v: izlenme, l:(m && m.likes != null) ? m.likes : null,
+                         c:(m && m.comments != null) ? m.comments : null, t: Date.now() };
+      if (izlenme != null){ klipSeriEkle(a.k, izlenme); olculen++; }
+    }, 2);
+    ttMetrikYaz(metrikOnb);
+    klipSeriFlush();
+    addLog(hatali ? 'warn' : 'ok', 'sistem', 'Klip serisi günlük turu: ' + olculen + ' ölçüm, '
+      + hatali + ' hata, ' + (adaylar.length - buTur.length) + ' bütçe dışı (' + adaylar.length + ' aday)');
+  } catch(e){
+    addLog('warn','sistem','Klip serisi turu başarısız: ' + histHataKisa(e));
+  } finally {
+    KLIP_SERI_KOSUYOR = false;
+    klipSeriDurumYaz();
+  }
+}
 // Rapor penceresi 30 günle sınırlı (RAP.hist); "en çok izlenen" ise İLK
 // SHORT'A kadar TÜM geçmişi ister. Bu yüzden burada ES_SAYFA (60) değil
 // daha derin bir tavan kullanılıyor. histCek geçmiş bitince (h.length<100)
@@ -4676,6 +4804,8 @@ async function rapTopUpYukle(p){
       // gönderiler yeniden sorulur ve bütçe onlara harcanır.
       onbellek[ttAnahtar(h)] = { v: izlenme, l:(m&&m.likes!=null)?m.likes:null,
                                  c:(m&&m.comments!=null)?m.comments:null, t: Date.now() };
+      // Manuel tur da kalici seriyi besler — ayni anahtar bicimi, kaynaklar birlesir.
+      klipSeriEkle(ttAnahtar(h), izlenme);
       if (izlenme == null){ verisiz++; return; }
       liste.push({ baslik: h.post_title||h.title||h.post_caption||'(başlıksız)',
         thumb: h.thumbnail||h.preview_url||'', url: h.post_url||'',
@@ -12581,6 +12711,9 @@ document.addEventListener('DOMContentLoaded', function() {
     setEl('panel-surum', PANEL_YAPI);
     setEl('dr-sent-cnt', S.sentURLs.size);
     addLog('ok','sistem','Panel v9 baslatildi ('+PANEL_YAPI+') — Kanal Listesi Arama/Video Detay/Kworb');
+    // Gunluk klip-seri turu: acilis yogunlugunun DISINDA, 90 sn sonra.
+    // 20 saatlik kapi + sekme rezervasyonu fonksiyonun icinde.
+    setTimeout(function(){ try { klipSeriOtoTur(); } catch(e){} }, 90000);
     toggleAutoLog(true);   // acilis — toast yok
     // YENİ: hızlı gönder, servis durumu, rozetler
     try { renderUretimTabs(); } catch(e){}
