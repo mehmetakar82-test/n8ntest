@@ -1,0 +1,11 @@
+name = "opus-arsiv"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+[[r2_buckets]]
+binding = "ARSIV"
+bucket_name = "opus-arsiv"
+
+# Sirlar BURAYA YAZILMAZ — dosya git'e giriyor. Komutla tanimla:
+#   npx wrangler secret put UP_KEY      (Upload-Post API anahtari)
+#   npx wrangler secret put OPUS_KEY    (n8n ile paylasilan sir)
