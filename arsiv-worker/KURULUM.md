@@ -4,7 +4,49 @@ Toplam ~15 dakika. Cloudflare hesabı yoksa ücretsiz açılıyor.
 
 ## 1. R2 bucket
 
-Cloudflare panel → **R2** → *Create bucket* → ad: `opus-arsiv`.
+Cloudflare panel → sol menü **Storage & databases → R2 object storage → Overview**
+→ *Create bucket* → ad: `opus-arsiv`
+
+Kestirme: `https://dash.cloudflare.com/?to=/:account/r2/overview`
+
+> ### ⚠ "Data Catalog" sihirbazına GİRME
+>
+> R2 bölümünde **Create Data Catalog** diye ayrı bir akış var (Catalog /
+> Maintenance / Review adımları, "Compaction", "Target file size 128 MB",
+> "Snapshot Expiration"). Bu **Apache Iceberg analitik tabloları** içindir —
+> MP4 dosyalarıyla ilgisi yok. Üstelik Review adımında bucket'ı **Iceberg
+> kataloğu + servis kimlik bilgisiyle birlikte** oluşturur; yani gereksiz bir
+> kimlik bilgisi ve ayrı bir fatura kalemi eklersin. Review'a gelmeden çıkarsan
+> hiçbir şey oluşmaz.
+>
+> ### Üç tuzak — ikisi GERİ ALINAMAZ
+>
+> 1. **Location / konum:** `None` (Automatic) bırak. Bu değer bucket
+>    oluşturulduktan sonra **asla değiştirilemez** — bucket'ı silip aynı adla
+>    yeniden açsan bile eski konum geri gelir.
+> 2. **Jurisdiction:** varsayılan (`Default`) bırak. `EU` seçersen
+>    `wrangler.toml`'a ayrıca `jurisdiction = "eu"` satırı eklemen gerekir;
+>    eklemezsen ad birebir aynı olsa da deploy *"The specified bucket does not
+>    exist"* der. Bu da geri alınamaz.
+> 3. **Default storage class:** `Standard` bırak (aşağıdaki nota bak).
+>
+> ### Ad birebir aynı olmalı
+>
+> `wrangler.toml` bucket adını açıkça yazıyor (`bucket_name = "opus-arsiv"`).
+> Ad yazılı olduğu için Wrangler'ın otomatik oluşturma özelliği **devreye
+> girmez** — bucket'ı önce sen oluşturmalısın, yoksa deploy hata verir.
+> Farklı bir ad verdiysen `wrangler.toml`'daki satırı ona göre düzelt.
+> (`binding = "ARSIV"` bucket adıyla alakasız; o sadece koddaki `env.ARSIV`
+> değişkeninin adı.)
+>
+> **Panelden EL İLE binding ekleme.** `wrangler deploy` bağlamayı
+> `wrangler.toml`'dan kendisi kurar ve panelde yaptığın düzenlemeleri bir
+> sonraki deploy'da ezer.
+>
+> **"Public access" / r2.dev'i AÇMA.** Worker dosyaları kendi `/f/...` ucundan
+> sunuyor (`env.ARSIV.get()`), bucket'ın public olmasına gerek yok. Kapalı
+> bırakmak hem Worker'daki doğrulamaları atlayan ikinci bir kapıyı önler, hem de
+> r2.dev'in hız kısıtına takılmanı engeller.
 
 > **R2 bir abonelik, ücretsiz plan değil** — açarken geçerli bir ödeme yöntemi
 > ister. Kesintinin GERÇEK sebebi budur: kartın süresi dolarsa bucket'lara erişim
