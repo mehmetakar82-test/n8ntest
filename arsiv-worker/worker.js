@@ -31,10 +31,21 @@ const UST = 'https://api.upload-post.com/api/uploadposts/ffmpeg/jobs/';
 const JOB_RE = /^[A-Za-z0-9._-]{1,128}$/;
 const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9/._-]{0,255}$/;
 
+// CORS ZORUNLU: panel GitHub Pages'ten (BAŞKA bir kaynaktan) /saglik ve /olcum
+// çağırıyor. Bu başlıklar olmadan tarayıcı yanıtı bloklar ve panel adres doğru
+// olsa bile "ulaşılamadı" der. /olcum özel başlık (X-OPUS-KEY) kullandığı için
+// tarayıcı önce OPTIONS ön-uçuşu yapar — o da yanıtlanmak zorunda.
+const CORS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET,POST,OPTIONS',
+  'access-control-allow-headers': 'content-type,x-opus-key',
+  'access-control-max-age': '86400',
+};
+
 const json = (govde, durum = 200) =>
   new Response(JSON.stringify(govde), {
     status: durum,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
+    headers: Object.assign({ 'content-type': 'application/json; charset=utf-8' }, CORS),
   });
 
 export default {
@@ -52,6 +63,8 @@ export default {
       });
     }
 
+    if (istek.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    if (yol === '/olcum') return olcum(istek, env);
     if (yol === '/al' && istek.method === 'POST') return al(istek, env, u);
     if (yol.startsWith('/f/') && (istek.method === 'GET' || istek.method === 'HEAD'))
       return sun(yol.slice(3), env, istek);
@@ -59,6 +72,46 @@ export default {
     return json({ opus: true, ok: false, hata: 'bilinmeyen uc' }, 404);
   },
 };
+
+// Arşivin gerçek boyutu. Cloudflare'in "10 GB" rakamı bir DUVAR değil, faturadan
+// düşülen ücretsiz pay (aşınca yazma durmaz, $0,015/GB-ay olarak faturalanır) —
+// ama büyümeyi görmeden yönetmek mümkün değil, bu yüzden panele canlı sayı veriyoruz.
+async function olcum(istek, env) {
+  if (!env.ARSIV) return json({ opus: true, ok: false, hata: 'R2 baglanmamis' }, 500);
+  if (!env.OPUS_KEY) return json({ opus: true, ok: false, hata: 'sir tanimlanmamis' }, 500);
+  if (istek.headers.get('X-OPUS-KEY') !== env.OPUS_KEY)
+    return json({ opus: true, ok: false, hata: 'yetkisiz' }, 401);
+
+  let adet = 0, bayt = 0, imlec, sayfa = 0, enEski = null, enYeni = null;
+  // Sayfa başı 1000 nesne; 50 sayfa = 50.000 nesne ≈ 9 yıllık üretim. Sınıra
+  // dayanırsak kırpıldığını SÖYLÜYORUZ — sessizce eksik sayı vermek yanıltır.
+  do {
+    const s = await env.ARSIV.list({ limit: 1000, cursor: imlec });
+    for (const o of s.objects) {
+      adet++;
+      bayt += o.size || 0;
+      const t = o.uploaded ? new Date(o.uploaded).getTime() : 0;
+      if (t) {
+        if (enEski === null || t < enEski) enEski = t;
+        if (enYeni === null || t > enYeni) enYeni = t;
+      }
+    }
+    imlec = s.truncated ? s.cursor : null;
+  } while (imlec && ++sayfa < 50);
+
+  const gunSayisi = enEski && enYeni ? Math.max(1, (enYeni - enEski) / 86400000) : 0;
+  return json({
+    opus: true,
+    ok: true,
+    adet,
+    bayt,
+    gb: Math.round((bayt / 1073741824) * 100) / 100,
+    ortalamaMb: adet ? Math.round((bayt / adet / 1048576) * 10) / 10 : 0,
+    gunlukGb: gunSayisi ? Math.round((bayt / 1073741824 / gunSayisi) * 1000) / 1000 : 0,
+    enEski: enEski ? new Date(enEski).toISOString() : null,
+    kirpik: !!imlec,
+  });
+}
 
 async function al(istek, env, u) {
   if (!env.ARSIV) return json({ opus: true, ok: false, hata: 'R2 baglanmamis' }, 500);

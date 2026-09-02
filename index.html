@@ -2621,7 +2621,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.09.01-94';
+const PANEL_YAPI = 'y2026.09.01-95';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -13912,8 +13912,26 @@ async function cerArsivSina(){
     if (!j.r2)      eksik.push('ARSIV (R2 bucket bağlaması)');
     if (eksik.length) throw new Error('Worker ayakta ama eksik: ' + eksik.join(', '));
     if (!CER.arsivSir) throw new Error('Worker hazır — panele paylaşılan sırrı da gir');
-    cerArsivYaz('<span style="color:var(--ok)">✓ Worker hazır (UP_KEY · OPUS_KEY · R2 tamam)</span>');
-    addLog('ok','cerceve','Arşiv Worker sınandı: hazır');
+    // Sır de girildiyse arşivin GERÇEK boyutunu da ölç. Cloudflare'deki "10 GB"
+    // bir duvar değil, faturadan düşülen ücretsiz pay — aşınca yazma durmaz,
+    // $0,015/GB-ay faturalanır. Asıl mesele büyümeyi görebilmek.
+    let ol = null;
+    try{
+      const ro = await fetch(CER.arsivUrl + '/olcum', { headers:{ 'X-OPUS-KEY': CER.arsivSir }, cache:'no-store' });
+      const jo = await ro.json().catch(()=>({}));
+      if (jo.ok) ol = jo;
+      else if (jo.hata === 'yetkisiz') throw new Error('Worker ayakta ama PAYLAŞILAN SIR TUTMUYOR — panele girdiğin dize ile OPUS_KEY farklı');
+    }catch(e){ if (/SIR TUTMUYOR/.test(e.message)) throw e; }
+    let ek = '';
+    if (ol){
+      const ay = ol.gunlukGb ? ' · ~' + (ol.gunlukGb*30).toFixed(1) + ' GB/ay artıyor' : '';
+      const ucret = ol.gb > 10 ? ' · ücretsiz payı aştı, ~$' + ((ol.gb-10)*0.015).toFixed(2) + '/ay' : ' · 10 GB ücretsiz payın içinde';
+      ek = ' — arşivde <b>' + ol.adet + '</b> video, <b>' + ol.gb + ' GB</b>'
+         + (ol.ortalamaMb ? ' (ort. ' + ol.ortalamaMb + ' MB)' : '') + ay + ucret
+         + (ol.kirpik ? ' · <span style="color:var(--wn)">sayım 50.000\'de kırpıldı</span>' : '');
+    }
+    cerArsivYaz('<span style="color:var(--ok)">✓ Worker hazır (UP_KEY · OPUS_KEY · R2 tamam)</span>' + ek);
+    addLog('ok','cerceve','Arşiv Worker sınandı: hazır' + (ol ? ' — '+ol.adet+' video / '+ol.gb+' GB' : ''));
   }catch(e){
     // Ağ hatası ile yanlış adres ayırt edilemiyor (CORS/DNS ikisi de TypeError).
     const ag = (e instanceof TypeError);
