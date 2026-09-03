@@ -85,13 +85,52 @@ Kestirme: `https://dash.cloudflare.com/?to=/:account/r2/overview`
 
 ## 2. Worker deploy
 
-Bu klasörde:
+İki yol var. **Node.js kurulu değilse A yolunu kullan** — terminal gerekmiyor.
+
+### A) Panelden (Node.js GEREKMEZ) ← önerilen
+
+1. `https://dash.cloudflare.com/?to=/:account/workers-and-pages`
+   (sol menüde: **Build → Compute → Workers & Pages**)
+2. **Create** → **Start with Hello World!** → *Get started*
+   > ⚠ *"Import a repository"* veya şablon galerisi SEÇME — Worker bir Git
+   > deposuna bağlanır ve tarayıcı içi editör devre dışı kalır.
+3. Ad: `opus-arsiv` → **Deploy**
+4. **Settings → Bindings → Add → R2 bucket**
+   - Variable name: `ARSIV` (büyük harf, birebir — `arsiv` çalışmaz)
+   - R2 bucket: `opus-storage` (açılır listeden seç)
+5. **Settings → Variables and Secrets → Add**
+   - Type: **Secret** (varsayılan `Text` gelir, mutlaka değiştir)
+   - `UP_KEY` = Upload-Post anahtarı
+   - `OPUS_KEY` = kendi ürettiğin uzun rastgele dize
+   - **Deploy**
+6. Sağ üstte **Edit code** (`</>` ikonu) → editörde `Ctrl+A` → `Delete` →
+   `worker.js` içeriğini yapıştır → **Deploy**
+   > Ham kod: `raw.githubusercontent.com/mehmetakar82-test/n8ntest/main/arsiv-worker/worker.js`
+   >
+   > ⚠ Şablon kodunun tamamı silinmeli — artakalan ikinci bir `export default`
+   > sözdizimi hatası verir.
+   >
+   > ⚠ **Deploy**'a bas, yanındaki oktaki **Save**'e değil. `Save` yalnızca
+   > taslak sürüm kaydeder, canlıya çıkmaz. ("Kaydettim ama değişmedi"
+   > şikâyetinin sebebi budur.)
+
+### B) Terminalden (Node.js gerekir)
+
+Node.js yoksa önce kur (`winget install OpenJS.NodeJS.LTS`) ve terminali
+yeniden aç. Sonra **`arsiv-worker` klasörünün içinde**:
 
 ```bash
 npx wrangler deploy
 ```
 
 İlk çalıştırmada tarayıcıdan Cloudflare girişi ister.
+
+> A yolunu kullandıysan 3. adımdaki `wrangler secret put` komutlarına gerek yok
+> — sırları zaten panelden girdin.
+>
+> ⚠ İleride B yoluna geçersen `wrangler.toml` doğruluk kaynağı olur: panelden
+> eklediğin binding'ler dosyada da tanımlı olmalı (zaten tanımlı) ve panelden
+> eklenen düz metin değişkenler ezilir. Secret'lar korunur.
 
 ## 3. Sırları tanımla
 
