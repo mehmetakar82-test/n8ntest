@@ -4,7 +4,7 @@ compatibility_date = "2026-01-01"
 
 [[r2_buckets]]
 binding = "ARSIV"
-bucket_name = "opus-arsiv"
+bucket_name = "opus-storage"
 
 # Sirlar BURAYA YAZILMAZ — dosya git'e giriyor. Komutla tanimla:
 #   npx wrangler secret put UP_KEY      (Upload-Post API anahtari)

@@ -5,7 +5,7 @@ Toplam ~15 dakika. Cloudflare hesabı yoksa ücretsiz açılıyor.
 ## 1. R2 bucket
 
 Cloudflare panel → sol menü **Storage & databases → R2 object storage → Overview**
-→ *Create bucket* → ad: `opus-arsiv`
+→ *Create bucket* → ad: `opus-storage`
 
 Kestirme: `https://dash.cloudflare.com/?to=/:account/r2/overview`
 
@@ -32,12 +32,20 @@ Kestirme: `https://dash.cloudflare.com/?to=/:account/r2/overview`
 >
 > ### Ad birebir aynı olmalı
 >
-> `wrangler.toml` bucket adını açıkça yazıyor (`bucket_name = "opus-arsiv"`).
+> `wrangler.toml` bucket adını açıkça yazıyor (`bucket_name = "opus-storage"`).
 > Ad yazılı olduğu için Wrangler'ın otomatik oluşturma özelliği **devreye
 > girmez** — bucket'ı önce sen oluşturmalısın, yoksa deploy hata verir.
 > Farklı bir ad verdiysen `wrangler.toml`'daki satırı ona göre düzelt.
-> (`binding = "ARSIV"` bucket adıyla alakasız; o sadece koddaki `env.ARSIV`
-> değişkeninin adı.)
+>
+> **Üç ayrı ad var, karıştırma:**
+>
+> | Ne | Değer | Nerede |
+> |---|---|---|
+> | Bucket adı | `opus-storage` | `bucket_name` — panelde oluşturduğun bucket |
+> | Worker adı | `opus-arsiv` | `name` — `opus-arsiv.<hesabin>.workers.dev` adresini verir |
+> | Binding adı | `ARSIV` | `binding` — koddaki `env.ARSIV` değişkeni |
+>
+> Bunlar farklı isim uzaylarında; aynı olmaları gerekmiyor, çakışma da değil.
 >
 > **Panelden EL İLE binding ekleme.** `wrangler deploy` bağlamayı
 > `wrangler.toml`'dan kendisi kurar ve panelde yaptığın düzenlemeleri bir
