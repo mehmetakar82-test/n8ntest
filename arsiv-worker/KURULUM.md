@@ -5,7 +5,7 @@ Toplam ~15 dakika. Cloudflare hesabı yoksa ücretsiz açılıyor.
 ## 1. R2 bucket
 
 Cloudflare panel → sol menü **Storage & databases → R2 object storage → Overview**
-→ *Create bucket* → ad: `opus-storage`
+→ *Create bucket* → ad: `opus-arsiv`
 
 Kestirme: `https://dash.cloudflare.com/?to=/:account/r2/overview`
 
@@ -32,7 +32,7 @@ Kestirme: `https://dash.cloudflare.com/?to=/:account/r2/overview`
 >
 > ### Ad birebir aynı olmalı
 >
-> `wrangler.toml` bucket adını açıkça yazıyor (`bucket_name = "opus-storage"`).
+> `wrangler.toml` bucket adını açıkça yazıyor (`bucket_name = "opus-arsiv"`).
 > Ad yazılı olduğu için Wrangler'ın otomatik oluşturma özelliği **devreye
 > girmez** — bucket'ı önce sen oluşturmalısın, yoksa deploy hata verir.
 > Farklı bir ad verdiysen `wrangler.toml`'daki satırı ona göre düzelt.
@@ -41,8 +41,8 @@ Kestirme: `https://dash.cloudflare.com/?to=/:account/r2/overview`
 >
 > | Ne | Değer | Nerede |
 > |---|---|---|
-> | Bucket adı | `opus-storage` | `bucket_name` — panelde oluşturduğun bucket |
-> | Worker adı | `opus-arsiv` | `name` — `opus-arsiv.<hesabin>.workers.dev` adresini verir |
+> | Bucket adı | `opus-arsiv` | `bucket_name` — panelde oluşturduğun bucket |
+> | Worker adı | `opus-arsiv` | `name` — `opus-arsiv.mehmetakar8812.workers.dev` adresini verir |
 > | Binding adı | `ARSIV` | `binding` — koddaki `env.ARSIV` değişkeni |
 >
 > Bunlar farklı isim uzaylarında; aynı olmaları gerekmiyor, çakışma da değil.
@@ -95,10 +95,11 @@ Kestirme: `https://dash.cloudflare.com/?to=/:account/r2/overview`
    > ⚠ *"Import a repository"* veya şablon galerisi SEÇME — Worker bir Git
    > deposuna bağlanır ve tarayıcı içi editör devre dışı kalır.
 3. Ad: `opus-arsiv` → **Deploy**
-4. **Settings → Bindings → Add → R2 bucket**
+4. **Bindings** sekmesi (Settings'in altında DEĞİL, kendi sekmesi) → **+ Binding** → **R2 bucket**
    - Variable name: `ARSIV` (büyük harf, birebir — `arsiv` çalışmaz)
-   - R2 bucket: `opus-storage` (açılır listeden seç)
-5. **Settings → Variables and Secrets → Add**
+   - R2 bucket: `opus-arsiv` (açılır listeden seç)
+5. **Settings** sekmesi → sayfa uzun, aşağı kaydır (`Ctrl+F` → "Secret") → **Variables and Secrets** → **Add**
+   > Kestirme: Worker adresindeki `/bindings` kelimesini `/settings` yap.
    - Type: **Secret** (varsayılan `Text` gelir, mutlaka değiştir)
    - `UP_KEY` = Upload-Post anahtarı
    - `OPUS_KEY` = kendi ürettiğin uzun rastgele dize
@@ -132,7 +133,9 @@ npx wrangler deploy
 > eklediğin binding'ler dosyada da tanımlı olmalı (zaten tanımlı) ve panelden
 > eklenen düz metin değişkenler ezilir. Secret'lar korunur.
 
-## 3. Sırları tanımla
+## 3. Sırları tanımla — YALNIZCA B yolu
+
+> A yolunu (panel) kullandıysan bu bölümü ATLA; sırları 2. adımda girdin.
 
 ```bash
 npx wrangler secret put UP_KEY
@@ -150,10 +153,10 @@ Aynısını panele gireceksin. Bu, Worker'a yalnız senin n8n'inin erişmesini s
 
 ## 4. Doğrula
 
-Deploy çıktısındaki adresi al (`https://opus-arsiv.<hesabin>.workers.dev`) ve:
+Deploy çıktısındaki adresi al (`https://opus-arsiv.mehmetakar8812.workers.dev`) ve:
 
 ```bash
-curl https://opus-arsiv.<hesabin>.workers.dev/saglik
+curl https://opus-arsiv.mehmetakar8812.workers.dev/saglik
 ```
 
 Beklenen: `{"opus":true,"ok":true,"upKey":true,"opusKey":true,"r2":true}`
@@ -162,12 +165,16 @@ Beklenen: `{"opus":true,"ok":true,"upKey":true,"opusKey":true,"r2":true}`
 
 ## 5. Panele gir
 
-Panel → **Çerçeve** → *Arşiv (R2 Worker)* bölümü:
+Panel → **Çerçeve** → **Arşiv Köprüsü** kartı:
 
-- **Worker adresi**: `https://opus-arsiv.<hesabin>.workers.dev`
-- **Paylaşılan sır**: 3. adımda `OPUS_KEY` olarak girdiğin dize
+- **Worker adresi**: `https://opus-arsiv.mehmetakar8812.workers.dev`
+- **Paylaşılan sır**: `OPUS_KEY` olarak girdiğin dize
 
-Sonra **⇪ Şimdi Gönder**'e bas — ayarlar n8n'e gider ve çerçeve sistemi açılır.
+Önce **Worker'ı Sına** (yanlış sır girersen açıkça "SIR TUTMUYOR" der), sonra
+**Kaydet ve n8n'e Gönder**.
+
+Son adım: n8n JSON'unu import et, sonra **⇪ Şimdi Gönder**'e bas. Durum
+şeridindeki kırmızı "Hiçbir klibe çerçeve eklenmiyor" uyarısının DÜŞMESİ gerekir.
 
 ## Ne olmuş oluyor
 
