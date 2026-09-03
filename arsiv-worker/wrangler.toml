@@ -4,8 +4,13 @@ compatibility_date = "2026-01-01"
 
 [[r2_buckets]]
 binding = "ARSIV"
-bucket_name = "opus-storage"
+# Worker PANELDEN kuruldu; bu dosya su an KULLANILMIYOR. Binding panelde
+# tanimli (Bindings sekmesi) ve /saglik r2:true donuyor.
+# Terminale (wrangler) gecersen: bu adin R2 > Overview'daki GERCEK bucket adiyla
+# birebir ayni oldugunu dogrula, yoksa deploy "bucket does not exist" der.
+bucket_name = "opus-arsiv"
 
-# Sirlar BURAYA YAZILMAZ — dosya git'e giriyor. Komutla tanimla:
+# Sirlar BURAYA YAZILMAZ. Panelden girildi (Settings > Variables and Secrets,
+# tur: Secret). Terminale gecersen komutla tanimla:
 #   npx wrangler secret put UP_KEY      (Upload-Post API anahtari)
 #   npx wrangler secret put OPUS_KEY    (n8n ile paylasilan sir)
