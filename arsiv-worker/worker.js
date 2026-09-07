@@ -31,6 +31,11 @@ const UST = 'https://api.upload-post.com/api/uploadposts/ffmpeg/jobs/';
 const JOB_RE = /^[A-Za-z0-9._-]{1,128}$/;
 const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9/._-]{0,255}$/;
 
+// 45 sn'lik 1080x1920 CRF21 bir video ~20-35 MB olur. 100 KB'ın altındaki
+// hiçbir şey video değildir (hata sayfası, JSON yanıtı, boş gövde).
+// Ölçülen gerçek vaka (4 Eylül 2026): Upload-Post HTTP 200 + 43 BAYT döndürdü.
+const ASGARI_BAYT = 100000;
+
 // CORS ZORUNLU: panel GitHub Pages'ten (BAŞKA bir kaynaktan) /saglik ve /olcum
 // çağırıyor. Bu başlıklar olmadan tarayıcı yanıtı bloklar ve panel adres doğru
 // olsa bile "ulaşılamadı" der. /olcum özel başlık (X-OPUS-KEY) kullandığı için
@@ -158,10 +163,28 @@ async function al(istek, env, u) {
   if (!kaynak.ok || !kaynak.body)
     return json({ opus: true, ok: false, hata: 'Upload-Post ' + kaynak.status }, 502);
 
+  // ── GELEN ŞEY GERÇEKTEN VİDEO MU? ────────────────────────────────────
+  // 4 Eylül 2026: Upload-Post HTTP 200 ile 43 BAYTLIK bir gövde döndürdü;
+  // eski hâl yalnız kaynak.ok'a bakıp bunu R2'ye yazdı ve ok:true dedi.
+  // Sonuç: yayın düğümü 43 baytlık bir "video"ya işaret eden linki kullandı.
+  // Artık hem tip hem BOYUT doğrulanıyor ve hata hâlinde gövdenin başı geri
+  // gönderiliyor — Upload-Post'un ne dediğini n8n çalıştırma kaydında GÖRELİM.
+  const ctype = kaynak.headers.get('content-type') || '';
+  if (!/^(video\/|application\/octet-stream)/i.test(ctype)) {
+    let ornek = '';
+    try { ornek = (await kaynak.text()).slice(0, 400); } catch (e) { ornek = '(gövde okunamadı)'; }
+    return json({
+      opus: true, ok: false,
+      hata: 'video degil: content-type=' + (ctype || '(yok)'),
+      ornek,
+    });
+  }
+
+  let yazilan;
   try {
-    await env.ARSIV.put(key, kaynak.body, {
+    yazilan = await env.ARSIV.put(key, kaynak.body, {
       httpMetadata: {
-        contentType: kaynak.headers.get('content-type') || 'video/mp4',
+        contentType: ctype || 'video/mp4',
         cacheControl: 'public, max-age=31536000, immutable',
       },
     });
@@ -169,7 +192,20 @@ async function al(istek, env, u) {
     return json({ opus: true, ok: false, hata: 'R2 yazilamadi: ' + e.message }, 502);
   }
 
-  return json({ opus: true, ok: true, url: link });
+  // İçerik akış hâlinde geldiği için boyut ancak YAZDIKTAN sonra kesinleşiyor.
+  // Eşiğin altındaysa nesneyi SİLİYORUZ: arşivde çöp bırakmak, yayın düğümünün
+  // ona işaret etmesinden daha kötü (sessizce bozuk yayın üretir).
+  const boyut = (yazilan && typeof yazilan.size === 'number') ? yazilan.size : 0;
+  if (boyut < ASGARI_BAYT) {
+    try { await env.ARSIV.delete(key); } catch (e) { /* silinemezse de basarisiz don */ }
+    return json({
+      opus: true, ok: false,
+      hata: 'gelen icerik cok kucuk (' + boyut + ' bayt, esik ' + ASGARI_BAYT + ') — video degil, R2den silindi',
+      boyut,
+    });
+  }
+
+  return json({ opus: true, ok: true, url: link, boyut });
 }
 
 async function sun(key, env, istek) {
