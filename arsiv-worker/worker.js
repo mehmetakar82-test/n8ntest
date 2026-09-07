@@ -36,6 +36,12 @@ const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9/._-]{0,255}$/;
 // Ölçülen gerçek vaka (4 Eylül 2026): Upload-Post HTTP 200 + 43 BAYT döndürdü.
 const ASGARI_BAYT = 100000;
 
+// SÜRÜM DAMGASI: Cloudflare panelindeki "Versions" listesi hangi KODUN canlı
+// olduğunu söylemiyor, yalnız ne zaman deploy edildiğini söylüyor. Bu damga
+// /saglik çıktısında görünür, yani doğru sürümün canlı olduğu dışarıdan
+// tek istekle doğrulanabilir. Kod her değiştiğinde BURAYI DA GÜNCELLE.
+const SURUM = 'w2026.09.04-2';
+
 // CORS ZORUNLU: panel GitHub Pages'ten (BAŞKA bir kaynaktan) /saglik ve /olcum
 // çağırıyor. Bu başlıklar olmadan tarayıcı yanıtı bloklar ve panel adres doğru
 // olsa bile "ulaşılamadı" der. /olcum özel başlık (X-OPUS-KEY) kullandığı için
@@ -62,6 +68,7 @@ export default {
       return json({
         opus: true,
         ok: true,
+        surum: SURUM,
         upKey: !!env.UP_KEY,
         opusKey: !!env.OPUS_KEY,
         r2: !!env.ARSIV,
