@@ -2621,7 +2621,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.09.01-95';
+const PANEL_YAPI = 'y2026.09.10-96';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12776,6 +12776,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Toggle butonun ikonunu doğru göster
     applyTheme(document.documentElement.classList.contains('light-theme') ? 'light' : 'dark');
     loadSettings();
+    // CER'i localStorage'dan AÇILIŞTA doldur: yedekN8nBildir (1400 ms) ve cerPeriyodik
+    // bellekteki CER'i okuyor; cerOku yalnız Çerçeve sekmesi açılınca çalışıyordu — geri
+    // yükleme sonrası n8n'e BOŞ profil listesi gidiyor, periyodik gönderim hiç koşmuyordu.
+    try{ cerOku(); }catch(e){ console.warn('[boot] cerOku:', e.message); }
     renderSearchHist();
     renderCatGrid();
     renderSentURLs();
@@ -12807,6 +12811,23 @@ document.addEventListener('DOMContentLoaded', function() {
     // Yedekten geri yüklendiyse n8n'e yapılandırmayı geri gönder. Burada,
     // yenilemeden SONRA yapılıyor çünkü cerAyarGonder bellekteki CER'i okuyor.
     setTimeout(()=>{ try{ yedekN8nBildir(); }catch(e){ console.warn('[boot] yedekN8nBildir:', e.message); } }, 1400);
+    // ÇERÇEVE AYARINI PERİYODİK YENİDEN GÖNDER — n8n staticData'yı koşu başında yükleyip
+    // bitişte (ve Wait'e girerken) BÜTÜN nesne olarak geri yazıyor (kaynak kodla doğrulandı,
+    // 10 Eyl 2026). Uzun bir koşu (saatlik Drive kontrolü, 5 dk'lık bekleyen OpusClip
+    // yoklaması) sürerken basılan "Şimdi Gönder" o koşu bitince SİLİNİYOR — çerçeve sessizce
+    // atlanıyor, panel yeşil kalıyor. Kalıcı onarım: panel açıkken ayar 10 dk'da bir yeniden
+    // gönderilir; kaybolan yazım en geç 10 dk içinde geri gelir. (n8n tarafında kilit/birleştirme yok.)
+    const cerPeriyodik = () => {
+      try{
+        // CER açılışta cerOku() ile dolduruldu (yukarıda). KAPALI sistem ve kaldırılmış köprü
+        // de yeniden gönderilir — kaybolması en tehlikeli ayarlar tam da bunlar (n8n açık
+        // sanıp çerçeve basmaya devam eder). 'sessiz': toast/alert yok, yalnız log.
+        if (!getN8N() || !CER.syncSon) return;                 // hiç senkron olmamışsa karışma
+        cerAyarGonder('sessiz');
+      }catch(e){ console.warn('[boot] cerPeriyodik:', e.message); }
+    };
+    setTimeout(cerPeriyodik, 45000);
+    setInterval(cerPeriyodik, 600000);
     // Kuyruk Derinliği biraz geriden: profil listesini kullanıyor ve açılışta
     // üç isteği aynı anda atmak Upload-Post'un hız sınırını zorluyordu.
     setTimeout(()=>{ try{ kuyrukDerinlik(); }catch(e){ console.warn('[boot] kuyrukDerinlik:', e.message); } }, 900);
@@ -12908,7 +12929,11 @@ const CER_SPEC = {
 // merkez 115+UST, yarıçap 82 → alt kenar UST+197; +30 px nefes payı)
 const CER_ICERIK_ALT = 227;
 const CER = { p:{}, aktif:false, urlModu:'', ghRepo:'mehmetakar82-test/n8ntest', ghPat:'', syncSon:'',
-              ust:150, mod:'bindir', zincir:'', arsivUrl:'', arsivSir:'', _sec:null, _test:false };
+              ust:150, mod:'bindir', zincir:'', arsivUrl:'', arsivSir:'', arsivTeyit:'', _sec:null, _test:false };
+// Worker'ın BEKLENEN sürüm damgası (arsiv-worker/worker.js SURUM ile aynı). /saglik eski
+// sürümde de "hazır" der; canlı kod repodakinden geriyse (Save'e basılıp Deploy'a
+// basılmamış) teşhis alanları (ornek/boyut) hiç gelmez — 10 Eylül 2026'da yaşandı.
+const CER_WORKER_SURUM = 'w2026.09.10-3';
 
 // ── ARŞİV KÖPRÜSÜ: çerçevenin çalışmasının TEK yolu ────────────────────
 // Upload-Post'un FFmpeg çıktısı yalnız `Authorization: Apikey` başlığıyla
@@ -13019,7 +13044,7 @@ function cerOku(){
     CER.ust = (j.ust == null) ? CER_UST_VARSAYILAN : Number(j.ust);
     CER.mod = CER_MOD_AD[j.mod] ? j.mod : 'bindir';
     CER.zincir = (j.zincir === 'tek' || j.zincir === 'cift') ? j.zincir : '';
-    CER.arsivUrl = j.arsivUrl||''; CER.arsivSir = j.arsivSir||'';
+    CER.arsivUrl = j.arsivUrl||''; CER.arsivSir = j.arsivSir||''; CER.arsivTeyit = j.arsivTeyit||'';
     CER.wmAlt = (j.wmAlt == null) ? 470 : Math.max(60, Math.min(1500, Number(j.wmAlt) || 470));
     CER_SPEC.wmAlt = CER.wmAlt;
   }catch(e){}
@@ -13031,7 +13056,7 @@ function cerYaz(){
       p:CER.p, aktif:CER.aktif, urlModu:CER.urlModu,
       ghRepo:CER.ghRepo, ghPat:CER.ghPat, syncSon:CER.syncSon, syncKirli:!!CER.syncKirli,
       ust:CER.ust, mod:CER.mod, zincir:CER.zincir, wmAlt:CER_SPEC.wmAlt,
-      arsivUrl:CER.arsivUrl, arsivSir:CER.arsivSir
+      arsivUrl:CER.arsivUrl, arsivSir:CER.arsivSir, arsivTeyit:CER.arsivTeyit||''
     }));
   }catch(e){ addLog('err','cerceve','Kaydedilemedi (localStorage dolu olabilir): '+e.message); }
 }
@@ -13269,6 +13294,17 @@ function cerDurumSerit(){
   else if (CER.syncKirli)
     parcalar.push(kutu('var(--er)','🔴','<b>Son ayar n8n\'e ULAŞMADI</b> — n8n eski ayarla çalışıyor; ekranda gördüğün '
       + 'toggle durumları n8n\'dekiyle AYNI OLMAYABİLİR. Sağdaki <b>⇪ Şimdi Gönder</b>\'e bas.'));
+  // n8n'in KENDİ teyidi (yanıttaki arsiv alanı): gönderim başarılı görünse de n8n
+  // köprüyü saklamamış olabilir — ayar uzun bir koşu tarafından ezilir ya da eski
+  // workflow kopyası cevap verir. İkisinde de çerçeve sessizce atlanır, R2 boş kalır.
+  else if (cerArsivVar() && CER.arsivTeyit === 'yok')
+    parcalar.push(kutu('var(--er)','🔴','<b>n8n köprüyü SAKLAMADI</b> — son gönderimde n8n <code>arsiv:false</code> döndü: '
+      + 'Worker adresi/sır n8n\'e eksik ulaştı. Aşağıdaki <b>Arşiv Köprüsü</b> kartını kontrol edip '
+      + 'sağdaki <b>⇪ Şimdi Gönder</b>\'e yeniden bas.'));
+  else if (cerArsivVar() && CER.arsivTeyit === 'eski')
+    parcalar.push(kutu('var(--er)','🔴','<b>n8n ESKİ workflow koduyla cevap verdi</b> — yanıtta <code>arsiv</code> alanı yok. '
+      + 'Güncel JSON import edilmemiş ya da eski kopya hâlâ aktif (aynı webhook yolu). Workflow listesinde '
+      + 'tek OPUSPRO kalsın, sonra <b>⇪ Şimdi Gönder</b>.'));
   if (bannersiz.length){
     // KÖK ENGEL ÖNCE: token yoksa 15 profili tek tek denemek boşuna —
     // hepsi "GitHub token gerekli" ile düşer (yaşandı).
@@ -13894,6 +13930,8 @@ async function cerArsivKaydet(){
   const s = await cerAyarGonder(true);
   if (s === 'gonderildi') cerArsivYaz('<span style="color:var(--ok)">✓ Kaydedildi ve n8n\'e gönderildi</span>');
   else if (s === 'belirsiz') cerArsivYaz('<span style="color:var(--wn)">⚠ Gönderildi ama n8n yanıt vermedi — ulaştığı doğrulanamadı</span>');
+  else if (s === 'teyit-yok') cerArsivYaz('<span style="color:var(--er)">✗ Gönderildi ama n8n köprüyü SAKLAMADI (arsiv:false) — Executions\'ta çalışan koşu yokken tekrar dene</span>');
+  else if (s === 'teyit-eski') cerArsivYaz('<span style="color:var(--er)">✗ n8n ESKİ workflow koduyla cevap verdi — güncel JSON\'u import et, eski kopyayı pasifleştir</span>');
   else cerArsivYaz('<span style="color:var(--er)">✗ n8n\'e GÖNDERİLEMEDİ — ayar yalnız bu tarayıcıda, n8n çerçeveyi atlamaya devam eder</span>');
   cerDurumSerit();
 }
@@ -13906,6 +13944,11 @@ async function cerArsivSina(){
     const r = await fetch(CER.arsivUrl + '/saglik', { cache:'no-store' });
     const j = await r.json().catch(()=>({}));
     if (!r.ok || j.opus !== true) throw new Error('HTTP '+r.status+' — adres bir OPUS arşiv Worker\'ı değil');
+    // SÜRÜM KAPISI: canlı kod repodakinden eskiyse "hazır" demek yanıltır — eski sürüm
+    // indirme hatasında ornek/boyut döndürmez, n8n'deki teşhis kör kalır.
+    if (j.surum !== CER_WORKER_SURUM)
+      throw new Error('Worker ayakta ama ESKİ SÜRÜM (canlı: ' + (j.surum || 'damgasız') + ', beklenen: ' + CER_WORKER_SURUM
+        + ') — Cloudflare → Workers → opus-arsiv → Edit code → repodaki arsiv-worker/worker.js\'i yapıştır → DEPLOY (Save değil)');
     const eksik = [];
     if (!j.upKey)   eksik.push('UP_KEY (Upload-Post anahtarı)');
     if (!j.opusKey) eksik.push('OPUS_KEY (paylaşılan sır)');
@@ -14016,6 +14059,10 @@ async function cerAyarGonder(manuel){
   return is_;
 }
 async function cerAyarGonderCek(manuel){
+  // 'sessiz' = periyodik yeniden gönderim: hata toast'ı atmaz, syncKirli'yi ELLEMEZ
+  // (geçici n8n kesintisi şeridi 10 dk kırmızıya çakmasın), yalnız 'warn' loglar.
+  const sessiz = (manuel === 'sessiz');
+  if (sessiz) manuel = false;
   const base = getN8N();
   if (!base){
     CER.syncKirli = !!CER.syncSon; cerYaz();   // daha önce senkron OLDUYSA n8n artık bayat demektir
@@ -14035,7 +14082,7 @@ async function cerAyarGonderCek(manuel){
                      ad: c.ad||u, bantRenk: c.bantRenk||'#ffffff', yaziRenk: c.yaziRenk||'#0b0b0e',
                      bannerYuk: c.bannerImza ? Number(c.bannerImza) : null };
   });
-  const s = fafSonuc(await faf(base+'/webhook/cerceve-ayar', {
+  const r = await faf(base+'/webhook/cerceve-ayar', {
     aktif: CER.aktif, urlModu: CER.urlModu, apikey: S.cfg.blot||'',
     // ARŞİV KÖPRÜSÜ — n8n 'Çerçeve Hazırla' kapısı bunlar dolu değilse çerçeveyi
     // ATLAR. arsivSir Worker'a erişim izni; n8n'de yalnız 'Çerçeve Arşivle'
@@ -14045,12 +14092,31 @@ async function cerAyarGonderCek(manuel){
     // GEOMETRİ n8n'e de gitmeli: bant kalınlığı panelden değiştirilebiliyor,
     // n8n'deki sabit değerler kalırsa başlık bandın dışına düşer.
     spec: cerSpecGonderilecek()
-  }));
+  });
+  const s = fafSonuc(r);
+  // 8 sn içinde yanıt yoksa BU uç için "gönderildi" değil "belirsiz"dir: cerceve-ayar
+  // iki düğümlük, anında cevap veren bir akış — yanıtsızlık olağan dışı.
+  if (r && r.pending){ s.belirsiz = true; s.mesaj = 'n8n 8 sn içinde yanıt vermedi'; }
+  // n8n'in TEYİDİ: 'Çerçeve Ayar Kaydet' yanıta arsiv:true/false koyuyor (sırrın kendisini
+  // değil). Eskiden gövde hiç okunmuyordu — HTTP 200 = "gönderildi" sayılıyor, n8n köprüyü
+  // SAKLAMAMIŞ olsa da (eski workflow cevap veriyor / ayar uzun bir koşu tarafından ezildi)
+  // şerit yeşil kalıyordu. 10 Eylül 2026: R2 boş, panel yeşil.
+  let teyit = 'belirsiz';
+  if (r && r.ok && !r.pending && typeof r.json === 'function'){
+    try{
+      const j = await r.json();
+      if (!j || typeof j !== 'object') teyit = 'belirsiz';
+      else if (!('arsiv' in j)) teyit = 'eski';                 // alan yok → n8n'de ESKİ workflow kodu
+      else if (!cerArsivVar()) teyit = 'ok';                    // köprü panelde de yok, false beklenen
+      else teyit = (j.arsiv === true) ? 'ok' : 'yok';
+    }catch(e){ teyit = 'belirsiz'; }
+  }
   // "Son gönderim" damgası KOŞULSUZ yazılıyordu: HTTP 404/500 (workflow pasif,
   // yanlış yol) hâlinde bile "şimdi" görünüyor, üstelik uyarı yalnız
   // manuel && corsOrNetwork durumunda çıkıyordu. Yani toggle'lardan yapılan
   // gönderimlerde hata tamamen sessizdi.
   if (!s.ok && !s.belirsiz){
+    if (sessiz){ addLog('warn','webhook','Periyodik çerçeve ayarı gönderilemedi (geçici olabilir): '+s.mesaj); return 'hata'; }
     // KİRLİ bayrağı: n8n'in elindeki ayar artık panelinkiyle AYNI DEĞİL.
     // Şerit ve cerEngeller bunu engel sayar; başarılı gönderim temizler.
     CER.syncKirli = true; cerYaz();
@@ -14066,13 +14132,28 @@ async function cerAyarGonderCek(manuel){
   // vermeyen n8n kurulumunda HER gönderim belirsizdir, kirli saymak şeridi
   // kalıcı kırmızıya çakardı. Şerh zaten etikette ve toast'ta görünür.
   CER.syncKirli = false;
+  // 'belirsiz' (8 sn yanıtsızlık / CORS) önceki KESİN teyidi (yok/eski/ok) EZMESİN —
+  // kırmızı kutu doğrulama olmadan kaybolmasın.
+  if (teyit !== 'belirsiz') CER.arsivTeyit = teyit;
   CER.syncSon = new Date().toISOString(); cerYaz();
-  setEl('cer-sync-son', new Date().toLocaleString('tr') + (s.belirsiz ? ' (yanıt alınamadı)' : ''));
+  // 'aldı ve yazdı': yanıt aynı koşudaki yazımı teyit eder; kalıcılık koşu bitince
+  // (uzun bir koşu daha sonra ezebilir — bkz. periyodik yeniden gönderim).
+  const teyitMetin = { ok:' · n8n aldı ve yazdı ✓', yok:' · n8n köprüyü SAKLAMADI ✗',
+                       eski:' · n8n ESKİ kod (arsiv alanı yok) ✗', belirsiz:'' }[teyit] || '';
+  setEl('cer-sync-son', new Date().toLocaleString('tr') + (s.belirsiz ? ' (yanıt alınamadı)' : '') + teyitMetin);
   cerDurumSerit();
   if (s.belirsiz){
     addLog('warn','webhook','Çerçeve ayarı: '+s.mesaj);
     if (manuel) alert('Gönderildi ama yanıt alınamadı — '+s.mesaj);
     return 'belirsiz';
+  }
+  if (teyit === 'yok' || teyit === 'eski'){
+    const m = (teyit === 'yok')
+      ? 'n8n köprüyü SAKLAMADI (yanıt: arsiv=false) — Worker adresi/sır n8n\'e eksik ulaştı; Arşiv Köprüsü kartını kontrol edip ⇪ Şimdi Gönder\'e yeniden bas'
+      : 'n8n ESKİ workflow koduyla cevap verdi (yanıtta arsiv alanı yok) — güncel JSON\'u import et, eski kopyayı pasifleştir, sonra ⇪ Şimdi Gönder';
+    if (sessiz) addLog('warn','webhook','Periyodik çerçeve ayarı: '+m);
+    else { addLog('err','webhook','Çerçeve ayarı: '+m); if (manuel) alert(m); else toast('⚠ '+m, 'err', 9000); }
+    return 'teyit-' + teyit;
   }
   return 'gonderildi';
 }
@@ -14082,6 +14163,9 @@ function cerDtEsc(s){
   return String(s||'')
     .replace(/[\u2018\u2019']/g,'\u2019').replace(/["\u201C\u201D]/g,'\u201D')
     .replace(/[\\`$;\[\]{}]/g,'')
+    // Upload-Post'un yasak listesi (docs.upload-post.com/api/ffmpeg-editor, 10 Eyl 2026):
+    // ; | & $ ` $( — '|' ve '&' eskiden geçiyordu, "Tom & Jerry" gibi başlıkta iş 400'le açılmıyordu.
+    .replace(/&/g,'+').replace(/\|/g,'/')
     .replace(/%/g,'\\%').replace(/:/g,'\\:');
 }
 // cerBaslikBol KALDIRILDI — yerini cerBaslikDuzen aldı (satır + punto +

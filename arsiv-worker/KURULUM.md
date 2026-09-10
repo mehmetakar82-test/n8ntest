@@ -159,9 +159,12 @@ Deploy çıktısındaki adresi al (`https://opus-arsiv.mehmetakar8812.workers.de
 curl https://opus-arsiv.mehmetakar8812.workers.dev/saglik
 ```
 
-Beklenen: `{"opus":true,"ok":true,"upKey":true,"opusKey":true,"r2":true}`
+Beklenen: `{"opus":true,"ok":true,"surum":"w2026.09.10-3","upKey":true,"opusKey":true,"r2":true}`
 
-Üçü de `true` değilse ilgili adım eksik.
+Üçü de `true` değilse ilgili adım eksik. **`surum` alanı yoksa ya da farklıysa
+canlıdaki kod ESKİ** — Edit code'da Save'e basılıp Deploy'a basılmamış demektir
+(10 Eylül 2026'da yaşandı: canlı sürüm 7 Eylül'deki koddan geriydi). Panelin
+**Worker'ı Sına** düğmesi de bunu kontrol edip "ESKİ SÜRÜM" der.
 
 ## 5. Panele gir
 
