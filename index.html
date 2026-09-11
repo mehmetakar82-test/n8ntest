@@ -2621,7 +2621,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.09.11-97';
+const PANEL_YAPI = 'y2026.09.12-98';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12939,6 +12939,16 @@ const CER_WORKER_SURUM = 'w2026.09.11-4';
 // Worker günlerce canlı kaldı ve iki ayrı arıza ("401", "known length") onun yüzünden
 // yaşandı (11 Eyl 2026). undefined = ölçülmedi, '' = damgasız (7 Eyl öncesi kod).
 let cerWorkerCanli;
+// SÜRÜM KARŞILAŞTIRMASI "EN AZ" olmalı, "birebir" değil: Worker güncellenip panel
+// sekmesi eski kalınca (tarayıcı önbelleği / dünden açık sekme) birebir eşitlik YENİ
+// Worker'ı "ESKİ SÜRÜM" diye işaretliyordu (12 Eyl 2026, yaşandı). Biçim: wYYYY.AA.GG-N.
+function cerSurumSayi(s){
+  const m = /^w(\d{4})\.(\d{2})\.(\d{2})-(\d+)$/.exec(String(s || '').trim());
+  return m ? Number(m[1] + m[2] + m[3]) * 10000 + Number(m[4]) : -1;   // damgasız/bozuk → -1
+}
+function cerWorkerYeterli(canli){ return cerSurumSayi(canli) >= cerSurumSayi(CER_WORKER_SURUM); }
+// Worker panelin bildiğinden YENİYSE panel sekmesi bayat demektir (hata değil, bilgi).
+function cerPanelBayat(canli){ return cerSurumSayi(canli) > cerSurumSayi(CER_WORKER_SURUM); }
 async function cerWorkerSurumOku(){
   if (!cerArsivVar()) return;
   try{
@@ -13321,11 +13331,14 @@ function cerDurumSerit(){
       + 'Güncel JSON import edilmemiş ya da eski kopya hâlâ aktif (aynı webhook yolu). Workflow listesinde '
       + 'tek OPUSPRO kalsın, sonra <b>⇪ Şimdi Gönder</b>.'));
   // WORKER SÜRÜMÜ — ayrı kutu (n8n teyidinden bağımsız; ikisi aynı anda bozuk olabilir).
-  if (cerArsivVar() && cerWorkerCanli !== undefined && cerWorkerCanli !== CER_WORKER_SURUM)
+  if (cerArsivVar() && cerWorkerCanli !== undefined && !cerWorkerYeterli(cerWorkerCanli))
     parcalar.push(kutu('var(--er)','🔴','<b>Cloudflare Worker ESKİ SÜRÜM</b> — canlı: <code>' + esc(cerWorkerCanli || 'damgasız') + '</code>, '
-      + 'beklenen: <code>' + esc(CER_WORKER_SURUM) + '</code>. Çerçeveli videolar R2\'ye yazılamayabilir. '
+      + 'en az: <code>' + esc(CER_WORKER_SURUM) + '</code>. Çerçeveli videolar R2\'ye yazılamayabilir. '
       + 'Cloudflare → Workers → opus-arsiv → <b>Edit code</b> → repodaki <code>arsiv-worker/worker.js</code>\'i '
       + 'tamamen yapıştır → <b>Deploy</b> (Save değil) → bu sayfayı yenile.'));
+  else if (cerArsivVar() && cerWorkerCanli !== undefined && cerPanelBayat(cerWorkerCanli))
+    parcalar.push(kutu('var(--wn)','🟡','<b>Panel sekmesi eski</b> — Worker <code>' + esc(cerWorkerCanli) + '</code>, bu panel <code>'
+      + esc(PANEL_YAPI) + '</code>. Sayfayı <b>Ctrl+F5</b> ile yenile.'));
   if (bannersiz.length){
     // KÖK ENGEL ÖNCE: token yoksa 15 profili tek tek denemek boşuna —
     // hepsi "GitHub token gerekli" ile düşer (yaşandı).
@@ -13968,9 +13981,9 @@ async function cerArsivSina(){
     // SÜRÜM KAPISI: canlı kod repodakinden eskiyse "hazır" demek yanıltır — eski sürüm
     // indirme hatasında ornek/boyut döndürmez, n8n'deki teşhis kör kalır.
     cerWorkerCanli = String(j.surum || '');   // şerit de aynı ölçümü göstersin
-    if (j.surum !== CER_WORKER_SURUM)
-      throw new Error('Worker ayakta ama ESKİ SÜRÜM (canlı: ' + (j.surum || 'damgasız') + ', beklenen: ' + CER_WORKER_SURUM
-        + ') — Cloudflare → Workers → opus-arsiv → Edit code → repodaki arsiv-worker/worker.js\'i yapıştır → DEPLOY (Save değil)');
+    if (!cerWorkerYeterli(j.surum))
+      throw new Error('Worker ayakta ama ESKİ SÜRÜM (canlı: ' + (j.surum || 'damgasız') + ', en az: ' + CER_WORKER_SURUM
+        + ', panel: ' + PANEL_YAPI + ') — Cloudflare → Workers → opus-arsiv → Edit code → repodaki arsiv-worker/worker.js\'i yapıştır → DEPLOY (Save değil)');
     const eksik = [];
     if (!j.upKey)   eksik.push('UP_KEY (Upload-Post anahtarı)');
     if (!j.opusKey) eksik.push('OPUS_KEY (paylaşılan sır)');
