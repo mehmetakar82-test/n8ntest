@@ -28,7 +28,9 @@ const UST = 'https://api.upload-post.com/api/uploadposts/ffmpeg/jobs/';
 
 // Anahtar/jobId'yi DAR bir alfabeye kısıtlıyoruz: aksi hâlde '../' veya bir tam
 // URL enjekte edilip Worker açık bir vekile (SSRF) dönüşebilirdi.
-const JOB_RE = /^[A-Za-z0-9._-]{1,128}$/;
+// '.' ve '..' tek başına kabul edilmez: URL normalizasyonu '/jobs/../download'u
+// başka bir Upload-Post yoluna çevirir ve anahtarlı istek oraya giderdi.
+const JOB_RE = /^(?!\.+$)[A-Za-z0-9._-]{1,128}$/;
 const KEY_RE = /^[A-Za-z0-9][A-Za-z0-9/._-]{0,255}$/;
 
 // 45 sn'lik 1080x1920 CRF21 bir video ~20-35 MB olur. 100 KB'ın altındaki
@@ -40,7 +42,7 @@ const ASGARI_BAYT = 100000;
 // olduğunu söylemiyor, yalnız ne zaman deploy edildiğini söylüyor. Bu damga
 // /saglik çıktısında görünür, yani doğru sürümün canlı olduğu dışarıdan
 // tek istekle doğrulanabilir. Kod her değiştiğinde BURAYI DA GÜNCELLE.
-const SURUM = 'w2026.09.10-3';
+const SURUM = 'w2026.09.11-4';
 
 // CORS ZORUNLU: panel GitHub Pages'ten (BAŞKA bir kaynaktan) /saglik ve /olcum
 // çağırıyor. Bu başlıklar olmadan tarayıcı yanıtı bloklar ve panel adres doğru
@@ -67,41 +69,153 @@ async function govdeBasi(yanit, n = 400) {
   }
 }
 
-// Uzunluğu BİLİNMEYEN akışı R2'ye parça parça yaz (multipart): sabit ~10 MiB bellek,
-// dosya boyutu ne olursa olsun. Belleğe alma (arrayBuffer) 128 MB izole sınırını
-// eşzamanlı /al çağrılarıyla paylaşırdı ve uzun klipte tek başına aşabilirdi.
-// R2 kuralı: son parça hariç tüm parçalar AYNI boyutta olmalı.
-const PARCA = 10 * 1024 * 1024;
-async function parcaliYaz(env, key, govde, meta) {
-  const mp = await env.ARSIV.createMultipartUpload(key, meta);
+// ── R2'YE YAZMA — İKİ YOL ────────────────────────────────────────────
+// 11 Eylül 2026 üretimde: put(key, yanit.body) → "Provided readable stream must
+// have a known length". R2 bir akışı ancak uzunluğu BİLİNİYORSA kabul eder.
+// workerd kaynağıyla doğrulandı (11 Eyl, 4 araştırma + çürütme): uzunluk yalnız
+// Content-Length VAR ve gövde çalışma zamanınca AÇILMIYORSA bilinir. Parça parça
+// (chunked) gövdede ya da gzip/br gövdede (çalışma zamanı okurken açar; başlıklar
+// sıkıştırılmış boyutu göstermeye devam eder) uzunluk bilinmez.
+//
+// dogrudan(): Content-Length var, kodlama yok → put(key, yanit.body). Baytları
+//             çalışma zamanı YEREL pompayla taşır: JS döngüsü yok, bellekte tutulmaz.
+// parcali():  aksi hâlde BYOB readAtLeast ile TAM 10 MiB'lik parçalar → R2 multipart.
+//             Parça başına tek JS turu (30 MB ≈ 3 tur), tepe bellek ≈ 20 MB.
+//
+// ELENEN iki yol (bilerek):
+//  - arrayBuffer() ile belleğe alma: çalışma zamanı gövdenin ~2 KATINI tutuyor;
+//    60 MB'lık video 128 MB izole sınırını (eşzamanlı isteklerle ortak) aşabilir.
+//  - Varsayılan okuyucuyla JS döngüsü: her read() 4-16 KiB döndürüyor → 30 MB için
+//    binlerce tur; Free plandaki 10 ms CPU sınırını aşıp 1102'ye düşer.
+//  - 'Accept-Encoding: identity': Cloudflare'in çıkış vekili (FL) gövdeyi kendisi
+//    açıp Content-Encoding'i siliyor — gövde yine uzunluksuz geliyor. Yarar yok.
+const PARCA = 10 * 1024 * 1024;          // R2: son parça hariç HEPSİ aynı boyda olmalı
+
+async function dogrudan(env, key, yanit, meta) {
+  const yazilan = await env.ARSIV.put(key, yanit.body, meta);
+  return (yazilan && typeof yazilan.size === 'number') ? yazilan.size : 0;
+}
+
+// MP4/QuickTime dosyası 4. bayttan itibaren bir kutu adıyla başlar (ffmpeg mp4 → 'ftyp').
+// Çalışma zamanının AÇMADIĞI bir kodlama (deflate, zstd...) sıkıştırılmış baytları
+// olduğu gibi verir; boyut kapısı bunu yakalamaz, imza yakalar.
+const MP4_KUTU = ['ftyp', 'moov', 'mdat', 'wide', 'free', 'skip'];
+function mp4Mu(b) {
+  if (!b || b.byteLength < 8) return false;
+  return MP4_KUTU.indexOf(String.fromCharCode(b[4], b[5], b[6], b[7])) >= 0;
+}
+function hexBasi(b, n = 16) {
+  return Array.from((b || new Uint8Array()).subarray(0, n)).map((x) => x.toString(16).padStart(2, '0')).join(' ');
+}
+
+async function parcali(env, key, yanit, meta) {
+  const rd = yanit.body.getReader({ mode: 'byob' });
+  let mp = null, n = 0, toplam = 0, kisa = null, ilk = true, tampon = new ArrayBuffer(PARCA);
   const parcalar = [];
-  let n = 0, toplam = 0, dolu = 0, tampon = new Uint8Array(PARCA);
-  const rd = govde.getReader();
+  const yukle = async (v) => {
+    if (!mp) mp = await env.ARSIV.createMultipartUpload(key, meta);
+    parcalar.push(await mp.uploadPart(++n, v));
+    toplam += v.byteLength;
+  };
   try {
     for (;;) {
-      const { value, done } = await rd.read();
-      if (done) break;
-      let ofs = 0;
-      while (ofs < value.length) {
-        const al = Math.min(PARCA - dolu, value.length - ofs);
-        tampon.set(value.subarray(ofs, ofs + al), dolu);
-        dolu += al; ofs += al;
-        if (dolu === PARCA) {
-          parcalar.push(await mp.uploadPart(++n, tampon));
-          toplam += dolu; dolu = 0; tampon = new Uint8Array(PARCA);
+      // min, tampon boyunu ASLA aşmamalı: workerd (ve WHATWG) min > view.byteLength
+      // olan readAtLeast'i TypeError ile reddeder (readable.c++:113-116). Kısa son
+      // parçadan sonraki EOF doğrulama okuması bu yüzden min=1 ile yapılıyor.
+      const { value, done } = await rd.readAtLeast(kisa ? 1 : PARCA, new Uint8Array(tampon));
+      if (value && value.byteLength) {
+        if (ilk) {
+          ilk = false;
+          if (!mp4Mu(value)) {
+            const e = new Error('video degil (mp4 imzasi yok): ' + hexBasi(value));
+            e.imza = true;
+            throw e;
+          }
+        }
+        // Kısa okuma yalnız EOF'ta olur; ardından veri gelirse parça boyları bozulur.
+        if (kisa) throw new Error('parca boyu tutarsiz (kisa okumadan sonra veri geldi)');
+        if (value.byteLength === PARCA) {
+          await yukle(value);
+          tampon = value.buffer;   // yükleme bitti → aynı belleği yeniden kullan (sıfırlama yok)
+        } else {
+          kisa = value;            // son parça (daha kısa olabilir)
         }
       }
+      if (done) break;
+      // workerd: EOF'tan önce minBytes'a ulaşılamazsa kısa veri done:false ile gelir,
+      // done:true bir SONRAKİ okumada gelir (internal.c++ ~705/742). O doğrulama
+      // okumasına küçük tampon yeter (yukarıda min=1). kisa kendi belleğinde duruyor;
+      // yeni tampon onu ayırmaz (detach etmez).
+      if (kisa) tampon = new ArrayBuffer(4096);
     }
-    if (dolu > 0 || n === 0) {
-      parcalar.push(await mp.uploadPart(++n, tampon.subarray(0, dolu)));
-      toplam += dolu;
+    if (!mp) {
+      // Gövde tek parçadan küçük: multipart gereksiz, tek put.
+      const yazilan = await env.ARSIV.put(key, kisa || new Uint8Array(0), meta);
+      return (yazilan && typeof yazilan.size === 'number') ? yazilan.size : (kisa ? kisa.byteLength : 0);
     }
+    if (kisa) await yukle(kisa);
     const nesne = await mp.complete(parcalar);
     return (nesne && typeof nesne.size === 'number') ? nesne.size : toplam;
   } catch (e) {
-    try { await mp.abort(); } catch (e2) { /* yarım yükleme R2'de kalmasın */ }
+    if (mp) { try { await mp.abort(); } catch (e2) { /* yarım yükleme R2'de kalmasın */ } }
+    try { await rd.cancel(); } catch (e3) { /* gövde zaten kapanmış olabilir */ }
     throw e;
   }
+}
+
+// Upload-Post yanıtının başlıkları — n8n'de görünür (hata → _cerOrnek, başarı →
+// Arşivle çıktısı). Bir dahaki arızada "chunked mı, gzip mi" diye tahmin etmeyelim.
+function ustBilgi(y) {
+  const b = (n) => y.headers.get(n) || '-';
+  return 'cl=' + b('content-length') + ' ce=' + b('content-encoding') + ' te=' + b('transfer-encoding') + ' ct=' + b('content-type');
+}
+
+// ── İNDİRME ──────────────────────────────────────────────────────────
+// redirect:'manual' — Workers fetch yönlendirmeyi kendisi izlerken Authorization
+// başlığını YABANCI alana da taşır; hedef imzalı bir depolama URL'siyse depolama
+// "yalnız tek kimlik mekanizması" diye 400 döner. Yönlendirmeyi kendimiz izliyor,
+// başlığı yalnız Upload-Post'un kendi kaynağına (origin) gönderiyoruz.
+// Anahtar yalnız İLK kaynağa gider: bir kez yabancı alana çıkıldıysa, oradan
+// Upload-Post'a geri dönen bir yönlendirmeye de anahtar eklenmez. Yalnız https
+// izlenir (düşürme ve tuhaf şemalar reddedilir; hata metnine yalnız şema/kaynak yazılır).
+async function indir(env, jobId) {
+  let hedef = UST + jobId + '/download';
+  let disarida = false;
+  for (let atlama = 0; ; atlama++) {
+    const ayniKaynak = !disarida && new URL(hedef).origin === new URL(UST).origin;
+    const basliklar = {};
+    if (ayniKaynak) basliklar.Authorization = 'Apikey ' + env.UP_KEY;
+    const y = await fetch(hedef, { redirect: 'manual', headers: basliklar });
+    const konum = y.headers.get('location');
+    if (!(y.status >= 300 && y.status < 400 && konum)) return { yanit: y };
+    let sonraki;
+    try { sonraki = new URL(konum, hedef); } catch (e) { return { yonlendirme: 'gecersiz Location' }; }
+    if (sonraki.protocol !== 'https:') return { yonlendirme: 'https disi yonlendirme (' + sonraki.protocol + ')' };
+    // Yalnız KAYNAĞI yaz: Location imzalı bir indirme linkiyse n8n kaydına düşmesin.
+    if (atlama >= 3) return { yonlendirme: 'cok fazla (' + sonraki.origin + ')' };
+    if (sonraki.origin !== new URL(UST).origin) disarida = true;
+    hedef = sonraki.toString();
+  }
+}
+
+// İçerik tipi + kodlama kapısı — ilk indirmeye de tekrar indirmeye de AYNI kapı.
+// Dönen: null (geçti) ya da { hata, ornek } (reddedildi; gövde iptal edildi).
+async function kapidanGecir(yanit) {
+  const ust = ustBilgi(yanit);
+  const ctype = yanit.headers.get('content-type') || '';
+  if (!/^(video\/|application\/(octet-stream|mp4)|binary\/octet-stream)/i.test(ctype)) {
+    const ornek = await govdeBasi(yanit);
+    return { hata: 'video degil: content-type=' + (ctype || '(yok)'), ornek: ornek || ust };
+  }
+  // workerd yalnız TAM 'gzip' ve 'br' değerlerini açar; başka bir kodlama (deflate,
+  // zstd, 'GZIP', liste...) sıkıştırılmış baytları olduğu gibi verir → MP4 diye çöp
+  // saklanırdı. Onları baştan reddediyoruz.
+  const kodlama = (yanit.headers.get('content-encoding') || '').trim();
+  if (kodlama && kodlama !== 'identity' && kodlama !== 'gzip' && kodlama !== 'br') {
+    try { await yanit.body.cancel(); } catch (e) { /* önemsiz */ }
+    return { hata: 'desteklenmeyen kodlama: ' + kodlama, ornek: ust };
+  }
+  return null;
 }
 
 const json = (govde, durum = 200) =>
@@ -127,10 +241,16 @@ export default {
     }
 
     if (istek.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-    if (yol === '/olcum') return olcum(istek, env);
-    if (yol === '/al' && istek.method === 'POST') return al(istek, env, u);
-    if (yol.startsWith('/f/') && (istek.method === 'GET' || istek.method === 'HEAD'))
-      return sun(yol.slice(3), env, istek);
+    // Yakalanmayan istisna Cloudflare'in CORS'suz 1101 HTML sayfasına dönüşürdü: panel
+    // "ulaşılamadı", n8n okunaksız HTML görürdü. Artık her uç JSON + opus:true döner.
+    try {
+      if (yol === '/olcum') return await olcum(istek, env);
+      if (yol === '/al' && istek.method === 'POST') return await al(istek, env, u);
+      if (yol.startsWith('/f/') && (istek.method === 'GET' || istek.method === 'HEAD'))
+        return await sun(yol.slice(3), env, istek);
+    } catch (e) {
+      return json({ opus: true, ok: false, hata: 'beklenmeyen hata: ' + (e && e.message ? e.message : String(e)) }, 500);
+    }
 
     return json({ opus: true, ok: false, hata: 'bilinmeyen uc' }, 404);
   },
@@ -214,26 +334,11 @@ async function al(istek, env, u) {
     /* head hatası akışı durdurmasın — indirmeye devam */
   }
 
-  // ── İNDİRME ──────────────────────────────────────────────────────────
-  // redirect:'manual' — Workers fetch yönlendirmeyi kendisi izlerken Authorization
-  // başlığını YABANCI alana da taşır; hedef imzalı bir depolama URL'siyse depolama
-  // "yalnız tek kimlik mekanizması" diye 400 döner. Yönlendirmeyi kendimiz izliyor,
-  // başlığı yalnız Upload-Post'un kendi kaynağına (origin) gönderiyoruz.
   let kaynak;
   try {
-    let hedef = UST + jobId + '/download';
-    for (let atlama = 0; ; atlama++) {
-      const ayniKaynak = new URL(hedef).origin === new URL(UST).origin;
-      kaynak = await fetch(hedef, {
-        redirect: 'manual',
-        headers: ayniKaynak ? { Authorization: 'Apikey ' + env.UP_KEY } : {},
-      });
-      const konum = kaynak.headers.get('location');
-      if (!(kaynak.status >= 300 && kaynak.status < 400 && konum)) break;
-      // Yalnız KAYNAĞI yaz: Location imzalı bir indirme linkiyse n8n kaydına düşmesin.
-      if (atlama >= 3) return json({ opus: true, ok: false, hata: 'cok fazla yonlendirme', konum: new URL(konum, hedef).origin }, 502);
-      hedef = new URL(konum, hedef).toString();
-    }
+    const s = await indir(env, jobId);
+    if (s.yonlendirme) return json({ opus: true, ok: false, hata: 'yonlendirme reddedildi: ' + s.yonlendirme }, 502);
+    kaynak = s.yanit;
   } catch (e) {
     return json({ opus: true, ok: false, hata: 'indirme basarisiz: ' + e.message }, 502);
   }
@@ -248,47 +353,50 @@ async function al(istek, env, u) {
   // ── GELEN ŞEY GERÇEKTEN VİDEO MU? ────────────────────────────────────
   // 4 Eylül 2026: Upload-Post HTTP 200 ile 43 BAYTLIK bir gövde döndürdü;
   // eski hâl yalnız kaynak.ok'a bakıp bunu R2'ye yazdı ve ok:true dedi.
-  // Sonuç: yayın düğümü 43 baytlık bir "video"ya işaret eden linki kullandı.
-  // Artık hem tip hem BOYUT doğrulanıyor ve hata hâlinde gövdenin başı geri
-  // gönderiliyor — Upload-Post'un ne dediğini n8n çalıştırma kaydında GÖRELİM.
-  // Yönlendirme sonrası tip depo kaynağından gelebilir: binary/octet-stream ve
-  // application/mp4 de meşru ikili tiplerdir. Çöp zaten boyut kapısında eleniyor.
-  const ctype = kaynak.headers.get('content-type') || '';
-  if (!/^(video\/|application\/(octet-stream|mp4)|binary\/octet-stream)/i.test(ctype)) {
-    const ornek = await govdeBasi(kaynak);
-    return json({
-      opus: true, ok: false,
-      hata: 'video degil: content-type=' + (ctype || '(yok)'),
-      ornek,
-    });
-  }
+  // Artık tip, kodlama, (parçalı yolda) MP4 imzası ve BOYUT doğrulanıyor; hata
+  // hâlinde gövdenin başı/başlıklar geri gönderiliyor — n8n kaydında GÖRELİM.
+  const red = await kapidanGecir(kaynak);
+  if (red) return json({ opus: true, ok: false, hata: red.hata, ornek: red.ornek }, 502);
 
   // ── R2'YE YAZ ─────────────────────────────────────────────────────────
-  // R2 put() bir akış (ReadableStream) için BİLİNEN UZUNLUK ister; uzunluk
-  // yalnız yanıtta Content-Length varsa bilinir. Upload-Post gövdeyi parça
-  // parça (chunked) yollarsa put() TEK BAYT yazmadan "Provided readable stream
-  // must have a known length" diye patlar ve R2 boş kalır. O hâlde uzunluk
-  // bilinmiyorsa gövdeyi belleğe alıp (20-40 MB, 128 MB sınırının altında)
-  // öyle yazıyoruz; biliniyorsa akıtmaya devam.
   const uzunluk = Number(kaynak.headers.get('content-length') || 0);
+  const kodlama = (kaynak.headers.get('content-encoding') || '').trim();
+  let ust = ustBilgi(kaynak);
+  // İçerik tipi SABİT: çıktı her zaman mp4 (output_extension + imza kontrolü).
+  // Kaynağın tipini aynen saklamak, virgüllü/tuhaf bir değerle /f/'den HTML
+  // sunulmasına kapı açardı.
   const meta = {
     httpMetadata: {
-      contentType: ctype || 'video/mp4',
+      contentType: 'video/mp4',
       cacheControl: 'public, max-age=31536000, immutable',
     },
   };
+
+  // Doğrudan yol düşerse (çalışma zamanı uzunluğu bilinmez saydı) gövdenin okunup
+  // okunmadığı garanti değil → ilk gövdeyi bırak, indirmeyi BİR KEZ tekrarla, aynı
+  // kapıdan geçir, parçalı yaz. GET /download yan etkisiz.
   let boyut = 0;
+  let yol = (Number.isSafeInteger(uzunluk) && uzunluk > 0 && (!kodlama || kodlama === 'identity')) ? 'dogrudan' : 'parcali';
   try {
-    if (uzunluk > 0) {
-      // Uzunluk biliniyor → doğrudan akıt (tek put, bellekte tutulmaz).
-      const yazilan = await env.ARSIV.put(key, kaynak.body, meta);
-      boyut = (yazilan && typeof yazilan.size === 'number') ? yazilan.size : uzunluk;
-    } else {
-      // Uzunluk bilinmiyor (chunked) → multipart ile parça parça.
-      boyut = await parcaliYaz(env, key, kaynak.body, meta);
+    boyut = (yol === 'dogrudan') ? await dogrudan(env, key, kaynak, meta) : await parcali(env, key, kaynak, meta);
+  } catch (e1) {
+    if (e1 && e1.imza)
+      return json({ opus: true, ok: false, hata: e1.message, ornek: ust + ' yol=' + yol }, 502);
+    if (yol !== 'dogrudan')
+      return json({ opus: true, ok: false, hata: 'R2 yazilamadi: ' + e1.message, ornek: ust + ' yol=' + yol }, 502);
+    try { await kaynak.body.cancel(); } catch (e) { /* kilitliyse zararsız */ }
+    try {
+      const t = await indir(env, jobId);
+      if (t.yonlendirme) throw new Error('yonlendirme reddedildi: ' + t.yonlendirme);
+      if (!t.yanit.ok || !t.yanit.body) throw new Error('Upload-Post ' + t.yanit.status);
+      ust += ' | tekrar ' + ustBilgi(t.yanit);
+      const red2 = await kapidanGecir(t.yanit);
+      if (red2) throw new Error(red2.hata);
+      yol = 'dogrudan>parcali';
+      boyut = await parcali(env, key, t.yanit, meta);
+    } catch (e2) {
+      return json({ opus: true, ok: false, hata: 'R2 yazilamadi: ' + e1.message + ' | tekrar: ' + e2.message, ornek: ust + ' yol=' + yol }, 502);
     }
-  } catch (e) {
-    return json({ opus: true, ok: false, hata: 'R2 yazilamadi: ' + e.message, uzunluk, akis: uzunluk > 0 }, 502);
   }
 
   // İçerik akış hâlinde geldiği için boyut ancak YAZDIKTAN sonra kesinleşiyor.
@@ -300,10 +408,13 @@ async function al(istek, env, u) {
       opus: true, ok: false,
       hata: 'gelen icerik cok kucuk (' + boyut + ' bayt, esik ' + ASGARI_BAYT + ') — video degil, R2den silindi',
       boyut,
+      ornek: ust + ' yol=' + yol,
     });
   }
 
-  return json({ opus: true, ok: true, url: link, boyut });
+  // yol + ust başarıda da dönüyor: n8n 'Çerçeve Arşivle' çıktısında Upload-Post'un
+  // hangi biçimde yolladığı (chunked/gzip/düz) ilk gerçek koşuda görülsün.
+  return json({ opus: true, ok: true, url: link, boyut, yol, ust });
 }
 
 async function sun(key, env, istek) {
@@ -320,6 +431,8 @@ async function sun(key, env, istek) {
   nesne.writeHttpMetadata(h);
   h.set('etag', nesne.httpEtag);
   h.set('accept-ranges', 'bytes');
+  // Tarayıcı içerik tipini "tahmin" edip bir dosyayı HTML gibi çalıştırmasın.
+  h.set('x-content-type-options', 'nosniff');
 
   if (istek.method === 'HEAD') {
     h.set('content-length', String(nesne.size));

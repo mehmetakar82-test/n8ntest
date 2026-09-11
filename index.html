@@ -2621,7 +2621,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.09.10-96';
+const PANEL_YAPI = 'y2026.09.11-97';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -12933,7 +12933,21 @@ const CER = { p:{}, aktif:false, urlModu:'', ghRepo:'mehmetakar82-test/n8ntest',
 // Worker'ın BEKLENEN sürüm damgası (arsiv-worker/worker.js SURUM ile aynı). /saglik eski
 // sürümde de "hazır" der; canlı kod repodakinden geriyse (Save'e basılıp Deploy'a
 // basılmamış) teşhis alanları (ornek/boyut) hiç gelmez — 10 Eylül 2026'da yaşandı.
-const CER_WORKER_SURUM = 'w2026.09.10-3';
+const CER_WORKER_SURUM = 'w2026.09.11-4';
+// Çerçeve sayfası açılınca /saglik'tan OTOMATİK okunur (sırsız, yan etkisiz). Eskiden
+// sürüm yalnız "Worker'ı Sına"ya basılınca kontrol ediliyordu — basılmayınca eski
+// Worker günlerce canlı kaldı ve iki ayrı arıza ("401", "known length") onun yüzünden
+// yaşandı (11 Eyl 2026). undefined = ölçülmedi, '' = damgasız (7 Eyl öncesi kod).
+let cerWorkerCanli;
+async function cerWorkerSurumOku(){
+  if (!cerArsivVar()) return;
+  try{
+    const r = await fetch(String(CER.arsivUrl).trim().replace(/\/+$/,'') + '/saglik', { cache:'no-store' });
+    const j = await r.json().catch(()=>({}));
+    cerWorkerCanli = (r.ok && j.opus === true) ? String(j.surum || '') : undefined;
+  }catch(e){ cerWorkerCanli = undefined; }   // ağ hatası: bilinmiyor say, yanlış alarm verme
+  cerDurumSerit();
+}
 
 // ── ARŞİV KÖPRÜSÜ: çerçevenin çalışmasının TEK yolu ────────────────────
 // Upload-Post'un FFmpeg çıktısı yalnız `Authorization: Apikey` başlığıyla
@@ -13104,6 +13118,7 @@ async function initCerceve(){
   cerFontYukle();
   cerProfilleriYukle();
   if (S.cfg.blot) cerKota();
+  cerWorkerSurumOku();
 }
 
 function cerGhKaydet(){
@@ -13305,6 +13320,12 @@ function cerDurumSerit(){
     parcalar.push(kutu('var(--er)','🔴','<b>n8n ESKİ workflow koduyla cevap verdi</b> — yanıtta <code>arsiv</code> alanı yok. '
       + 'Güncel JSON import edilmemiş ya da eski kopya hâlâ aktif (aynı webhook yolu). Workflow listesinde '
       + 'tek OPUSPRO kalsın, sonra <b>⇪ Şimdi Gönder</b>.'));
+  // WORKER SÜRÜMÜ — ayrı kutu (n8n teyidinden bağımsız; ikisi aynı anda bozuk olabilir).
+  if (cerArsivVar() && cerWorkerCanli !== undefined && cerWorkerCanli !== CER_WORKER_SURUM)
+    parcalar.push(kutu('var(--er)','🔴','<b>Cloudflare Worker ESKİ SÜRÜM</b> — canlı: <code>' + esc(cerWorkerCanli || 'damgasız') + '</code>, '
+      + 'beklenen: <code>' + esc(CER_WORKER_SURUM) + '</code>. Çerçeveli videolar R2\'ye yazılamayabilir. '
+      + 'Cloudflare → Workers → opus-arsiv → <b>Edit code</b> → repodaki <code>arsiv-worker/worker.js</code>\'i '
+      + 'tamamen yapıştır → <b>Deploy</b> (Save değil) → bu sayfayı yenile.'));
   if (bannersiz.length){
     // KÖK ENGEL ÖNCE: token yoksa 15 profili tek tek denemek boşuna —
     // hepsi "GitHub token gerekli" ile düşer (yaşandı).
@@ -13946,6 +13967,7 @@ async function cerArsivSina(){
     if (!r.ok || j.opus !== true) throw new Error('HTTP '+r.status+' — adres bir OPUS arşiv Worker\'ı değil');
     // SÜRÜM KAPISI: canlı kod repodakinden eskiyse "hazır" demek yanıltır — eski sürüm
     // indirme hatasında ornek/boyut döndürmez, n8n'deki teşhis kör kalır.
+    cerWorkerCanli = String(j.surum || '');   // şerit de aynı ölçümü göstersin
     if (j.surum !== CER_WORKER_SURUM)
       throw new Error('Worker ayakta ama ESKİ SÜRÜM (canlı: ' + (j.surum || 'damgasız') + ', beklenen: ' + CER_WORKER_SURUM
         + ') — Cloudflare → Workers → opus-arsiv → Edit code → repodaki arsiv-worker/worker.js\'i yapıştır → DEPLOY (Save değil)');
@@ -13973,7 +13995,8 @@ async function cerArsivSina(){
          + (ol.ortalamaMb ? ' (ort. ' + ol.ortalamaMb + ' MB)' : '') + ay + ucret
          + (ol.kirpik ? ' · <span style="color:var(--wn)">sayım 50.000\'de kırpıldı</span>' : '');
     }
-    cerArsivYaz('<span style="color:var(--ok)">✓ Worker hazır (UP_KEY · OPUS_KEY · R2 tamam)</span>' + ek);
+    cerArsivYaz('<span style="color:var(--ok)">✓ Worker hazır (' + esc0(j.surum) + ' · UP_KEY · OPUS_KEY · R2 tamam)</span>' + ek);
+    cerDurumSerit();
     addLog('ok','cerceve','Arşiv Worker sınandı: hazır' + (ol ? ' — '+ol.adet+' video / '+ol.gb+' GB' : ''));
   }catch(e){
     // Ağ hatası ile yanlış adres ayırt edilemiyor (CORS/DNS ikisi de TypeError).
@@ -13981,6 +14004,7 @@ async function cerArsivSina(){
     cerArsivYaz('<span style="color:var(--er)">✗ '
       + esc0(ag ? 'Ulaşılamadı — adres yanlış olabilir ya da Worker deploy edilmemiş' : e.message) + '</span>');
     addLog('err','cerceve','Arşiv Worker sınaması başarısız: '+e.message);
+    cerDurumSerit();   // ESKİ SÜRÜM ise şeritteki kırmızı kutu da hemen çıksın
   }
 }
 async function cerGhTest(){
