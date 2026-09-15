@@ -2447,7 +2447,8 @@ function getCats(){ return Object.keys(S.cats).length ? S.cats : DEFAULT_CATS; }
 
 // ── Kategori ↔ Upload-Post profil eşlemesi ──────────────────
 // n8n "Clips Parse Et" node'undaki KATEGORI_PROFIL_POOL ile BİREBİR aynı olmalı.
-// Short üretilirken kategori bu havuzdan en az yüklü profile yönlendirilir.
+// Short üretilirken kategori bu havuzdan PLANI EN ERKEN BİTEN profile yönlendirilir
+// (eşitlikte en az yüklü, sonra sırayla; bağlı platformu olmayan profil aday olmaz).
 const KATEGORI_PROFIL_POOL = {
   genel:    ['General-1','genel-2-tr','genel-3-tr','genel-4-tr'],
   genel_en: ['genel-1-en','genel-2-en'],
@@ -2621,7 +2622,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.09.12-98';
+const PANEL_YAPI = 'y2026.09.15-99';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -3023,7 +3024,8 @@ function kuyrukCiz(satir){
   const el = document.getElementById('kuyruk-list'); if (!el) return;
   const stEl = document.getElementById('kuyruk-durum');
   const esc = esc0;
-  const gunFark = t => t ? Math.max(0, Math.round((t-Date.now())/864e5)) : 0;
+  // Zil bildirimiyle AYNI gün hesabı ve AYNI eşik (planGunu + STOK_GUN_ESIK).
+  const gunFark = t => planGunu(t) || 0;
   // Sıra = aciliyet: BOŞ olanlar en üstte, sonra tarihi en yakın olanlar,
   // tarihi bilinmeyenler onların ardından.
   // NOT: eskiden bir de "okunamadı" (s.hata) dalı vardı — profil başına
@@ -3036,14 +3038,14 @@ function kuyrukCiz(satir){
     return (a.son||0) - (b.son||0);
   });
   const bos = satir.filter(s=>!s.dolu).length;
-  const azalan = satir.filter(s=>s.dolu && gunFark(s.son) < 2).length;
+  const azalan = satir.filter(s=>s.dolu && gunFark(s.son) < STOK_GUN_ESIK).length;
   if (stEl) stEl.textContent = bos ? (bos+' profilin kuyruğu BOŞ')
-    : (azalan ? (azalan+' profilde 2 günden az kaldı') : 'tümü dolu ✓');
+    : (azalan ? (azalan+' profilde '+STOK_GUN_ESIK+' günden az kaldı') : 'tümü dolu ✓');
   el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px">'
     + satir.map(s=>{
         const g = gunFark(s.son);
-        const col = !s.dolu ? 'var(--er)' : (g < 2 ? 'var(--wn)' : 'var(--ok)');
-        const deger = !s.dolu ? 'BOŞ' : (!s.son ? 'tarih yok' : (g === 0 ? 'bugün biter' : g+' gün'));
+        const col = !s.dolu ? 'var(--er)' : (g < STOK_GUN_ESIK ? 'var(--wn)' : 'var(--ok)');
+        const deger = !s.dolu ? 'BOŞ' : (!s.son ? 'tarih yok' : (g === 0 ? '24 sa içinde' : g+' gün'));
         const alt = !s.dolu ? 'kuyrukta hiç gönderi yok'
           : s.dolu+' gönderi'
             + (s.son ? ' · son: '+new Date(s.son).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'}) : '')
@@ -3192,7 +3194,7 @@ async function sendSingle() {
   }).join(' · ');
   showRes('sv-res', (s.belirsiz ? '⚠ ' : '✓ ')
     + (direkt ? 'Direkt yayın başlatıldı' : 'n8n\'e gönderildi') + ' ['+katAd+']'
-    + (selCats.length>1 ? ' — '+selCats.length+' kategori: '+havuzlar+' (her havuzdan en az yüklü profil seçilir)' : '')
+    + (selCats.length>1 ? ' — '+selCats.length+' kategori: '+havuzlar+' (her havuzdan planı en erken biten profil seçilir)' : '')
     + (s.belirsiz ? ' — ama ' + s.mesaj : ''), s.belirsiz ? 'warn' : 'ok');
   recordSend(url, selCats.join(','));
   addLog(s.belirsiz?'warn':'ok','webhook',(direkt?'Direkt yayın':'Video gonderildi')+' ['+katAd+']'+(s.belirsiz?' (belirsiz: '+s.mesaj+')':''));
@@ -12544,7 +12546,7 @@ async function opcSendSelected() {
     // seçilse bile KOPYA sayılıp uyarı çıkıyordu. Oysa farklı profile
     // yayınlamak kopya değil — kullanıcının asıl yapmak istediği şey.
     // Hedef havuz: seçilen kategorilerin profil havuzlarının birleşimi
-    // (n8n hangisini seçeceğini round-robin ile belirler, panel bilemez;
+    // (n8n hangisini seçeceğini plan ufku, yük ve sıra ile belirler, panel bilemez;
     // bu yüzden HAVUZ ile karşılaştırıyoruz).
     const opcDil = getSelLang('opc-cats');
     const hedefHavuz = new Set();
@@ -16309,7 +16311,22 @@ const STOK_ESIK_VARSAYILAN = 50;
 // son: profil başına EN GEÇ planlanmış tarih (ms) — "kuyruk ne zamana kadar
 // yetiyor" sorusunun cevabı. Upload-Post 1 yıla kadar planlamaya izin verir
 // (scheduled_date "within 1 year"), yani ufuk API sınırı değil KUYRUK DERİNLİĞİ.
-const STOK = { data:null, t:0, yukleniyor:false };
+const STOK = { data:null, son:{}, t:0, yukleniyor:false };
+// GÜN EŞİĞİ (15 Eyl 2026): adet eşiği (varsayılan 50) planın NE ZAMAN biteceğini
+// söylemiyordu — General-1'in planı 3 Eylül'de bitti ve 12 gün boş kaldı. Artık
+// planı bu kadar günden kısa kalan profil ayrıca uyarılır; bildirim metni günü söyler.
+const STOK_GUN_ESIK = 3;
+// TEK GÜN HESABI: Kuyruk Derinliği kartı ile zil bildirimi AYNI profil için farklı
+// gün (round/floor) ve farklı eşik (2/3) gösteriyordu. İkisi de bunu kullanır.
+// 24 saatlik dilim sayar (takvim günü değil): 0 = "24 saat içinde bitiyor".
+function planGunu(t){ return t ? Math.max(0, Math.floor((t - Date.now()) / 864e5)) : null; }
+function stokGun(p){ return planGunu(STOK.son && STOK.son[p]); }
+function stokGunMetni(x){
+  if (!x.n) return 'plan bitti';
+  if (x.gun == null) return 'bitiş tarihi bilinmiyor';
+  if (x.gun < 1) return 'plan 24 saat içinde bitiyor';
+  return 'plan ' + x.gun + ' gün sonra bitiyor';
+}
 function stokEsik(){
   const n = parseInt((S.cfg||{}).stokEsik);
   return (isNaN(n) || n < 0) ? STOK_ESIK_VARSAYILAN : n;
@@ -16319,12 +16336,17 @@ async function stokVeri(zorla){
   if (!zorla && STOK.data && Date.now()-STOK.t < 5*60000) return STOK.data;
   if (STOK.yukleniyor) return STOK.data;
   STOK.yukleniyor = true;
+  // Adetle birlikte profil başına EN GEÇ planlı tarihi de topla (STOK.son).
+  let son = {};
   const say = arr => {
-    const by = {};
+    const by = {}, sn = {};
     (arr||[]).forEach(s=>{
       const p=String(s.profile_username||s.profile||s.user||'').trim(); if(!p) return;
       by[p]=(by[p]||0)+1;
+      const t = Date.parse(s.scheduled_date||s.scheduledDate||s.scheduled_at||s.date||'') || 0;
+      if (t > (sn[p]||0)) sn[p] = t;
     });
+    son = sn;
     return by;
   };
   try{
@@ -16332,15 +16354,20 @@ async function stokVeri(zorla){
     if (S.cfg.blot){
       try{
         const {data} = await upFetch('/uploadposts/schedule');
-        const arr = Array.isArray(data)?data:(data.scheduled_posts||data.scheduled||data.jobs||data.data||data.results||data.posts||data.schedules||[]);
-        by = say(arr);
+        // Yanıt TANINAN bir biçimdeyse (boş liste dahil) okuma BAŞARILI sayılır.
+        // Eskiden boş sonuç "okunamadı" gibi atılıyordu: BÜTÜN kuyruklar bitince
+        // (en kötü durum) STOK güncellenmiyor ve hiç uyarı çıkmıyordu.
+        const ANAHTAR = ['scheduled_posts','scheduled','jobs','data','results','posts','schedules'];
+        const k = data && !Array.isArray(data) ? ANAHTAR.find(a => Array.isArray(data[a])) : null;
+        if (Array.isArray(data) || k) by = say(Array.isArray(data) ? data : data[k]);
+        else console.warn('[Stok] /schedule yanıtı tanınmadı — uyarı üretilmedi');
       }catch(e){ console.warn('[Stok] Upload-Post alınamadı:', e.message); }
     }
-    if ((!by || !Object.keys(by).length) && getN8N()){
-      try{ const d = await n8nGetCached('/webhook/panel-data'); if (d && !d._bos) by = say(d.scheduled||[]); }
+    if (!by && getN8N()){
+      try{ const d = await n8nGetCached('/webhook/panel-data'); if (d && !d._bos && Array.isArray(d.scheduled)) by = say(d.scheduled); }
       catch(e){ console.warn('[Stok] panel-data alınamadı:', e.message); }
     }
-    if (by && Object.keys(by).length){ STOK.data = by; STOK.t = Date.now(); }
+    if (by){ STOK.data = by; STOK.son = son; STOK.t = Date.now(); }
   }catch(e){ console.warn('[Stok]', e.message); }
   STOK.yukleniyor = false;
   return STOK.data;
@@ -16349,13 +16376,18 @@ async function stokVeri(zorla){
 function stokDusukler(upBy){
   const esik = stokEsik(), out = [];
   if (!upBy) return out;
+  // Sıralama ÖNCE GÜNE göre (en erken biten en üstte), sonra adede. Tarihi
+  // bilinmeyen (null) profiller günü bilinenlerin ardından gelir.
+  const gunSira = x => (x.n === 0 ? -1 : (x.gun == null ? 9999 : x.gun));
   Object.keys(KATEGORI_PROFIL_POOL).forEach(k=>{
-    const profiller = KATEGORI_PROFIL_POOL[k].map(p=>({ p, n: parseInt(upBy[p]||0) }));
-    const dusuk = profiller.filter(x=>x.n < esik).sort((a,b)=>a.n-b.n);
+    const profiller = KATEGORI_PROFIL_POOL[k].map(p=>{ const n = parseInt(upBy[p]||0); return { p, n, gun: n ? stokGun(p) : 0 }; });
+    const dusuk = profiller.filter(x=>x.n < esik || (x.gun != null && x.gun < STOK_GUN_ESIK))
+      .sort((a,b)=>(gunSira(a)-gunSira(b)) || (a.n-b.n));
     if (dusuk.length) out.push({ kat:k, label:katLabel(k), profiller, dusuk,
-      toplam: profiller.reduce((s,x)=>s+x.n,0), enAz: dusuk[0].n });
+      toplam: profiller.reduce((s,x)=>s+x.n,0), enAz: Math.min.apply(null, dusuk.map(x=>x.n)),
+      enErkenGun: Math.min.apply(null, dusuk.map(gunSira)) });
   });
-  return out.sort((a,b)=>a.enAz-b.enAz);
+  return out.sort((a,b)=>(a.enErkenGun-b.enErkenGun) || (a.enAz-b.enAz));
 }
 // Kategori chip'lerini stok durumuna gore isaretle.
 // 'genel' ve 'genel_en' AYRI havuzlar: kategori chip'i 'genel'i gosterir,
@@ -16378,15 +16410,18 @@ function stokChipIsaretle(){
     temizle(chip);
     const g = durum[havuz];
     if (!g) return;
-    const krit = g.enAz === 0;
+    // Seviye zil bildirimiyle AYNI ölçüt: plan bitti ya da 24 saat içinde bitiyor.
+    // Rozette en erken bitişin günü (varsa), yoksa en az adet.
+    const krit = g.dusuk.some(x => x.n === 0 || (x.gun != null && x.gun < 1));
     chip.classList.add(krit ? 'stok-krit' : 'stok-az');
     const rozet = document.createElement('span');
     rozet.className = 'cs-n';
-    rozet.textContent = g.enAz;
+    const gunlu = g.dusuk.filter(x => x.n > 0 && x.gun != null);
+    rozet.textContent = krit ? '0' : (gunlu.length ? Math.min.apply(null, gunlu.map(x => x.gun)) + 'g' : g.enAz);
     chip.appendChild(rozet);
-    chip.title = (krit ? 'Kuyruk bitti — bu kategoriye içerik gönder' : 'Kuyruk azalıyor')
-      + ' (eşik ' + esik + ')\n'
-      + g.dusuk.map(x=>'• '+x.p+': '+x.n+' zamanlanmış').join('\n')
+    chip.title = (krit ? 'Plan bitti ya da 24 saat içinde bitiyor — bu kategoriye içerik gönder' : 'Plan azalıyor')
+      + ' (eşik ' + esik + ' short / ' + STOK_GUN_ESIK + ' gün)\n'
+      + g.dusuk.map(x=>'• '+x.p+': '+x.n+' zamanlanmış · '+stokGunMetni(x)).join('\n')
       + '\nBu kategoride ' + g.profiller.length + ' profil var, toplam ' + g.toplam + ' zamanlanmış.';
     chip.dataset.stokTip = '1';
   };
@@ -16397,6 +16432,36 @@ function stokChipIsaretle(){
     isle(c, c.dataset.lang === 'en' ? 'genel_en' : 'genel'));
 }
 window.stokChipIsaretle = stokChipIsaretle;
+// Stok / plan bitişi bildirimleri. id'ye seviye eklenir (az/krit) → kritiğe
+// düşünce yeniden uyarır. Artık geçerli olmayan stok bildirimleri silinir, hâlâ
+// geçerli olanlar YERİNDE güncellenir (15 dk'lık turda her seferinde en üste
+// fırlayıp "yeni" görünmesinler).
+async function stokBildir(){
+  try{
+    const upBy = await stokVeri();
+    if (!upBy) return;
+    const esik = stokEsik(), gruplar = stokDusukler(upBy);
+    const yeni = [];
+    gruplar.forEach(g=>g.dusuk.forEach(x=>{
+      const krit = x.n === 0 || (x.gun != null && x.gun < 1);
+      yeni.push({ id:'stok-'+x.p+'-'+(krit?'krit':'az'), krit, g, x });
+    }));
+    const idler = new Set(yeni.map(y=>y.id));
+    // Düzelen profilin bildirimi silinirken "görüldü" işareti de silinmeli: aynı
+    // profil aynı seviyeye TEKRAR düşerse (plan bitti → doldu → yine bitti) rozet
+    // yeniden yansın. Yoksa id sabit olduğu için ikinci sefer SESSİZ gelirdi.
+    NOTIF.items.forEach(it=>{ const id = String(it.id); if (id.startsWith('stok-') && !idler.has(id)) NOTIF.seen.delete(id); });
+    NOTIF.items = NOTIF.items.filter(it=>!String(it.id).startsWith('stok-') || idler.has(it.id));
+    yeni.forEach(({id, krit, g, x})=>{
+      const sonT = STOK.son && STOK.son[x.p];
+      notifEkle(id, krit?'🛑':'🟡',
+        katLabel(g.kat)+' · '+x.p+' — '+stokGunMetni(x)+(x.n ? ' ('+x.n+' short)' : ''),
+        (sonT ? 'Son planlı: '+new Date(sonT).toLocaleDateString('tr-TR',{day:'2-digit',month:'short'})+' · ' : '')
+          + 'bu kategoriye yeni video gönder · eşik '+esik+' short / '+STOK_GUN_ESIK+' gün', 'video');
+    });
+    stokChipIsaretle();
+  }catch(e){ console.warn('[Stok/NOTIF]', e.message); }
+}
 // Şeridi tazele (sayfa açılışında ve veri yenilendiğinde)
 async function stokTazele(zorla){
   await stokVeri(zorla);
@@ -16482,25 +16547,14 @@ async function notifCheck(derin){
           const bad=Object.values(phCompute(raw,sp)).filter(h=>h.status!=='live').length;
           if(bad>0) notifEkle('health','🔴',bad+' profilde bağlantı sorunu','Süresi dolmuş veya hesapsız profil','platformlar'); else notifSil('health');
         }catch(e){}
-        // Stok: eşiğin altına inen her profil için ayrı bildirim.
-        // id'ye seviye eklenir (az/krit) → 0'a düşünce yeniden uyarır, yoksa susar.
-        try{
-          const upBy=await stokVeri();
-          if(upBy){
-            const esik=stokEsik(), gruplar=stokDusukler(upBy);
-            NOTIF.items=NOTIF.items.filter(x=>!String(x.id).startsWith('stok-'));
-            gruplar.forEach(g=>g.dusuk.forEach(x=>{
-              const krit=x.n===0;
-              notifEkle('stok-'+x.p+'-'+(krit?'krit':'az'), krit?'🛑':'🟡',
-                katLabel(g.kat)+' · '+x.p+(krit?' — zamanlanmış short kalmadı':' — '+x.n+' zamanlanmış short kaldı'),
-                'Eşik '+esik+' · bu profile yeni short gönder', 'video');
-            }));
-            stokChipIsaretle();
-          }
-        }catch(e){ console.warn('[Stok/NOTIF]', e.message); }
+        await stokBildir();
         if(Date.now()-NOTIF.lastViral>3*3600000){ NOTIF.lastViral=Date.now(); await notifViralTara(items); }
       }catch(e){}
     }
+    // Plan bitişi uyarısı DERİN TARAMAYI BEKLEMESİN: derin tarama yalnız panel
+    // açılışında ve zil açılınca koşuyor; panel açık kalırken 15 dk'lık turda da
+    // güncellensin (stokVeri 5 dk önbellekli, tek /schedule isteği).
+    else if (S.cfg.blot || getN8N()) await stokBildir();
   }catch(e){ console.warn('[NOTIF]',e.message); }
   notifKaydet(); notifRender(); NOTIF.checking=false;
 }
