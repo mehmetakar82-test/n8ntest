@@ -934,7 +934,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
           <button class="btn bg bsm" onclick="vpFetchDuration()">⏱ Süreyi Getir</button>
           <span id="vp-dur-display" style="font-size:13px;color:var(--acc);margin-left:8px"></span>
         </div>
-        <div class="fg"><label>Parça Uzunluğu (sn)</label><input id="vp-seglen" type="number" value="120" min="10"/></div>
+        <div class="fg"><label>Parça Uzunluğu (sn) <span style="color:var(--mt)" title="n8n her parçadan en fazla parça+5 sn'lik klip istiyor; YouTube Shorts 3 dakikayla (180 sn) sınırlı. 170 üstü parça Shorts sayılmayan klip üretebilir.">(10–170)</span></label><input id="vp-seglen" type="number" value="120" min="10" max="170"/></div>
         <div class="fg"><label>Parçalar Arası Örtüşme (sn) <span style="color:var(--mt)">(isteğe bağlı)</span></label><input id="vp-overlap" type="number" value="5" min="0"/></div>
         <div class="fg"><button class="btn bp bsm" onclick="vpComputeSegments()">▤ Parçaları Hesapla</button></div>
         <div class="fg"><label>Kategori</label><div class="cat-chips" id="vp-cats"></div></div>
@@ -1686,7 +1686,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div id="rd-res" class="res"></div>
 
   <div class="card">
-    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— müzik ve 15 dk altı hariç</span></span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>🔥 Bugün Trend <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)" title="YouTube 21 Temmuz 2025'ten beri mostPopular listesini Trending sayfası yerine Müzik, Film ve Oyun listelerinden dolduruyor (YouTube Data API revizyon geçmişi). Bu yüzden bölüm genel gündemi değil bu üç listeyi yansıtır.">— müzik ve 15 dk altı hariç · kaynak: YouTube Müzik/Film/Oyun listeleri ⓘ</span></span><span id="rd-trend-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-trend" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card" style="border-color:rgba(52,211,153,.3)">
@@ -2622,7 +2622,7 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
 // "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.09.15-99';
+const PANEL_YAPI = 'y2026.09.16-100';
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
@@ -4503,12 +4503,41 @@ const RAP_TOP_ADET = 20;           // gösterilen sıra sayısı
 // beklemek gerekmez.
 const RAP_TOP_METRIK_ANAHTAR = 'op_top_metrik';
 const RAP_TOP_METRIK_TTL = 7*864e5;   // 7 gün sonra tazelenir (izlenme artar)
-const RAP_TOP_TUR_BUTCE = 400;        // tur başına YENİ ölçüm (Upload-Post)
+// Tur başına YENİ ölçüm (Upload-Post). 400'dü: belge canlı post-analytics
+// uçlarını 5 dakikada 100 istekle sınırlıyor (docs.upload-post.com/api/get-analytics).
+// 100'ü aşan istekler 429 alıp "hatalı" sayılıyordu — tur fiilen ~100 ölçüyordu.
+// Artık tek tur tek pencereye sığar; kalanlar "Kalanları tara" ile sürer.
+const RAP_TOP_TUR_BUTCE = 90;
 function ttMetrikOku(){
   try { const o = JSON.parse(localStorage.getItem(RAP_TOP_METRIK_ANAHTAR)||'{}'); return (o&&typeof o==='object'&&!Array.isArray(o))?o:{}; }
   catch(e){ return {}; }
 }
+// Birleştirerek yaz: diski TAZE oku, yerel ölçümü yalnız daha yeniyse (t) üstüne koy.
+// Kör tam-üzerine-yazma, aynı anda koşan öteki turun (klip serisi / rapTop /
+// YouTube) ölçümlerini siliyordu — yalnız klipSeriOtoTur birleştiriyordu.
+function ttMetrikBirlestirYaz(yerel){
+  const disk = ttMetrikOku();
+  Object.keys(yerel || {}).forEach(function(k){
+    const y = yerel[k], e = disk[k];
+    if (!y) return;
+    if (e && e.t && !(y.t && y.t >= e.t)) return;          // diskteki daha yeni
+    // Diskteki TAZE ve SAĞLAM değeri yeni bir null EZMESİN: eşzamanlı öteki tur
+    // aynı gönderiyi ölçüp değer yazmış olabilir, null ise çoğu zaman geçici hata.
+    // (Kural yerel kopyada değil burada: yerelde uygulanınca bayat kaydın damgası
+    // hiç tazelenmiyor ve En Çok İzlenen turu aynı gönderileri döngüyle soruyordu.)
+    if (y.v == null && e && e.v != null && ttKayitTaze(k, e)) return;
+    disk[k] = y;
+  });
+  ttMetrikYaz(disk);
+}
 function ttMetrikYaz(o){
+  // BUDAMA: 2×TTL'den (14 gün) eski kayıtlar hiçbir okuyucuda kullanılmıyor
+  // (üç okuyucu da ttTaze ister) ama anahtar proaktif budanmadığı için sınırsız
+  // büyüyor, localStorage kotasını öteki depolarla paylaşıyordu.
+  try {
+    const sinir = Date.now() - 2 * RAP_TOP_METRIK_TTL;
+    Object.keys(o).forEach(function(k){ const x = o[k]; if (!x || !x.t || x.t < sinir) delete o[k]; });
+  } catch(e){}
   try { localStorage.setItem(RAP_TOP_METRIK_ANAHTAR, JSON.stringify(o)); }
   catch(e){
     // Kota dolduysa en eski yarıyı at, bir kez daha dene — sessizce
@@ -4521,6 +4550,19 @@ function ttMetrikYaz(o){
   }
 }
 function ttTaze(kayit){ return kayit && kayit.t && (Date.now()-kayit.t) < RAP_TOP_METRIK_TTL; }
+// KAYIT SÜRÜMÜ (16 Eyl 2026): eski ayrıştırıcı gönderi metriği gelmeyince HESAP
+// toplamını izlenme diye önbelleğe yazabiliyordu. Hangi kaydın kirli olduğu ayırt
+// edilemez; bu yüzden yeni ayrıştırıcının yazdığı Upload-Post kayıtları s:2 taşır
+// ve s:2 taşımayan kayıt TAZE SAYILMAZ (yeniden ölçülür, 14 günde budanır).
+// Tek seferlik silme yerine damga: eski kodla açık kalmış bir sekmenin, eski bir
+// yedeğin ya da uçuştaki bir turun birleştirerek geri yazdığı kirli kayıt da
+// kendiliğinden etkisiz kalır. 'yt:' kayıtları YouTube Data API'den gelir, o
+// ayrıştırıcıdan hiç geçmedi — damga istemez.
+const TT_KAYIT_SURUM = 2;
+function ttKayitTaze(anahtar, kayit){
+  if (!ttTaze(kayit)) return false;
+  return String(anahtar||'').indexOf('yt:') === 0 || kayit.s === TT_KAYIT_SURUM;
+}
 
 // ── KLIP BAZLI KALICI IZLENME SERISI (izlenme arastirmasi 2026-08) ─────────
 // op_top_metrik TTL'li ve GECICI: 7 gunde ucup gidiyor, tarih serisi yok.
@@ -4533,9 +4575,11 @@ const KLIP_SERI_ANAHTAR = 'op_klip_seri';
 const KLIP_SERI_OTO_ANAHTAR = 'op_klip_seri_oto';
 const KLIP_SERI_MAX_ANAHTAR = 1200, KLIP_SERI_MAX_NOKTA = 24, KLIP_SERI_ESKI_GUN = 120;
 let KLIP_SERI_BUF = {}, KLIP_SERI_TID = null;
-function klipSeriEkle(anahtar, izlenme){
+// gun (isteğe bağlı): ölçümün YAPILDIĞI gün. Verilmezse bugün. Önbellekten gelen
+// eski bir değer bugünün noktası diye yazılırsa seride sahte, düz noktalar oluşur.
+function klipSeriEkle(anahtar, izlenme, gun){
   if (!anahtar || izlenme == null || !isFinite(izlenme)) return;
-  KLIP_SERI_BUF[anahtar] = Math.round(izlenme);
+  KLIP_SERI_BUF[anahtar] = { v: Math.round(izlenme), g: (gun != null && isFinite(gun)) ? Math.floor(gun) : null };
   if (!KLIP_SERI_TID) KLIP_SERI_TID = setTimeout(klipSeriFlush, 4000);
 }
 function klipSeriFlush(){
@@ -4550,8 +4594,16 @@ function klipSeriFlush(){
   const gun = Math.floor(Date.now() / 864e5);
   for (const k of adlar){
     const d = Array.isArray(disk[k]) ? disk[k] : [];
-    if (d.length && d[d.length-1][0] === gun) d[d.length-1][1] = buf[k];
-    else d.push([gun, buf[k]]);
+    const b = buf[k];
+    const g = (b && b.g != null) ? b.g : gun;
+    const v = (b && typeof b === 'object') ? b.v : b;
+    const i = d.findIndex(function(n){ return n && n[0] === g; });
+    if (i >= 0) d[i][1] = v;
+    else {
+      d.push([g, v]);
+      // geçmiş günlü nokta araya girebilir — seri gün sırasında kalmalı
+      if (d.length > 1 && d[d.length-2][0] > g) d.sort(function(x, y){ return x[0] - y[0]; });
+    }
     while (d.length > KLIP_SERI_MAX_NOKTA) d.shift();
     disk[k] = d;
   }
@@ -4645,50 +4697,67 @@ async function klipSeriOtoTur(){
       if (ga !== gb) return ga - gb;                       // en eski olcum once
       return (Date.parse(rapHistTime(b.h))||0) - (Date.parse(rapHistTime(a.h))||0);
     });
-    const buTur = adaylar.filter(a => {
+    // ONBELLEK AYRIMI BUTCEDEN ONCE: eskiden taze onbellekli gonderiler de 150'lik
+    // butceden pay aliyordu ve (a) eski deger BUGUNUN noktasi diye seriye yaziliyordu,
+    // (b) metrik DONMEYEN (null) gonderi her gun yeniden soruluyordu — metrik
+    // vermeyen bir sinif butcenin tamamini yiyebilirdi.
+    let olculen = 0, hatali = 0, atlanan = 0, nullBekleyen = 0;
+    const _olculecek = [];
+    adaylar.forEach(a => {
+      const _eski = metrikOnb[a.k];
+      if (ttKayitTaze(a.k, _eski)){
+        if (_eski.v != null){
+          // Taze ve saglam: API'ye gitme; seriye OLCUM GUNUYLE yaz (bugunle degil)
+          klipSeriEkle(a.k, _eski.v, Math.floor(_eski.t / 864e5));
+          olculen++; atlanan++; return;
+        }
+        // Null yalniz (a) gonderi olculdugunde >=40 saatlikse ve (b) platform METRIK
+        // dondurup izlenme alani vermediyse (e yok) kalici sayilir — TTL boyunca
+        // tekrar sorulmaz. Genc gonderide metrik henuz olusmamis olabilir; hata
+        // (post_metrics_error: jeton/oran) cogu zaman gecicidir, ertesi gun sorulur.
+        const _yayin = Date.parse(rapHistTime(a.h)) || 0;
+        if (!_eski.e && _yayin && (_eski.t - _yayin) >= 40 * 3600000){ nullBekleyen++; return; }
+      }
+      _olculecek.push(a);
+    });
+    const buTur = _olculecek.filter(a => {
       const s = _serimiz[a.k];
       return !(Array.isArray(s) && s.length && s[s.length-1][0] === _bugun);   // bugun olculeni atla
     }).slice(0, KLIP_SERI_TUR_BUTCE);
-    let olculen = 0, hatali = 0, atlanan = 0;
     await upSirali(buTur, async a => {
-      // ttTaze KONTROLU: onbellekte taze ve SAGLAM bir olcum varsa API'ye
-      // gitme — hem kota harcamaz hem asagidaki null yazimi o degeri EZMEZ.
       const _eski = metrikOnb[a.k];
-      if (ttTaze(_eski) && _eski.v != null){ klipSeriEkle(a.k, _eski.v); olculen++; atlanan++; return; }
       let m = null;
+      const _b1 = {}, _b2 = {};
       try {
         // upFetchRetry: 429'da yeniden dener VE ortak kapiyi kapatir.
         // Duz upFetch kullanmak 150 olcumu sessizce dusuruyordu.
         if (a.h.request_id){
           const { data } = await upFetchRetry('/uploadposts/post-analytics/' + encodeURIComponent(a.h.request_id));
-          m = takParseMetrics(data);
+          m = takParseMetrics(data, a.p, _b1);
         }
         if (!m && a.h.platform_post_id){
-          const { data } = await upFetchRetry('/uploadposts/post-analytics?platform_post_id=' + encodeURIComponent(a.h.platform_post_id)
-            + '&platform=' + encodeURIComponent(a.p));
-          m = takParseMetrics(data);
+          const { data } = await upFetchRetry(upAnalitikPidYol(a.h.platform_post_id, a.p, a.h.profile_username || a.h.user));
+          m = takParseMetrics(data, a.p, _b2);
         }
       } catch(e){ hatali++; return; }
       const izlenme = m ? ((m.views != null) ? m.views : ((m.impressions != null) ? m.impressions : null)) : null;
-      // SAGLAM degeri null ile EZME: olcum bos dondugunde eski gecerli kayit korunur.
-      if (izlenme != null || !(_eski && _eski.v != null)){
-        metrikOnb[a.k] = { v: izlenme, l:(m && m.likes != null) ? m.likes : null,
-                           c:(m && m.comments != null) ? m.comments : null, t: Date.now() };
-      }
+      // Null da yazilir (damga tazelenir, ayni gonderi dongude sorulmaz). Diskteki TAZE
+      // ve saglam bir degeri null'un ezmesini ttMetrikBirlestirYaz engeller. Buraya
+      // gelen _eski zaten taze-saglam degil (yukarida ayrildi).
+      // e:1 = null METRIKSIZLIKTEN degil hatadan/bulunamamaktan geldi (gecici olabilir)
+      const _hataNull = izlenme == null && !m && _b1.durum !== 'metrik' && _b2.durum !== 'metrik';
+      metrikOnb[a.k] = { v: izlenme, l:(m && m.likes != null) ? m.likes : null,
+                         c:(m && m.comments != null) ? m.comments : null, t: Date.now(), s: TT_KAYIT_SURUM };
+      if (_hataNull) metrikOnb[a.k].e = 1;
       if (izlenme != null){ klipSeriEkle(a.k, izlenme); olculen++; }
     }, 2);
-    // KAYIP GUNCELLEME KORUMASI: ttMetrikYaz kor tam-uzerine-yazma yapiyor;
-    // bu tur suresince rapTop da yazmis olabilir. Diski TAZE okuyup birlestir.
-    const _diskSon = ttMetrikOku();
-    Object.keys(metrikOnb).forEach(function(k){
-      const y = metrikOnb[k], e = _diskSon[k];
-      if (!e || !e.t || (y && y.t && y.t >= e.t)) _diskSon[k] = y;   // yeni olcum kazanir
-    });
-    ttMetrikYaz(_diskSon);
+    // KAYIP GUNCELLEME KORUMASI: bu tur suresince rapTop da yazmis olabilir.
+    // Diski TAZE okuyup birlestir (yeni olcum kazanir).
+    ttMetrikBirlestirYaz(metrikOnb);
     klipSeriFlush();
     addLog(hatali ? 'warn' : 'ok', 'sistem', 'Klip serisi günlük turu: ' + olculen + ' ölçüm ('
-      + atlanan + ' önbellekten), ' + hatali + ' hata, ' + Math.max(0, adaylar.length - buTur.length)
-      + ' sonraki tura (' + adaylar.length + ' aday)');
+      + atlanan + ' önbellekten), ' + hatali + ' hata, ' + nullBekleyen + ' metriksiz (7 gün sorulmaz), '
+      + Math.max(0, _olculecek.length - buTur.length) + ' sonraki tura (' + adaylar.length + ' aday)');
   } catch(e){
     // Damgayi GERI SAR: gecici hata 20 saat kaybettirmesin (ciftOto ile ayni kural,
     // orada ~10 dk). Once yazip sonra geri sarmak, tur SURERKEN ikinci sekmenin
@@ -4840,7 +4909,7 @@ async function rapTopUpYukle(p){
     const yeniler = [];
     olculebilir.forEach(h => {
       const k = onbellek[ttAnahtar(h)];
-      if (ttTaze(k)){
+      if (ttKayitTaze(ttAnahtar(h), k)){
         if (k.v == null){ verisiz++; return; }
         liste.push({ baslik: h.post_title||h.title||h.post_caption||'(başlıksız)',
           thumb: h.thumbnail||h.preview_url||'', url: h.post_url||'',
@@ -4855,21 +4924,26 @@ async function rapTopUpYukle(p){
       // Kullanıcı başka platforma geçtiyse KOTA HARCAMA — kalan sayısına
       // eklensin ki "kalan" gerçeği söylesin.
       if (RAP_TOP.plat !== p){ atlanan++; return; }
-      // Ara kayıt: 400 ölçüm uzun sürüyor, sekme kapanırsa emek kaybolmasın.
-      if (bitti % 50 === 0) ttMetrikYaz(onbellek);
-      if (bitti % 10 === 1)
+      // Ara kayıt: ölçüm uzun sürebilir, sekme kapanırsa emek kaybolmasın.
+      // Birleştirerek: aynı anda koşan klip serisi turunun yazdıklarını silmesin.
+      if (bitti % 50 === 0) ttMetrikBirlestirYaz(onbellek);
+      const _bekle = upAnalitikBekleme();
+      if (bitti % 10 === 1 || _bekle > 0)
         el.innerHTML = durumHTML('yukleniyor',{kompakt:true,
-          alt:bitti+'/'+buTur.length+' gönderi ölçülüyor…'+(liste.length?' ('+liste.length+' önbellekten)':'')});
+          alt:bitti+'/'+buTur.length+' gönderi ölçülüyor…'+(liste.length?' ('+liste.length+' önbellekten)':'')
+            + (_bekle > 0 ? ' · Upload-Post hız sınırı (5 dk\'da 100): ~'+Math.ceil(_bekle/1000)+' sn bekleniyor' : '')});
       let m = null;
+      const _b1 = {}, _b2 = {};
       try {
+        // upFetchRetry: 429'da ortak kapıyı kapatıp yeniden dener. Çıplak upFetch
+        // 429 alan her isteği "hatalı" sayıp atıyordu.
         if (h.request_id){
-          const { data } = await upFetch('/uploadposts/post-analytics/' + encodeURIComponent(h.request_id));
-          m = takParseMetrics(data);
+          const { data } = await upFetchRetry('/uploadposts/post-analytics/' + encodeURIComponent(h.request_id));
+          m = takParseMetrics(data, p, _b1);
         }
         if (!m && h.platform_post_id){
-          const { data } = await upFetch('/uploadposts/post-analytics?platform_post_id=' + encodeURIComponent(h.platform_post_id)
-            + '&platform=' + encodeURIComponent(p === 'x' ? 'x' : p));
-          m = takParseMetrics(data);
+          const { data } = await upFetchRetry(upAnalitikPidYol(h.platform_post_id, p, h.profile_username || h.user));
+          m = takParseMetrics(data, p, _b2);
         }
       } catch(e){ hatali++; return; }
       // İzlenme: views yoksa impressions (Takvim modalı ve hesap kartlarıyla
@@ -4877,8 +4951,12 @@ async function rapTopUpYukle(p){
       const izlenme = m ? ((m.views != null) ? m.views : ((m.impressions != null) ? m.impressions : null)) : null;
       // "Metrik yok" da ÖNBELLEĞE yazılır — yoksa her turda aynı boş
       // gönderiler yeniden sorulur ve bütçe onlara harcanır.
+      // Diskteki taze-sağlam bir değeri (eşzamanlı klip serisi turu yazmış olabilir)
+      // bu null'un ezmesini ttMetrikBirlestirYaz engeller. e:1 = null hatadan geldi
+      // (geçici olabilir — klip serisi ertesi gün yeniden sorar). s = kayıt sürümü.
       onbellek[ttAnahtar(h)] = { v: izlenme, l:(m&&m.likes!=null)?m.likes:null,
-                                 c:(m&&m.comments!=null)?m.comments:null, t: Date.now() };
+                                 c:(m&&m.comments!=null)?m.comments:null, t: Date.now(), s: TT_KAYIT_SURUM };
+      if (izlenme == null && !m && _b1.durum !== 'metrik' && _b2.durum !== 'metrik') onbellek[ttAnahtar(h)].e = 1;
       // Manuel tur da kalici seriyi besler — ayni anahtar bicimi, kaynaklar birlesir.
       klipSeriEkle(ttAnahtar(h), izlenme);
       if (izlenme == null){ verisiz++; return; }
@@ -4887,7 +4965,7 @@ async function rapTopUpYukle(p){
         profil: h.profile_username||h.user||'', tarih: String(rapHistTime(h)).slice(0,10),
         views: izlenme, likes: (m.likes!=null)?m.likes:null, comments: (m.comments!=null)?m.comments:null });
     }, 2);
-    ttMetrikYaz(onbellek);          // ölçülenler kalıcı — sonraki tur kaldığı yerden
+    ttMetrikBirlestirYaz(onbellek); // ölçülenler kalıcı — sonraki tur kaldığı yerden
     liste.sort((a,b) => b.views - a.views);
     // Hata varsa kısa TTL — eksik sıralama 10 dk donup kalmasın
     RAP_TOP.onb[p] = { t: Date.now() - (hatali ? RAP_TOP_TTL - 30000 : 0),
@@ -5036,7 +5114,7 @@ async function rapTopYtYukle(){
     }
     // İzlenmesi gizli (null) videolar bilinçli olarak dibe: sıralamanın
     // ölçütü izlenme, ölçüsü olmayan yarışamaz — satırında '—' yazar.
-    ttMetrikYaz(onbellek);          // ölçülenler kalıcı — ikinci açılış anında gelir
+    ttMetrikBirlestirYaz(onbellek); // ölçülenler kalıcı — ikinci açılış anında gelir
     liste.sort((a,b) => ((b.views==null?-1:b.views)) - ((a.views==null?-1:a.views)));
     // Parça hatası varsa KISA TTL: eksik tablo 10 dk donup kalmasın, bir
     // sonraki render yeniden denesin (t geçmişe çekilerek).
@@ -9359,8 +9437,9 @@ function phYayinSorun(a){
          + 'Son başarısız gönderim: '+ne+'\n'+g.sonHata
          + '\n\nSon hatadan sonra bu hesaba başarılı gönderim yapılmamış. '
          + 'İLK BAŞARILI GÖNDERİMDE bu uyarı kendiliğinden kalkar.\n\n'
-         + 'Hesabı yeni bağladıysan: Platformlar → 🔄 Hesap Sıfırlama ile o tarihten '
-         + 'önceki kayıtları sayım dışı bırakabilirsin; uyarı hemen kalkar.',
+         + 'Yerine FARKLI bir hesap bağladıysan: Platformlar → 🔄 Hesap Sıfırlama ile o tarihten '
+         + 'önceki kayıtları sayım dışı bırakabilirsin; uyarı hemen kalkar. Aynı hesabı yeniden '
+         + 'bağladıysan sıfırlama YAPMA (eski yayınlar kopya olarak yeniden gönderilir) — ilk başarılı gönderimi bekle.',
     api: g.sonHata
   };
 }
@@ -9372,11 +9451,11 @@ function platHesapSorun(a){
   const S_ = s => ({kisa:s.k, detay:s.d, api});
   if (a.expired===true || a.is_expired===true || a.token_expired===true)
     return S_({k:'Yetki süresi dolmuş', d:'Erişim jetonu geçersiz. Profil kartındaki 🔗 Bağla düğmesiyle hesabı yeniden bağla. Yeniden bağlanana kadar bu hesaba gönderim başarısız olur.'});
-  if (a.needs_reconnect===true || a.reconnect_required===true)
-    return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post bu hesap için yeniden yetkilendirme istiyor — profil kartındaki 🔗 Bağla düğmesini kullan.'});
+  if (a.reauth_required===true || a.needs_reconnect===true || a.reconnect_required===true)
+    return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post bu hesap için yeniden yetkilendirme istiyor (reauth_required) — profil kartındaki 🔗 Bağla düğmesini kullan. Bilgi oturum başında okunur; bağladıktan sonra Platformlar → Yenile.'});
   const s = String(a.status||a.connection_status||a.state||'').toLowerCase();
   if (/expir/.test(s))      return S_({k:'Yetki süresi dolmuş', d:'Erişim jetonu geçersiz — profil kartındaki 🔗 Bağla ile yeniden bağla.'});
-  if (/reconnect/.test(s))  return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post yeniden yetkilendirme istiyor — 🔗 Bağla düğmesini kullan.'});
+  if (/reconnect|reauth/.test(s))  return S_({k:'Yeniden bağlanması gerekiyor', d:'Upload-Post yeniden yetkilendirme istiyor — 🔗 Bağla düğmesini kullan.'});
   if (/revoked/.test(s))    return S_({k:'Yetki iptal edilmiş', d:'Sosyal medya tarafında uygulama erişimi kaldırılmış. Önce hesap ayarlarından izni geri ver, sonra profil kartındaki 🔗 Bağla ile yeniden bağla.'});
   if (/disconnect/.test(s)) return S_({k:'Bağlantı kopmuş', d:'Hesap Upload-Post ile bağlı görünmüyor.'});
   if (/invalid/.test(s))    return S_({k:'Geçersiz hesap', d:'Upload-Post hesabı geçersiz olarak işaretlemiş.'});
@@ -9743,9 +9822,46 @@ function upKapiKapat(sn, deneme){
   UP_KAPI_KADAR = Math.max(UP_KAPI_KADAR, Date.now() + Math.min(ms, 20000));
 }
 
+// ── CANLI GÖNDERİ ANALİTİĞİ HIZ KOVASI ─────────────────────────────────
+// Belge (docs.upload-post.com/api/get-analytics): canlı post-analytics uçları
+// "limited to 100 requests per 5 minutes". Klip serisi turu (150), En Çok
+// İzlenen turu, viral taraması ve Takvim modalı aynı kovayı tüketiyor; hiçbiri
+// ötekini bilmiyordu. Kayan pencere: 5 dk'da en fazla 95 istek (pay bırakılır).
+// Bellek içi — sekme başına. Ortak 429 kapısından AYRI: analitik beklerken
+// history/schedule/yayın çağrıları durmasın. /cached ucu bu sınıra tabi değil.
+const UP_ANALITIK_PENCERE_MS = 300000, UP_ANALITIK_TAVAN = 95;
+let UP_ANALITIK_DAMGA = [];
+function upAnalitikMi(path){
+  return /^\/uploadposts\/post-analytics(?:[\/?]|$)/.test(String(path||'')) && !/^\/uploadposts\/post-analytics\/cached/.test(String(path||''));
+}
+function upAnalitikBekleme(){
+  const simdi = Date.now();
+  UP_ANALITIK_DAMGA = UP_ANALITIK_DAMGA.filter(t => simdi - t < UP_ANALITIK_PENCERE_MS);
+  return UP_ANALITIK_DAMGA.length < UP_ANALITIK_TAVAN ? 0 : Math.max(0, UP_ANALITIK_PENCERE_MS - (simdi - UP_ANALITIK_DAMGA[0]) + 50);
+}
+async function upAnalitikSira(){
+  for (;;){
+    const k = upAnalitikBekleme();
+    // Kontrol + kayıt aynı eşzamanlı adımda: iki işçi aynı boş yuvayı alamaz
+    if (k === 0){ UP_ANALITIK_DAMGA.push(Date.now()); return; }
+    await new Promise(r => setTimeout(r, Math.min(k, 5000)));
+  }
+}
+// platform_post_id ucu: belge `user` (profile_username) parametresini ZORUNLU sayıyor
+// ("user string Query Yes"). Eskiden hiç gönderilmiyordu → yedek yol çalışamıyordu.
+function upAnalitikPidYol(postId, platform, kullanici){
+  return '/uploadposts/post-analytics?platform_post_id=' + encodeURIComponent(postId)
+    + '&platform=' + encodeURIComponent(platform === 'twitter' ? 'x' : platform)
+    + (kullanici ? '&user=' + encodeURIComponent(kullanici) : '');
+}
+
 async function upFetch(path, opts) {
   opts = opts || {};
   await upKapiBekle();                 // sınır açılana kadar hiç istek atma
+  if (upAnalitikMi(path)){
+    await upAnalitikSira();
+    await upKapiBekle();               // kovada beklerken ortak 429 kapısı kapanmış olabilir
+  }
   if (S.cfg.blot) {
     const init = { headers: { 'Authorization': 'Apikey ' + S.cfg.blot } };
     if (opts.method) init.method = opts.method;
@@ -10502,7 +10618,10 @@ async function yedekN8nBildir(){
     const oy = JSON.parse(localStorage.getItem('op_oto_ayarlar')||'null');
     if (oy){
       const r = await faf(base+'/webhook/oto-yakala-ayarlar', oy);
-      if (r && r.ok) ok++; else { hata++; addLog('warn','webhook','Geri yükleme: Oto Yakala ayarları n8n\'e ulaşmadı'); }
+      // pending = 8 sn'de yanıt yok: teyit DEĞİL (uç yazım bitince yanıtlıyor)
+      if (r && r.ok && !r.pending) ok++;
+      else if (r && r.pending) { hata++; addLog('warn','webhook','Geri yükleme: Oto Yakala ayarları iletildi ama n8n yanıtlamadı — yazım teyit edilmedi (Executions\'a bak)'); }
+      else { hata++; addLog('warn','webhook','Geri yükleme: Oto Yakala ayarları n8n\'e ulaşmadı'+(r && r.status ? ' (HTTP '+r.status+')' : '')); }
     }
   } catch(e){ hata++; addLog('warn','webhook','Geri yükleme: Oto Yakala gönderilemedi — '+(e.message||'')); }
   // opcSyncProcessed'in hatayı tamamen yutan kalıbını TEKRARLAMA: sonuç görünür olsun.
@@ -10553,7 +10672,8 @@ function ytkApiKey() {
 }
 
 // YouTube API hata mesajını insan diline çevir. Hem structured error objesi hem düz string kabul eder.
-function ytkErrMsg(e) {
+// url (isteğe bağlı): hatayı üreten istek — kota mesajı hangi kovanın dolduğunu söyleyebilsin
+function ytkErrMsg(e, url) {
   if (!e) return 'Bilinmeyen hata';
   const r = (typeof e === 'string') ? {} : (e.error || e);
   const reason = (r.errors && r.errors[0] && r.errors[0].reason) || r.status || '';
@@ -10571,7 +10691,14 @@ function ytkErrMsg(e) {
     return 'YouTube Data API v3 bu projede AÇIK DEĞİL — Google Cloud Console → "APIs & Services" → "Enable APIs" → YouTube Data API v3 → Enable.';
   }
   if (reason === 'quotaExceeded' || /quota/i.test(msg)) {
-    return 'Günlük kota doldu (10.000 birim) — yarın sıfırlanır, veya farklı projede yeni key oluştur.';
+    // YouTube Data API artık kotayı KOVALARA ayırıyor (developers.google.com/youtube/v3
+    // getting-started): varsayılan günde 100 search.list çağrısı + 100 videos.insert +
+    // öteki tüm uçlar için 10.000 birim. Arama kovası dolunca video/kanal çağrıları
+    // ÇALIŞMAYA DEVAM EDER; eski "10.000 birim doldu" metni yanlış teşhisti.
+    // Sıfırlama Pasifik gece yarısı = TR 10:00 (yaz) / 11:00 (kış).
+    if (/\/youtube\/v3\/search\b/.test(String(url||'')))
+      return 'Arama kotası doldu (varsayılan günde ~100 arama çağrısı, ayrı kova) — video/kanal çağrıları çalışmaya devam eder. Pasifik gece yarısı (TR ~10:00-11:00) sıfırlanır.';
+    return 'Günlük kota doldu (arama dışı çağrılar için 10.000 birim) — Pasifik gece yarısı (TR ~10:00-11:00) sıfırlanır, veya farklı projede yeni key oluştur.';
   }
   // "V3DataSearchService.List are blocked" tarzı API restriction: reason=keyInvalid veya sadece "blocked" içerir
   if (reason === 'keyInvalid' || /SERVICE_DISABLED|are blocked|blocked\./i.test(msg)) {
@@ -10588,8 +10715,8 @@ async function ytkFetch(url) {
   let j;
   try { j = await r.json(); }
   catch(e) { throw new Error('HTTP ' + r.status + ' — yanıt JSON değil'); }
-  if (j.error) throw new Error(ytkErrMsg(j));
-  if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + ytkErrMsg(j));
+  if (j.error) throw new Error(ytkErrMsg(j, url));
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + ytkErrMsg(j, url));
   return j;
 }
 
@@ -11333,9 +11460,14 @@ async function vpFetchDuration() {
 
 // Sabit uzunluk + sabit ortusme ile ardisik segmentler uretir.
 // Son parca cok kisa kalirsa (segLen'in ucte birinden az) bir onceki parcayla birlestirilir.
+// PARÇA TAVANI: n8n 'Video Analiz Et3' parça için clipDurations [[len-10, len+5]]
+// istiyor. YouTube Shorts 3 dk (180 sn) ile sınırlı; parça >175 sn olursa klip
+// Shorts sayılmayabilir. 170 = 5 sn pay. Sondaki kısa parçanın öncekine
+// eklenmesi de bu tavanı aşmamalı (120'lik parça + 50 sn kuyruk = 170).
+const VP_PARCA_TAVAN = 170;
 function vpCalcSegments(totalSec, segLen, overlap) {
   totalSec = Math.max(1, Math.round(totalSec));
-  segLen = Math.max(10, Math.round(segLen));
+  segLen = Math.min(VP_PARCA_TAVAN, Math.max(10, Math.round(segLen)));
   overlap = Math.max(0, Math.min(Math.round(overlap||0), segLen-5));
   const step = segLen - overlap;
   const segs = [];
@@ -11348,9 +11480,19 @@ function vpCalcSegments(totalSec, segLen, overlap) {
   }
   if (segs.length > 1) {
     const last = segs[segs.length-1];
+    const onceki = segs[segs.length-2];
     if ((last.end-last.start) < segLen/3) {
-      segs[segs.length-2].end = last.end;
-      segs.pop();
+      if ((last.end - onceki.start) <= VP_PARCA_TAVAN) {
+        onceki.end = last.end;
+        segs.pop();
+      } else {
+        // Birleşince tavanı aşıyor: kısa kuyruğu (ör. 6 sn) ayrı bırakmak klip
+        // üretemeyen ücretli bir OpusClip projesi açardı. Son iki parçayı EŞİT
+        // böl (örtüşme korunur) — ikisi de ~yarım pencere, ikisi de tavanın altında.
+        const bas = onceki.start, son = last.end;
+        onceki.end = bas + Math.ceil((son - bas + overlap) / 2);
+        last.start = onceki.end - overlap;
+      }
     }
   }
   return segs;
@@ -11360,8 +11502,30 @@ function vpComputeSegments() {
   if (!VP.durationSec) return showRes('vp-res','Önce Süreyi Getir\'e bas','warn');
   const segLen = parseInt((document.getElementById('vp-seglen')||{}).value)||120;
   const overlap = parseInt((document.getElementById('vp-overlap')||{}).value)||0;
+  // Sessizce 170'e kırpmak yerine söyle: operatör 180 yazdığını sanmasın
+  if (segLen > VP_PARCA_TAVAN) {
+    VP.segments = []; vpRenderSegments();
+    return showRes('vp-res','Parça uzunluğu en fazla '+VP_PARCA_TAVAN+' sn olabilir — daha uzun parça YouTube Shorts sınırını (3 dk) aşan klip üretebilir','err');
+  }
   VP.segments = vpCalcSegments(VP.durationSec, segLen, overlap);
   vpRenderSegments();
+  // Sayı sınırını HESAPLAMADA söyle (gönderimde değil): operatör çözümü baştan görsün
+  if (VP.segments.length > VP_PARCA_SAYI_TAVAN) showRes('vp-res', vpParcaSayiMesaj(), 'warn');
+}
+// n8n 'Video Parcala Formatla' SEGMENT_MAX ile aynı olmalı
+const VP_PARCA_SAYI_TAVAN = 24;
+// Uygulanabilir öneri: parça zaten tavandaysa "artır" demek imkânsız bir eylem —
+// bu ayarla Parçala'nın kapsayabileceği en uzun süreyi söyle.
+function vpParcaSayiMesaj(){
+  const n = VP.segments.length;
+  const segLen = parseInt((document.getElementById('vp-seglen')||{}).value) || 120;
+  const ov = Math.max(0, Math.min(parseInt((document.getElementById('vp-overlap')||{}).value) || 0, VP_PARCA_TAVAN - 5));
+  const enFazlaDk = Math.floor((VP_PARCA_SAYI_TAVAN * (VP_PARCA_TAVAN - ov) + ov) / 60);
+  return n + ' parça — n8n en fazla ' + VP_PARCA_SAYI_TAVAN + ' parça kabul ediyor. '
+    + (segLen < VP_PARCA_TAVAN
+        ? 'Parça Uzunluğu\'nu artırıp (en fazla ' + VP_PARCA_TAVAN + ' sn) yeniden hesapla.'
+        : 'Parça Uzunluğu zaten tavanda: Parçala bu videonun en fazla ~' + enFazlaDk + ' dakikasını işleyebilir. '
+          + 'Videoyu Video Gönder ile tek parça gönder (OpusClip en iyi anları kendisi seçer).');
 }
 
 function vpRenderSegments() {
@@ -11379,6 +11543,11 @@ async function vpSend() {
   const url = (document.getElementById('vp-url')||{}).value||'';
   if (!url.trim()) return showRes('vp-res','YouTube linki girin','err');
   if (!VP.segments.length) return showRes('vp-res','Önce Parçaları Hesapla\'ya bas','warn');
+  // Hesaplamadan sonra VP.segments dışarıdan değişmiş olabilir — gönderimden önce yeniden sına
+  const _uzun = VP.segments.filter(s => (s.end - s.start) > VP_PARCA_TAVAN).length;
+  if (_uzun) return showRes('vp-res', _uzun+' parça '+VP_PARCA_TAVAN+' sn\'den uzun — Parça Uzunluğu\'nu düşürüp yeniden hesapla','err');
+  // n8n 'Video Parcala Formatla' SEGMENT_MAX=24 üstünü hata ile reddediyor
+  if (VP.segments.length > VP_PARCA_SAYI_TAVAN) return showRes('vp-res', vpParcaSayiMesaj(),'err');
   if (!confirmDupeSend(url)) return showRes('vp-res','İptal edildi — video zaten gönderilmişti','warn');
   const base = getN8N();
   if (!base) return showRes('vp-res','Ayarlar\'dan n8n URL girin','warn');
@@ -11391,18 +11560,35 @@ async function vpSend() {
   // gonderir, her segment ICIN AYRI bir OpusClip projesi acilir (n8n tarafinda
   // SEGMENT_MAX=24) — yani tek yanlis tikta 24'e kadar ucretli is iki katina cikar.
   const kilit = btnKilitle('vp-send-btn');
+  let r;
   try {
   // Çoklu kategoride bile TEK gönderim — her parça OpusClip'te bir kez işlenir,
   // klipler her kategori için ayrı profille yayınlanır (kategoriler dizisi).
-  await faf(base+'/webhook/video-parcala', {
+  r = await faf(base+'/webhook/video-parcala', {
     'Youtube linki': url.trim(),
     ...mcFields(cats), dil, platformlar, aciklama_notu,
     segments: VP.segments,
   });
   } finally { kilit.ac(); }
-  showRes('vp-res','✓ '+VP.segments.length+' parça n8n\'e gönderildi ['+cats.join(', ')+(dil==='en'?'/EN':'')+']','ok');
-  recordSend(url, cats.join(',')+' (parçalı)');
-  addLog('ok','webhook','Video Parçala: '+VP.segments.length+' parça gönderildi — '+url.slice(0,50));
+  // SONUÇ OKUNUR: eskiden faf'ın dönüşüne bakılmadan '✓ gönderildi' yazılıyordu —
+  // 403/404'te bile. Kesin RED (HTTP durum kodu) varsa gönderim kaydı yazılmaz:
+  // yanlış kayıt sonraki gerçek gönderimde 'zaten gönderildi' uyarısı çıkarır.
+  // Ağ/CORS belirsizliğinde kayıt YAZILIR (istek büyük olasılıkla ulaştı; ücretli
+  // OpusClip projesinin kazara ikinci kez açılmasına karşı temkinli taraf).
+  if (r && r.ok) {
+    showRes('vp-res','✓ '+VP.segments.length+' parça n8n\'e gönderildi ['+cats.join(', ')+(dil==='en'?'/EN':'')+']'
+      + (r.pending ? ' — istek iletildi, n8n işliyor' : ''),'ok');
+    recordSend(url, cats.join(',')+' (parçalı)');
+    addLog('ok','webhook','Video Parçala: '+VP.segments.length+' parça gönderildi — '+url.slice(0,50));
+  } else if (r && r.status) {
+    showRes('vp-res','✕ n8n HTTP '+r.status+' döndürdü — parçalar işleme ALINMADI'
+      + ((r.status === 401 || r.status === 403) ? ' (webhook anahtarı uyuşmuyor: Ayarlar → n8n Bağlantısı)' : r.status === 404 ? ' (uç yok: workflow aktif mi?)' : ''),'err');
+    addLog('err','webhook','Video Parçala reddedildi (HTTP '+r.status+') — '+url.slice(0,50));
+  } else {
+    showRes('vp-res','⚠ n8n\'e ulaşılıp ulaşılmadığı bilinmiyor (ağ/CORS) — n8n Executions\'a bak; işlenmediyse tekrar gönder','warn');
+    if (!(r && r.invalidUrl)) recordSend(url, cats.join(',')+' (parçalı, teyitsiz)');
+    addLog('warn','webhook','Video Parçala: n8n yanıtı alınamadı (ağ/CORS) — '+url.slice(0,50));
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -11410,7 +11596,8 @@ async function vpSend() {
 // ═══════════════════════════════════════════════════════════
 // gorunen: ekrandaki (filtre+sıralama sonrası) videoId sırası — Shift+tık aralığı
 // ve J/K imleci bu sıraya göre çalışır. imlec: klavye imlecinin indeksi.
-const TR = { pending: [], selected: new Set(), gorunen: [], imlec: null, sonSecim: null };
+const TR = { pending: [], selected: new Set(), gorunen: [], imlec: null, sonSecim: null,
+             kartDurum: {} };   // videoId → operatörün elle değiştirdiği {cats, dil, not}
 const TR_PLAT_LABEL = { ig:'IG', yt:'YT', tt:'TT', fb:'FB', x:'X' };
 function trDur(sec){ sec=parseInt(sec)||0; const m=Math.floor(sec/60), s=sec%60; return m+':'+String(s).padStart(2,'0'); }
 
@@ -11482,6 +11669,11 @@ function trRenderPending() {
   const empty = document.getElementById('tr-empty');
   const toolbar = document.getElementById('tr-toolbar');
   if (!grid) return;
+  // Kart durumu dinleyicisi + budama (aşağıdaki KART DURUMU KORUMA notu) boş-liste
+  // dönüşünden ÖNCE: kuyruk boşalınca da kalkan videoların durumu temizlensin.
+  trKartDurumDinle(grid);
+  const _bekleyenIdler = new Set(TR.pending.map(v => v.videoId));
+  Object.keys(TR.kartDurum).forEach(id => { if (!_bekleyenIdler.has(id)) delete TR.kartDurum[id]; });
   if (toolbar) toolbar.style.display = TR.pending.length ? 'block' : 'none';
   if (!TR.pending.length) { grid.innerHTML=''; if (empty) empty.style.display='block'; return; }
   if (empty) empty.style.display='none';
@@ -11506,6 +11698,14 @@ function trRenderPending() {
   TR.gorunen = list.map(v=>v.videoId);
   if (TR.imlec != null && TR.imlec >= TR.gorunen.length) TR.imlec = TR.gorunen.length ? TR.gorunen.length-1 : null;
   trUpdateSelCount();
+  // KART DURUMU KORUMA: grid baştan çiziliyor. Arama kutusuna yazmak, sıralama,
+  // Tümünü Seç, tekli onay/red, 'a' kısayolu hepsi bu fonksiyonu çağırıyor ve
+  // operatörün kartta elle seçtiği kategori/dil/notu SESSİZCE varsayılana
+  // döndürüyordu — sonraki onay yanlış kategori/dille gidiyordu.
+  // YALNIZ OPERATÖRÜN DOKUNDUĞU kartlar saklanır (olay dinleyicisiyle): ekrandaki
+  // her seçimi toplamak, dokunulmamış kartı eski öneride donduruyordu — başka bir
+  // onaydan sonra öğrenilen kategori öneride görünüp çiplere geçmiyordu.
+  // Harita videoId'ye bağlı ve DOM'dan bağımsız: aramayla gizlenen kart da korunur.
   grid.innerHTML = list.map(v => {
     const vid = v.videoId;
     const already = findDupeSend(v.youtubeLink || '');
@@ -11565,7 +11765,52 @@ function trRenderPending() {
       alt:'Kuyruktaki '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'})
       + islenmisNotu(_ay.gizlenen);
   }
+  trKartDurumUygula(grid, TR.kartDurum);
+  // Kart çipleri yeni çizildi: stok (plan bitiyor) işaretleri yalnız sayfa
+  // açılışında konuyordu, yeniden çizimde kayboluyordu.
+  try{ stokChipIsaretle(); }catch(e){}
   trImlecCiz(false);   // yeniden çizimde klavye imleci kaybolmasın
+}
+// Operatör bir kartta çip/dil/not değiştirdiğinde o kartın TAM durumunu kaydet.
+// Tek dinleyici grid'e bir kez bağlanır; çipin satır içi onclick'i önce çalıştığı
+// için (hedef evresi) burada okunan sınıf zaten güncel.
+function trKartDurumDinle(grid){
+  if (!grid || grid.dataset.durumDinle === '1') return;
+  grid.dataset.durumDinle = '1';
+  const kaydet = ev => {
+    const t = ev.target; if (!t || !t.closest) return;
+    const ilgili = (ev.type === 'click' && t.closest('.tr-cats .cat-chip'))
+                || (ev.type === 'change' && t.closest('.tr-dil'))
+                || (ev.type === 'input' && t.closest('.tr-desc'));
+    if (!ilgili) return;
+    const c = t.closest('[data-trvid]'); if (!c) return;
+    const dilEl = c.querySelector('.tr-dil'), notEl = c.querySelector('.tr-desc');
+    TR.kartDurum[c.getAttribute('data-trvid')] = {
+      cats: Array.from(c.querySelectorAll('.tr-cats .cat-chip.sel')).map(x => x.getAttribute('data-cat')),
+      dil: dilEl ? dilEl.value : null,
+      not: notEl ? notEl.value : null
+    };
+  };
+  grid.addEventListener('click', kaydet);
+  grid.addEventListener('change', kaydet);
+  grid.addEventListener('input', kaydet);
+}
+// Yeniden çizilen kartlara önceki durumu geri koy. Kategori listesi değiştiyse
+// (getCats) artık olmayan kategori yok sayılır; hiç geçerli seçim kalmazsa
+// kartın kendi önerisi durur.
+function trKartDurumUygula(grid, durum){
+  if (!grid || !durum) return;
+  grid.querySelectorAll('[data-trvid]').forEach(c => {
+    const s = durum[c.getAttribute('data-trvid')]; if (!s) return;
+    const chipler = Array.from(c.querySelectorAll('.tr-cats .cat-chip'));
+    const gecerli = s.cats.filter(k => chipler.some(x => x.getAttribute('data-cat') === k));
+    if (gecerli.length || !s.cats.length)
+      chipler.forEach(x => x.classList.toggle('sel', gecerli.indexOf(x.getAttribute('data-cat')) >= 0));
+    const dilEl = c.querySelector('.tr-dil');
+    if (dilEl && s.dil != null && Array.from(dilEl.options).some(o => o.value === s.dil)) dilEl.value = s.dil;
+    const notEl = c.querySelector('.tr-desc');
+    if (notEl && s.not != null) notEl.value = s.not;
+  });
 }
 
 async function trApprove(videoId) {
@@ -11613,6 +11858,8 @@ async function trReject(videoId) {
   const v = TR.pending[idx];
   const base = getN8N();
   if (!base) return showRes('tr-status','Ayarlar\'dan n8n URL girin','warn');
+  // Kart durumu yeniden çizimde budanır; geri alma elle ayarlanmış kategori/notu geri getirsin
+  const _kartDurum = TR.kartDurum[videoId];
   TR.pending.splice(idx,1);
   TR.selected.delete(videoId);
   trRenderPending();
@@ -11623,7 +11870,8 @@ async function trReject(videoId) {
       await faf(base + '/webhook/kworb-pending-sil', {videoId, durum:'reddedildi'});
       addLog('info','webhook','Trend reddedildi: '+((v&&v.title)||videoId).slice(0,40));
     },
-    () => { TR.pending.splice(Math.min(idx,TR.pending.length), 0, v); trRenderPending(); }
+    () => { if (_kartDurum) TR.kartDurum[videoId] = _kartDurum;
+            TR.pending.splice(Math.min(idx,TR.pending.length), 0, v); trRenderPending(); }
   );
 }
 
@@ -11751,6 +11999,16 @@ async function trBulkApprove() {
         kats     = [...card.querySelectorAll('.tr-cats .cat-chip.sel')].map(c=>c.dataset.cat);
         dil      = (card.querySelector('.tr-dil')||{}).value || 'tr';
         aciklama = (card.querySelector('.tr-desc')||{}).value || '';
+      } else {
+        // Kart ekranda yok (aramayla gizli ama seçili): eskiden 'genel'/'tr'/boş not
+        // gidiyordu. Operatörün elle ayarladığı durum varsa o, yoksa kartın kendi
+        // çizimde göstereceği öneri (güven ≥40) — görünür kartla aynı sonuç.
+        const d = TR.kartDurum[v.videoId];
+        if (d){ kats = (d.cats||[]).slice(); dil = d.dil || 'tr'; aciklama = d.not || ''; }
+        else {
+          const kt = katTahmin({ title:v.title, channel:v.channelTitle||'' });
+          if ((kt.guven||0) >= 40) kats = [kt.kategori];
+        }
       }
     }
     if(!kats.length) kats=['genel'];
@@ -11787,7 +12045,8 @@ async function trBulkReject() {
   const base=getN8N(); if(!base) return toast('Ayarlar\'dan n8n URL girin','warn');
   const ids=[...TR.selected];
   // Geri alma için konumlarıyla birlikte sakla (aynı sıraya dönsün)
-  const yedek=ids.map(id=>({id, idx:TR.pending.findIndex(x=>x.videoId===id), v:TR.pending.find(x=>x.videoId===id)}))
+  const yedek=ids.map(id=>({id, idx:TR.pending.findIndex(x=>x.videoId===id), v:TR.pending.find(x=>x.videoId===id),
+                            durum:TR.kartDurum[id]}))   // elle ayarlanmış kart durumu da geri gelsin
                  .filter(x=>x.v).sort((a,b)=>a.idx-b.idx);
   TR.pending=TR.pending.filter(x=>!TR.selected.has(x.videoId));
   TR.selected.clear(); TR.sonSecim=null;
@@ -11801,7 +12060,7 @@ async function trBulkReject() {
       const res=await sqRunBatch(tasks,{name:'Trend reddet'});
       if(!res.cancel) showRes('tr-status',`✗ ${res.ok} reddedildi${res.err?` · ✕ ${res.err}`:''}`,'info');
     },
-    () => { yedek.forEach(y=>TR.pending.splice(Math.min(y.idx,TR.pending.length),0,y.v)); trRenderPending(); },
+    () => { yedek.forEach(y=>{ if(y.durum) TR.kartDurum[y.id]=y.durum; TR.pending.splice(Math.min(y.idx,TR.pending.length),0,y.v); }); trRenderPending(); },
     8000
   );
 }
@@ -11820,7 +12079,9 @@ function initOtoYakala() {
 
   const saved = JSON.parse(localStorage.getItem('op_oto_ayarlar')||'{}');
   const setVal = (id, val) => { const el = document.getElementById(id); if (el && val != null) el.value = val; };
-  setVal('oy-yt-key', saved.YT_API_KEY || S.cfg.ytApiKey || '');
+  // Tarayıcı anahtarıyla ÖNDEN DOLDURMA YOK: panel anahtarı HTTP referrer kısıtlı;
+  // n8n'e giderse sunucudan her çağrı ipRefererBlocked alır (güvenlik denetimi TUZAĞI).
+  setVal('oy-yt-key', saved.YT_API_KEY || '');
   setVal('oy-pl-short', saved.PLAYLIST_SHORT);
   setVal('oy-pl-video', saved.PLAYLIST_VIDEO);
   setVal('oy-kat-short', saved.SHORT_KATEGORI || 'genel');
@@ -11875,6 +12136,17 @@ async function oySave() {
   if (!ayar.PLAYLIST_SHORT && !ayar.PLAYLIST_VIDEO && !ayar.IG_USER_ID) {
     return showRes('oy-res','En az bir bölümü (Playlist veya IG) doldurun','warn');
   }
+  // Panelin TARAYICI anahtarı n8n'de çalışmaz (referrer kısıtlı). Değeri
+  // göstermeden sor — operatör bilerek göndermek isteyebilir.
+  const _ytK = String(ayar.YT_API_KEY||'').trim();
+  if (_ytK && (_ytK === String(S.cfg.ytApiKey||'').trim() || _ytK === String(S.cfg.shkey||'').trim())) {
+    if (!confirm('Oto Yakala\'daki YouTube API Key, panelin TARAYICI anahtarıyla AYNI.\n\n'
+        + 'Tarayıcı anahtarı yalnız panel adresinden çalışır; n8n sunucudan çağırınca her istek '
+        + '"ipRefererBlocked" alır ve playlist izleme sessizce durur. Buraya SUNUCU anahtarını girmelisin.\n\n'
+        + 'Yine de bu anahtarla kaydedilsin mi?')) {
+      return showRes('oy-res','İptal edildi — YouTube API Key alanına sunucu anahtarını gir','warn');
+    }
+  }
 
   // Yerel kayıt HER HÂLÜKÂRDA — n8n olmasa da form dolu gelsin
   try { localStorage.setItem('op_oto_ayarlar', JSON.stringify(ayar)); }
@@ -11887,8 +12159,15 @@ async function oySave() {
   }
   showRes('oy-res','⏳ n8n\'e gönderiliyor…','info');
   const r = await faf(base+'/webhook/oto-yakala-ayarlar', ayar);
-  if (r && r.ok) {
-    showRes('oy-res','✓ Ayarlar kaydedildi ve n8n\'e gönderildi','ok');
+  if (r && r.pending) {
+    // faf 8 sn içinde yanıt gelmezse {ok:true, pending:true} döndürüyor. Bu uç
+    // 'responseNode' ile yanıtlıyor (yazım BİTİNCE 200) — yanıtsızlık yazımın
+    // teyidi DEĞİL. Eskiden burası da '✓ kaydedildi' diyordu.
+    showRes('oy-res','⏳ İstek n8n\'e iletildi ama 8 sn içinde yanıt gelmedi — kaydedilip kaydedilmediği BİLİNMİYOR. '
+      + 'n8n Executions\'ta "Ayarlar Kaydet" koşusuna bak; yoksa tekrar Kaydet.','warn');
+    addLog('warn','webhook','Oto Yakala ayarları — n8n yanıtı gecikti, yazım teyit edilmedi');
+  } else if (r && r.ok) {
+    showRes('oy-res','✓ n8n yanıt verdi (HTTP '+(r.status||200)+') — ayarlar n8n\'e kaydedildi','ok');
     addLog('ok','webhook','Oto Yakala ayarları güncellendi');
   } else if (r && (r.status === 401 || r.status === 403)) {
     // Webhook'lar Header Auth'a alındıktan sonra bu HATA, "muhtemelen işlendi"
@@ -11896,11 +12175,18 @@ async function oySave() {
     // burada yanıltıyordu: anahtar n8n'e hiç ulaşmıyor ama kullanıcı ulaştı sanıyordu.
     showRes('oy-res','✕ n8n reddetti (HTTP '+r.status+') — webhook anahtarı yanlış ya da eksik. '
       + 'Ayarlar → n8n Bağlantısı → Webhook Anahtarı ile n8n\'deki Header Auth kimliği '
-      + 'AYNI olmalı. <b>Bu ayarlar n8n\'e KAYDEDİLMEDİ.</b>','err');
+      + 'AYNI olmalı. Bu ayarlar n8n\'e KAYDEDİLMEDİ.','err');   // showRes textContent: etiket yazı olarak görünüyordu
     addLog('err','webhook','Oto Yakala ayarları REDDEDİLDİ (HTTP '+r.status+') — webhook anahtarı uyuşmuyor');
+  } else if (r && r.status) {
+    // 404 / 500 gibi gerçek HTTP yanıtı: n8n isteği aldı ve REDDETTİ ya da düştü.
+    // Eski metin bunu da "genelde yine de işlenmiş olur" diye geçiştiriyordu.
+    showRes('oy-res','✕ n8n HTTP '+r.status+' döndürdü — ayarlar n8n\'e KAYDEDİLMEDİ (yalnız tarayıcıda saklandı). '
+      + (r.status === 404 ? 'Uç bulunamadı: workflow aktif mi, import sonrası Save yapıldı mı?' : 'n8n Executions\'taki hatayı kontrol et.'),'err');
+    addLog('err','webhook','Oto Yakala ayarları n8n\'e yazılamadı (HTTP '+r.status+')');
   } else {
-    showRes('oy-res','⚠ Tarayıcıda kaydedildi, n8n\'den yanıt alınamadı (CORS/ağ engeli olabilir — genelde yine de işlenmiş olur). n8n execution log\'undan doğrula.','warn');
-    addLog('warn','webhook','Oto Yakala ayarları — n8n yanıtı alınamadı (CORS olabilir)');
+    showRes('oy-res','⚠ Tarayıcıda kaydedildi ama n8n\'e ulaşılıp ulaşılmadığı BİLİNMİYOR (ağ/CORS engeli). '
+      + 'n8n Executions\'ta "Ayarlar Kaydet" koşusu yoksa ayar gitmedi — tekrar Kaydet.','warn');
+    addLog('warn','webhook','Oto Yakala ayarları — n8n yanıtı alınamadı (ağ/CORS), yazım teyit edilmedi');
   }
 }
 
@@ -12819,11 +13105,48 @@ document.addEventListener('DOMContentLoaded', function() {
     // yoklaması) sürerken basılan "Şimdi Gönder" o koşu bitince SİLİNİYOR — çerçeve sessizce
     // atlanıyor, panel yeşil kalıyor. Kalıcı onarım: panel açıkken ayar 10 dk'da bir yeniden
     // gönderilir; kaybolan yazım en geç 10 dk içinde geri gelir. (n8n tarafında kilit/birleştirme yok.)
+    let _cerAtlananImza = null;
     const cerPeriyodik = () => {
       try{
         // CER açılışta cerOku() ile dolduruldu (yukarıda). KAPALI sistem ve kaldırılmış köprü
         // de yeniden gönderilir — kaybolması en tehlikeli ayarlar tam da bunlar (n8n açık
         // sanıp çerçeve basmaya devam eder). 'sessiz': toast/alert yok, yalnız log.
+        // BAYAT SEKME KORUMASI: CER açılışta bir kez okunuyor. Operatör başka
+        // sekmede çerçeve ayarını değiştirdiyse bu sekme 10 dk içinde ESKİ ayarı
+        // n8n'e geri yazıyordu. Disk bu sekmenin son gördüğünden farklıysa önce
+        // diski oku; Çerçeve sayfası bu sekmede açıksa (kaydedilmemiş form
+        // değişikliği ezilmesin) bu turu atla.
+        let _ham = null; try { _ham = localStorage.getItem('opus_cerceve'); } catch(x){}
+        const _disk = (_ham != null) ? cerAyarImza(_ham) : null;
+        if (_disk != null && _disk !== CER_DISK_IMZA){
+          const _sayfa = document.getElementById('page-cerceve');
+          // Banner yayını sürerken cerOku CER.p nesnesini değiştirir ve yayının
+          // tuttuğu cfg başvurusu kopar (yeni bannerUrl kaybolur) — bu turu atla.
+          const _yayinBtn = document.getElementById('cer-yayinla-btn');
+          if (_yayinBtn && _yayinBtn.disabled) return;
+          let _diskRev = 0; try { _diskRev = Number((JSON.parse(_ham) || {}).ayarRev) || 0; } catch(x){}
+          if (_diskRev > (CER.ayarRev || 0)){
+            // Diskteki ayar GERÇEKTEN daha yeni (başka sekmede değiştirildi): benimse
+            if (_sayfa && _sayfa.classList.contains('active')){
+              if (_cerAtlananImza !== _disk){    // aynı durum için 10 dk'da bir log basma
+                _cerAtlananImza = _disk;
+                addLog('info','cerceve','Çerçeve ayarı başka sekmede değişmiş — bu sekmede Çerçeve sayfası açık, periyodik gönderim atlandı (eski ayar geri yazılmasın)');
+              }
+              return;
+            }
+            cerOku();
+            addLog('info','cerceve','Çerçeve ayarı başka sekmede değişmiş — güncel ayar diskten okundu, gönderim onunla yapılıyor');
+          } else {
+            // Disk farklı ama DAHA YENİ DEĞİL: eski kodla açık kalmış bir sekme ya da
+            // uçuştaki eski bir gönderimin sonundaki yazım. Bu sekmenin ayarı geçerli —
+            // diske geri yaz ve n8n'e onu gönder (sürüm artmaz, imza zaten bizimki).
+            if (_cerAtlananImza !== _disk){
+              _cerAtlananImza = _disk;
+              addLog('info','cerceve','Diskte daha ESKİ sürümlü çerçeve ayarı bulundu (eski kodlu sekme / gecikmiş yazım) — bu sekmenin güncel ayarı geri yazıldı');
+            }
+            cerYaz();
+          }
+        }
         if (!getN8N() || !CER.syncSon) return;                 // hiç senkron olmamışsa karışma
         cerAyarGonder('sessiz');
       }catch(e){ console.warn('[boot] cerPeriyodik:', e.message); }
@@ -13061,9 +13384,31 @@ function cerKapanmaYuzde(baslik){
   return (cerBantYuk(baslik === undefined ? 'x'.repeat(60) : baslik) / CER_SPEC.H * 100).toFixed(1);
 }
 
+// Bu sekmenin diskte GÖRDÜĞÜ son çerçeve AYARI (okuma ya da kendi yazımı).
+// Disk bundan farklıysa başka bir sekme ayarı değiştirmiştir. İmza yalnız n8n'e
+// giden AYAR alanlarından kurulur: syncSon/syncKirli/arsivTeyit her gönderimde
+// değişen durum damgalarıdır — onları saymak, öteki sekmenin her 10 dk'lık
+// gönderimini "ayar değişti" sanıp Çerçeve sayfası açık sekmede periyodik
+// gönderimi kalıcı durduruyordu.
+let CER_DISK_IMZA = null;
+// ghPat da imzada: gönderimle değişmez, ama "Sırları Sil" ya da token yenileme
+// sonrası bayat sekme eski token'ı diske geri yazmasın.
+function cerAyarImza(ham){
+  try {
+    const j = JSON.parse(ham || '{}') || {};
+    return JSON.stringify(['p','aktif','urlModu','ghRepo','ghPat','ust','mod','zincir','wmAlt','arsivUrl','arsivSir']
+      .map(k => (j[k] === undefined ? null : j[k])));
+  } catch(e){ return String(ham); }
+}
 function cerOku(){
   try{
-    const j = JSON.parse(localStorage.getItem('opus_cerceve')||'{}');
+    const _ham = localStorage.getItem('opus_cerceve');
+    CER_DISK_IMZA = cerAyarImza(_ham);
+    const j = JSON.parse(_ham||'{}');
+    // AYAR SÜRÜMÜ: ayar gerçekten değiştiğinde cerYaz artırır. "Disk farklı" tek başına
+    // "daha yeni" demek değil — eski kodlu bir sekme ya da uçuştaki eski gönderim de
+    // diske yazabilir; periyodik tur diski yalnız sürümü daha büyükse benimser.
+    CER.ayarRev = Number(j.ayarRev) || 0;
     CER.p = j.p||{}; CER.aktif = !!j.aktif; CER.urlModu = j.urlModu||'';
     CER.ghRepo = j.ghRepo||CER.ghRepo; CER.ghPat = j.ghPat||''; CER.syncSon = j.syncSon||'';
     CER.syncKirli = !!j.syncKirli;
@@ -13078,12 +13423,20 @@ function cerOku(){
 }
 function cerYaz(){
   try{
-    localStorage.setItem('opus_cerceve', JSON.stringify({
+    const _o = {
       p:CER.p, aktif:CER.aktif, urlModu:CER.urlModu,
       ghRepo:CER.ghRepo, ghPat:CER.ghPat, syncSon:CER.syncSon, syncKirli:!!CER.syncKirli,
       ust:CER.ust, mod:CER.mod, zincir:CER.zincir, wmAlt:CER_SPEC.wmAlt,
       arsivUrl:CER.arsivUrl, arsivSir:CER.arsivSir, arsivTeyit:CER.arsivTeyit||''
-    }));
+    };
+    const _imza = cerAyarImza(JSON.stringify(_o));
+    // Ayar alanları bu sekmenin son gördüğünden farklıysa bu bir AYAR değişikliği:
+    // sürümü artır (durum damgası yazımları — syncSon vb. — artırmaz).
+    if (_imza !== CER_DISK_IMZA) CER.ayarRev = Date.now();
+    _o.ayarRev = CER.ayarRev || 0;
+    const _ham = JSON.stringify(_o);
+    localStorage.setItem('opus_cerceve', _ham);
+    CER_DISK_IMZA = _imza;
   }catch(e){ addLog('err','cerceve','Kaydedilemedi (localStorage dolu olabilir): '+e.message); }
 }
 function cerSlug(ad){
@@ -15634,6 +15987,7 @@ function takOpenPost(gi){
   // hücresinden açılışta gün modalı zaten kapalı olduğu için etkilenmez.
   hideTakTip();
   const it = TAK.items[gi]; if (!it) return;
+  TAK._aktifPost = it;   // geç gelen metrik yanıtı başka postun modalına yazılmasın
   const esc = s => String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
   const pm = PLAT_META[it.plat] || {};
   const col = TAK_ST_COLOR[it.status] || 'var(--acc)';
@@ -15660,19 +16014,61 @@ function takOpenPost(gi){
   else mEl.innerHTML = `<div style="color:var(--mt);font-size:11.5px">${it.status==='plan'?'Henüz yayınlanmadı — metrikler yayın sonrası gelir.':'Bu post için metrik yok.'}</div>`;
   document.getElementById('tak-post-modal').style.display = 'flex';
 }
-// Yanıt hangi biçimde gelirse gelsin metrik alanlarını bul (düz / platform-anahtarlı / iç içe)
-function takParseMetrics(d){
-  const keys = TPM_METRICS.map(m=>m[0]).concat(['profileViews','followers']);
+// Upload-Post post-analytics yanıtından GÖNDERİ metriklerini çıkar.
+// Belgelenmiş biçim (docs.upload-post.com/api/get-analytics):
+//   { platforms: { <plat>: { post_metrics:{views,likes,…}, post_metrics_error,
+//                            profile_snapshot_at_post_date:{followers,impressions,…},
+//                            profile_snapshot_latest:{…} } } }
+// ESKİ HATA: derin tarama 'followers' da içeren İLK nesneyi alıyordu. Gönderi
+// metriği gelmeyince (post_metrics_error) profile_snapshot_* — yani HESABIN
+// toplam gösterimi — o gönderinin izlenmesi diye yazılıyordu (belgedeki TikTok
+// örneğinde 12.000). Profil anlık görüntüleri artık hiçbir yolda okunmaz.
+// plat: 'instagram' | 'tiktok' | 'youtube' | 'facebook' | 'x' (verilmezse tek kayıt varsayılır)
+// bilgi (isteğe bağlı nesne): bilgi.durum = 'metrik' (post_metrics geldi) | 'hata'
+// (platform kaydı var, post_metrics yok/post_metrics_error — çoğu zaman GEÇİCİ:
+// jeton, oran sınırı) | 'yok' (kayıt bulunamadı) | 'eski' (belgelenmemiş biçim).
+// Klip serisi 'metriksiz' geri çekilmesini yalnız 'metrik' durumunda uygular.
+function takParseMetrics(d, plat, bilgi){
+  bilgi = bilgi || {};
+  bilgi.durum = 'yok';
+  if (!d || typeof d !== 'object') return null;
+  const PROFIL_ANAHTAR = /^profile_snapshot/i;
+  const keys = TPM_METRICS.map(m=>m[0]);
+  const cikar = o => {
+    if (!o || typeof o !== 'object') return null;
+    const out = {};
+    TPM_METRICS.forEach(([k]) => { const v = parseFloat(o[k]); if (!isNaN(v)) out[k] = v; });
+    return Object.keys(out).length ? out : null;
+  };
   const scan = (o,depth) => {
     if (!o || typeof o !== 'object' || depth > 3) return null;
     if (keys.some(k => o[k] != null && !isNaN(parseFloat(o[k])))) return o;
-    for (const k in o){ const r = scan(o[k], depth+1); if (r) return r; }
+    for (const k in o){ if (PROFIL_ANAHTAR.test(k)) continue; const r = scan(o[k], depth+1); if (r) return r; }
     return null;
   };
-  const src = scan(d, 0); if (!src) return null;
-  const out = {};
-  TPM_METRICS.forEach(([k]) => { const v = parseFloat(src[k]); if (!isNaN(v)) out[k] = v; });
-  return Object.keys(out).length ? out : null;
+  const nesneMi = o => !!o && typeof o === 'object' && !Array.isArray(o);
+  const pl = nesneMi(d.platforms) ? d.platforms : (nesneMi(d.data) && nesneMi(d.data.platforms) ? d.data.platforms : null);
+  if (pl){
+    const ad = String(plat||'').toLowerCase();
+    const adlar = ad ? (ad === 'x' || ad === 'twitter' ? ['x','twitter'] : [ad]) : [];
+    let kayit = null;
+    for (const a of adlar) if (nesneMi(pl[a])){ kayit = pl[a]; break; }
+    if (!kayit){
+      const hepsi = Object.keys(pl).filter(k => nesneMi(pl[k]));
+      if (hepsi.length === 1) kayit = pl[hepsi[0]];
+      // İstenen platform yok ve birden çok kayıt var: başka platformun metriğini
+      // bu gönderiye yazmaktansa ölçülemedi say.
+      else if (!ad){ const ilk = hepsi.find(k => nesneMi(pl[k].post_metrics)); if (ilk) kayit = pl[ilk]; }
+    }
+    if (!kayit) return null;
+    if (!nesneMi(kayit.post_metrics)){ bilgi.durum = 'hata'; return null; }   // post_metrics_error → ölçülemedi
+    bilgi.durum = 'metrik';
+    return cikar(kayit.post_metrics) || cikar(scan(kayit.post_metrics, 0));
+  }
+  // Belgelenmemiş / eski düz biçim: derin tarama, profil anlık görüntüleri hariç
+  const _eskiSonuc = cikar(scan(d, 0));
+  if (_eskiSonuc) bilgi.durum = 'eski';
+  return _eskiSonuc;
 }
 async function takLoadMetrics(it){
   const mEl = document.getElementById('tpm-metrics'); if (!mEl) return;
@@ -15686,14 +16082,25 @@ async function takLoadMetrics(it){
         </div>`).join('') + '</div>';
   };
   if (it._metrics){ render(it._metrics, '(önbellek)'); return; }
+  // Hız kovası doluysa (arka planda klip serisi turu koşuyor olabilir) modal
+  // dakikalarca "çekiliyor"da asılı kalmasın — söyle ve istek atma.
+  const _kova = upAnalitikBekleme();
+  if (_kova > 3000){
+    mEl.innerHTML = '<div style="color:var(--wn);font-size:11.5px">⏳ Upload-Post analitik hız sınırı dolu (5 dk\'da 100 istek; arka plan ölçüm turu sürüyor olabilir). ~'
+      + Math.ceil(_kova/1000) + ' sn sonra postu yeniden aç.</div>';
+    return;
+  }
   mEl.innerHTML = '<div style="color:var(--mt);font-size:11.5px">⏳ Canlı metrikler çekiliyor…</div>';
   let m = null;
+  const _pa = ydPlatApi(it.plat);
   if (it.reqId){
-    try { const { data } = await upFetch('/uploadposts/post-analytics/' + encodeURIComponent(it.reqId)); m = takParseMetrics(data); } catch(e){ console.warn('[TPM] reqId:', e.message); }
+    try { const { data } = await upFetch('/uploadposts/post-analytics/' + encodeURIComponent(it.reqId)); m = takParseMetrics(data, _pa); } catch(e){ console.warn('[TPM] reqId:', e.message); }
   }
   if (!m && it.postId){
-    try { const { data } = await upFetch('/uploadposts/post-analytics?platform_post_id=' + encodeURIComponent(it.postId) + '&platform=' + encodeURIComponent(ydPlatApi(it.plat))); m = takParseMetrics(data); } catch(e){ console.warn('[TPM] postId:', e.message); }
+    try { const { data } = await upFetch(upAnalitikPidYol(it.postId, _pa, it.profile)); m = takParseMetrics(data, _pa); } catch(e){ console.warn('[TPM] postId:', e.message); }
   }
+  if (m) it._metrics = m;              // geç gelse de sakla: yeniden açılışta kota harcanmasın
+  if (TAK._aktifPost !== it) return;   // bu arada başka post açıldı — onun modalını ezme
   if (m){ it._metrics = m; render(m, '(canlı — Upload-Post)'); }
   else mEl.innerHTML = '<div style="color:var(--mt);font-size:11.5px">Metrik alınamadı — platform bu post için analitik sunmuyor olabilir.</div>';
 }
@@ -16562,12 +16969,16 @@ async function notifCheck(derin){
 async function notifViralTara(items){
   const adaylar=items.filter(i=>i.status==='published' && (i.reqId||i.postId) && (Date.parse(i.time)||0)>=Date.now()-48*3600000).slice(0,15);
   for(const it of adaylar){
-    const nid='viral-'+(it.postId||it.reqId);
+    // Kimlik reqId ÖNCELİKLİ: ydFetchItems öğelerinde postId eskiden hiç yoktu,
+    // yani görülmüş bildirimler 'viral-<reqId>' ile kayıtlı. Sıra ters olsaydı
+    // postId eklenince aynı bildirimler bir kez daha çalardı.
+    const nid='viral-'+(it.reqId||it.postId);
     if(NOTIF.seen.has(nid)||NOTIF.items.find(x=>x.id===nid)) continue;
     let m=null;
+    const _pa=ydPlatApi(it.plat);
     try{
-      if(it.reqId){ const {data}=await upFetch('/uploadposts/post-analytics/'+encodeURIComponent(it.reqId)); m=takParseMetrics(data); }
-      if(!m&&it.postId){ const {data}=await upFetch('/uploadposts/post-analytics?platform_post_id='+encodeURIComponent(it.postId)+'&platform='+encodeURIComponent(ydPlatApi(it.plat))); m=takParseMetrics(data); }
+      if(it.reqId){ const {data}=await upFetch('/uploadposts/post-analytics/'+encodeURIComponent(it.reqId)); m=takParseMetrics(data,_pa); }
+      if(!m&&it.postId){ const {data}=await upFetch(upAnalitikPidYol(it.postId,_pa,it.profile)); m=takParseMetrics(data,_pa); }
     }catch(e){}
     const views=m?parseInt(m.views!=null?m.views:m.impressions)||0:0;
     const esik=viralEsik(it.plat);
@@ -16773,8 +17184,9 @@ const HATA_KURALLARI = [
   [/log ?in to (www\.)?instagram|checkpoint_required|challenge_required/i,
     'Instagram hesabı GİRİŞ/DOĞRULAMA bekliyor',
     'Instagram bu hesabı kilitlemiş. SIRA ÖNEMLİ: (1) tarayıcıdan instagram.com\'a o hesapla gir ve çıkan doğrulamayı tamamla, '
-    + '(2) Upload-Post → Manage Users\'ta hesabı yeniden bağla (taze jeton alınsın), (3) Platformlar → 🔄 Hesap Sıfırlama ile tarihi işaretle, '
-    + '(4) sonra tekrar gönder. Bu sırayı atlarsan her deneme aynı hatayı alır — yeniden göndermek tek başına ÇÖZMEZ.', 'kritik'],
+    + '(2) Upload-Post → Manage Users\'ta hesabı yeniden bağla (taze jeton alınsın), '
+    + '(3) sonra tekrar gönder. Bu sırayı atlarsan her deneme aynı hatayı alır — yeniden göndermek tek başına ÇÖZMEZ. '
+    + '🔄 Hesap Sıfırlama YALNIZ yerine FARKLI bir hesap bağladıysan: aynı hesapta işaretlemek eski yayınları "yayınlanmamış" sayar ve Eşitle onları aynı hesaba KOPYA olarak yeniden gönderir.', 'kritik'],
   // Kuyrukta boş yuva kalmaması bir ARIZA değil, KAPASİTE sınırı: profilin
   // günlük yuva sayısı × aktif günler kadar gönderi alınabiliyor.
   [/no available queue slot|queue is full|no free slot/i,
@@ -16784,7 +17196,28 @@ const HATA_KURALLARI = [
     'Facebook Sayfası seçili değil',
     'Facebook Reels yalnız SAYFALARA yayınlanabiliyor, kişisel profile değil. Upload-Post’ta bu profilin Facebook bağlantısını bir Sayfa seçerek yeniden kur. (n8n tarafındaki boş page_id hatası y2026.08.03-12 ile düzeltildi — workflow’u içe aktarmayı unutma.)', 'kritik'],
   [/session (has )?expired|reconnect your|token (is )?expired|invalid[_ ]?token|reauth|please reconnect/i,
-    'Hesap bağlantısının süresi dolmuş', 'Platformlar sayfasında bu profilin kartındaki 🔗 Bağla düğmesine bas — Türkçe bağlama sayfası açılır (48 saat geçerli). Hesabı yeniden bağladıktan sonra 🔄 Hesap Sıfırlama ile tarihi işaretle, sonra tekrar gönder.', 'kritik'],
+    'Hesap bağlantısının süresi dolmuş', 'Platformlar sayfasında bu profilin kartındaki 🔗 Bağla düğmesine bas — Türkçe bağlama sayfası açılır (48 saat geçerli). Aynı hesabı yeniden bağladıktan sonra doğrudan tekrar gönder. 🔄 Hesap Sıfırlama yalnız yerine FARKLI bir hesap bağladıysan — aynı hesapta işaretlemek eski yayınların kopyasını üretir.', 'kritik'],
+  // ── HESAP KISITI / GÜNLÜK TAVAN (16 Eyl 2026) ──
+  // Bu hatalar eskiden yanlış sınıfa düşüyordu: "The Instagram account is
+  // restricted." aşağıdaki /private|restricted/ kuralıyla "İÇERİK kurallarına
+  // takıldı" oluyordu (operatör videoyu değiştirip aynı kısıtlı hesaba yeniden
+  // gönderiyordu); günlük tavan kodları ise "Yayın başarısız — yeniden dene"
+  // varsayılanına düşüp kalıcı arıza sanılıyordu. Kalıplar platform hata
+  // kodlarına dayanıyor (Instagram 2207050/2207051/2207042, TikTok Content
+  // Posting API hata kodları, YouTube uploadLimitExceeded). Sıra: bu üçü
+  // izin/oran/içerik kurallarından ÖNCE.
+  [/unaudited_client_can_only_post_to_private|can only post to private accounts|privacy_level_option_mismatch|tiktok_privacy_unavailable/i,
+    'TikTok bu hesaba herkese açık yayın izni vermiyor',
+    'Video sorunu DEĞİL — yeniden göndermek aynı hatayı alır. İki ayrı neden var: '
+    + '(1) "unaudited_client…" → gönderen uygulama TikTok denetiminden geçmemiş ve yalnız GİZLİ hesaplara/gizli yayın yapabiliyor; '
+    + 'hesabı herkese açık yapmak bunu ÇÖZMEZ, çözüm Upload-Post tarafında (destekle görüş). '
+    + '(2) "privacy_level_option_mismatch" → istenen gizlilik düzeyi hesabın sunduğu seçeneklerde yok (ör. hesap gizli); TikTok\'ta hesap gizlilik ayarını kontrol et.', 'kritik'],
+  [/(account|user|profile) (is |has been |was )?(restricted|suspended|banned|disabled|deactivated)|banned_from_posting|user_banned|\b2207050\b|\b2207051\b|restrict certain activity/i,
+    'Hesap kısıtlanmış — platform yayını engelliyor',
+    'Bu bir video sorunu DEĞİL: platform hesabı kısıtlamış. YENİDEN GÖNDERME — kısıtlı hesaba her deneme durumu uzatabilir. Önce uygulamada Ayarlar → Hesap Durumu\'na bak. Hesap kurtarılamaz ve yerine yeni hesap bağlanırsa 🔄 Hesap Sıfırlama ile tarihi işaretle.', 'kritik'],
+  [/spam_risk_too_many_posts|too many posts|\b2207042\b|maximum number of posts|uploadLimitExceeded|exceeded the number of videos|daily (upload|post|posting) limit/i,
+    'Platformun günlük gönderi tavanı doldu',
+    'Hesap kısıtlı değil; bugünkü gönderim hakkı bitti. Yarın yeniden dene ve bu profile günde daha az gönderi planla.', 'gecici'],
   [/access token|oauth|permission|not authorized|unauthorized|forbidden|403/i,
     'Yayınlama izni yok / yetki düşmüş', 'Hesabı yeniden bağlarken gerekli izinleri (yayınlama) onayla. İzin eksikse platform gönderime kapatır.', 'kritik'],
   [/too many requests|rate.?limit|quota|429|throttl/i,
@@ -17063,6 +17496,9 @@ async function ydFetchItems(){
         permalink: h.post_url || h.url || '',
         error:   h.error_message || h.error || '',
         reqId:   h.request_id || '',
+        // Viral taramasının platform_post_id yedeği bu alanı okuyor; eskiden hiç
+        // doldurulmadığı için o yol ölüydü.
+        postId:  h.platform_post_id || '',
         jobId:   h.job_id || '',
         time:    h.upload_timestamp || h.uploaded_at || h.created_at || h.timestamp || h.date || ''
       });
@@ -17163,7 +17599,14 @@ function ydCozulenleriIsaretle(items){
 // boşuna düğmeye bastırmamak için satırda açıkça yazılır.
 function ydYenidenCozmez(hataMetni){
   const s = String(hataMetni||'').replace(/https?:\/\/\S+/gi, ' ');
-  return /session (has )?expired|reconnect|token (is )?expired|invalid[_ ]?token|reauth|not authorized|unauthorized|forbidden|permission|no facebook pages found/i.test(s);
+  return /session (has )?expired|reconnect|token (is )?expired|invalid[_ ]?token|reauth|not authorized|unauthorized|forbidden|permission|no facebook pages found/i.test(s)
+    || ydHesapKisitiMi(s);
+}
+// Hesap kısıtı / TikTok gizlilik reddi: yeniden gönderim yayınlanamaz (kısıt kalkmadan).
+// hataCevir'deki iki kuralın kalıplarıyla AYNI olmalı.
+function ydHesapKisitiMi(hataMetni){
+  const s = String(hataMetni||'').replace(/https?:\/\/\S+/gi, ' ');
+  return /unaudited_client_can_only_post_to_private|can only post to private accounts|privacy_level_option_mismatch|tiktok_privacy_unavailable|(account|user|profile) (is |has been |was )?(restricted|suspended|banned|disabled|deactivated)|banned_from_posting|user_banned|\b2207050\b|\b2207051\b|restrict certain activity/i.test(s);
 }
 
 // ── YAYIN DEFTERİ ────────────────────────────────────────────────────────
@@ -17458,7 +17901,10 @@ function renderYayinDurumu(){
             ? `<div style="margin-top:4px;font-size:11.5px;color:var(--acc)">↻ Bu gönderimi ${ne} yeniden gönderdin — henüz yayınlanmadı.`
               + `<div style="color:var(--mt);margin-top:1px">Kuyruğa alındıysa sırası gelince yayınlanır; yayınlandığında bu kayıt listeden kendiliğinden düşer.</div></div>`
             : `<div style="margin-top:4px;font-size:11.5px;color:var(--wn)">↻ ${ne} yeniden gönderdin ama <b>yayınlanmadı</b> — bu hata yeniden göndermekle geçmiyor.`
-              + `<div style="color:var(--mt);margin-top:1px">Önce yukarıdaki bağlantı sorununu gider (Upload-Post → Manage Users), sonra tekrar dene. O zamana kadar her deneme aynı hatayı alır.</div></div>`;
+              + (ydHesapKisitiMi(it.error)
+                // Hesap kısıtında "bağlantıyı gider" tavsiyesi yanlış: bağlantı sağlam, platform hesabı kısıtlamış
+                ? `<div style="color:var(--mt);margin-top:1px">Platform hesabı kısıtlamış ya da herkese açık yayına kapatmış — yeniden bağlamak çözmez. Önce uygulamada hesabın durumunu kontrol et; kısıt kalkmadan her deneme aynı hatayı alır.</div></div>`
+                : `<div style="color:var(--mt);margin-top:1px">Önce yukarıdaki bağlantı sorununu gider (Upload-Post → Manage Users), sonra tekrar dene. O zamana kadar her deneme aynı hatayı alır.</div></div>`);
         })():''}
       </div>
       <span style="font-size:12px;color:${stColor};font-weight:700;white-space:nowrap">${stLabel}</span>
@@ -17868,6 +18314,12 @@ async function ydTopluKuyruk(){
       + 'yani mevcut yayın ritmin bozulmaz.\n'
       + (kaynaksiz ? '\n⚠ '+kaynaksiz+' kaydın kaynak videosu bulunamadı, onlar atlanacak.\n' : '')
       + (zatenGonderilmis ? '\nℹ '+zatenGonderilmis+' kayıt zaten yeniden gönderilmişti, ikinci kez gönderilmeyecek.\n' : '')
+      + (function(){
+          // Davranış değişmez (hepsi yine gönderilir) — yalnız operatör bilerek karar versin.
+          const kisitli = gonderilebilir.filter(i => ydHesapKisitiMi(i.error)).length;
+          return kisitli ? '\n⚠ '+kisitli+' kaydın hatası HESAP KISITI (hesap kısıtlı / TikTok herkese açık yayına kapalı). '
+            + 'Kısıt kalkmadan bunlar yeniden gönderilse de yayınlanmaz; kısıtlı hesaba tekrar tekrar göndermek durumu uzatabilir.\n' : '';
+        })()
       + '\nDevam edilsin mi?')) return;
 
   if (btn){ btn.disabled = true; btn.textContent = '⏳ 0/'+gonderilebilir.length; }
@@ -17999,9 +18451,11 @@ async function phFetchAccounts(){
 function phAcctConnected(a){ return !!(a && typeof a==='object' && (a.username||a.handle||a.id||a.display_name||a.displayName||a.name)); }
 function phAcctExpired(a){
   if (!a || typeof a!=='object') return false;
-  if (a.expired===true||a.is_expired===true||a.token_expired===true||a.needs_reconnect===true||a.reconnect_required===true) return true;
+  // reauth_required: Upload-Post şemasındaki GERÇEK alan (UserProfile.social_accounts.*).
+  // Öteki adlar şemada yok; geriye uyum için duruyorlar.
+  if (a.reauth_required===true||a.expired===true||a.is_expired===true||a.token_expired===true||a.needs_reconnect===true||a.reconnect_required===true) return true;
   const s = String(a.status||a.connection_status||a.state||'').toLowerCase();
-  return /expir|reconnect|disconnect|invalid|revoked/.test(s);
+  return /expir|reconnect|reauth|disconnect|invalid|revoked/.test(s);
 }
 // raw: /users; shortProfiles: Set (short alan profil adları) → { username:{accounts,platforms,expired,status} }
 function phCompute(raw, shortProfiles){
@@ -18162,7 +18616,11 @@ function initRadar(){
     const s=document.getElementById('rd-kat-status'); if(s) s.textContent='✓ bugünün taraması ('+c.gun+')'; } }catch(e){}
   if(RD.data){ renderRadar(); return; }
   const cache=rdCacheGet();
-  if(cache){ RD.data=cache.data; RD.src=cache.src+' (önbellek)'; renderRadar(); return; }
+  if(cache){ RD.data=cache.data; RD.src=cache.src+' (önbellek)'; renderRadar();
+    // Önbellekteki hesap aramaları düşmüş hâlde üretildiyse eksik bölümler burada da söylensin
+    if(cache.data && cache.data.aramaHata && cache.data.aramaHata.n)
+      showRes('rd-res','⚠ Bu liste (önbellek) hesaplanırken '+cache.data.aramaHata.n+'/'+cache.data.aramaHata.top+' taze video araması başarısız olmuştu — Hızlı Yükselenler ve Potansiyel eksik olabilir: '+cache.data.aramaHata.son,'warn');
+    return; }
   loadRadar(false);
 }
 function rdCacheGet(){
@@ -18206,6 +18664,12 @@ async function loadRadar(force){
     try{ localStorage.setItem('op_radar_cache',JSON.stringify({v:4,ts:Date.now(),src,data})); }catch(e){}
     renderRadar();
     const rEl=document.getElementById('rd-res'); if(rEl) rEl.style.display='none';
+    // Taze video araması düştüyse (genelde arama kotası) Hızlı Yükselenler ve
+    // Potansiyel boş/eksik kalır — eskiden bu sessizdi, bölümler "sonuç yok" gibi görünüyordu.
+    if(data && data.aramaHata && data.aramaHata.n){
+      showRes('rd-res','⚠ '+data.aramaHata.n+'/'+data.aramaHata.top+' taze video araması başarısız — Hızlı Yükselenler ve Potansiyel eksik olabilir: '+data.aramaHata.son,'warn');   // showRes textContent kullanır
+      addLog('warn','sistem','Trend Radar: '+data.aramaHata.n+'/'+data.aramaHata.top+' arama düştü — '+data.aramaHata.son);
+    }
     addLog('ok','sistem','Trend Radar güncellendi ('+src+'): '+data.trend.length+' trend, '+data.rising.length+' yükselen, '+data.potential.length+' potansiyel');
   }catch(e){
     showRes('rd-res','Hata: '+e.message,'err');
@@ -18324,10 +18788,25 @@ function katTahmin(v){
   const puan={}; const ekle=(k,p)=>{ if(k) puan[k]=(puan[k]||0)+p; };
   // 1) ÖĞRENİLMİŞ kanal hafızası — en güçlü sinyal
   const m=katOgrenmeYukle();
-  const kayit=m[v.channelId]||m['ad:'+String(v.channel||'').toLowerCase()];
+  // İKİ KAYIT TOPLANIR: Radar kanal kimliğiyle (channelId), Trend Onay kimliksiz
+  // (yalnız kanal adıyla, 'ad:') öğretiyor. Eskiden channelId kaydı bulununca
+  // 'ad:' kaydı HİÇ okunmuyordu — Trend Onay'daki seçimler Radar'da, Radar'dakiler
+  // Trend Onay'da görünmüyordu.
+  const _kanalAd = String(v.channel||'').toLowerCase();
+  const _kayitlar = [];
+  if (v.channelId && m[v.channelId]) _kayitlar.push(m[v.channelId]);
+  if (_kanalAd && m['ad:'+_kanalAd]) _kayitlar.push(m['ad:'+_kanalAd]);
+  // Kimliksiz çağrıda (Trend Onay kartlarında channelId yok) Radar'ın kimlikle
+  // öğrendiği kayıtlar da bulunsun: kimlik kayıtları kanal adını 'ad' alanında tutuyor.
+  if (!v.channelId && _kanalAd) Object.keys(m).forEach(k => {
+    const r = m[k];
+    if (k.indexOf('ad:') !== 0 && r && String(r.ad||'').toLowerCase() === _kanalAd) _kayitlar.push(r);
+  });
+  const _say = {};
+  _kayitlar.forEach(k=>{ if(k&&k.say) Object.keys(k.say).forEach(kat=>{ _say[kat]=(_say[kat]||0)+(Number(k.say[kat])||0); }); });
   let ogrenilen='';
-  if(kayit&&kayit.say){
-    const sirali=Object.entries(kayit.say).sort((a,b)=>b[1]-a[1]);
+  {
+    const sirali=Object.entries(_say).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);
     if(sirali.length){ ogrenilen=sirali[0][0]; ekle(ogrenilen, 6+Math.min(4,sirali[0][1])); }
   }
   // 2) Google'ın anlamsal konu etiketleri
@@ -18374,6 +18853,7 @@ async function rdHaftaTara(zorla){
   const after=new Date(Date.now()-7*24*3600*1000).toISOString();
   const idSet=new Set();
   let n=0;
+  const aramaHata={n:0,son:''};   // düşen aramalar SAYILIR: kota dolunca "Sonuç yok" yanıltıcıydı
   for(const q of RD_HAFTA_SORGU){
     for(const band of ['medium','long']){
       n++; if(st) st.textContent='⏳ taranıyor '+n+'/'+(RD_HAFTA_SORGU.length*2);
@@ -18381,11 +18861,15 @@ async function rdHaftaTara(zorla){
         const s=await ytkFetch(YT+'search?part=snippet&type=video&order=viewCount&regionCode=TR&relevanceLanguage=tr&videoDuration='+band
           +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(q)+'&maxResults=25&key='+key);
         (s.items||[]).forEach(x=>{ const id=x.id&&x.id.videoId; if(id) idSet.add(id); });
-      }catch(e){ console.warn('[RD-HAFTA]',q,band,e.message); }
+      }catch(e){ console.warn('[RD-HAFTA]',q,band,e.message); aramaHata.n++; aramaHata.son=e.message; }
     }
   }
+  if(aramaHata.n) addLog('warn','sistem','Haftanın en çok izlenenleri: '+aramaHata.n+'/'+n+' arama düştü — '+aramaHata.son);
   const ids=[...idSet];
-  if(!ids.length){ el.innerHTML='<div class="rd-empty">Sonuç yok</div>'; if(st) st.textContent=''; return; }
+  if(!ids.length){
+    el.innerHTML='<div class="rd-empty">'+(aramaHata.n ? '⚠ '+aramaHata.n+'/'+n+' arama başarısız: '+esc0(aramaHata.son) : 'Sonuç yok')+'</div>';
+    if(st) st.textContent=''; return;
+  }
   const det={};
   for(let a=0;a<ids.length;a+=50){
     try{ const d=await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics,topicDetails&id='+ids.slice(a,a+50).join(',')+'&key='+key);
@@ -18483,6 +18967,7 @@ async function rdKategoriTaraCalistir(){
   const kats=Object.keys(RD_KAT_SORGU);
   const bulunan={}; const idSet=new Set();
   let i=0;
+  const aramaHata={n:0,top:0,son:''};   // düşen aramalar SAYILIR (kota dolunca "sonuç yok" yanıltıcıydı)
   for(const k of kats){
     i++; if(st) st.textContent='⏳ '+i+'/'+kats.length+' — '+k+' aranıyor…';
     const c=RD_KAT_SORGU[k];
@@ -18496,16 +18981,22 @@ async function rdKategoriTaraCalistir(){
                +'&relevanceLanguage='+dil+'&videoDuration='+band
                +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(q)+'&maxResults=25&key='+key;
           if(c.cid) u+='&videoCategoryId='+c.cid;
+          aramaHata.top++;
           const s=await ytkFetch(u);
           (s.items||[]).forEach(x=>{ const id=x.id&&x.id.videoId; if(id) bulun.add(id); });
-        }catch(e){ console.warn('[RD-KAT] '+k+' q='+q+' '+band+':',e.message); }
+        }catch(e){ console.warn('[RD-KAT] '+k+' q='+q+' '+band+':',e.message); aramaHata.n++; aramaHata.son=e.message; }
       }
     }
     bulunan[k]=[...bulun];
     bulunan[k].forEach(id=>idSet.add(id));
   }
+  if(aramaHata.n) addLog('warn','sistem','Kategori radarı: '+aramaHata.n+'/'+aramaHata.top+' arama düştü — '+aramaHata.son);
   const ids=[...idSet];   // tüm kategorilerin adayları (parça parça detay çekilir)
-  if(!ids.length){ if(st) st.textContent='Sonuç yok'; el.innerHTML='<div class="rd-empty">Bu taramada sonuç çıkmadı</div>'; return; }
+  if(!ids.length){
+    if(st) st.textContent=aramaHata.n ? ('⚠ '+aramaHata.n+'/'+aramaHata.top+' arama başarısız') : 'Sonuç yok';
+    el.innerHTML='<div class="rd-empty">'+(aramaHata.n ? '⚠ Aramalar düştü: '+esc0(aramaHata.son) : 'Bu taramada sonuç çıkmadı')+'</div>';
+    return;
+  }
   if(st) st.textContent='⏳ video detayları…';
   const det={};
   for(let a=0;a<ids.length;a+=50){
@@ -18588,16 +19079,18 @@ async function rdClientCompute(key, st){
   // Çözüm: haftalık taramadaki ile aynı stopword tohumları, birleştirilerek.
   // Ölçüm: 4 tohum → 191 eşsiz video, hepsi TR ve yüksek izlenmeli.
   const freshIdSet=new Set();
+  const aramaHata={n:0,top:0,son:''};   // düşen aramalar sayılır → çağıran kullanıcıya söyler
   // 15 dk alt sınırı için medium(4-20dk)+long(>20dk) bantları — short'ları arama
   // AŞAMASINDA eler. Bantsız aramada ≥15dk video sayısı çok düşük kalıyordu
   // (ölçüm 23.07: bantsız 191→sadece 15 adet ≥15dk; bantlı 383→232 adet ≥15dk).
   for(const q of RD_HAFTA_SORGU){
     for(const band of ['medium','long']){
+      aramaHata.top++;
       try{
         const s=await ytkFetch(YT+'search?part=snippet&type=video&order=viewCount&regionCode=TR&relevanceLanguage=tr&videoDuration='+band
           +'&publishedAfter='+encodeURIComponent(after)+'&q='+encodeURIComponent(q)+'&maxResults=50&key='+key);
         (s.items||[]).forEach(i=>{ const id=i.id&&i.id.videoId; if(id) freshIdSet.add(id); });
-      }catch(e){ console.warn('[RD] taze arama "'+q+'/'+band+'":',e.message); }
+      }catch(e){ console.warn('[RD] taze arama "'+q+'/'+band+'":',e.message); aramaHata.n++; aramaHata.son=e.message; }
     }
   }
   const freshIds=[...freshIdSet];
@@ -18679,7 +19172,8 @@ async function rdClientCompute(key, st){
   // gtrend (Erken Sinyal) tarayıcıdan hesaplanamaz — Google Trends CORS engelli, n8n gerekli
   // kesif de gtrend gibi n8n'e bagli: Wikipedia ve YouTube HTML'i CORS yuzunden
   // tarayicidan cekilemez, sunucu tarafi (n8n) gerekir.
-  return {trend,rising,potential,outlier,gtrend:[],kesif:[],channels};
+  return {trend,rising,potential,outlier,gtrend:[],kesif:[],channels,
+          aramaHata: aramaHata.n ? aramaHata : null};
 }
 
 // Filtre eşikleri — keşif bölümlerinde 100K+ abone, her yerde 15 dk – 1 saat.
