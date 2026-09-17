@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- YAPI DAMGASI - TEK KAYNAK (PANEL_YAPI buradan okunur). Her push'ta elle ARTIR; geri almada da
+     artir (git revert bu satiri da geri alir, damga ASLA kuculmez). Bicim yYYYY.AA.GG-N, N genel sayac.
+     Nitelik sirasini ve bicimi DEGISTIRME: acik kalan eski sekmeler sayfanin yalniz ilk 4 KB'ini
+     okuyup bu satiri duzenli ifadeyle ariyor. -->
+<meta name="opus-yapi" content="y2026.09.17-101">
 <!-- Sayfanin adresi ucuncu taraflara (Google Fonts, YouTube, ytimg) sizmasin.
      API anahtarlarini sizdirmiyordu - anahtar giden istegin URL'sinde, Referer'da
      degil - ama IP + tam adres yine de gereksiz yere paylasiliyordu. -->
@@ -94,6 +99,9 @@ nav{flex:1;padding:8px 0;overflow-y:auto}
 .opc-check.done{background:var(--ok);color:#012}
 .opc-score{position:absolute;left:6px;top:6px;display:inline-flex;align-items:center;gap:3px;background:linear-gradient(135deg,#00e5ff,#00b8d4);color:#012;font-size:14px;font-weight:800;padding:3px 8px;border-radius:6px;box-shadow:0 2px 7px rgba(0,0,0,.4);z-index:4;line-height:1;letter-spacing:.2px}
 .opc-dur{position:absolute;right:6px;bottom:6px;background:rgba(0,0,0,.85);color:#fff;font-size:12px;font-weight:600;padding:2px 7px;border-radius:4px;z-index:4;line-height:1.4}
+/* OpusClip alt skor rozetleri kart GÖVDESİNDE (görselin üstü .opc-score/.opc-dur ile dolu).
+   SEÇİCİ İKİ SINIFLI: .badge aşağıda DAHA SONRA tanımlı; tek sınıflı kural ezilirdi. */
+.badge.opc-jr{font-size:10px;padding:0 5px;background:var(--sur2);color:var(--mt);border:1px solid var(--brd);letter-spacing:0;font-weight:500;cursor:help}
 .ph{margin-bottom:20px}
 .pt{font-family:var(--fh);font-size:24px;font-weight:800;color:var(--tx)}
 .ps{color:var(--mt);font-size:13px;margin-top:2px}
@@ -669,6 +677,8 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
 </aside>
 
 <main class="main">
+<!-- Bayat sekme seridi: sayfalarin DISINDA, tum sayfalarda gorunur; bayatSeritCiz doldurur -->
+<div id="panel-bayat-serit" style="display:none;max-width:1400px;margin:0 auto 8px"></div>
 
 <!-- DASHBOARD -->
 <div id="page-dashboard" class="page active">
@@ -987,6 +997,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
       Üstteki kategori çipleri <b>boşken</b> her video kendi kartındaki kategori, dil ve açıklamayla gönderilir.
       Çip seçersen bu bilinçli bir ezmedir: tüm seçililer o kategoriye gider, kartlardaki notlar kullanılmaz.
     </div>
+    <div id="tr-havuz" style="display:none;font-size:11px;color:var(--mt);padding-top:6px;line-height:1.7"></div>
     <div id="tr-kisayol">
       <span>⌨</span>
       <span><kbd>J</kbd><kbd>K</kbd> gez</span>
@@ -1144,6 +1155,14 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
           <div style="font-size:12px;color:var(--mt)" id="opc-clip-sub"></div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <!-- autocomplete=off: tarayıcı form durumunu geri yüklerse kutu ile ızgara ayrışmasın. -->
+          <select id="opc-sira" autocomplete="off" onchange="opcSiraDegis(this.value)" style="width:170px;margin:0;font-size:12px"
+            title="Yalnız GÖRÜNÜM sırası. Gönderim sırası değişmez: seçilen klipler OpusClip'in verdiği sırayla gönderilir. Skor ve kanca OpusClip tahmini, izlenmeyle ilişkisi ölçülmedi.">
+            <option value="api">Görünüm: OpusClip sırası</option>
+            <option value="skor">Görünüm: skor ↓</option>
+            <option value="kanca">Görünüm: kanca ↓</option>
+            <option value="sure">Görünüm: süre ↑</option>
+          </select>
           <button class="btn bg bsm" onclick="opcSelectAll()">Tümünü Seç</button>
           <button class="btn bg bsm" onclick="opcDeselectAll()">Seçimi Kaldır</button>
           <button class="btn bg bsm" onclick="opcMarkSelectedDone()" title="Seçili clipleri işlendi olarak işaretle (göndermeden)">✓ İşlendi İşaretle</button>
@@ -1346,6 +1365,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <button class="btn bg bsm" onclick="exportCSV('sl-tbody','shorts')">⬇ CSV</button>
   </div>
   <div class="card">
+    <div id="sl-uyum" style="font-size:11.5px;color:var(--mt);margin-bottom:8px;line-height:1.6"></div>
     <div class="tw">
       <table>
         <thead><tr><th>Başlık</th><th>Puan</th><th>Süre</th><th>IG</th><th>YT</th><th>TT</th><th>Durum</th><th>Tarih</th></tr></thead>
@@ -1414,7 +1434,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <!-- EN ÇOK İZLENEN SHORT'LAR -->
   <div class="card">
     <div class="ct">🏆 En Çok İzlenen Short'lar <span id="rap-top-n" style="letter-spacing:0;text-transform:none;font-size:11px;color:var(--mt)"></span></div>
-    <div id="klip-seri-durum" style="font-size:11px;color:var(--mt);margin-bottom:8px"></div>
+    <div id="klip-seri-durum" style="font-size:11px;color:var(--mt);margin-bottom:8px;white-space:pre-line"></div>
     <div id="rap-top-chips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
     <div id="rap-top-icerik"><div style="color:var(--mt);font-size:12px;text-align:center;padding:10px">↻ Raporu Oluştur'a bas</div></div>
   </div>
@@ -1462,6 +1482,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
   <div id="hd-uyari" style="margin-bottom:12px"></div>
+  <div id="yt-gor" style="margin-bottom:12px"></div>
   <div id="plat-eksik" style="margin-bottom:12px"></div>
   <div id="plat-kapsama" style="margin-bottom:12px"></div>
   <div id="plat-cift" style="margin-bottom:12px"></div>
@@ -1709,7 +1730,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <div id="rd-kat"><div class="rd-empty">Bu tarama isteğe bağlı — <b>🎯 Günün En İyi 5'i</b> butonuna bas</div></div>
   </div>
   <div class="card" style="border-color:rgba(167,139,250,.35)">
-    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--acc3)">💥 Outlier <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— kanal medyanının kaç katı</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="&lt;b&gt;Outlier = videonun izlenmesi ÷ kanalın son 20 video medyanı&lt;/b&gt; (chMed).&lt;br&gt;&lt;br&gt;Kanal büyüklüğünden bağımsız olarak &amp;quot;bu kanal için anormal&amp;quot; performansı gösterir — algoritmanın bir videoyu ittiğinin en erken sinyalidir.&lt;br&gt;&lt;br&gt;&lt;b&gt;2x&lt;/b&gt; kayda değer · &lt;b&gt;3–5x&lt;/b&gt; güçlü · &lt;b&gt;10x+&lt;/b&gt; patlama">ⓘ</button></span><span id="rd-outlier-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--acc3)">💥 Outlier <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— kanal medyanının kaç katı</span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="&lt;b&gt;Outlier = videonun izlenmesi ÷ kanalın son 50 yüklemesinden 3 dakikadan uzun olanların (en çok 20) medyanı; ≤3 dk videolar hariç&lt;/b&gt; (chMed).&lt;br&gt;&lt;br&gt;Kanal büyüklüğünden bağımsız olarak &amp;quot;bu kanal için anormal&amp;quot; performansı gösterir — algoritmanın bir videoyu ittiğinin en erken sinyalidir.&lt;br&gt;&lt;br&gt;&lt;b&gt;2x&lt;/b&gt; kayda değer · &lt;b&gt;3–5x&lt;/b&gt; güçlü · &lt;b&gt;10x+&lt;/b&gt; patlama">ⓘ</button></span><span id="rd-outlier-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span></div>
     <div id="rd-outlier" class="rd-grid"><div class="rd-empty" data-ilk="1"><span class="isk" style="display:inline-block;width:120px;height:12px"></span></div></div>
   </div>
   <div class="card">
@@ -2620,10 +2641,195 @@ function goUretim(id, anchor){
 // ═══════════════════════════════════════════════════════════
 // API HELPERS
 // ═══════════════════════════════════════════════════════════
-// Yapı damgası: her push'ta elle artırılır. Sol alt köşede görünür —
-// "eski sürümü mü açıyorum?" sorusunu tek bakışta cevaplar.
-const PANEL_YAPI = 'y2026.09.16-100';
+// Yapı damgası sol alt köşede görünür. TEK KAYNAK head'deki opus-yapi meta etiketi: açık kalan
+// eski sekme yeni sürümü sayfanın yalnız ilk 4 KB'ını okuyarak anlıyor, bu satır ~200 KB ötede.
+// Sabit + meta ikilisinde biri unutulunca ya hiç uyarmaz ya da taze sekmeyi kalıcı eski gösterirdi.
+// Okunamaz/geçersizse 'y0000.00.00-0': panel açılır, sürüm kontrolü ve sekme nabzı kendini kapatır.
+const PANEL_YAPI = (function(){
+  try {
+    const m = document.querySelector('meta[name="opus-yapi"]');
+    const v = m ? String(m.getAttribute('content') || '').trim() : '';
+    if (/^y[0-9]{4}[.][0-9]{2}[.][0-9]{2}-[0-9]{1,6}$/.test(v)) return v;
+  } catch(e){}
+  return 'y0000.00.00-0';
+})();
 function getN8N(){ return (S.cfg.n8n||'').replace(/\/$/,''); }
+
+// ── BAYAT PANEL SEKMESİ ──────────────────────────────────────────────
+// Push sonrası açık kalan sekme ESKİ kodu çalıştırır: saatlik çift temizliği (Upload-Post
+// kuyruğundan SİLER), günlük klip serisi (op_top_metrik), 10 dk'lık çerçeve ayarı gönderimi (n8n),
+// 15 dk'lık zil turu (n8n çalıştırması + op_notif'i bütün dizi olarak yazar) ve günlük YouTube görünürlük
+// turu (op_yt_gor + YouTube kotası).
+//  1) Yayın kontrolü: sayfanın ilk 4 KB'ı Range ile okunur; meta damgası büyükse şerit.
+//     HEAD + ETag/Last-Modified SEÇİLMEDİ: Pages'te ikisi de DAĞITIM anına bağlı ve panel banner'ları
+//     aynı repoya commit ediyor → her banner yayını yanlış alarm olurdu.
+//  2) Sekme nabzı: aynı yolda DAHA YENİ damgalı sekme son 15 dk'da nabız attıysa bu sekme periyodik
+//     YAZAN döngülerini atlar (o sekme koşturuyor). Tek başına bayat sekme DURMAZ: n8n import'u
+//     sonrası çerçeve ayarını geri getiren tek yol onun cerPeriyodik'i.
+// Otomatik yenileme YOK: kilitli toplu gönderimler yarıda kalır.
+function yapiSayi(s){
+  // METİN karşılaştırması YANLIŞ: 'y2026.09.16-100' > 'y2026.09.16-99' → false.
+  // Önce tarih, sonra N: N geçmişte bir kez sıfırlandı (y2026.08.03-23 → y2026.08.04-01).
+  const m = /^y([0-9]{4})[.]([0-9]{2})[.]([0-9]{2})-([0-9]{1,6})$/.exec(String(s || '').trim());
+  if (!m) return -1;
+  const yil = +m[1], ay = +m[2], gun = +m[3];
+  if (yil < 2026 || ay < 1 || ay > 12 || gun < 1 || gun > 31) return -1;
+  // Elle yazım hatası (09.61, 10.16 …) dev sayı üretip sekmeyi kalıcı 'en yeni' yapardı: nabzı doğru
+  // yeni sekmeleri durdurur, kendisi hiç şerit görmezdi. Gelecek tarih → geçersiz (2 gün pay).
+  if (new Date(yil, ay - 1, gun).getTime() > Date.now() + 2 * 864e5) return -1;
+  return (yil * 10000 + ay * 100 + gun) * 1e6 + Number(m[4]);
+}
+const SEKME_NABIZ_ANAHTAR = 'op_panel_nabiz';
+const SEKME_NABIZ_ARALIK  = 4 * 60000;     // 15 dk pencerede >=3 nabız
+const SEKME_NABIZ_TAZE    = 15 * 60000;
+let PANEL_BAYAT_NABIZ = null;   // bu sekmeden DAHA YENİ sekmenin son nabzı {yapi,t,yol} | null
+let PANEL_BAYAT_LOG = '';       // duraklatma logu geçiş başına BİR kez
+// Kullanıcının TÜM github.io Pages repoları aynı kökende = aynı localStorage: başka repodaki
+// panel kopyasının nabzı bu paneli durdurmasın.
+function panelYolu(){ try { return String(location.pathname || '/').replace(/index[.]html$/i, ''); } catch(e){ return '/'; } }
+function sekmeNabizOku(){
+  try {
+    const o = JSON.parse(localStorage.getItem(SEKME_NABIZ_ANAHTAR) || 'null');
+    if (o && typeof o.yapi === 'string' && Number.isFinite(o.t)) return o;
+  } catch(e){}
+  return null;
+}
+// ASKIDAN DÖNÜŞ (uyku / sekme dondurma): gecikmiş zamanlayıcılar birlikte tetiklenir, sıraları belirsiz.
+// Eski sekmenin dakikalık turu yeni sekmenin nabız turundan önce koşarsa diskteki nabız saatlerce eski
+// görünür ve eski kod bir tur koşardı. Son kontrolden 2×ARALIK'tan fazla geçtiyse uyanma sayılır: uyumadan
+// önce taze olan daha yeni nabız, uyanmadan sonra bir ARALIK (+30 sn) daha geçerli (o sekme yeniden yazsın).
+let SEKME_SON_KONTROL = 0, SEKME_UYANMA = 0, SEKME_UYKU_ONCESI = 0;
+const SEKME_UYANMA_PAYI = SEKME_NABIZ_ARALIK + 30000;
+function sekmeUyanmaIzle(simdi){
+  if (SEKME_SON_KONTROL && simdi - SEKME_SON_KONTROL > 2 * SEKME_NABIZ_ARALIK){
+    SEKME_UYANMA = simdi; SEKME_UYKU_ONCESI = SEKME_SON_KONTROL;
+  }
+  SEKME_SON_KONTROL = simdi;
+}
+// Her çağrı diski TAZE okur: yeni sekme açılınca bir sonraki döngü turunda etkili.
+function sekmeNabizDahaYeni(){
+  const simdi = Date.now();
+  sekmeUyanmaIzle(simdi);
+  const ben = yapiSayi(PANEL_YAPI);
+  if (ben < 0) return null;                          // damgası geçersiz sekme ne durur ne durdurur
+  const o = sekmeNabizOku(); if (!o) return null;
+  if (typeof o.yol === 'string' && o.yol !== panelYolu()) return null;
+  const yas = simdi - o.t;
+  if (yas < -SEKME_NABIZ_ARALIK) return null;                            // geleceğe dönük
+  if (yas > SEKME_NABIZ_TAZE){
+    const uyanmaPayi = SEKME_UYANMA && simdi - SEKME_UYANMA < SEKME_UYANMA_PAYI
+      && o.t >= SEKME_UYKU_ONCESI - SEKME_NABIZ_TAZE;                    // uyumadan önce tazeydi
+    if (!uyanmaPayi) return null;                                        // bayat
+  }
+  return yapiSayi(o.yapi) > ben ? o : null;
+}
+// lsNesneYaz İLE YAZILMAZ: değer birikim değil tek gözlem (şu an canlı en yeni damga). Asıl
+// tehlike eski sekmenin yeni sekmenin izini EZMESİ — oku-kıyasla: daha yeni taze nabız varsa
+// yazma. Aynı ms yarışı en fazla bir nabız kaybettirir, yeni sekme 4 dk içinde yeniden yazar.
+function sekmeNabizTur(){
+  PANEL_BAYAT_NABIZ = sekmeNabizDahaYeni();
+  if (!PANEL_BAYAT_NABIZ && yapiSayi(PANEL_YAPI) > 0){
+    try { localStorage.setItem(SEKME_NABIZ_ANAHTAR, JSON.stringify({ yapi: PANEL_YAPI, t: Date.now(), yol: panelYolu() })); } catch(e){}
+  }
+  bayatDurumLog();
+  bayatSeritCiz();
+}
+// Periyodik YAZAN döngülerin başında, REZERVASYONDAN/disk yazımından ÖNCE: true → tur atlanır.
+// Yalnız cerPeriyodik, ciftOtoTik, klipSeriOtoTur, ytGorTur (otomatik) ve 15 dk'lık zil turu. Elle yapılan işler etkilenmez.
+function bayatDongu(){
+  PANEL_BAYAT_NABIZ = sekmeNabizDahaYeni();
+  bayatDurumLog();
+  bayatSeritCiz();                 // duraklama bitince de şerit hemen güncellensin
+  return !!PANEL_BAYAT_NABIZ;
+}
+function bayatDurumLog(){
+  const y = PANEL_BAYAT_NABIZ ? PANEL_BAYAT_NABIZ.yapi : '';
+  if (y === PANEL_BAYAT_LOG) return;
+  if (y) addLog('warn','sistem', 'Bu sekme eski sürüm (' + PANEL_YAPI + '); daha yeni sürümlü sekme (' + y + ') son 15 dk içinde çalışıyor — bu sekmede otomatik çift temizliği, klip serisi turu, YouTube görünürlük turu, çerçeve ayarı yeniden gönderimi ve 15 dk\'lık zil taraması DURAKLATILDI (o sekme yürütüyor).');
+  else addLog('info','sistem', 'Daha yeni sürümlü sekmenin nabzı 15 dk\'dır görülmüyor — bu sekmede otomatik döngüler yeniden etkin');
+  PANEL_BAYAT_LOG = y;
+}
+
+const PANEL_SURUM_ARALIK = 30 * 60000, PANEL_SURUM_GORUNUR_KAPI = 5 * 60000, PANEL_SURUM_200_TAVAN = 2;
+const PANEL_YAPI_META_RE = /name="opus-yapi"[ ]+content="(y[0-9]{4}[.][0-9]{2}[.][0-9]{2}-[0-9]{1,6})"/;
+// protokol ayrı alan: location değiştirilemez, sahte veri testinde 'https:' verilebilsin
+const PANEL_SURUM = { canli:'', son:0, kapali:'', calisiyor:false, loglu:'', tam200:0, protokol: location.protocol };
+async function panelSurumKontrol(zorla){
+  if (PANEL_SURUM.protokol !== 'https:') return 'http';     // localhost → CSP connect-src https: bloklar
+  if (PANEL_SURUM.kapali) return 'kapali';
+  if (PANEL_SURUM.calisiyor) return 'suruyor';
+  if (yapiSayi(PANEL_YAPI) < 0) return 'damgasiz';
+  if (!zorla && Date.now() - PANEL_SURUM.son < PANEL_SURUM_GORUNUR_KAPI) return 'kapi';
+  PANEL_SURUM.calisiyor = true; PANEL_SURUM.son = Date.now();
+  const ac = new AbortController();
+  const zaman = setTimeout(() => ac.abort(), 10000);
+  try {
+    // cache:'no-store' TARAYICI önbelleğini atlar; CDN (max-age=600) devrede kalır. Chrome Range'li
+    // istekte sıkıştırma istemiyor (ölçüldü, github.io: 206, content-encoding yok, ~4,4 KB).
+    const r = await fetch(location.origin + location.pathname,
+      { cache:'no-store', headers:{ Range:'bytes=0-4095' }, signal: ac.signal });
+    if (r.status !== 206 && r.status !== 200){ try { await r.body.cancel(); } catch(e){} return 'hata'; }  // 4xx/5xx geçici
+    if (r.status === 200){
+      // Range yok sayıldı. TEK 200'de kapatma: günlerce açık bayat sekmeyi dağıtım sonrası tek bir
+      // önbellek ıskası kalıcı kör ederdi. Bu yanıtın da yalnız ilk parçaları okunur, akış iptal edilir.
+      PANEL_SURUM.tam200++;
+      if (PANEL_SURUM.tam200 >= PANEL_SURUM_200_TAVAN){
+        PANEL_SURUM.kapali = 'HTTP 200 x' + PANEL_SURUM.tam200;
+        addLog('info','sistem','Panel sürüm kontrolü bu oturumda kapatıldı: sunucu aralık isteğini üst üste desteklemedi (sekme nabzı çalışmaya devam ediyor)');
+      }
+    } else PANEL_SURUM.tam200 = 0;
+    const okuyucu = r.body.getReader(), dec = new TextDecoder();
+    let metin = '', n = 0;
+    try {
+      while (n < 8192){
+        const { done, value } = await okuyucu.read();
+        if (done) break;
+        n += value.length; metin += dec.decode(value, { stream:true });
+        if (PANEL_YAPI_META_RE.test(metin)) break;
+      }
+    } catch(e){}                              // kesik parça: okunan kadarı yeter
+    try { await okuyucu.cancel(); } catch(e){}
+    const m = PANEL_YAPI_META_RE.exec(metin);
+    // Meta yok → uyarı yok. Okuma yarıda kaldıysa ÖNCEKİ ölçüm kalır: kesik akış geçerli bir
+    // şeridi kapatmasın (meta ilk ~500 baytta).
+    if (m) PANEL_SURUM.canli = m[1];
+    else if (n >= 1024) PANEL_SURUM.canli = '';
+    bayatSeritCiz();
+    return PANEL_SURUM.canli;
+  } catch(e){
+    return 'hata';                            // ağ/zaman aşımı: sessiz, sonraki turda denenir
+  } finally {
+    clearTimeout(zaman); PANEL_SURUM.calisiyor = false;
+  }
+}
+let BAYAT_SERIT_HTML = '';
+function bayatSeritCiz(){
+  const el = document.getElementById('panel-bayat-serit'); if (!el) return;
+  const ben = yapiSayi(PANEL_YAPI);
+  const canliYeni = (ben > 0 && yapiSayi(PANEL_SURUM.canli) > ben) ? PANEL_SURUM.canli : '';
+  const nabizYeni = (ben > 0 && PANEL_BAYAT_NABIZ && yapiSayi(PANEL_BAYAT_NABIZ.yapi) > ben) ? PANEL_BAYAT_NABIZ.yapi : '';
+  let metin = '';
+  if (canliYeni){
+    metin = '<b>Panelin yeni sürümü yayınlandı</b> — yayında <code>' + esc0(canliYeni) + '</code>, bu sekme <code>'
+      + esc0(PANEL_YAPI) + '</code>. Uzun bir gönderim sürmüyorsa sayfayı <b>Ctrl+F5</b> ile yenile.';
+  } else if (nabizYeni){
+    // YAYINLANDI DENMEZ: nabız yalnız başka bir sekmenin damgasını bilir. Geri alma yayınında yenilemek
+    // bu sekmeyi yine aynı damgayla açar (duraklama sürer) — o yüzden kapatma seçeneği de yazılır.
+    metin = '<b>Bu sekme eski sürüm</b> — başka bir sekmede daha yeni panel açık (<code>' + esc0(nabizYeni)
+      + '</code>), bu sekme <code>' + esc0(PANEL_YAPI) + '</code>. Uzun bir gönderim sürmüyorsa bu sekmeyi <b>kapat</b> ya da <b>Ctrl+F5</b> ile yenile.';
+  }
+  if (nabizYeni) metin += '<br>Bu sekmede otomatik çift temizliği, klip serisi turu, YouTube görünürlük turu, çerçeve ayarı yeniden gönderimi ve 15 dk\'lık zil taraması <b>duraklatıldı</b> — daha yeni sekme yürütüyor.';
+  const html = metin ? seritKutu('var(--wn)', '🟡', metin) : '';
+  if (html !== BAYAT_SERIT_HTML){          // dakikalık ciftOtoTik çağrısında boşuna DOM yazma
+    BAYAT_SERIT_HTML = html;
+    el.innerHTML = html;
+    el.style.display = html ? 'block' : 'none';
+  }
+  if (canliYeni && PANEL_SURUM.loglu !== canliYeni){
+    PANEL_SURUM.loglu = canliYeni;
+    addLog('warn','sistem','Panelin yeni sürümü yayınlandı: ' + canliYeni + ' (bu sekme ' + PANEL_YAPI + ') — uzun gönderim sürmüyorsa Ctrl+F5');
+  }
+}
 
 // ── n8n webhook kimlik doğrulaması ─────────────────────────────────────────
 // n8n'deki 24 webhook'un tamamı kimlik doğrulamasız ve yolları tahmin
@@ -3835,6 +4041,9 @@ async function loadAllSheetData(page) {
 const SHEET_TBODY = { kuyruk:['kuyruk-tbody',6], shortlist:['sl-tbody',8],
                       urltakip:['url-tbody',8], arsiv:['ar-tbody',5] };
 function sheetTbodyYaz(page, metin){
+  // Yapılandırma eksik ya da iki okuma da düştü: uyum özetini de sil — önceki
+  // başarılı yüklemenin sayıları hata metninin üstünde güncelmiş gibi durmasın.
+  if (page === 'shortlist') { const u = document.getElementById('sl-uyum'); if (u) u.textContent = ''; }
   const t = SHEET_TBODY[page]; if (!t) return;
   const el = document.getElementById(t[0]); if (!el) return;
   el.innerHTML = '<tr><td colspan="'+t[1]+'" style="text-align:center;color:var(--wn);padding:16px">'
@@ -3900,6 +4109,119 @@ function urlMukerrerUyari(urls){
     + '<b>yeni tarih varsa</b> hâlâ açık bir yol var.'
     + satirlar + (m.length > 12 ? '<div style="margin-top:4px;opacity:.8">… ve ' + (m.length - 12) + ' video daha</div>' : '')
     + '</div>';
+}
+
+// ── OPUSCLIP ÇIKTI UYUMU (Kısa Liste) — 0 istek, 0 yazım ─────────────────
+// Sheet1'e iki yazıcı var (n8n JSON ile doğrulandı):
+//   'Short Kaydet3'    → üretim hattı + Galeri direkt; clip-id = '{projectId}.{clipId}'
+//   'Sheet Kaydet Oto' → clip-id 'igm-<media_id>', score/duration-ms YAZMAZ
+// igm- satırları paydaya girerse oran yapay düşer ve "skor gelmiyor" yanlış sonucu
+// çıkar; yalnız birleşik kimlikli satırlar sayılır. Birim KLİP: çok kategorili
+// gönderim aynı clip-id'yi 2+ satır yazar.
+const KLIP_UYUM_PENCERE = 200;
+// 1 saatten uzun klip olamaz. Değerler metin yazılıyor; TR yerel ayarlı tablo
+// ondalıklı ms'yi binlik ayırıcıyla 1000 kat büyütebilir (canlıda ölçülmedi) —
+// '>90 sn' kovasına girerse "[[30,90]] uygulanmıyor" diye YANLIŞ sonuç çıkar.
+const KLIP_UYUM_SURE_TAVAN_SN = 3600;
+// n8n 'Video Parcala Formatla': `[Parça ${i+1}/${N} — ${start}sn-${end}sn]`.
+// Biçim değişirse Parçala klipleri ana dağılıma düşer ve "Parçala" satırı hiç görünmez.
+const KLIP_UYUM_PARCA_RE  = /\[\s*Par[çc]a\s+\d+\s*\/\s*\d+/i;
+const KLIP_UYUM_ARALIK_RE = /(\d+)\s*sn\s*-\s*(\d+)\s*sn/i;
+// Sheets değeri sayı ya da metin gelebilir. tamSayiMs: TR binlik ayırıcı ("45.600")
+// ondalık sanılırsa 45,6 ms → okunamaz olurdu. (Kısa Liste Süre kolonu aynı hücrede '-' gösterir.)
+function klipUyumSayi(v, tamSayiMs){
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return NaN;
+  if (tamSayiMs && /^\d{1,3}([.,]\d{3})+$/.test(s)) return Number(s.replace(/[.,]/g, ''));
+  return Number(s.replace(',', '.'));
+}
+// SAF: DOM ve localStorage'a dokunmaz.
+function klipUyumSayac(shorts){
+  const satirlar = Array.isArray(shorts) ? shorts : [];
+  const o = { n:0, satir:0, skorlu:0,
+              ana:   { n:0, alt:0, orta:0, ust:0, okunamadi:0, tarihsiz:0, tarihsizKova: { alt:0, orta:0, ust:0 } },
+              parca: { n:0, icinde:0, disinda:0, okunamadi:0 } };
+  const gorulen = new Set(), klipler = [];
+  // Sondan geriye (append sırası = en yeni en sonda). Filtre DİLİMLEMEDEN ÖNCE:
+  // yoksa son 200 satırın bir kısmı igm- olur ve pencere daralır.
+  for (let i = satirlar.length - 1; i >= 0 && klipler.length < KLIP_UYUM_PENCERE; i--){
+    const r = satirlar[i] || {};
+    const cid = String(r['clip-id'] || r['clipId'] || '').trim();
+    if (!cid || /^igm-/i.test(cid) || !pdProjeKimligi(cid)) continue;
+    o.satir++;
+    if (gorulen.has(cid)) continue;
+    gorulen.add(cid); klipler.push(r);
+  }
+  o.n = klipler.length;
+  klipler.forEach(r => {
+    // n8n JS3: `clipJson.score || ''` → skorsuz ve 0 aynı yazılır; ikisi de "skor yok".
+    const sk = klipUyumSayi(ydefAl(r, ['score']), false);
+    if (Number.isFinite(sk) && sk > 0) o.skorlu++;
+    const ms = klipUyumSayi(ydefAl(r, ['duration-ms','durationMs']), true);
+    const sn = (Number.isFinite(ms) && ms >= 1000 && ms <= KLIP_UYUM_SURE_TAVAN_SN * 1000) ? Math.round(ms / 1000) : null;
+    const not = ydefAl(r, ['aciklama-notu','aciklama_notu']);
+    const pIx = not.search(KLIP_UYUM_PARCA_RE);
+    if (pIx >= 0){
+      // Parçala kendi penceresiyle istendi ([[max(10,segLen-10), segLen+5]]);
+      // [[30,90]] kovalarına katılırsa >90 oranını yapay şişirir.
+      o.parca.n++;
+      const m = not.slice(pIx).match(KLIP_UYUM_ARALIK_RE);   // not başındaki başka "sn-" ifadesini yakalamasın
+      const seg = m ? (Number(m[2]) - Number(m[1])) : 0;
+      if (sn == null || !(seg > 0)) { o.parca.okunamadi++; return; }
+      if (sn >= Math.max(10, seg - 10) && sn <= seg + 5) o.parca.icinde++; else o.parca.disinda++;
+      return;
+    }
+    o.ana.n++;
+    // Galeri direkt yolu created-at'i boş yazar; üretim hattı clip.createdAt geçirir.
+    // Canlıda doğrulanmadığı için DIŞARIDA BIRAKILMAZ, kova dağılımı ayrıca sayılır.
+    const tarihsiz = !ydefAl(r, ['created-at','createdAt']);
+    if (tarihsiz) o.ana.tarihsiz++;
+    if (sn == null) { o.ana.okunamadi++; return; }
+    const kova = sn < 30 ? 'alt' : (sn <= 90 ? 'orta' : 'ust');
+    o.ana[kova]++;
+    if (tarihsiz) o.ana.tarihsizKova[kova]++;
+  });
+  return o;
+}
+// HTML'e yalnız hesaplanmış TAM SAYILAR ve sabit metin girer; Sheet metni hiç basılmaz.
+// RENK/EŞİK YOK: yanlış alarm operatörü plan ya da n8n değişikliğine itebilir.
+function klipUyumHtml(o){
+  if (!o || !o.n){
+    return '<span title="' + esc0('Sheet1\'de clip-id\'si {projectId}.{clipId} biçiminde satır bulunamadı. igm- (Oto Yakala) satırları sayılmaz.') + '">'
+         + '🎯 OpusClip çıktı uyumu: sayılacak OpusClip satırı yok</span>';
+  }
+  const yz = (a, b) => b ? '%' + Math.round(a * 100 / b) : '—';
+  const IPUCU_GENEL = 'Kaynak: Sheet1 (short-kaydetme). Satır sırasına göre sondan geriye, benzersiz clip-id ile en fazla '
+    + KLIP_UYUM_PENCERE + ' OpusClip klibi. igm- (Oto Yakala) ve {projectId}.{clipId} biçiminde olmayan satırlar sayılmaz; '
+    + 'çok kategorili gönderimin tekrar satırları tek klip sayılır. Tablonun arama/durum süzgecinden bağımsızdır. Ek istek ya da kayıt yok.';
+  const IPUCU_SKOR = 'score > 0 olan klip oranı. Skor OpusClip tahmini (0-99, kliplerin birbiriyle karşılaştırılması için); izlenmeyle ilişkisi ölçülmedi.\n'
+    + 'Boş ya da 0 skor: OpusClip bu klibe skor vermedi (skor yalnız Pro/Starter planında) ya da yanıttaki alan adı farklı.\n'
+    + 'Üretim hattındaki n8n skor kapısı skorsuz klipleri ELEMEZ: oran düşükse kapı fiilen veri görmüyor demektir; bu bir n8n arızası anlamına gelmez.\n'
+    + 'Karşılaştırma: Galeri\'de bir proje açınca başlıktaki "skor a/n" OpusClip yanıtının kendisini sayar.\n'
+    + 'Sonuç tek başına plan, n8n ya da ayar değişikliği gerektirmez.';
+  const IPUCU_SURE = 'n8n Video Analiz Et3 clipDurations [[30,90]] istiyor. Bu değer OpusClip belgesinin saydığı seçenekler arasında değil; '
+    + 'uygulanıp uygulanmadığı bu dağılımdan görülür. Saniye yuvarlanır.\n'
+    + '1 sn altı ya da 1 saat üstü değerler (bozuk ya da yerel ayarla büyümüş) kovalara girmez, "şüpheli" sayılır.\n'
+    + 'Parçala klipleri kendi pencereleriyle istendiği için ayrı sayılır (aciklama-notu içindeki [Parça i/N — Xsn-Ysn] etiketi; '
+    + 'çok parçalı gönderimde n8n tüm kliplere 1. parçanın etiketini yazabilir).\n'
+    + 'Tarihsiz (created-at boş) satırlar büyük olasılıkla Galeri gönderimidir; Galeri projeleri başka süre ayarıyla açılmış olabilir. '
+    + 'Dağılıma DAHİLDİR, kendi kovaları parantezde ayrıca yazılır (üretim hattı = toplam − tarihsiz).\n'
+    + 'Sonuç tek başına ayar değişikliği gerektirmez; clipDurations değişikliği ayrı karardır.';
+  let skorNot = '';
+  if (o.n >= 10 && o.skorlu === 0) skorNot = ' — skor verisi gelmiyor (plan ya da alan adı)';
+  else if (o.skorlu > 0 && o.skorlu < o.n / 2) skorNot = ' — skor kısmen geliyor';
+  const a = o.ana, tk = a.tarihsizKova, okunan = a.alt + a.orta + a.ust;
+  const p = o.parca, pOk = p.icinde + p.disinda;
+  return '<div title="' + esc0(IPUCU_GENEL) + '">🎯 <b>OpusClip çıktı uyumu</b> · son ' + o.n + ' klip (' + o.satir + ' satır)'
+       +   (o.n < 20 ? ' · örnek az, yorumlama' : '') + '</div>'
+       + '<div title="' + esc0(IPUCU_SKOR) + '">Skor &gt; 0: ' + o.skorlu + '/' + o.n + ' (' + yz(o.skorlu, o.n) + ')' + skorNot + '</div>'
+       + '<div title="' + esc0(IPUCU_SURE) + '">Süre ([[30,90]] istendi, Parçala hariç ' + a.n + ' klip): '
+       +   '&lt;30 sn ' + a.alt + ' (' + yz(a.alt, okunan) + ') · 30–90 sn ' + a.orta + ' (' + yz(a.orta, okunan) + ') · &gt;90 sn ' + a.ust + ' (' + yz(a.ust, okunan) + ')'
+       +   (a.okunamadi ? ' · süresi okunamayan/şüpheli ' + a.okunamadi : '')
+       +   (a.tarihsiz ? ' · tarihsiz ' + a.tarihsiz + ' (Galeri olabilir, dahil: &lt;30 ' + tk.alt + ' · 30–90 ' + tk.orta + ' · &gt;90 ' + tk.ust + ')' : '')
+       + '</div>'
+       + (p.n ? '<div title="' + esc0(IPUCU_SURE) + '">Parçala: ' + p.n + ' klip · kendi penceresinde ' + p.icinde + '/' + pOk + ' (' + yz(p.icinde, pOk) + ')'
+       +   (p.okunamadi ? ' · okunamayan ' + p.okunamadi : '') + '</div>' : '');
 }
 
 async function loadSheetPage(page) {
@@ -3998,6 +4320,17 @@ async function loadSheetPage(page) {
 
   if (page==='shortlist') {
     const tb=document.getElementById('sl-tbody');
+    // Uyum özeti aynı `shorts` dizisinden: ek istek yok. Hata tabloyu düşürmesin.
+    const uyEl = document.getElementById('sl-uyum');
+    if (uyEl) {
+      try {
+        // Sheet1 düşüp URL-Takip okunduysa yukarıdaki erken dönüş çalışmaz; o durumda
+        // "sayılacak satır yok" demek YANLIŞ olur — sebep okuma hatası.
+        // SHEETS_HATA önbellek yolunda sıfırlanmıyor → yalnız !onb iken bakılır.
+        if (!onb && !shorts.length && SHEETS_HATA) uyEl.textContent = '🎯 OpusClip çıktı uyumu: Sheet1 okunamadı, sayılmadı';
+        else uyEl.innerHTML = klipUyumHtml(klipUyumSayac(shorts));
+      } catch(e) { uyEl.textContent = ''; console.warn('[klipUyum]', e.message); }
+    }
     const igK = ['instagram-hesap','instagram','ig-hesap','ig','instagram_account','Instagram'];
     const ytK = ['youtube-hesap','youtube','yt-hesap','yt','youtube_account','YouTube'];
     const ttK = ['tiktok-hesap','tiktok','tt-hesap','tt','tiktok_account','TikTok'];
@@ -4567,20 +4900,165 @@ function ttKayitTaze(anahtar, kayit){
 // ── KLIP BAZLI KALICI IZLENME SERISI (izlenme arastirmasi 2026-08) ─────────
 // op_top_metrik TTL'li ve GECICI: 7 gunde ucup gidiyor, tarih serisi yok.
 // Oysa "hangi degisiklik ise yaradi" sorusu klip basina TARIHLI seri ister.
-// Bicim: { "<plat>:<anahtar>": [[gunNo, izlenme], ...] }  gunNo = gun(epoch).
-// Ayni gun icin tek nokta tutulur (gunun son olcumu kazanir).
+// Bicim: { "<plat>:<anahtar>": [[gunNo, izlenme(, yasSaat)], ...] }  gunNo = gun(epoch, UTC).
+// Ayni gun icin tek nokta. Kazanan klipSeriYeniKazanir: D+2 (40-96 sa) noktasi pencere DISI
+// olcumle ezilmez; yassiz eski noktada eski kural (gunun son olcumu kazanir).
+// yasSaat (Eyl 2026, istege bagli): olcum anindaki yas, tam saat, Date.parse(rapHistTime(h)) ile.
+// DIKKAT: ofsetsiz upload_timestamp Chrome'da YEREL saat okunur (olculdu). Sunucu UTC'yi
+// ofsetsiz yaziyorsa TR'de yaslar +3 sa kayik. 1. katmanin 40 sa kurali ve hsSayilir da ayni
+// ayristirmayi kullandigi icin burada DUZELTILMEZ; tur ofsetsiz kayit sayisini ozete yazar (tzsiz).
 // Kota: anahtar 1200 / seri 24 nokta / son noktasi 120 gunden eski anahtar
 // budanir (~350 KB tavan; op_rap_snap'in yaninda guvenli).
 const KLIP_SERI_ANAHTAR = 'op_klip_seri';
 const KLIP_SERI_OTO_ANAHTAR = 'op_klip_seri_oto';
+// Son tur özeti + son 10 tur başlangıcı + katman başlangıcı (<1 KB). Ayrı anahtar: seri biçimine
+// dokunmadan öteki sekme de durumu okur, gerçek tur aralığı (kadans kararı) ölçülür.
+const KLIP_SERI_OZET_ANAHTAR = 'op_klip_seri_ozet';
 const KLIP_SERI_MAX_ANAHTAR = 1200, KLIP_SERI_MAX_NOKTA = 24, KLIP_SERI_ESKI_GUN = 120;
+// Tampon: { anahtar: { gunNo: {v, y} } }. Anahtar başına TEK yuva, 4 sn içindeki farklı günlü
+// ikinci yazımda ilkini diske hiç ulaştırmıyordu.
 let KLIP_SERI_BUF = {}, KLIP_SERI_TID = null;
-// gun (isteğe bağlı): ölçümün YAPILDIĞI gün. Verilmezse bugün. Önbellekten gelen
-// eski bir değer bugünün noktası diye yazılırsa seride sahte, düz noktalar oluşur.
-function klipSeriEkle(anahtar, izlenme, gun){
+
+// ── D+2 ÖLÇÜM YAŞI KATMANI (Eyl 2026, 2. katman) ──────────────────────────
+// Neden: 12. saatte alınan değer önbellekte 7 gün taze sayılıyor, D+2'de API'ye hiç gidilmiyordu
+// (simülasyon d2sim.ps1: gönderilerin %0,4-17'si 40-96 sa yaşında gerçekten ölçülüyordu).
+// Karşılaştırılabilir tek sayı D+2. Nokta biçimi GÖÇ ETMEZ; okuyucular yalnız [0]/[1] kullanıyor.
+const KLIP_SAAT = 3600000;
+const KLIP_D2_ALT = 40, KLIP_D2_UST = 96;
+// Seçimde üst sınır 1 sa dar: tur kova yüzünden dakikalar sürer, 95,9. saatte seçilen
+// gönderi 97. saatte ölçülüp pencereden düşmesin.
+const KLIP_D2_SECIM_UST = 95;
+// Sekme kapanırsa en fazla ~24 op_top_metrik kaydı kaybolur (seri noktaları 4 sn'de diske gidiyor)
+const KLIP_SERI_ARA_KAYIT = 25;
+
+function klipSeriYas(olcumMs, yayinMs){
+  if (!olcumMs || !yayinMs || !isFinite(olcumMs) || !isFinite(yayinMs)) return null;
+  // Aşağı yuvarlama: 39,6 saatlik ölçüm D+2 sayılmasın (seçim de tam saatle)
+  return Math.max(0, Math.floor((olcumMs - yayinMs) / KLIP_SAAT));
+}
+function klipD2Icinde(y){ return typeof y === 'number' && y >= KLIP_D2_ALT && y <= KLIP_D2_UST; }
+// Aynı güne ikinci ölçüm: (a) D+2 noktası pencere DIŞI ölçümle ezilmez (aynı gün 95 → 100 sa'lik
+// En Çok İzlenen ölçümü D+2'yi silerdi); (b) daha genç ölçüm daha yenisini ezmez (önbellek yolu
+// eski değeri ölçüm gününe yazar); (c) yaşsız ölçüm D+2 noktasını ezmez.
+function klipSeriYeniKazanir(eskiYas, yeniYas){
+  const e = (typeof eskiYas === 'number') ? eskiYas : null;
+  const y = (typeof yeniYas === 'number') ? yeniYas : null;
+  if (e == null) return true;
+  if (y == null) return !klipD2Icinde(e);
+  if (klipD2Icinde(e) && !klipD2Icinde(y)) return false;
+  return y >= e;
+}
+// sadecePencere=false: 40 sa sonrası nokta var mı (seçim). true: 40-96 sa noktası var mı (oran).
+function klipSeriD2Var(seri, sadecePencere){
+  return Array.isArray(seri) && seri.some(function(n){
+    return Array.isArray(n) && typeof n[2] === 'number'
+      && (sadecePencere ? klipD2Icinde(n[2]) : n[2] >= KLIP_D2_ALT);
+  });
+}
+// Son noktanın günü; boş ya da BOZUK seride -1. Elle bozulmuş/yedekten dönmüş bir öğe ölçüm
+// başlamadan TypeError atıp damgayı geri sardırıyor, tur her saat 10 sayfa geçmiş okuyordu.
+function klipSeriSonGun(seri){
+  if (!Array.isArray(seri) || !seri.length) return -1;
+  const n = seri[seri.length - 1];
+  return (Array.isArray(n) && typeof n[0] === 'number' && isFinite(n[0])) ? n[0] : -1;
+}
+// op_top_metrik kaydı "40 sa sonrası DENENDİ ama izlenme gelmedi" mi? 'mz' = metrik geldi, izlenme
+// alanı yok (FB belgeye göre yalnız reach); 'hata' = e:1. Seriye nokta yazılmadığı için bu gönderi
+// 7 günlük geri çekilme bitince "hiç ölçülmemiş" sanılıp gerçek yeniden ölçümlerin önüne geçiyordu.
+// Yalnız s:2: eski ayrıştırıcının kaydı sınıflamaya girmez (1. katman kararı).
+function klipKayitDenenmis(r, yayinMs){
+  if (!r || r.s !== TT_KAYIT_SURUM || r.v != null || !r.t || !yayinMs) return '';
+  if (r.t - yayinMs < KLIP_D2_ALT * KLIP_SAAT) return '';
+  return r.e ? 'hata' : 'mz';
+}
+function klipSeriOku(){
+  try { const h = JSON.parse(localStorage.getItem(KLIP_SERI_ANAHTAR) || '{}');
+        return (h && typeof h === 'object' && !Array.isArray(h)) ? h : {}; } catch(e){ return {}; }
+}
+function klipSeriOzetOku(){
+  try { const o = JSON.parse(localStorage.getItem(KLIP_SERI_OZET_ANAHTAR) || '{}');
+        return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; } catch(e){ return {}; }
+}
+// Oku-birleştir-yaz (lsNesneYaz kalıbı; onun "kopya koruması körleşebilir" hata metni bu anahtar
+// için yanlış olurdu). Aynı turun (bas) alanları birleşir, yeni tur özeti tamamen yeniler; diskte
+// DAHA YENİ turun özeti varsa geç kalan yazım onu ezmez.
+function klipSeriOzetYaz(son, ekTur, kap){
+  const disk = klipSeriOzetOku();
+  const eski = (disk.son && typeof disk.son === 'object') ? disk.son : null;
+  const bas = (son && son.bas) || ekTur || 0;
+  if (bas && eski && typeof eski.bas === 'number' && eski.bas > bas) return disk;
+  if (son && son.bas) disk.son = Object.assign({}, (eski && eski.bas === son.bas) ? eski : {}, son);
+  if (ekTur){
+    const t = Array.isArray(disk.turlar) ? disk.turlar.filter(function(x){ return typeof x === 'number'; }) : [];
+    if (t.indexOf(ekTur) < 0) t.push(ekTur);
+    disk.turlar = t.sort(function(a, b){ return a - b; }).slice(-10);
+    if (!disk.d2Bas) disk.d2Bas = ekTur;   // katmanın ilk turu: orandan önceki dönem çıkarılır
+  }
+  if (kap) disk.kap = Object.assign({ t: Date.now() }, kap);
+  disk.s = 1;
+  try { localStorage.setItem(KLIP_SERI_OZET_ANAHTAR, JSON.stringify(disk)); }
+  catch(e){ console.warn('[KLIP] tur özeti yazılamadı:', e.message || e.name); }
+  return disk;
+}
+// Katman 0 adayı mı? a: {k, yayin, yas, sayilir}; seri: op_klip_seri[k]; eski: op_top_metrik[k]
+function klipSeriD2Aday(a, seri, eski){
+  if (!a.sayilir || a.yas < KLIP_D2_ALT || a.yas > KLIP_D2_SECIM_UST) return false;
+  if (klipSeriD2Var(seri, false)) return false;
+  if (ttKayitTaze(a.k, eski)){
+    const oy = klipSeriYas(eski.t, a.yayin);
+    // Taze kayıt ZATEN 40 sa sonrası alınmışsa API'ye gitme: değer varsa önbellek yolu noktayı
+    // yaşıyla yazar; e'siz null metriksiz (1. katmanın 7 günlük kuralı). e:1 yeniden sorulur.
+    if (oy != null && oy >= KLIP_D2_ALT && (eski.v != null || !eski.e)) return false;
+  }
+  return true;
+}
+// D+2 ÖLÇÜM ORANI (arayüzde "kapsama" DENMEZ: panelde Kapsama = yayın kapsaması, düşük yüzde
+// yeniden gönderme refleksi doğurabilir). 4-10 günlük gönderilerin kaçında 40-96 sa noktası var.
+// Sayılmayan: hesabı sıfırlanmış eski gönderi, katman başlamadan D+2 seçimini geçmiş gönderi.
+// mz: noktası yok ve 40 sa sonrası denemede platform izlenme alanı vermedi (paydadan çıkarılır).
+function klipSeriD2Oran(adaylar, seri, metrik, simdi, d2Bas){
+  const o = { n: 0, d2: 0, mz: 0, p: {} };
+  (adaylar || []).forEach(function(a){
+    if (!a || !a.sayilir || !a.yayin) return;
+    const yas = Math.floor((simdi - a.yayin) / KLIP_SAAT);
+    if (yas < KLIP_D2_UST || yas > 240) return;                      // 240 = 10 günlük tur penceresi
+    if (d2Bas && a.yayin < d2Bas - KLIP_D2_SECIM_UST * KLIP_SAAT) return;
+    const p = o.p[a.p] || (o.p[a.p] = [0, 0, 0]);                  // [d2, n, metriksiz]
+    o.n++; p[1]++;
+    if (klipSeriD2Var(seri[a.k], true)){ o.d2++; p[0]++; return; }
+    // Seri noktası kaybolmuş olabilir (anahtar tavanı budaması, kota): op_top_metrik'teki s:2 değer
+    // 40-96 sa'te alınmışsa ölçüm yapılmıştır — kaçırılmış sayılmaz
+    const r = metrik[a.k];
+    if (r && r.s === TT_KAYIT_SURUM && r.v != null && klipD2Icinde(klipSeriYas(r.t, a.yayin))){ o.d2++; p[0]++; return; }
+    if (klipKayitDenenmis(r, a.yayin) === 'mz'){ o.mz++; p[2]++; }
+  });
+  return o;
+}
+
+// gun (isteğe bağlı): ölçümün YAPILDIĞI gün; verilmezse YAZIM anındaki gün (flush anı değil).
+// Önbellekten gelen eski bir değer bugünün noktası diye yazılırsa seride sahte, düz noktalar
+// oluşur. yasSaat (isteğe bağlı): bilinmiyorsa nokta 2 elemanlı.
+function klipSeriEkle(anahtar, izlenme, gun, yasSaat){
   if (!anahtar || izlenme == null || !isFinite(izlenme)) return;
-  KLIP_SERI_BUF[anahtar] = { v: Math.round(izlenme), g: (gun != null && isFinite(gun)) ? Math.floor(gun) : null };
+  const g = (gun != null && isFinite(gun)) ? Math.floor(gun) : Math.floor(Date.now() / 864e5);
+  const y = (yasSaat != null && isFinite(yasSaat)) ? Math.max(0, Math.floor(yasSaat)) : null;
+  const gunler = KLIP_SERI_BUF[anahtar] || (KLIP_SERI_BUF[anahtar] = {});
+  const onceki = gunler[g];
+  if (onceki && !klipSeriYeniKazanir(onceki.y, y)) return;
+  gunler[g] = { v: Math.round(izlenme), y: y };
   if (!KLIP_SERI_TID) KLIP_SERI_TID = setTimeout(klipSeriFlush, 4000);
+}
+// Budama sırası (ilk silinecek önce): D+2 koruması OLMAYANLAR son nokta günü en eski önce, sonra
+// korunanlar. KORUMA: son 11 günde alınmış 40-96 sa noktası (D+2 ölçüm oranının 4-10 günlük
+// penceresi). Yalnız son nokta gününe bakan sıra, En Çok İzlenen'in eski gönderilere BUGÜN tarihli
+// yazdığı noktalar yüzünden yeni gönderilerin D+2 noktalarını önce siliyordu (oran günlerce düşük,
+// değer kalıcı kayıp). Korunan anahtar ~11 gün × ~75 yayın ≈ 825 < 1200 tavan.
+function klipSeriBudamaSirasi(disk, gun){
+  const sinir = gun - KLIP_SERI_PENCERE_GUN - 1;
+  return Object.keys(disk).map(function(k){
+    const d = disk[k];
+    return { k: k, koru: d.some(function(n){ return n[0] >= sinir && klipD2Icinde(n[2]); }) ? 1 : 0, son: d[d.length - 1][0] };
+  }).sort(function(a, b){ return (a.koru - b.koru) || (a.son - b.son); }).map(function(x){ return x.k; });
 }
 function klipSeriFlush(){
   KLIP_SERI_TID = null;
@@ -4591,19 +5069,34 @@ function klipSeriFlush(){
   let disk = {};
   try { const h = JSON.parse(localStorage.getItem(KLIP_SERI_ANAHTAR) || '{}');
         if (h && typeof h === 'object' && !Array.isArray(h)) disk = h; } catch(e){}
+  // Bozuk öğe (elle düzenleme / elle değiştirilmiş yedek): budama ve sıralama TypeError atıp bu
+  // flush'taki TÜM noktaları kaybettiriyordu. Geçersiz öğe süzülür, boş kalan anahtar aşağıda budanır.
+  const _gecerli = n => Array.isArray(n) && typeof n[0] === 'number' && isFinite(n[0]);
+  Object.keys(disk).forEach(k => {
+    const d = disk[k];
+    if (!Array.isArray(d)) disk[k] = [];
+    else if (!d.every(_gecerli)) disk[k] = d.filter(_gecerli);
+  });
   const gun = Math.floor(Date.now() / 864e5);
   for (const k of adlar){
     const d = Array.isArray(disk[k]) ? disk[k] : [];
-    const b = buf[k];
-    const g = (b && b.g != null) ? b.g : gun;
-    const v = (b && typeof b === 'object') ? b.v : b;
-    const i = d.findIndex(function(n){ return n && n[0] === g; });
-    if (i >= 0) d[i][1] = v;
-    else {
-      d.push([g, v]);
-      // geçmiş günlü nokta araya girebilir — seri gün sırasında kalmalı
-      if (d.length > 1 && d[d.length-2][0] > g) d.sort(function(x, y){ return x[0] - y[0]; });
-    }
+    const gunler = (buf[k] && typeof buf[k] === 'object') ? buf[k] : {};
+    Object.keys(gunler).map(Number).filter(isFinite).sort(function(a, b){ return a - b; }).forEach(function(g){
+      const b = gunler[g]; if (!b) return;
+      const y = (typeof b.y === 'number') ? b.y : null;
+      const i = d.findIndex(function(n){ return Array.isArray(n) && n[0] === g; });
+      if (i >= 0){
+        if (klipSeriYeniKazanir(d[i][2], y)){
+          d[i][1] = b.v;
+          if (y != null) d[i][2] = y;
+          else d[i].length = 2;          // yaşı bilinmeyen ölçüm eski yaşı TAŞIMASIN
+        }
+      } else {
+        d.push(y != null ? [g, b.v, y] : [g, b.v]);
+        // geçmiş günlü nokta araya girebilir — seri gün sırasında kalmalı
+        if (d.length > 1 && d[d.length-2][0] > g) d.sort(function(x, z){ return x[0] - z[0]; });
+      }
+    });
     while (d.length > KLIP_SERI_MAX_NOKTA) d.shift();
     disk[k] = d;
   }
@@ -4615,14 +5108,14 @@ function klipSeriFlush(){
   }
   let kalan = Object.keys(disk);
   if (kalan.length > KLIP_SERI_MAX_ANAHTAR){
-    kalan.sort((a,b) => disk[a][disk[a].length-1][0] - disk[b][disk[b].length-1][0]);
+    kalan = klipSeriBudamaSirasi(disk, gun);
     kalan.slice(0, kalan.length - KLIP_SERI_MAX_ANAHTAR).forEach(k => delete disk[k]);
   }
   try { localStorage.setItem(KLIP_SERI_ANAHTAR, JSON.stringify(disk)); }
   catch(e){
     // kota: en eski yari gider, bir kez daha denenir (ttMetrikYaz kalibi)
     try {
-      const ks = Object.keys(disk).sort((a,b) => disk[a][disk[a].length-1][0] - disk[b][disk[b].length-1][0]);
+      const ks = klipSeriBudamaSirasi(disk, gun);
       ks.slice(0, Math.floor(ks.length/2)).forEach(k => delete disk[k]);
       localStorage.setItem(KLIP_SERI_ANAHTAR, JSON.stringify(disk));
       addLog('warn','sistem','Klip serisi kotaya carpti — en eski yarisi budandi');
@@ -4633,18 +5126,92 @@ function klipSeriFlush(){
 function klipSeriDurumYaz(){
   const el = document.getElementById('klip-seri-durum'); if (!el) return;
   try {
-    const disk = JSON.parse(localStorage.getItem(KLIP_SERI_ANAHTAR) || '{}');
-    const n = Object.keys(disk).length;
-    const son = parseInt(localStorage.getItem(KLIP_SERI_OTO_ANAHTAR) || '0', 10);
-    el.textContent = n
+    const n = Object.keys(klipSeriOku()).length;
+    const son = parseInt(localStorage.getItem(KLIP_SERI_OTO_ANAHTAR) || '0', 10) || 0;
+    const oz = klipSeriOzetOku();
+    const t = (oz.son && typeof oz.son === 'object') ? oz.son : null;
+    const kap = (oz.kap && typeof oz.kap === 'object') ? oz.kap : null;
+    // localStorage elle bozulmuş olabilir: sayı değilse 0 (yazım zaten textContent)
+    const say = function(x){ return (typeof x === 'number' && isFinite(x)) ? x : 0; };
+    const trh = function(ms){ ms = say(ms); return ms ? new Date(ms).toLocaleString('tr', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '?'; };
+    const PAD = { instagram:'IG', youtube:'YT', tiktok:'TT', facebook:'FB', x:'X' };
+    // Kadans ölçümü: ara tur kararı gerçek aralığa bağlı
+    const tl = Array.isArray(oz.turlar) ? oz.turlar.filter(function(x){ return typeof x === 'number'; }).sort(function(a, b){ return a - b; }) : [];
+    let aralik = '';
+    if (tl.length >= 3){
+      const fr = []; for (let i = 1; i < tl.length; i++) fr.push(tl[i] - tl[i-1]);
+      fr.sort(function(a, b){ return a - b; });
+      aralik = ' · turlar arası medyan ~' + Math.round(fr[Math.floor(fr.length / 2)] / KLIP_SAAT) + ' sa';
+    }
+    const satir = [];
+    satir.push(n
       ? ('📈 Kalıcı izlenme serisi: ' + n + ' gönderi izleniyor · son otomatik tur: '
-         + (son ? new Date(son).toLocaleString('tr') : 'henüz yok') + ' (günde 1, panel açıkken)')
-      : '📈 Kalıcı izlenme serisi boş — ilk otomatik tur panel açıldıktan ~90 sn sonra başlar (Upload-Post API Key gerekli)';
+         + (son ? new Date(son).toLocaleString('tr') : 'henüz yok') + ' (günde 1, panel açıkken)' + aralik)
+      : '📈 Kalıcı izlenme serisi boş — ilk otomatik tur panel açıldıktan ~90 sn sonra başlar (Upload-Post API Key gerekli)');
+    if (kap && say(kap.n) > 0){
+      const olc = Math.max(0, say(kap.n) - say(kap.mz));
+      satir.push('🎯 D+2 ölçüm oranı (40-96 sa yaşında izlenmesi alınan), 4-10 günlük gönderiler: '
+        + (olc ? '%' + Math.round(100 * say(kap.d2) / olc) + ' (' + say(kap.d2) + '/' + olc + ')' : '—')
+        + (say(kap.mz) ? ' · ' + say(kap.mz) + ' gönderide platform izlenme sayısı vermiyor (orana katılmadı)' : '')
+        + ' · ' + trh(kap.t)
+        + (kap.eksik ? ' · yayın geçmişi 10 günü kapsamadı, oran eksik olabilir' : ''));
+      if (kap.p && typeof kap.p === 'object'){
+        // Yalnız bilinen platformlar: anahtar elle bozulmuşsa ekrana yabancı metin taşınmaz
+        const pl = Object.keys(PAD).filter(function(p){ return Array.isArray(kap.p[p]); }).map(function(p){
+          const v = kap.p[p], o = Math.max(0, say(v[1]) - say(v[2]));
+          return PAD[p] + ' ' + (o ? say(v[0]) + '/' + o : '—') + (say(v[2]) ? ' (izlenmesiz ' + say(v[2]) + ')' : '');
+        });
+        if (pl.length) satir.push('    ' + pl.join(' · '));
+      }
+    } else if (typeof oz.d2Bas === 'number'){
+      satir.push('🎯 D+2 ölçüm oranı: henüz 4 günü dolmuş gönderi yok — ölçüm yaşı katmanı ' + trh(oz.d2Bas) + ' tarihinde başladı');
+    }
+    if (t && say(t.bas)){
+      if (t.bit == null){
+        const canli = KLIP_SERI_KOSUYOR || (Date.now() - say(t.nabiz || t.bas) < 20 * 60000);
+        const ilerleme = say(t.istenen) ? say(t.bitti) + '/' + say(t.istenen) + ' gönderi' : '';
+        satir.push(canli
+          ? '⏳ Ölçüm turu sürüyor' + (ilerleme ? ': ' + ilerleme : ' (yayın geçmişi okunuyor)')
+          : '⚠ Son tur yarım kaldı (' + trh(t.bas) + ', ' + (ilerleme || 'yayın geçmişi okunurken')
+            + ') — sekme kapanmış olabilir; işlenenler kaydedildi, kalanlar bir sonraki günlük turda');
+      } else if (t.hata){
+        satir.push('⚠ Son tur hata ile bitti (' + trh(t.bas) + '): ' + String(t.hata).slice(0, 60)
+          + (say(t.bitti) ? ' — ' + say(t.bitti) + ' gönderi işlendi ve kaydedildi' : ''));
+      } else {
+        satir.push('Son tur (' + trh(t.bas) + '): ' + say(t.istenen) + ' gönderi soruldu · '
+          + say(t.olculen) + ' izlenme kaydı (' + say(t.atlanan) + ' önbellekten) · D+2 ' + say(t.d2Olculen) + '/' + say(t.d2Aday) + ' aday'
+          + (say(t.d2Mz) ? ' (' + say(t.d2Mz) + ' izlenmesiz platform)' : '')
+          + ' · ' + say(t.nullBekleyen) + ' izlenmesiz kayıt 7 gün sorulmadı'
+          + ' · ölçülemeyen ' + (say(t.hatali) + say(t.hataNull))
+          + ' (Upload-Post API hız sınırı: ' + say(t.h429) + ', ağ: ' + say(t.hAg) + ', diğer HTTP: ' + say(t.hDiger)
+          + ', yanıtta metrik hatası: ' + say(t.hataNull) + ')'
+          + (say(t.g429) ? ' · API hız sınırına ' + say(t.g429) + ' kez çarpıldı, otomatik beklendi (hesapla ilgisi yok)' : '')
+          + (say(t.sonraki) ? ' · ' + say(t.sonraki) + ' gönderi sonraki tura kaldı' : ''));
+      }
+    }
+    // Özet yazmayan (eski sürümlü) bir sekme turu koşmuşsa damga son özetten belirgin yeni olur.
+    // Geri sarılmış damga bas'tan KÜÇÜK olduğu için bu not yanlış tetiklenmez.
+    if (son && t && say(t.bas) && son > say(t.bas) + KLIP_SAAT && Date.now() - son < 20 * KLIP_SAAT)
+      satir.push('ℹ Son otomatik tur (' + trh(son) + ') özet yazmayan eski sürümlü bir sekmede koşmuş olabilir — yukarıdaki sayılar önceki turun');
+    el.title = (t && say(t.tzsiz))
+      ? 'Yayın zamanlarının ' + say(t.tzsiz) + ' tanesi saat dilimi belirtmiyor: yaşlar tarayıcı saatine göre hesaplandı (sunucu UTC yazıyorsa ~3 sa fazla)'
+      : '';
+    el.textContent = satir.join('\n');
   } catch(e){}
 }
-// Gunluk otomatik tur: son 10 gunun gonderilerini olcer (butce 150),
-// hem op_top_metrik onbellegini besler (manuel tur butcesi korunur)
-// hem kalici seriye yazar. Panel ACIKKEN gunde bir kez kosar.
+// Günlük otomatik tur: son 10 günün gönderilerini ölçer (bütçe 150 gönderi), op_top_metrik'i besler
+// (manuel tur bütçesi korunur), kalıcı seriye yazar. Panel AÇIKKEN 20 saatte bir.
+// ÖNCELİK KATMANLARI (Eyl 2026):
+//  0 D+2 adayı (40-95 sa, 40 sa sonrası noktası yok): önce taze adaylar, sonra D+2'de hata almış
+//    olanlar (hesap engeli olabilir); her grupta pencereden en önce çıkacak önce
+//  1 hiç DENENMEMİŞ ve ≥40 sa (D+2'yi kaçırmış, ör. panel kapalıydı): en eski önce
+//  2 ölçülmüş ya da 40 sa sonrası izlenmesiz/hatalı denenmiş: son deneme günü en eski önce
+//  3 hiç ölçülmemiş ve <40 sa: nasılsa D+2'de ölçülecek
+//  4 hesabı sıfırlanmış eski hesap gönderisi
+// Neden 3 sonda: yaşa bakmadan "hiç ölçülmemiş"i öne almak bütçeyi 12. saat ölçümlerine yediriyor,
+// 96 sa sonrası ölçümü %72'den %4'e düşürüyordu (d2sim.ps1, sürekli açık panel). Kapalı günlerde
+// ve yüksek hacimde bu oran yine düşer (%5-37); D+2 bilerek önceliklidir.
+// Kadans 20 sa: D+2 yükü tur başına 3,125/sa × aralık; 55 sa'lik seçim penceresi ≥2 tura denk gelir.
 const KLIP_SERI_TUR_BUTCE = 150, KLIP_SERI_PENCERE_GUN = 10;
 let KLIP_SERI_KOSUYOR = false;
 async function klipSeriOtoTur(){
@@ -4652,6 +5219,8 @@ async function klipSeriOtoTur(){
   if (!S.cfg.blot) { klipSeriDurumYaz(); return; }
   const son = parseInt(localStorage.getItem(KLIP_SERI_OTO_ANAHTAR) || '0', 10) || 0;
   if (Date.now() - son < 20 * 3600000) { klipSeriDurumYaz(); return; }
+  // BAYAT SEKME: rezervasyondan ÖNCE. Rezerve edip koşmamak 20 saati yakardı; tur daha yeni sekmede koşar.
+  if (bayatDongu()) { klipSeriDurumYaz(); return; }
   // REZERVASYON ISTEN ONCE + SON YAZAN KAZANIR JETONU (ciftOto ile ayni desen).
   // Yalniz damga yazmak yetmiyordu: iki sekme ayni milisaniyede kapiyi gecip
   // ikisi de turu kosabiliyordu (denetimde yakalandi — 'ciftOto dersi' deyip
@@ -4666,105 +5235,179 @@ async function klipSeriOtoTur(){
   let _bizimMi = true;
   try { _bizimMi = (localStorage.getItem(KLIP_SERI_OTO_ANAHTAR + '_j') === _jeton); } catch(e){}
   if (!_bizimMi){ klipSeriDurumYaz(); return; }
-  // Hata olursa damga GERI SARILIR (asagida catch) — gecici bir ag hatasi
-  // yuzunden 20 saat kaybetmemek icin. ciftOto ile ayni kural.
   KLIP_SERI_KOSUYOR = true;
+  const _bas = Date.now();
+  // Geri sarma _olcumBasladi'ya bakar: ölçüm başladıktan sonra geri sarmak aynı gün ikinci bir
+  // 150'lik tur, kod hatasında her saatlik kontrolde tekrar (istek fırtınası) demekti.
+  let _olcumBasladi = false, _bitti = 0, _degisen = {};
+  const _sayac = { olculen:0, atlanan:0, hatali:0, h429:0, hAg:0, hDiger:0, hataNull:0,
+                   nullBekleyen:0, d2Aday:0, d2Olculen:0, d2Mz:0, d2Hata:0, tzsiz:0 };
+  const _g429 = UP_429_SAYAC;
   try {
+    klipSeriOzetYaz({ bas:_bas, bit:null, nabiz:_bas });     // öteki sekmenin satırı "sürüyor" desin
     const NP = { instagram:'instagram', youtube:'youtube', tiktok:'tiktok', facebook:'facebook', x:'x', twitter:'x' };
     const onb = await histCek(KAPSAMA_SAYFA);
-    const sinir = Date.now() - KLIP_SERI_PENCERE_GUN * 864e5;
+    klipSeriOzetYaz(null, _bas);          // kadans: yalnız geçmişi okuyabilen turlar sayılır
+    const _simdi = Date.now();
+    const sinir = _simdi - KLIP_SERI_PENCERE_GUN * 864e5;
     const metrikOnb = ttMetrikOku();
-    const adaylar = [];
+    const _serimiz = klipSeriOku();
+    const adaylar = [], _gorulen = new Set();
+    let _enEski = 0;
     (onb.kayitlar || []).forEach(h => {
+      const _zs = String(rapHistTime(h) || '').trim();
+      const t = Date.parse(_zs) || 0;
+      if (t && (!_enEski || t < _enEski)) _enEski = t;
       if (h.success === false || h.error_message) return;
       const p = NP[String(h.platform || '').toLowerCase()]; if (!p) return;
       if (!h.request_id && !h.platform_post_id) return;
-      const t = Date.parse(rapHistTime(h)) || 0;
       if (!t || t < sinir) return;
-      adaylar.push({ h, p, k: p + ':' + (h.request_id || ('pid_' + h.platform_post_id)) });
+      const k = p + ':' + (h.request_id || ('pid_' + h.platform_post_id));
+      if (_gorulen.has(k)) return;              // yinelenen geçmiş kaydı: tek istek, tek sayım
+      _gorulen.add(k);
+      // Saat dilimi tanısı: ofsetsiz damga Chrome'da yerel saat okunur (yaş kayması bilinsin)
+      if (!/(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(_zs)) _sayac.tzsiz++;
+      adaylar.push({ h, p, k, yayin: t, yas: Math.floor((_simdi - t) / KLIP_SAAT),
+                     sayilir: hsSayilir(h.profile_username || h.user || '', p, h) });
     });
-    // ROTASYON: aday sayisi butceyi asiyor (10 gun x ~75 yayin = ~750, butce 150).
-    // Liste histCek sirasiyla EN YENI once geliyordu; slice(0,150) her gun AYNI
-    // en yeni 150'yi olcup geri kalanini hic olcmuyordu — seri hic buyumezdi.
-    // Bugun ZATEN olculmuse en sona at; kalanlari en ESKI olcumden baslat.
-    const _bugun = Math.floor(Date.now() / 864e5);
-    const _serimiz = (function(){ try { const h = JSON.parse(localStorage.getItem(KLIP_SERI_ANAHTAR)||'{}');
-      return (h && typeof h === 'object' && !Array.isArray(h)) ? h : {}; } catch(e){ return {}; } })();
+    // Kırpılmış geçmiş 10 günü kapsamıyorsa oran eksik sayılır — satırda söylenir
+    const _gecmisEksik = !!onb.kirpik && !!_enEski && _enEski > _simdi - 240 * KLIP_SAAT;
+    const _bugun = Math.floor(_simdi / 864e5);
+    adaylar.forEach(a => {
+      const s = _serimiz[a.k], r = metrikOnb[a.k];
+      const sg = klipSeriSonGun(s);
+      const den = klipKayitDenenmis(r, a.yayin);
+      a.sonGun = den ? Math.max(sg, Math.floor(r.t / 864e5)) : sg;
+      a.hataTekrar = (den === 'hata');
+      if (!a.sayilir) a.katman = 4;
+      else if (klipSeriD2Aday(a, s, r)) a.katman = 0;
+      else if (a.sonGun < 0 && a.yas >= KLIP_D2_ALT) a.katman = 1;
+      else if (a.sonGun >= 0) a.katman = 2;
+      else a.katman = 3;
+      if (a.katman === 0) _sayac.d2Aday++;
+    });
     adaylar.sort(function(a, b){
-      const sa = _serimiz[a.k], sb = _serimiz[b.k];
-      const ga = (Array.isArray(sa) && sa.length) ? sa[sa.length-1][0] : -1;   // -1 = hic olculmemis, ONCE
-      const gb = (Array.isArray(sb) && sb.length) ? sb[sb.length-1][0] : -1;
-      if (ga !== gb) return ga - gb;                       // en eski olcum once
-      return (Date.parse(rapHistTime(b.h))||0) - (Date.parse(rapHistTime(a.h))||0);
+      if (a.katman !== b.katman) return a.katman - b.katman;
+      if (a.katman === 0){
+        if (a.hataTekrar !== b.hataTekrar) return a.hataTekrar ? 1 : -1;
+        return b.yas - a.yas;                                 // pencereden en önce çıkacak önce
+      }
+      if (a.katman === 1) return a.yayin - b.yayin;           // en eski önce
+      if (a.katman === 2 && a.sonGun !== b.sonGun) return a.sonGun - b.sonGun;
+      return b.yayin - a.yayin;                               // en yeni önce (eski eşitlik kuralı)
     });
-    // ONBELLEK AYRIMI BUTCEDEN ONCE: eskiden taze onbellekli gonderiler de 150'lik
-    // butceden pay aliyordu ve (a) eski deger BUGUNUN noktasi diye seriye yaziliyordu,
-    // (b) metrik DONMEYEN (null) gonderi her gun yeniden soruluyordu — metrik
-    // vermeyen bir sinif butcenin tamamini yiyebilirdi.
-    let olculen = 0, hatali = 0, atlanan = 0, nullBekleyen = 0;
+    // ÖNBELLEK AYRIMI BÜTÇEDEN ÖNCE (1. katman): taze-sağlam değer API'ye gitmez, seriye ÖLÇÜM GÜNÜ
+    // ve yaşıyla yazılır; e'siz null yalnız ≥40 sa ölçümde 7 gün sorulmaz (genç gönderide metrik
+    // henüz oluşmamış, hata çoğu zaman geçici). D+2 adayı ATLAR: taze kaydı 40 sa'ten genç ölçüm.
     const _olculecek = [];
     adaylar.forEach(a => {
       const _eski = metrikOnb[a.k];
-      if (ttKayitTaze(a.k, _eski)){
+      if (a.katman !== 0 && ttKayitTaze(a.k, _eski)){
         if (_eski.v != null){
-          // Taze ve saglam: API'ye gitme; seriye OLCUM GUNUYLE yaz (bugunle degil)
-          klipSeriEkle(a.k, _eski.v, Math.floor(_eski.t / 864e5));
-          olculen++; atlanan++; return;
+          klipSeriEkle(a.k, _eski.v, Math.floor(_eski.t / 864e5), klipSeriYas(_eski.t, a.yayin));
+          _sayac.olculen++; _sayac.atlanan++; return;
         }
-        // Null yalniz (a) gonderi olculdugunde >=40 saatlikse ve (b) platform METRIK
-        // dondurup izlenme alani vermediyse (e yok) kalici sayilir — TTL boyunca
-        // tekrar sorulmaz. Genc gonderide metrik henuz olusmamis olabilir; hata
-        // (post_metrics_error: jeton/oran) cogu zaman gecicidir, ertesi gun sorulur.
-        const _yayin = Date.parse(rapHistTime(a.h)) || 0;
-        if (!_eski.e && _yayin && (_eski.t - _yayin) >= 40 * 3600000){ nullBekleyen++; return; }
+        if (!_eski.e && (_eski.t - a.yayin) >= KLIP_D2_ALT * KLIP_SAAT){ _sayac.nullBekleyen++; return; }
       }
       _olculecek.push(a);
     });
-    const buTur = _olculecek.filter(a => {
-      const s = _serimiz[a.k];
-      return !(Array.isArray(s) && s.length && s[s.length-1][0] === _bugun);   // bugun olculeni atla
-    }).slice(0, KLIP_SERI_TUR_BUTCE);
+    // Bugün (seri noktası ya da 40 sa sonrası deneme) ölçüleni atla; D+2 adayı muaf
+    const buTur = _olculecek.filter(a => a.katman === 0 || a.sonGun !== _bugun).slice(0, KLIP_SERI_TUR_BUTCE);
+    const _sonraki = Math.max(0, _olculecek.length - buTur.length);
+    const _ozetAlan = function(bit){
+      return Object.assign({ bas:_bas, bit:bit, nabiz:Date.now(), aday:adaylar.length, istenen:buTur.length,
+                             bitti:_bitti, sonraki:_sonraki, g429:UP_429_SAYAC - _g429 }, _sayac);
+    };
+    // ARA KAYIT: yalnız değişenler birleştirilir (tüm önbelleği yeniden yazmak eşzamanlı silinen/
+    // budanan kaydı geri getirirdi). Jeton ve 20 sa damgasına DOKUNMAZ.
+    const _araKayit = function(){
+      try { ttMetrikBirlestirYaz(_degisen); _degisen = {}; klipSeriOzetYaz(_ozetAlan(null)); klipSeriFlush(); }
+      catch(x){ console.warn('[KLIP] ara kayıt:', x && x.message); }
+    };
+    klipSeriOzetYaz(_ozetAlan(null));
+    _olcumBasladi = true;
     await upSirali(buTur, async a => {
-      const _eski = metrikOnb[a.k];
-      let m = null;
-      const _b1 = {}, _b2 = {};
       try {
-        // upFetchRetry: 429'da yeniden dener VE ortak kapiyi kapatir.
-        // Duz upFetch kullanmak 150 olcumu sessizce dusuruyordu.
-        if (a.h.request_id){
-          const { data } = await upFetchRetry('/uploadposts/post-analytics/' + encodeURIComponent(a.h.request_id));
-          m = takParseMetrics(data, a.p, _b1);
+        let m = null;
+        const _b1 = {}, _b2 = {};
+        try {
+          // upFetchRetry: 429'da yeniden dener VE ortak kapıyı kapatır.
+          // Düz upFetch kullanmak 150 ölçümü sessizce düşürüyordu.
+          if (a.h.request_id){
+            const { data } = await upFetchRetry('/uploadposts/post-analytics/' + encodeURIComponent(a.h.request_id));
+            m = takParseMetrics(data, a.p, _b1);
+          }
+          if (!m && a.h.platform_post_id){
+            const { data } = await upFetchRetry(upAnalitikPidYol(a.h.platform_post_id, a.p, a.h.profile_username || a.h.user));
+            m = takParseMetrics(data, a.p, _b2);
+          }
+        } catch(e){
+          _sayac.hatali++;
+          if (a.katman === 0) _sayac.d2Hata++;
+          const msg = String((e && e.message) || '');
+          const _m = /HTTP (\d+)/.exec(msg);
+          const kod = (e && e.status) || (_m ? parseInt(_m[1], 10) : 0);
+          // 429 = kova/kapı yetmedi; ağ = CORS başlıksız 429 da olabilir; diğer = 400/404 (ör. silinmiş
+          // gönderi, engelli hesap) — kayıt YAZILMAZ (rapTop eşliği), her turda yeniden sorulur
+          if (kod === 429 || /too many/i.test(msg)) _sayac.h429++;
+          else if (!kod && /failed to fetch|networkerror|load failed|network request failed/i.test(msg)) _sayac.hAg++;
+          else _sayac.hDiger++;
+          return;
         }
-        if (!m && a.h.platform_post_id){
-          const { data } = await upFetchRetry(upAnalitikPidYol(a.h.platform_post_id, a.p, a.h.profile_username || a.h.user));
-          m = takParseMetrics(data, a.p, _b2);
+        const izlenme = m ? ((m.views != null) ? m.views : ((m.impressions != null) ? m.impressions : null)) : null;
+        // e:1 = null METRİKSİZLİKTEN değil hatadan/bulunamamaktan geldi (geçici olabilir)
+        const _hataNull = izlenme == null && !m && _b1.durum !== 'metrik' && _b2.durum !== 'metrik';
+        const _t = Date.now();
+        const _kayit = { v: izlenme, l:(m && m.likes != null) ? m.likes : null,
+                         c:(m && m.comments != null) ? m.comments : null, t:_t, s: TT_KAYIT_SURUM };
+        if (_hataNull){ _kayit.e = 1; _sayac.hataNull++; }
+        // Null da yazılır (damga tazelenir). Taze-sağlam değeri null'un ezmesini
+        // ttMetrikBirlestirYaz engeller (1. katman kararı — burada tekrarlanmaz).
+        _degisen[a.k] = _kayit;
+        if (izlenme != null){
+          klipSeriEkle(a.k, izlenme, Math.floor(_t / 864e5), klipSeriYas(_t, a.yayin));
+          _sayac.olculen++;
+          if (a.katman === 0) _sayac.d2Olculen++;
+        } else if (a.katman === 0){
+          if (_hataNull) _sayac.d2Hata++; else _sayac.d2Mz++;
         }
-      } catch(e){ hatali++; return; }
-      const izlenme = m ? ((m.views != null) ? m.views : ((m.impressions != null) ? m.impressions : null)) : null;
-      // Null da yazilir (damga tazelenir, ayni gonderi dongude sorulmaz). Diskteki TAZE
-      // ve saglam bir degeri null'un ezmesini ttMetrikBirlestirYaz engeller. Buraya
-      // gelen _eski zaten taze-saglam degil (yukarida ayrildi).
-      // e:1 = null METRIKSIZLIKTEN degil hatadan/bulunamamaktan geldi (gecici olabilir)
-      const _hataNull = izlenme == null && !m && _b1.durum !== 'metrik' && _b2.durum !== 'metrik';
-      metrikOnb[a.k] = { v: izlenme, l:(m && m.likes != null) ? m.likes : null,
-                         c:(m && m.comments != null) ? m.comments : null, t: Date.now(), s: TT_KAYIT_SURUM };
-      if (_hataNull) metrikOnb[a.k].e = 1;
-      if (izlenme != null){ klipSeriEkle(a.k, izlenme); olculen++; }
+      } finally {
+        _bitti++;
+        if (_bitti % KLIP_SERI_ARA_KAYIT === 0) _araKayit();
+      }
     }, 2);
-    // KAYIP GUNCELLEME KORUMASI: bu tur suresince rapTop da yazmis olabilir.
-    // Diski TAZE okuyup birlestir (yeni olcum kazanir).
-    ttMetrikBirlestirYaz(metrikOnb);
+    // KAYIP GÜNCELLEME KORUMASI: diski TAZE oku, yalnız bu turun değişenlerini birleştir
+    ttMetrikBirlestirYaz(_degisen); _degisen = {};
+    // Özet/oran burada FIRLAMAMALI: dış catch'e düşerse tur "başarısız" görünür
+    try {
+      const _oz = klipSeriOzetOku();
+      // Oran seriyi okumadan önce tampon diske (klipSeriFlush aşağıda da çağrılır, boş tampon ucuz)
+      klipSeriFlush();
+      const kap = klipSeriD2Oran(adaylar, klipSeriOku(), ttMetrikOku(), Date.now(),
+                                 (typeof _oz.d2Bas === 'number') ? _oz.d2Bas : _bas);
+      if (_gecmisEksik) kap.eksik = 1;
+      klipSeriOzetYaz(_ozetAlan(Date.now()), null, kap);
+    } catch(x){ console.warn('[KLIP] tur özeti:', x && x.message); }
     klipSeriFlush();
-    addLog(hatali ? 'warn' : 'ok', 'sistem', 'Klip serisi günlük turu: ' + olculen + ' ölçüm ('
-      + atlanan + ' önbellekten), ' + hatali + ' hata, ' + nullBekleyen + ' metriksiz (7 gün sorulmaz), '
-      + Math.max(0, _olculecek.length - buTur.length) + ' sonraki tura (' + adaylar.length + ' aday)');
+    addLog(_sayac.hatali ? 'warn' : 'ok', 'sistem', 'Klip serisi günlük turu: ' + _sayac.olculen + ' izlenme kaydı ('
+      + _sayac.atlanan + ' önbellekten), D+2 ' + _sayac.d2Olculen + '/' + _sayac.d2Aday
+      + (_sayac.d2Mz ? ' (' + _sayac.d2Mz + ' izlenmesiz)' : '') + ', '
+      + _sayac.hatali + ' hata (API hız sınırı 429: ' + _sayac.h429 + ', ağ: ' + _sayac.hAg + ', diğer: ' + _sayac.hDiger + '), '
+      + _sayac.nullBekleyen + ' izlenmesiz (7 gün sorulmaz), ' + _sonraki + ' sonraki tura (' + adaylar.length + ' aday)');
   } catch(e){
-    // Damgayi GERI SAR: gecici hata 20 saat kaybettirmesin (ciftOto ile ayni kural,
-    // orada ~10 dk). Once yazip sonra geri sarmak, tur SURERKEN ikinci sekmenin
-    // ayni turu baslatmasini yine de onler.
-    try { localStorage.setItem(KLIP_SERI_OTO_ANAHTAR,
-            String(Date.now() - 20 * 3600000 + 10 * 60000)); } catch(x){}
-    addLog('warn','sistem','Klip serisi turu başarısız: ' + histHataKisa(e) + ' — ~10 dk sonra tekrar denenecek');
+    // Damgayı GERİ SAR — yalnız ölçüm BAŞLAMADAN düştüyse (geçmiş okunamadı): geçici ağ hatası
+    // 20 saat kaybettirmesin. Tekrar saatlik kontrolde (10-70 dk). Ölçüm başladıysa ilerleme
+    // ara kayıtlarla diskte; geri sarmak aynı gün ikinci 150'lik tur olurdu.
+    if (!_olcumBasladi){
+      try { localStorage.setItem(KLIP_SERI_OTO_ANAHTAR, String(Date.now() - 20 * 3600000 + 10 * 60000)); } catch(x){}
+    }
+    try { ttMetrikBirlestirYaz(_degisen); _degisen = {}; } catch(x){}
+    try { klipSeriOzetYaz({ bas:_bas, bit:Date.now(), nabiz:Date.now(), bitti:_bitti, hata: histHataKisa(e) }); } catch(x){}
+    try {
+      addLog('warn','sistem','Klip serisi turu başarısız: ' + histHataKisa(e)
+        + (_olcumBasladi ? ' — ' + _bitti + ' gönderi işlendi ve kaydedildi, kalanlar sonraki günlük turda'
+                         : ' — 10-70 dk içinde (saatlik kontrolde) tekrar denenecek'));
+    } catch(x){}
   } finally {
     KLIP_SERI_KOSUYOR = false;
     klipSeriDurumYaz();
@@ -4957,8 +5600,10 @@ async function rapTopUpYukle(p){
       onbellek[ttAnahtar(h)] = { v: izlenme, l:(m&&m.likes!=null)?m.likes:null,
                                  c:(m&&m.comments!=null)?m.comments:null, t: Date.now(), s: TT_KAYIT_SURUM };
       if (izlenme == null && !m && _b1.durum !== 'metrik' && _b2.durum !== 'metrik') onbellek[ttAnahtar(h)].e = 1;
-      // Manuel tur da kalici seriyi besler — ayni anahtar bicimi, kaynaklar birlesir.
-      klipSeriEkle(ttAnahtar(h), izlenme);
+      // Manuel tur da kalici seriyi besler — ayni anahtar bicimi, kaynaklar birlesir. Yaş da yazılır:
+      // En Çok İzlenen D+2 penceresinde ölçtüyse klip turu aynı gönderiyi yeniden sormaz (klipSeriD2Aday).
+      klipSeriEkle(ttAnahtar(h), izlenme, null,
+        klipSeriYas(onbellek[ttAnahtar(h)].t, Date.parse(rapHistTime(h)) || 0));
       if (izlenme == null){ verisiz++; return; }
       liste.push({ baslik: h.post_title||h.title||h.post_caption||'(başlıksız)',
         thumb: h.thumbnail||h.preview_url||'', url: h.post_url||'',
@@ -5156,6 +5801,516 @@ function rapTopYtCiz(c){
     +   '<div style="font-family:var(--ft);font-weight:700;color:var(--gld);font-size:15px;font-variant-numeric:tabular-nums;letter-spacing:.2px"'+(v.views==null?' title="Kanal izlenme sayısını gizlemiş — API bu alanı döndürmüyor"':'')+'>'+(v.views==null?'—':ytkFmt(v.views))+'</div>'
     +   '<div style="font-size:10.5px;color:var(--mt)"'+(v.likes==null?' title="Kanal beğeni sayısını gizlemiş — API bu alanı döndürmüyor"':'')+'>👍 '+(v.likes==null?'—':ytkFmt(v.likes))+'</div>'
     + '</div></div>').join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// YOUTUBE GÖRÜNÜRLÜK TURU (katman 2) — herkese açık görünmeyen, listesiz, TR'de
+// engelli, çocuk sınıfı, 48 sa+ sıfır izlenme, "kanal hiç dönmedi"
+// ───────────────────────────────────────────────────────────────────────
+// NEDEN: rapTopYtYukle aynı videos.list çağrısını elle ve tüm geçmiş için yapıyor,
+// dönmeyenleri yalnız SAYIYOR (5136) — profile, zamana, zile bağlı değil.
+// BİLEREK YAPILMAYANLAR:
+//  • op_top_metrik'e YAZILMAZ, rapTop önbelleği OKUNMAZ: ttTaze 7 gün (4505).
+//  • hsSayilir KULLANILMAZ: zamansız kaydı SAYAR (6553, kopya yönü). Burada zamansız
+//    kayıt aday DEĞİL — hangi hesaba ait olduğu bilinmeyen videoya alarm çalınmaz.
+//  • op_hesap_temel.t SINIR DEĞİL: htTara her doğrulamada Date.now() yazar (8442).
+//  • Metin "gizliye kilit / shadowban" demez, yeniden bağlama önermez.
+// HESAP TAKASI: değişim kaydının t'si ESKİ handle'ın SON DOĞRULANDIĞI an (8469).
+// [t, tespit] arasında eski kanala gitmiş video yeni hesabın "dönmeyen"i gibi görünür.
+// Kopya korumasında temkin "yeni dönem say"dır; burada temkin "zil çalma"dır →
+// sınırdan sonraki 48 sa'teki, ilk açık videodan önceki ve (hiç açık yoksa) değişimin panelde
+// işlendiği andan önceki dönmeyenler NÖTR ('o').
+// ═══════════════════════════════════════════════════════════════════════
+const YT_GOR_ANAHTAR     = 'op_yt_gor';
+const YT_GOR_OTO_ANAHTAR = 'op_yt_gor_oto';      // + '_j' sekme jetonu
+const YT_GOR_PENCERE_GUN = 14;
+const YT_GOR_MIN_YAS     = 6 * 3600000;          // işleme payı: daha genç video aday değil
+const YT_GOR_SIFIR_YAS   = 48 * 3600000;
+const YT_GOR_SAYFA       = 15;                   // ~75 kayıt/gün × 14 gün ≈ 11 sayfa + pay
+const YT_GOR_PARTI       = 50;                   // belge üst sınır yazmıyor; rapTopYtYukle 50 ile canlıda
+const YT_GOR_ORNEK       = 3;                    // sınıf başına saklanan örnek kimlik
+const YT_GOR_GECIS_MIN   = 2;                    // sınır YOKKEN "önceki kanal" önek eşiği
+const YT_GOR_GECIS_PAY   = 48 * 3600000;         // sınır VARKEN belirsiz pencere payı
+const YT_GOR_SINIR_ETKIN = 3 * 864e5;            // pencere başından en fazla bu kadar eski sınır etkin
+const YT_GOR_ONC_TAVAN   = 120;                  // "yeni bulgu mu" b/l/c/s anahtarları (k/d bu tavana girmez)
+const YT_GOR_ONC_KD_TAVAN = 3000;                // k/d güvenlik tavanı (14 gün × ~75 ≈ 1050 aday)
+const YT_GOR_TAZE        = 48 * 3600000;         // bundan eski özet zil/rozet üretmez
+const YT_GOR_TEKRAR_MS   = 10 * 60000;
+const YT_GOR_ISTEK_MS    = 20000;
+const YT_GOR_SINIF_SIRA  = { k:0, d:1, b:2, l:3, c:4, s:5 };
+let YT_GOR_KOSUYOR = false, YT_GOR_TEKRAR_Z = null;
+
+function ytGorOku(){
+  try { const o = JSON.parse(localStorage.getItem(YT_GOR_ANAHTAR) || '{}');
+        return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; } catch(e){ return {}; }
+}
+// OKU-BİRLEŞTİR-YAZ (panel-denetim 7). p/n/onc/nid turundur — jeton tek tur garanti ediyor.
+// 'sinir' başka sekmenin kancasıyla tur SÜRERKEN yazılabilir → profil başına EN YENİ t
+// kazanır, ts ikisinin büyüğü. lsNesneYaz KULLANILMIYOR: iç içe sinir'i düz Object.assign
+// ile ezer, kota hatasını 'err' + "kopya koruması körleşebilir" toast'ıyla yazar (10485-10492).
+function ytGorYaz(alanlar){
+  const disk = ytGorOku();
+  const sinir = {};
+  [disk.sinir || {}, (alanlar && alanlar.sinir) || {}].forEach(s => Object.keys(s).forEach(p => {
+    const v = s[p]; if (!Array.isArray(v) || !(Number(v[0]) > 0)) return;
+    const m = sinir[p];
+    if (!m || Number(v[0]) > m[0]) sinir[p] = [Number(v[0]), Math.max(Number(v[1]) || 0, m ? m[1] : 0), String(v[2] || '')];
+    else m[1] = Math.max(m[1], Number(v[1]) || 0);
+  }));
+  // Etkinlik eşiğinden eski sınır hiçbir kurala girmez — sınırsız büyümesin
+  const esik = Date.now() - YT_GOR_PENCERE_GUN * 864e5 - YT_GOR_SINIR_ETKIN;
+  Object.keys(sinir).forEach(p => { if (!(sinir[p][0] > esik)) delete sinir[p]; });
+  const yeni = Object.assign(disk, alanlar || {}, { sinir });
+  try { localStorage.setItem(YT_GOR_ANAHTAR, JSON.stringify(yeni)); }
+  catch(e){ addLog('warn', 'sistem', 'YouTube görünürlük özeti yazılamadı: ' + (e.message || e.name)); }
+  return yeni;
+}
+// hdYoksay / hdPlanla KANCASI. Yoksay sıfırlama işareti KOYMUYOR (8501-8515).
+// [t, ts, eski]: t = eski handle'ın son doğrulandığı an (8469), ts = yazma anı
+// (render-anı susturma), eski = geçerlilik kontrolü için eski handle.
+function ytGorSinirOgren(profil, plat, t, eski){
+  if (plat !== 'youtube' || !profil || !(t > 0)) return;
+  ytGorYaz({ sinir: { [String(profil).trim()]: [t, Date.now(), String(eski || '')] } });
+}
+// Öğrenilmiş sınır GEÇERLİ mi? Yoksay/Planla eski handle'ı temel.eskiler'e ekler (8510,
+// 8754). htTara'nın KENDİLİĞİNDEN düşürdüğü değişimde (8447) handle temele DÖNMÜŞTÜR ve
+// eskiler'e girmez → sahte sınır 14 gün gerçek bulguları gizlemesin.
+function ytGorSinirGecerli(profil, s, temel){
+  if (!Array.isArray(s) || !(Number(s[0]) > 0)) return false;
+  if (!s[2]) return true;
+  const b = temel[hsAnahtar(profil, 'youtube')] || {};
+  return b.h !== s[2] && (b.eskiler || []).indexOf(s[2]) >= 0;
+}
+// { b: sınır (eski handle'ın son doğrulandığı an), ts: panelin değişimi İŞLEDİĞİ an }. ts'den sonra
+// yüklenen video kesin yeni kanala gitti (değişim o an zaten tespit edilmişti); [b, ts] belirsiz.
+function ytGorSinir(profil, disk, hsMap, temel){
+  const hs = hsMap[hsAnahtar(profil, 'youtube')];
+  const og = (disk.sinir || {})[profil];
+  const hb = (hs && Number(hs.t)) || 0;
+  const ob = ytGorSinirGecerli(profil, og, temel) ? Number(og[0]) : 0;
+  const b = Math.max(hb, ob);
+  // ts = sınırdan SONRA işlenmiş geçerli kayıtların EN ERKENİ (yoksa sınırı belirleyen kaydınki).
+  // İki kaydın büyüğünü almak: Yoksay'dan günler sonra AYNI değişim için elle konan Hesap Sıfırlama
+  // (ts = uygulama anı) ts'yi şişirip yeni kanalın dönmeyen videolarını 'önceki kanal' diye
+  // nötrlüyor, doğru 'k' alarmını bir tur siliyordu — operatör geçiş gününü seçse de (hs.t > og[0]).
+  const hts = hb ? (Number(hs.ts) || 0) : 0, ots = ob ? (Number(og[1]) || 0) : 0;
+  // hs.ts yalnız hs sınırı belirliyor/eşitliyorsa aday: og daha yeni bir değişimin sınırıysa, ÖNCEKİ
+  // değişimden kalan elle sıfırlamanın ts'si (sınırdan sonra uygulanmış olsa da) yeni kanal için
+  // erken bir ts seçtirip ölü eski kanalın videolarıyla sahte 'k' alarmı üretiyordu.
+  // İstisna: sıfırlama, og'nin AYNI değişimi beklerken yapıldıysa (hs.bek === og eski handle'ı) hs.ts de
+  // aday — operatör değişimi o an işlemişti; dışarıda bırakmak doğru 'k' alarmını bir tur geciktiriyordu.
+  const hsAday = hb >= ob || !!(hs && hs.bek && Array.isArray(og) && ob && String(hs.bek) === String(og[2] || ''));
+  const sonra = [hsAday ? hts : 0, ots].filter(x => x > 0 && x >= b);
+  let ts = 0;
+  if (sonra.length) ts = Math.min.apply(null, sonra);
+  else {
+    const tanim = [];
+    if (hb && hb === b) tanim.push(hts);
+    if (ob && ob === b) tanim.push(ots);
+    ts = tanim.length ? Math.min.apply(null, tanim) : 0;
+  }
+  return { b, ts };
+}
+// YouTube hata gövdesi → kısa kod. Tam URL (anahtar içerir) HİÇBİR yere yazılmaz.
+function ytGorHataKod(r, j){
+  const er = (j && j.error) || {};
+  const reason = String((er.errors && er.errors[0] && er.errors[0].reason) || '');
+  const msg = String(er.message || '');
+  if (/quotaExceeded|dailyLimitExceeded|rateLimitExceeded/i.test(reason) || /quota/i.test(msg) || (r && r.status === 429)) return 'kota';
+  if (/ipRefererBlocked|keyInvalid|keyExpired|accessNotConfigured|API_KEY/i.test(reason)
+      || /API key|referer|referrer|has not been used|disabled/i.test(msg)) return 'anahtar';
+  // Belge: notFound (404) videoNotFound. Parti bütünüyle mi düşüyor bilinmiyor → bilinmiyor,
+  // ama AYRI metinle görünür (ilk canlı turda sessiz arıza olmasın).
+  if (/videoNotFound/i.test(reason) || (r && r.status === 404)) return 'bulunamadi';
+  return 'hata';
+}
+function ytGorHataMetin(kod){
+  return ({ kota:'YouTube kotası / hız sınırı', anahtar:'YouTube anahtarı reddedildi (kısıt/izin)',
+            ag:'ağ hatası / zaman aşımı', bulunamadi:'YouTube parti için videoNotFound döndürdü',
+            hata:'YouTube API hatası' })[kod] || String(kod || '');
+}
+
+// SAF sınıflandırıcı (sahte veriyle doğrudan sınanır).
+// adaylar: [{id, profil, t}] · donen: Map(id → video) · bilinmeyen: Set(id)
+// sinirMap: Map(profil → {b, ts}) — eski biçim Map(profil → B sayısı) da kabul (ts = 0)
+function ytGorSiniflandir(adaylar, donen, bilinmeyen, simdi, sinirMap){
+  const gruplar = new Map();                       // Map: profil adı nesne anahtarıyla çakışmasın
+  adaylar.forEach(a => { if (!gruplar.has(a.profil)) gruplar.set(a.profil, []); gruplar.get(a.profil).push(a); });
+  const p = {}, anahtarlar = [];
+  let mfk = 0, acikTop = 0;
+  const ornek = (o, harf, id, neden) => { const l = o[harf] || (o[harf] = []); if (l.length < YT_GOR_ORNEK) l.push(neden ? id + ':' + neden : id); };
+  const ekle = (o, harf, id, neden) => { o[harf + 'n'] = (o[harf + 'n'] || 0) + 1; ornek(o, harf, id, neden); anahtarlar.push(harf + ':' + id); };
+  const pencereBas = simdi - YT_GOR_PENCERE_GUN * 864e5;
+  gruplar.forEach((liste0, profil) => {
+    const liste = liste0.slice().sort((x, y) => x.t - y.t);   // en ESKİ önce
+    const o = { a: liste.length };
+    const sm = sinirMap && sinirMap.get(profil);
+    const B = Number((sm && typeof sm === 'object') ? sm.b : sm) || 0;
+    const TS = (sm && typeof sm === 'object') ? (Number(sm.ts) || 0) : 0;
+    const bEtkin = B > pencereBas - YT_GOR_SINIR_ETKIN;
+    const durum = liste.map(a => {
+      if (bilinmeyen.has(a.id)) return { a, tip:'u' };
+      const v = donen.get(a.id);
+      if (!v) return { a, tip:'d' };                 // API yanıt verdi, kimlik YOK
+      const st = v.status || {};
+      const up = String(st.uploadStatus || ''), gz = String(st.privacyStatus || '');
+      const kotuUp = (up === 'deleted' || up === 'rejected' || up === 'failed');
+      if (gz === 'private' || kotuUp){
+        // Sebep: gerçek gerekçe alanları, sonra YALNIZ anlamlı durum. 'up || gz' sırası
+        // gizli + işlenmiş videoda 'processed' yazardı.
+        const neden = String(st.rejectionReason || st.failureReason || (kotuUp ? up : '') || (gz === 'private' ? 'private' : ''))
+          .replace(/[^A-Za-z]/g, '').slice(0, 24);
+        return { a, tip:'d', neden };
+      }
+      return { a, tip:'acik', v };
+    });
+    // (a) SINIR-BİTİŞİK PENCERE: sınırdan sonraki 48 sa'te dönmeyen eski kanalın olabilir
+    if (bEtkin) durum.forEach(x => { if (x.tip === 'd' && x.a.t < B + YT_GOR_GECIS_PAY) x.tip = 'o'; });
+    const u = durum.filter(x => x.tip === 'u').length;
+    const acik = durum.filter(x => x.tip === 'acik').length;
+    // Hiç açık yok ama bir kısmı sorulamadı: HÜKÜM YOK
+    if (acik === 0 && u > 0){ o.u = liste.length; p[profil] = o; return; }
+    if (u) o.u = u;
+    // (c) SINIR ETKİN + HİÇ AÇIK YOK: sınır bayat olabilir (temel.t yalnız Platformlar açılınca tazeleniyor)
+    // → [B, ts] arasında dönmeyen eski kanalın olabilir, NÖTR; ts bilinmiyorsa (0) sınırdan sonraki hepsi.
+    // ts SONRASI dönmeyenler kesin yeni kanalın: 'k' yalnız onlardan ≥2 ise.
+    if (bEtkin && acik === 0) durum.forEach(x => { if (x.tip === 'd' && !(TS > 0 && x.a.t >= TS)) x.tip = 'o'; });
+    const kalanD = durum.filter(x => x.tip === 'd');
+    if (acik === 0 && kalanD.length >= 2){
+      o.k = 1; anahtarlar.push('k:' + profil);
+      // Örnekler doğrulama bağlantısı için; GÖLGE d anahtarları: kanala tek açık video gelip
+      // videolar tek tek 'd'ye dönünce aynı bulgu yeniden zil çalmasın
+      kalanD.forEach(x => { ornek(o, 'd', x.a.id, x.neden); anahtarlar.push('d:' + x.a.id); });
+    } else {
+      // (b) ÖNEK: ilk açık videodan önceki dönmeyen blok — sınır varsa ≥1, yoksa ≥2
+      const ilkAcik = durum.findIndex(x => x.tip === 'acik');
+      if (ilkAcik > 0){
+        // 'u' (sorulamadı) ÖNEĞİ BOZMAZ: gerçek değeri ne olursa olsun kalan 'd'ler önekte kalır. Bozsaydı
+        // parti düşünce eski kanalın videoları yeni hesaba zil çalardı (tam turda nötr çıkanlar).
+        const onek = durum.slice(0, ilkAcik).filter(x => x.tip === 'd');
+        if (onek.length && onek.length >= (bEtkin ? 1 : YT_GOR_GECIS_MIN)) onek.forEach(x => { x.tip = 'o'; });
+      }
+      durum.forEach(x => {
+        if (x.tip === 'd'){ ekle(o, 'd', x.a.id, x.neden); return; }
+        if (x.tip !== 'acik') return;
+        acikTop++;
+        const st = x.v.status || {}, cd = x.v.contentDetails || {}, ist = x.v.statistics || {};
+        let aciklandi = false;
+        if (st.privacyStatus === 'unlisted'){ ekle(o, 'l', x.a.id); aciklandi = true; }
+        // Belge: ya allowed ya blocked; allowed varsa ve TR yoksa (boş liste dahil) engelli
+        const rr = cd.regionRestriction;
+        if (rr && ((Array.isArray(rr.blocked) && rr.blocked.indexOf('TR') >= 0)
+                || (Array.isArray(rr.allowed) && rr.allowed.indexOf('TR') < 0))){ ekle(o, 'b', x.a.id); aciklandi = true; }
+        // Alan YOKSA false SANILMAZ: sınıf kapalı kalır, dönen alan sayısı ekranda
+        if (typeof st.madeForKids === 'boolean'){ mfk++; if (st.madeForKids) ekle(o, 'c', x.a.id); }
+        // Listesiz/TR-engelli videonun sıfırı açıklanmış. viewCount gizliyse alan gelmez → sıfır değil.
+        if (!aciklandi && simdi - x.a.t >= YT_GOR_SIFIR_YAS && ('viewCount' in ist) && String(ist.viewCount) === '0') ekle(o, 's', x.a.id);
+      });
+    }
+    durum.forEach(x => { if (x.tip === 'o'){ o.on = (o.on || 0) + 1; ornek(o, 'o', x.a.id, x.neden); } });
+    p[profil] = o;
+  });
+  return { p, mfk, acik: acikTop, anahtarlar };
+}
+
+async function ytGorTur(elle){
+  if (YT_GOR_KOSUYOR) return 'kosuyor';
+  const key = S.cfg.ytApiKey || S.cfg.shkey || '';
+  if (!S.cfg.blot || !key){ try { ytGorCiz(); } catch(e){} return 'kapali'; }
+  let son = 0; try { son = parseInt(localStorage.getItem(YT_GOR_OTO_ANAHTAR) || '0', 10) || 0; } catch(e){}
+  if (!elle && Date.now() - son < 20 * 3600000) return 'erken';
+  // BAYAT SEKME: otomatik tur REZERVASYONDAN ÖNCE atlanır (daha yeni sekme yürütüyor); elle tarama etkilenmez.
+  if (!elle && bayatDongu()) return 'bayat';
+  // REZERVASYON + SON YAZAN KAZANIR JETONU — klipSeriOtoTur (4660-4668) ile aynı
+  const _jeton = Date.now() + '-' + Math.random().toString(36).slice(2, 10);
+  try {
+    localStorage.setItem(YT_GOR_OTO_ANAHTAR, String(Date.now()));
+    localStorage.setItem(YT_GOR_OTO_ANAHTAR + '_j', _jeton);
+  } catch(e){}
+  await new Promise(r => setTimeout(r, 60));
+  let _bizimMi = true;
+  try { _bizimMi = (localStorage.getItem(YT_GOR_OTO_ANAHTAR + '_j') === _jeton); } catch(e){}
+  if (!_bizimMi) return 'jeton';
+  YT_GOR_KOSUYOR = true;
+  const geriSar = () => { try { localStorage.setItem(YT_GOR_OTO_ANAHTAR, String(Date.now() - 20 * 3600000 + YT_GOR_TEKRAR_MS)); } catch(x){} };
+  // Geri sarma TEK BAŞINA "10 dk" değil: kapı yalnız 40 sn'de ve saatlik setInterval'da
+  // (13085 kalıbı) kontrol ediliyor → 10-70 dk. Tek seferlik zamanlayıcı 10 dk'yı sağlar;
+  // sekme kapanırsa öteki sekmelerin saatlik kontrolü geri sarılmış damgayla devralır.
+  const tekrarKur = () => {
+    geriSar();
+    if (YT_GOR_TEKRAR_Z) clearTimeout(YT_GOR_TEKRAR_Z);
+    YT_GOR_TEKRAR_Z = setTimeout(function(){ YT_GOR_TEKRAR_Z = null; ytGorTur().catch(function(){}); }, YT_GOR_TEKRAR_MS + 5000);
+  };
+  let asama = 'gecmis';
+  try {
+    const simdi = Date.now();
+    const onb = await histCek(YT_GOR_SAYFA);
+    asama = 'aday';
+    // Tek okuma: hsZaman her çağrıda JSON.parse ediyordu (6540-6543)
+    const disk = ytGorOku(), hdBek = hdOku(), hsMap = hsOku(), temel = htOku();
+    const pencereBas = simdi - YT_GOR_PENCERE_GUN * 864e5;
+    const say = { zamansiz:0, genc:0, sinirDisi:0, urlsiz:0 };
+    const sus = {}, sinirYeni = {}, sinirMap = new Map(), adayMap = new Map();
+    let enEski = 0;
+    (onb.kayitlar || []).forEach(h => {
+      const t = Date.parse(rapHistTime(h)) || 0;
+      if (t && (!enEski || t < enEski)) enEski = t;
+      if (rapPlatAnahtar(h.platform) !== 'youtube' || !rapOk(h)) return;
+      const profil = String(h.profile_username || h.user || '').trim(); if (!profil) return;
+      if (t && t < pencereBas) return;               // pencere dışı: sayaçlara da girmez
+      const id = rapTopYtKimlik(h.post_url || h.url || '');
+      if (!id){ say.urlsiz++; return; }
+      if (!t){ say.zamansiz++; return; }             // zamansız kayıt aday DEĞİL
+      if (simdi - t < YT_GOR_MIN_YAS){ say.genc++; return; }
+      const bek = hdBek[hsAnahtar(profil, 'youtube')];
+      if (bek){
+        // Bekleyen değişim: profil SUSTURULUR, sorgu yok. Sınır eski handle ile ÖĞRENİLİR —
+        // değişim eski kodlu bir sekmede Yoksay'la kapanırsa da geçerli olsun (ytGorSinirGecerli).
+        sus[profil] = (sus[profil] || 0) + 1;
+        if (bek.t > 0 && !(sinirYeni[profil] && sinirYeni[profil][0] >= bek.t)) sinirYeni[profil] = [bek.t, simdi, String(bek.eski || '')];
+        return;
+      }
+      if (!sinirMap.has(profil)) sinirMap.set(profil, ytGorSinir(profil, disk, hsMap, temel));
+      if (t < sinirMap.get(profil).b){ say.sinirDisi++; return; }
+      if (!adayMap.has(id)) adayMap.set(id, { id, profil, t });
+    });
+    const adaylar = Array.from(adayMap.values());
+    const idler = adaylar.map(a => a.id);
+    asama = 'sorgu';
+    const donen = new Map(), bilinmeyen = new Set();
+    let hataKod = '', sorgu = 0, cagri = 0;
+    for (let i = 0; i < idler.length; i += YT_GOR_PARTI){
+      const parca = idler.slice(i, i + YT_GOR_PARTI);
+      // kota/anahtar sonrası kalan partiler SORULMAZ: geçersiz istek de ≥1 birim yakar (belge)
+      if (hataKod === 'kota' || hataKod === 'anahtar'){ parca.forEach(id => bilinmeyen.add(id)); continue; }
+      let kod = '', j = null;
+      const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;   // 2683 deseni
+      const zt = ctl ? setTimeout(() => { try { ctl.abort(); } catch(x){} }, YT_GOR_ISTEK_MS) : null;
+      try {
+        cagri++;
+        // maxResults BİLEREK yok (belge: id ile desteklenmiyor). Kimlikler [\w-] → kodlama gerekmez.
+        const r = await fetch('https://www.googleapis.com/youtube/v3/videos?part=status,statistics,contentDetails&id='
+          + parca.join(',') + '&key=' + encodeURIComponent(key), ctl ? { signal: ctl.signal } : undefined);
+        // Gövde YUTULMAZ: başlıklar gelip gövde okunurken bağlantı koparsa (ağ değişimi, uyku, 20 sn
+        // iptali) {} "yanıt verdi, kimlik yok" sayılır ve partinin TÜM videoları 'd'/'k' olurdu.
+        let govdeHata = false;
+        j = await r.json().catch(() => { govdeHata = true; return null; });
+        if (!r.ok || (j && j.error)) kod = ytGorHataKod(r, j);
+        else if (govdeHata) kod = 'ag';
+        // Beklenmeyen biçim de hüküm üretmez. Boş sonuçta items: [] gelir; alan yoksa tür etiketi yeter.
+        else if (!j || typeof j !== 'object' || (!Array.isArray(j.items) && j.kind !== 'youtube#videoListResponse')) kod = 'hata';
+      } catch(e){ kod = 'ag'; }                      // e/URL loglanmaz
+      finally { if (zt) clearTimeout(zt); }
+      if (kod){ hataKod = kod; parca.forEach(id => bilinmeyen.add(id)); continue; }
+      sorgu += parca.length;
+      ((j && j.items) || []).forEach(v => { if (v && v.id) donen.set(v.id, v); });
+      if (i + YT_GOR_PARTI < idler.length) await sleep(150);
+    }
+    asama = 'yaz';
+    // 20 sa'te BİR yeniden deneme hakkı (kota ve ağ ortak). Ağ için sınırsız geri sarma, googleapis
+    // erişilemeyen bir ağda saatte 15 history isteği demekti (HIST_TTL 2 dk, 6420).
+    const tekrarHak = !(disk.tk && (simdi - disk.tk) < 20 * 3600000);
+    if (idler.length && sorgu === 0){
+      const tekrar = tekrarHak && (hataKod === 'kota' || hataKod === 'ag');
+      if (tekrar) tekrarKur();
+      // Hiçbir parti yanıt vermedi: ESKİ sonuç korunur — alarm yok
+      ytGorYaz({ hata: hataKod, ht: simdi, tk: tekrar ? simdi : (disk.tk || 0), sinir: sinirYeni });
+      addLog('warn', 'sistem', 'YouTube görünürlük turu: ' + idler.length + ' video sorgulanamadı ('
+        + ytGorHataMetin(hataKod) + ') — önceki sonuç korundu' + (tekrar ? ', ~10 dk sonra bir kez daha denenecek' : ''));
+      try { ytGorCiz(); } catch(e){}
+      return 'hata';
+    }
+    const tekrar = tekrarHak && hataKod === 'kota';
+    if (tekrar) tekrarKur();
+    const sin = ytGorSiniflandir(adaylar, donen, bilinmeyen, simdi, sinirMap);
+    Object.keys(sus).forEach(pr => { sin.p[pr] = { a: sus[pr], z: 1 }; });
+    // ZİL KİMLİĞİ yalnız GERÇEKTEN yeni bulgu varsa döner. k/d anahtarları TAVANSIZ saklanır (en fazla
+    // pencere adayı kadar); 120 tavan yalnız b/l/c/s'ye uygulanır. Taşma olduysa yalnız k/d 'yeni'
+    // sayılabilir — k/d hep tam saklandığı için bu kıyas doğru (eskiden 120'yi aşan k/d gölgeleri her
+    // gün yeni görünüyordu). Bilinmeyen varsa önceki liste korunur (kısmi tur ertesi gün çaldırmasın).
+    const oncekiDizi = Array.isArray(disk.onc) ? disk.onc : [];
+    const onceki = new Set(oncekiDizi);
+    const kdMi = k => /^[kd]:/.test(k);
+    const sirali = sin.anahtarlar.slice().sort((x, y) => YT_GOR_SINIF_SIRA[x.charAt(0)] - YT_GOR_SINIF_SIRA[y.charAt(0)]);
+    const yeniVar = sirali.some(k => !onceki.has(k) && (!disk.oncTasti || kdMi(k)));
+    const oncHam = bilinmeyen.size ? Array.from(new Set(sirali.concat(oncekiDizi))) : sirali;
+    const oncKd = oncHam.filter(kdMi).slice(0, YT_GOR_ONC_KD_TAVAN);
+    const oncYer = Math.max(0, YT_GOR_ONC_TAVAN - oncKd.length);
+    const onc = oncKd.concat(oncHam.filter(k => !kdMi(k)).slice(0, oncYer));
+    const gun = new Date(simdi - new Date(simdi).getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    // Kimlik TUR başına: gün başına sabit kimlik NOTIF.seen'de kaldığından aynı gün ikinci turun yeni
+    // bulgusu rozet üretmezdi. Yeni bulgu yoksa önceki kimlik kalır (okunmuşsa okunmuş).
+    const nid = (yeniVar || !disk.nid) ? ('yt-gor-' + gun + '-' + simdi.toString(36)) : disk.nid;
+    const kirpik = !!(onb.kirpik && enEski > pencereBas);
+    ytGorYaz({
+      v: 1, t: simdi, g: gun,
+      pen: kirpik ? Math.max(1, Math.floor((simdi - enEski) / 864e5)) : YT_GOR_PENCERE_GUN,
+      kirpik: kirpik ? 1 : 0,
+      n: { aday: adaylar.length, sorgu, bilinmiyor: bilinmeyen.size, acik: sin.acik, mfk: sin.mfk, cagri,
+           zamansiz: say.zamansiz, genc: say.genc, sinirDisi: say.sinirDisi, urlsiz: say.urlsiz,
+           sus: Object.keys(sus).reduce((x, k) => x + sus[k], 0) },
+      p: sin.p, hata: hataKod, ht: hataKod ? simdi : 0,
+      tk: tekrar ? simdi : (hataKod ? (disk.tk || 0) : 0),
+      nid, onc, oncTasti: (sirali.filter(k => !kdMi(k)).length > oncYer) ? 1 : 0, sinir: sinirYeni
+    });
+    const T = { d:0, k:0, b:0, l:0, c:0, s:0, o:0 };
+    Object.keys(sin.p).forEach(pr => { const x = sin.p[pr];
+      T.d += x.dn || 0; T.k += x.k ? 1 : 0; T.b += x.bn || 0; T.l += x.ln || 0; T.c += x.cn || 0; T.s += x.sn || 0; T.o += x.on || 0; });
+    addLog((T.d || T.k || T.b || hataKod) ? 'warn' : 'ok', 'sistem', 'YouTube görünürlük turu: ' + adaylar.length + ' video, '
+      + cagri + ' çağrı · ' + T.d + ' herkese açık görünmüyor · ' + T.k + ' kanal hiç dönmedi · ' + T.b + ' TR engeli · '
+      + T.l + ' listesiz · ' + T.c + ' çocuk sınıfı · ' + T.s + ' sıfır izlenme · ' + T.o + ' nötr (hesap sınırı/önceki kanal) · '
+      + bilinmeyen.size + ' bilinmiyor' + (hataKod ? ' (' + ytGorHataMetin(hataKod) + (tekrar ? ', ~10 dk sonra bir kez daha' : '') + ')' : '')
+      + ' · ' + Object.keys(sus).length + ' profil susturuldu (hesap değişimi bekliyor)');
+    try { ytGorCiz(); ytGorBildir(); notifKaydet(); notifRender(); } catch(e){}
+    return 'tamam';
+  } catch(e){
+    if (asama === 'gecmis'){
+      // Yalnız geçici hatada geri sar (ağ/429/5xx); 401/403'te her saat 15 sayfa denemek boşa.
+      // Zamanlayıcı YOK: Upload-Post düşükse saatlik kontrol yeter (klipSeriOtoTur ile aynı).
+      const kod = e && e.status;
+      const gecici = !kod || kod === 429 || kod >= 500;
+      if (gecici) geriSar();
+      addLog('warn', 'sistem', 'YouTube görünürlük turu: yayın geçmişi okunamadı — ' + histHataKisa(e) + (gecici ? ' · sonraki saatlik kontrolde yeniden denenecek' : ''));
+    } else {
+      // Kod hatası yeniden deneme döngüsüne SOKULMAZ
+      addLog('warn', 'sistem', 'YouTube görünürlük turu beklenmeyen hata (' + asama + '): ' + String((e && e.message) || e).slice(0, 80));
+    }
+    return 'hata';
+  } finally { YT_GOR_KOSUYOR = false; }
+}
+
+async function ytGorElle(){
+  if (YT_GOR_KOSUYOR){ toast('YouTube görünürlük turu zaten sürüyor', 'info'); return; }
+  const kilit = btnKilitle('yt-gor-btn');
+  let s = '';
+  try { s = await ytGorTur(true); } catch(e){} finally { kilit.ac(); try { ytGorCiz(); } catch(e){} }
+  // Sekmeler arası storage dinleyicisi yok (10458) — öbür sekmenin sonucu buraya kendiliğinden gelmez
+  if (s === 'jeton') toast('Başka bir panel sekmesi aynı anda tur başlattı — sonuç Platformlar yenilenince görünür', 'info', 5000);
+}
+
+// '' | 'degisim' | 'sinir'. Tur SONRASI açılan hesap değişimi ya da konan sınır da susturur.
+function ytGorSusturma(profil, o, hdMap, hsMap){
+  const k = hsAnahtar(profil, 'youtube');
+  const x = (o.p || {})[profil];
+  if (hdMap[k]) return 'degisim';
+  // Turda susturulmuş (z) ama değişim ARTIK beklemiyor: çözüldü, sonuç yok → sonraki tur tarar
+  if (x && x.z) return 'sinir';
+  const hs = hsMap[k], og = (o.sinir || {})[profil];
+  if ((hs && Number(hs.ts) > (o.t || 0)) || (Array.isArray(og) && Number(og[1]) > (o.t || 0))) return 'sinir';
+  return '';
+}
+
+function ytGorBildir(){
+  const o = ytGorOku();
+  const T = { d:0, k:0, b:0, l:0, c:0, s:0 };
+  if (o.t && (Date.now() - o.t) < YT_GOR_TAZE){
+    const hdMap = hdOku(), hsMap = hsOku();
+    Object.keys(o.p || {}).forEach(pr => {
+      const x = o.p[pr]; if (!x || ytGorSusturma(pr, o, hdMap, hsMap)) return;
+      T.d += Number(x.dn) || 0; T.k += x.k ? 1 : 0; T.b += Number(x.bn) || 0;
+      T.l += Number(x.ln) || 0; T.c += Number(x.cn) || 0; T.s += Number(x.sn) || 0;   // 'o' ve 'u' zil çalmaz
+    });
+  }
+  const parca = [];
+  if (T.d) parca.push(T.d + ' video herkese açık görünmüyor');
+  if (T.k) parca.push(T.k + ' kanalda hiçbir video açık dönmedi');
+  if (T.b) parca.push(T.b + " video TR'de engelli");
+  if (T.l) parca.push(T.l + ' video listesiz');
+  if (T.c) parca.push(T.c + ' video çocuklara özel sınıfta');
+  if (T.s) parca.push(T.s + ' video 48 sa+ sıfır izlenme');
+  // TEK kimlik: eski günlerin yt-gor-* kayıtları silinir (op_notif 60 sınırı)
+  NOTIF.items.filter(x => /^yt-gor-/.test(String(x.id)) && (!parca.length || x.id !== o.nid)).forEach(x => notifSil(x.id));
+  if (parca.length && o.nid)
+    notifEkle(o.nid, '👁', 'YouTube görünürlük: ' + parca.join(' · '),
+      'Son ' + (Number(o.pen) || YT_GOR_PENCERE_GUN) + ' gün · ' + (Number((o.n || {}).sorgu) || 0)
+      + " video kontrol edildi · bağlantılar Platformlar'da", 'platformlar');
+}
+
+function ytGorCiz(){
+  const o = ytGorOku(), hdMap = hdOku(), hsMap = hsOku();
+  try { ytGorSeritCiz(o, hdMap, hsMap); } catch(e){ console.warn('[YTGOR] şerit:', e.message); }
+  // Rozetler grid YENİDEN ÇİZİLMEDEN tazelenir (grid yalnız loadPlatforms'ta çiziliyor; yeniden
+  // oluşturmak 6375'teki _ytKanalId'yi düşürüp CANLI rozetini kaybettirirdi). data-p'den okunan
+  // ad HTML'e geri BASILMAZ — rozet ad içermiyor, ikinci enjeksiyon yüzeyi yok.
+  try { document.querySelectorAll('#pl-grid .yt-gor-rozet').forEach(s => { s.innerHTML = ytGorRozet(s.getAttribute('data-p') || '', o, hdMap, hsMap); }); } catch(e){}
+}
+
+function ytGorSeritCiz(o, hdMap, hsMap){
+  const el = document.getElementById('yt-gor'); if (!el) return;
+  const key = S.cfg.ytApiKey || S.cfg.shkey || '';
+  const N = v => Number(v) || 0;
+  const kutu = (ic, renk) => '<div style="padding:9px 12px;border:1px solid var(--brd);'
+    + (renk ? 'border-left:3px solid ' + renk + ';' : '') + 'border-radius:6px;background:var(--sur2);font-size:12px">' + ic + '</div>';
+  const btn = '<button class="btn bg bsm" id="yt-gor-btn" style="margin-left:auto;padding:1px 8px;font-size:11px;flex-shrink:0" onclick="ytGorElle()"'
+    + ' title="Son 14 günün YouTube yayınlarını şimdi sorgular (~5 YouTube kota birimi + Upload-Post geçmişi). Otomatik tur günde bir, panel açıkken.">↻ Şimdi tara</button>';
+  if (!S.cfg.blot || !key){
+    el.innerHTML = kutu('<span style="color:var(--mt)">👁 YouTube görünürlük turu kapalı — Upload-Post API Key ve YouTube (tarayıcı) API anahtarı gerekli (Ayarlar).</span>');
+    return;
+  }
+  const n = o.n || {};
+  if (!o.t){
+    el.innerHTML = kutu('<div style="display:flex;gap:8px;align-items:center"><span style="color:var(--mt)">👁 YouTube görünürlük turu henüz çalışmadı — panel açıldıktan ~40 sn sonra başlar (günde 1)'
+      + (o.ht ? ' · son deneme başarısız: ' + esc0(ytGorHataMetin(o.hata)) : '') + '</span>' + btn + '</div>');
+    return;
+  }
+  const eski = (Date.now() - o.t) >= YT_GOR_TAZE;
+  const pen = N(o.pen) || YT_GOR_PENCERE_GUN;
+  const bag = liste => (Array.isArray(liste) ? liste : []).map((x, i) => {
+    const par = String(x).split(':'), id = par[0], neden = par[1] || '';
+    if (!/^[\w-]{6,}$/.test(id)) return '';
+    return ' <a href="' + guvenliUrl('https://www.youtube.com/watch?v=' + id) + '" target="_blank" rel="noopener"'
+      + ' title="' + esc0('Çıkış yapılmış tarayıcıda aç — YouTube durumu gösterir' + (neden ? ' · API: ' + neden : '')) + '">[' + (i + 1) + ']</a>';
+  }).join('');
+  const satirlar = []; let temiz = 0, kirmizi = false;
+  Object.keys(o.p || {}).sort().forEach(pr => {
+    const x = o.p[pr] || {};
+    const bas = '<b>' + esc0(pr) + '</b> · ';
+    const sus = ytGorSusturma(pr, o, hdMap, hsMap);
+    if (sus === 'degisim'){ satirlar.push('<div style="color:var(--mt)">' + bas + '⏸ hesap değişimi bekliyor — sonuçlar gösterilmiyor</div>'); return; }
+    if (sus === 'sinir'){ satirlar.push('<div style="color:var(--mt)">' + bas + '⏸ hesap sınırı tur sonrası değişti — sonraki turda yeniden taranacak</div>'); return; }
+    const par = [];
+    if (x.k) par.push('<span style="color:var(--er)">⛔ son ' + pen + ' günün ' + N(x.a) + ' videosunun hiçbiri herkese açık dönmedi — kanal kapatılmış, videolar kaldırılmış/gizlenmiş ya da bu profil başka bir kanala geçmiş olabilir</span>' + bag(x.d));
+    if (x.dn) par.push('<span style="color:var(--er)">🚫 ' + N(x.dn) + ' video herkese açık görünmüyor</span>' + bag(x.d));
+    if (x.bn) par.push('<span style="color:var(--wn)">🌍 ' + N(x.bn) + " video TR'de engelli</span>" + bag(x.b));
+    if (x.ln) par.push('<span style="color:var(--wn)">📭 ' + N(x.ln) + ' video listesiz</span>' + bag(x.l));
+    if (x.cn) par.push('<span style="color:var(--wn)">🧒 ' + N(x.cn) + ' video çocuklara özel sınıfta</span>' + bag(x.c));
+    if (x.sn) par.push('<span style="color:var(--wn)">0️⃣ ' + N(x.sn) + ' video 48 sa+ sıfır izlenme</span>' + bag(x.s));
+    if (x.on) par.push('<span style="color:var(--mt)">ℹ ' + N(x.on) + ' video dönmedi ama hesap sınırına yakın ya da ilk açık videodan önce — önceki kanalın videoları olabilir (zil yok)</span>' + bag(x.o));
+    if (x.u) par.push('<span style="color:var(--mt)">… ' + N(x.u) + ' video sorgulanamadı</span>');
+    if (!par.length){ temiz++; return; }
+    if (x.k || x.dn) kirmizi = true;
+    satirlar.push('<div>' + bas + par.join(' · ') + '</div>');
+  });
+  const acik = N(n.acik), mfk = N(n.mfk);
+  const bilgi = '👁 <b>YouTube görünürlük</b> · son tur ' + esc0(new Date(o.t).toLocaleString('tr'))
+    + ' · ' + N(n.sorgu) + ' video kontrol edildi (son ' + pen + ' gün' + (o.kirpik ? ', geçmiş kırpık' : '') + ')'
+    + (n.aday ? '' : ' · kontrol edilecek YouTube yayını yok')
+    + (n.bilinmiyor ? ' · <span style="color:var(--wn)">⚠ ' + N(n.bilinmiyor) + ' video sorgulanamadı (' + esc0(ytGorHataMetin(o.hata)) + ')</span>' : '')
+    + ((acik && !mfk) ? ' · <span title="status.madeForKids alanı API anahtarlı yanıtta gelmedi — sınıf devre dışı">çocuk sınıfı kapalı (alan dönmüyor)</span>' : '')
+    + ((acik && mfk && mfk < acik) ? ' · madeForKids alanı ' + (acik - mfk) + ' videoda yok' : '')
+    + ((o.ht && o.ht > o.t) ? ' · <span style="color:var(--wn)">son deneme başarısız: ' + esc0(ytGorHataMetin(o.hata)) + '</span>' : '')
+    + (eski ? ' · <span style="color:var(--wn)">⚠ sonuç 2 günden eski</span>' : '')
+    + (temiz ? ' · <span style="color:var(--ok)">' + temiz + ' profil temiz</span>' : '');
+  const aciklama = satirlar.length
+    ? '<div style="font-size:11px;color:var(--mt);margin-top:6px;line-height:1.5">'
+      + "Herkese açık görünmeyen video silinmiş, YouTube tarafından kaldırılmış (telif ya da topluluk kuralı) veya özel (gizli) yapılmış olabilir. Bağlantıyı çıkış yapılmış bir tarayıcıda aç — YouTube durumu gösterir; telif/topluluk bildirimleri YouTube Studio'da görünür. Sıfır izlenme tek başına hesap durumu hakkında bilgi vermez. Bu tur yayınları durdurmaz ve hesaplara dokunmaz."
+      + '</div>'
+    : '';
+  el.innerHTML = kutu('<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>' + bilgi + '</span>' + btn + '</div>'
+    + (satirlar.length ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">' + satirlar.join('') + '</div>' : '')
+    + aciklama, eski ? '' : (kirmizi ? 'var(--er)' : (satirlar.length ? 'var(--wn)' : '')));
+}
+
+// Hesap satırı rozeti İÇERİĞİ — sarmalayıcı renderPlatformsGrid'de (display:contents). 'o'/'u' sayılmaz.
+function ytGorRozet(profil, o, hdMap, hsMap){
+  profil = String(profil || '').trim();
+  if (!profil || !o || !o.t || (Date.now() - o.t) >= YT_GOR_TAZE) return '';
+  const x = (o.p || {})[profil]; if (!x || ytGorSusturma(profil, o, hdMap, hsMap)) return '';
+  const n = (Number(x.dn) || 0) + (Number(x.bn) || 0) + (Number(x.ln) || 0) + (Number(x.cn) || 0) + (Number(x.sn) || 0) + (x.k ? 1 : 0);
+  if (!n) return '';
+  const renk = (x.k || x.dn) ? 'var(--er)' : 'var(--wn)';
+  return '<span style="flex-shrink:0;font-size:9.5px;color:' + renk + ';border:1px solid ' + renk + ';border-radius:3px;padding:0 4px"'
+    + ' title="YouTube görünürlük turu: ' + n + ' bulgu — ayrıntı ve bağlantılar sayfanın üstündeki 👁 şeridinde">👁 ' + n + '</span>';
 }
 
 function rapRenderPlatforms(inP){
@@ -6237,6 +7392,8 @@ async function loadPlatforms(zorla) {
   // eski handle taşır → temel ile aynıdır → yanlış alarm ÜRETMEZ; değişim
   // ancak taze veride görünür. İlk görüşte yalnız temel yazılır.
   try { htTara(raw); hdBanner(); } catch(e){ console.warn('[HT] tarama:', e.message); }
+  // YouTube görünürlük şeridi: htTara yeni bekleyen değişim yazdıysa aynı anda sustursun
+  try { ytGorCiz(); } catch(e){ console.warn('[YTGOR] şerit:', e.message); }
   // Taze veriyi ortak önbelleğe de yaz: Takvim, Raporlar ve profil sağlık
   // kontrolü phFetchAccounts() üzerinden aynı yerden okuyor.
   if (raw && taze){
@@ -6634,11 +7791,15 @@ function hsUygula(){
       + 'Hiçbir gönderi silinmez. Bu işareti sonra geri alabilirsin.\n\nDevam edilsin mi?')) return;
   const o = hsOku();
   o[k] = { t, tarih, profil, plat, ts: Date.now() };
+  // Sıfırlama BEKLEYEN bir hesap değişimi sırasında yapıldıysa o değişimin eski handle'ı: YouTube
+  // görünürlük sınırı (ytGorSinir) bu kaydı, sonra Yoksay'la öğrenilen AYNI değişimin sınırıyla eşler.
+  try { const _bek = hdOku()[k]; if (_bek && _bek.eski) o[k].bek = String(_bek.eski); } catch(e){}
   hsYaz(o);
   hsListeCiz();
   const el = document.getElementById('hs-onizle'); if (el) el.innerHTML = '';
   toast('🔄 '+profil+' · '+(HS_PLAT_AD[plat]||plat)+' sıfırlandı — ⚖ Eşitle ile eksikleri yeni hesaba kuyruklayabilirsin', 'ok', 8000);
   addLog('info','uploadpost','Hesap sıfırlama: '+k+' < '+tarih);
+  try { ytGorCiz(); } catch(e){}      // YouTube görünürlük şeridi/rozeti yeni sınırla susturulsun
 }
 
 function hsGeriAl(k){
@@ -6648,6 +7809,7 @@ function hsGeriAl(k){
   delete o[k]; hsYaz(o); hsListeCiz();
   toast('✓ Sıfırlama geri alındı', 'ok', 4000);
   addLog('info','uploadpost','Hesap sıfırlama geri alındı: '+k);
+  try { ytGorCiz(); } catch(e){}
 }
 
 function hsListeCiz(){
@@ -8246,6 +9408,12 @@ async function ciftOtoTik(){
     return;
   }
   if (Date.now() - ciftOtoSon() < CIFT_OTO_ARALIK){ ciftOtoDurumYaz(); return; }
+  // BAYAT SEKME: turu REZERVE ETMEDEN bırak — rezerve edip koşmamak yeni sekmenin saatini yakardı.
+  if (bayatDongu()){
+    const _el = document.getElementById('plat-cift-oto-durum');
+    if (_el) _el.textContent = '🔁 Çift kontrolü: bu sekme eski sürüm — tur daha yeni sekmede koşuyor (Ctrl+F5)';
+    return;
+  }
 
   // ── SEKMELER ARASI TEK TUR GARANTISI ───────────────────────────────────
   // Eskiden saat damgasi (_t) turun SONUNDA yaziliyordu: kapiyi gectikten
@@ -8511,6 +9679,10 @@ function hdYoksay(k){
   htYaz(temel);
   delete degisim[k]; hdYaz(degisim);
   hdBanner(); notifSil('hesap-degisim');
+  // YouTube görünürlük turu için hesap sınırını öğren (Yoksay sıfırlama işareti koymuyor);
+  // yalnız op_yt_gor ve zil yazar, op_hesap_* anahtarlarına dokunmaz.
+  try { ytGorSinirOgren(d.profil, d.plat, d.t, d.eski);
+        if (d.plat === 'youtube'){ ytGorCiz(); ytGorBildir(); notifKaydet(); notifRender(); } } catch(e){}
   addLog('info','uploadpost','Hesap değişimi yok sayıldı: '+k);
 }
 
@@ -8755,6 +9927,9 @@ async function hdPlanla(){
       htYaz(temel);
       const degisim = hdOku(); delete degisim[k]; hdYaz(degisim);
       hdBanner(); notifSil('hesap-degisim');
+      // YouTube görünürlük turu: işaret sonradan geri alınsa da hesap sınırı kaybolmasın
+      try { ytGorSinirOgren(d.profil, d.plat, d.t, d.eski);
+            if (d.plat === 'youtube'){ ytGorCiz(); ytGorBildir(); notifKaydet(); notifRender(); } } catch(e){}
       if (btn) btn.style.display = 'none';
     } else {
       // Gönderilen/elenen işaretsiz kalsın, kalanlar seçili dursun —
@@ -9602,6 +10777,7 @@ function renderPlatformsGrid(byPlat) {
       + ' onmouseenter="platTipAc(this,event)" onmousemove="platTipTasi(event)" onmouseleave="platTipKapat()"'
     : '';
   let bozukProfil = 0, bozukHesap = 0, toplamHesap = 0;
+  const _ytGor = ytGorOku(), _ytHd = hdOku(), _ytHs = hsOku();   // YouTube görünürlük rozeti için bir kez oku
   grid.innerHTML = gruplar.map(g => {
     const ps = platProfilSorun(g);
     if (ps) bozukProfil++;
@@ -9650,6 +10826,12 @@ function renderPlatformsGrid(byPlat) {
         +   '<div class="pl-h-ad">'+esc(ad)+canliRozet+'</div>'
         +   '<div class="pl-h-alt">'+esc(h.p.label)+(kul?' · @'+esc(kul):'')+'</div>'
         + '</div>'
+        // YouTube görünürlük rozeti: display:contents sarmalayıcı boşken flex gap üretmez;
+        // ytGorCiz içeriği grid'i yeniden çizmeden tazeler (data-p geri okunup HTML'e basılmaz)
+        + (h.p.key === 'youtube'
+            ? '<span class="yt-gor-rozet" data-p="' + esc(h.a._profile || '') + '" style="display:contents">'
+              + ytGorRozet(h.a._profile, _ytGor, _ytHd, _ytHs) + '</span>'
+            : '')
         + (hs ? '<span class="pl-h-uyari">⚠</span>' : '')
         + (()=>{ const d = platDuzenleHedef(h.p.key, h.a); if(!d) return '';
             // Kart tıklaması detay modalını açıyor → link kendi tıklamasını yutar
@@ -9807,6 +10989,10 @@ function platCloseModal() { const m = document.getElementById('plat-modal'); if 
 // sınır sürekli tazeleniyordu (12/15 profil "hız sınırına takıldı").
 let UP_KAPI_KADAR = 0;                 // bu ana kadar tüm çağrılar bekler
 let UP_SON_429 = 0;                    // en son ne zaman hız sınırı görüldü
+// Sekme ömrü boyunca görülen 429 SAYISI (UP_SON_429 yalnız son anı tutuyor). Klip serisi tur
+// özeti farkı alır; yeniden denemeyle kurtarılan 429'lar da sayılır — kovanın yetip yetmediğinin
+// asıl sinyali bu. Aynı sekmedeki başka çağrıların 429'u da girer (satırda böyle etiketli).
+let UP_429_SAYAC = 0;
 function upKapiKalan(){ return Math.max(0, UP_KAPI_KADAR - Date.now()); }
 async function upKapiBekle(){
   let k = upKapiKalan();
@@ -9815,6 +11001,7 @@ async function upKapiBekle(){
 // Retry-After saniye cinsindendir; yoksa artan bir varsayılan kullanılır.
 function upKapiKapat(sn, deneme){
   UP_SON_429 = Date.now();
+  UP_429_SAYAC++;
   // Üst sınır bilerek düşük: kapı ORTAK olduğu için uzun kapanış tüm
   // profilleri birden bekletir. 15 profillik raporda 60 sn'lik bir kapanış
   // tek bir takılan istek yüzünden turu dakikalarca uzatırdı.
@@ -10518,6 +11705,7 @@ const YEDEK_BIRLESTIR = ['op_sent', 'op_sent_log'];
 function yedekTopla(){
   const veri = {};
   for (const k of Object.keys(localStorage)){
+    if (k === SEKME_NABIZ_ANAHTAR) continue;   // anlık gözlem: başka zamana/makineye taşınırsa yanlış duraklatır
     if (k.startsWith('op_') || k === 'opus_cerceve') veri[k] = localStorage.getItem(k);
   }
   return veri;
@@ -10574,6 +11762,7 @@ function yedekYukle(input){
 
     let yazilan=0, birlestirilen=0, hata=[];
     for (const k of anahtarlar){
+      if (k === SEKME_NABIZ_ANAHTAR) continue;   // eski dosyada varsa diske yazılmasın (yanlış duraklatma)
       try {
         if (YEDEK_BIRLESTIR.includes(k)) { yedekBirlestirYaz(k, y.veri[k]); birlestirilen++; }
         else { localStorage.setItem(k, y.veri[k]); yazilan++; }
@@ -10730,6 +11919,13 @@ function ytkFmt(n) {
   return String(n);
 }
 
+// contentDetails.duration P#DT#H#M#S olabilir (resmî belge). ytkParseDur 'P1DT2H'yi 0 okuyor;
+// onu değiştirmek Radar süre filtrelerini de değiştirirdi → ayrı yardımcı.
+function ytSureSn(iso){
+  const m = String(iso||'').match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)(?:\.\d+)?S)?)?$/);
+  if (!m) return 0;
+  return (+(m[1]||0))*86400 + (+(m[2]||0))*3600 + (+(m[3]||0))*60 + (+(m[4]||0));
+}
 function ytkParseDur(iso) {
   const m = (iso||'').match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!m) return 0;
@@ -11605,25 +12801,58 @@ function initTrendOnay() {
   trFetchPending();
 }
 
-// Onay kuyruğu videolarının CANLI izlenmesini çek + GÜNLÜK değişimi hesapla.
-// Keşif radarıyla aynı mantık: canlı izlenme (YouTube API) + günlük snapshot
-// (op_tr_snap). Kota ucuz: 117 video ≈ 3 istek. Anahtar yoksa sessizce atlanır.
-async function trEnrichViews() {
+// Bu sürenin üstü çoğunlukla yayın kaydı/derleme. Panelin YARGI eşiği; API ya da OpusClip sınırı değil.
+const TR_UZUN_SN = 3*3600;
+// BCP-47: 'und' belirsiz, 'zxx' dilsiz, 'mul' çok dilli → ses dili BİLİNMİYOR sayılır
+const TR_SES_BILINMEZ = /^(und|zxx|mul)$/i;
+// YouTube 22 (People & Blogs) ve 24 (Entertainment) genel kova: YT_CAT_MAP'te vlog/eglence'ye bağlı
+// ve TEK BAŞINA %75 ön seçim üretiyordu (ölçüldü). Trend Onay'da sinyal sayılmaz; Radar değişmez.
+const TR_KAT_KOVA_CATID = { '22':1, '24':1 };
+// n8n _profilBagliHaritasi ile AYNI platform kümesi (threads/linkedin sayılmaz)
+const TR_N8N_PLAT = { instagram:'ig', youtube:'yt', tiktok:'tt', facebook:'fb', x:'x', twitter:'x' };
+
+// Onay kuyruğu videolarının CANLI izlenmesi + kart üstverisi TEK çağrıdan + GÜNLÜK değişim.
+// Keşif radarıyla aynı mantık: canlı izlenme (YouTube API) + günlük snapshot (op_tr_snap).
+// Kota: videos.list ÇAĞRI başına 1 birim (resmî belge; part maliyette anılmıyor) → 117 video = 3 çağrı.
+// Üstveri (v._yt) YALNIZ BELLEKTE (localStorage baskısı). description SAKLANMAZ: öneride
+// kullanılmıyor, eşitlik bozup yanlış kategoriyi %40'ta seçtiriyordu (ölçüldü).
+async function trEnrichViews(liste) {
+  liste = liste || TR.pending;
   const key = S.cfg.ytApiKey || S.cfg.shkey || '';
-  if (!key || !TR.pending.length) return;
-  const ids = [...new Set(TR.pending.map(v=>v.videoId).filter(Boolean))];
+  if (!key || !liste.length) return;
+  const ids = [...new Set(liste.map(v=>v.videoId).filter(Boolean))];
   const YT = 'https://www.googleapis.com/youtube/v3/';
-  const live = {};
+  const live = {}, yt = {};
   for (let a=0; a<ids.length; a+=50) {
     try {
-      const r = await ytkFetch(YT+'videos?part=statistics&id='+ids.slice(a,a+50).join(',')+'&key='+key);
-      (r.items||[]).forEach(it=>{ live[it.id] = parseInt((it.statistics||{}).viewCount||0); });
-    } catch(e) { console.warn('[TR] canlı izlenme:', e.message); }
+      const r = await ytkFetch(YT+'videos?part=snippet,contentDetails,statistics&id='+ids.slice(a,a+50).join(',')+'&key='+key);
+      (r.items||[]).forEach(it=>{
+        live[it.id] = parseInt((it.statistics||{}).viewCount||0);
+        const sn = it.snippet||{}, cd = it.contentDetails||{};
+        yt[it.id] = {
+          channelId: String(sn.channelId||''),
+          catId:     String(sn.categoryId||''),
+          tags:      Array.isArray(sn.tags) ? sn.tags.slice(0,20).map(t=>String(t).slice(0,40)) : [],  // YALNIZ gölge ölçüm
+          sesDili:   String(sn.defaultAudioLanguage||''),   // konuşulan dil (resmî tanım)
+          metinDili: String(sn.defaultLanguage||''),        // BAŞLIK/AÇIKLAMA dili — ses değil
+          canli:     String(sn.liveBroadcastContent||''),   // live | upcoming | none
+          sureSn:    ytSureSn(cd.duration),
+          lisansli:  cd.licensedContent === true
+        };
+      });
+    } catch(e) { console.warn('[TR] canlı izlenme/üstveri:', e.message); }
   }
   let snap = {};
   try { snap = JSON.parse(localStorage.getItem('op_tr_snap')||'{}') || {}; } catch(e) {}
   const now = Date.now();
-  TR.pending.forEach(v=>{
+  liste.forEach(v=>{
+    const y = yt[v.videoId];
+    if (y) {
+      v._yt = y;
+      // Kworb satırında channelId YOK → katOgren 'ad:' anahtarına yazıyordu. Kimlik dolunca Radar'la
+      // AYNI anahtara yazar; katTahmin iki kaydı zaten topluyor (1. katman).
+      if (!v.channelId && y.channelId) v.channelId = y.channelId;
+    }
     const lv = live[v.videoId];
     if (lv == null) return;
     v.liveViews = lv;
@@ -11651,9 +12880,13 @@ async function trFetchPending() {
     const data = await n8nGetCached('/webhook/kworb-bekleyenler');
     if (!data) { showRes('tr-status','✕ n8n\'e ulaşılamadı — URL yanlış, CORS engeli ya da webhook kayıtlı değil (ayrıntı: Loglar)','err'); return; }
     if (data._bos) { showRes('tr-status','✕ n8n boş yanıt döndü (HTTP 200, 0 bayt) — akış tamamlanmıyor. n8n → Executions listesinde son çalıştırmanın hatasına bak.','err'); return; }
-    TR.pending = Array.isArray(data.pending) ? data.pending.slice().reverse() : [];
-    try{ trTabCount(TR.pending.length); }catch(e){}  // en yeni önce
-    try{ await trEnrichViews(); }catch(e){ console.warn('[TR] izlenme zenginleştirme:', e.message); }
+    const yeni = Array.isArray(data.pending) ? data.pending.slice().reverse() : [];   // en yeni önce
+    try{ trTabCount(yeni.length); }catch(e){}
+    // TR.pending üstveri BİTTİKTEN SONRA değişir: beklerken arama kutusu yeniden çizerse
+    // zenginleşmemiş öneri görünüp operatörün dokunuşu kartDurum'da donuyordu.
+    try{ await trEnrichViews(yeni); }catch(e){ console.warn('[TR] izlenme zenginleştirme:', e.message); }
+    TR.pending = yeni;
+    try{ trOneriOzetLogla(); }catch(e){}
     trRenderPending();
     showRes('tr-status', TR.pending.length ? ('✓ '+TR.pending.length+' bekleyen video') : 'Bekleyen trend video yok', TR.pending.length?'ok':'info');
     addLog('ok','webhook','Trend onay: '+TR.pending.length+' bekleyen');
@@ -11680,9 +12913,10 @@ function trRenderPending() {
   // Çoklu seçim: kategori chip'leri (diğer sayfalardaki cat-chip deseniyle aynı)
   // trChip(selKat): verilen kategori önceden seçili gelir → tahmin edilen kategoriyi işaretlemek için
   const trChip = (selKat) => Object.entries(getCats()).map(([k,c])=>`<span class="cat-chip${k===selKat?' sel':''}" data-cat="${k}" onclick="this.classList.toggle('sel')" style="font-size:11px;padding:2px 7px">${c.label}</span>`).join('');
-  const catChips = trChip('genel');
-  // bulk kategori chip'lerini doldur (bir kez)
-  const bc = document.getElementById('tr-bulk-cats'); if (bc && !bc.children.length) bc.innerHTML = catChips;
+  // Araç çubuğu çipleri BOŞ başlar. Eskiden trChip('genel') ile Genel seçili geliyordu → toplu onay
+  // varsayılan EZME modundaydı: kart kategorisi/dili/notu ve katOgren kullanılmıyordu; oysa araç
+  // çubuğu metni ('çipler boşken her video kendi kartındaki…') kart modunu vaat ediyor.
+  const bc = document.getElementById('tr-bulk-cats'); if (bc && !bc.children.length) bc.innerHTML = trChip('');
   // filtre + sıralama
   const q = ((document.getElementById('tr-search')||{}).value||'').toLowerCase();
   const sort = (document.getElementById('tr-sort')||{}).value || 'views';
@@ -11717,17 +12951,19 @@ function trRenderPending() {
       ? `<span class="rd-badge-delta" style="right:auto;left:6px;top:auto;bottom:6px" title="Son ${v.deltaH} saatte kazanılan izlenme (günlük değişim)">▲ +${ytkFmt(v.delta)} / ${v.deltaH}sa</span>`
       : '';
     const channel = v.channelTitle || '';
-    // Kategori tahmini — Keşif radarındaki katTahmin ile aynı (başlık kelimeleri +
-    // öğrenilmiş kanal hafızası). Güven yeterliyse chip önceden seçili gelir.
-    const kt = katTahmin({ title:v.title, channel:channel });
-    const ktGuven = kt.guven || 0;
+    // Kategori + dil önerisi TEK yerden (trKartOneri): gizli kart toplu onayda aynı sonucu alır.
+    const _o = trKartOneri(v);
+    const kt = _o.kt, ktGuven = _o.guven, ktSel = _o.kat, ds = _o.dil;
     const ktLbl = (getCats()[kt.kategori]||{}).label || kt.kategori;
-    const ktSel = ktGuven>=40 ? kt.kategori : 'genel';
-    const ktHint = ktGuven>=40
+    const ktHint = _o.enZorla
+      ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--mt)" title="${esc0('Kategori önerisi: '+ktLbl+' %'+ktGuven+' · '+(kt.neden||'')+'\nEN profiller yalnız Genel havuzunda ('+KATEGORI_PROFIL_POOL.genel_en.join(' / ')+'); bu yüzden Genel seçili geldi. Değiştirebilirsin.')}">🏷 Öneri <b>${esc0(ktLbl)}</b> %${ktGuven} · ses EN → <b>Genel (EN)</b> seçili</div>`
+      : ktGuven>=40
       ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--acc3)" title="${esc0(kt.neden||'')} · güven %${ktGuven}">🏷 Önerilen: <b>${esc0(ktLbl)}</b> <span style="color:var(--mt)">%${ktGuven} · seçili</span></div>`
       : (ktGuven>0
-        ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--wn)" title="Zayıf sinyal — kontrol edip seç">🤔 belki <b>${esc0(ktLbl)}</b> — emin değilim, kontrol et</div>`
+        ? `<div style="font-size:10.5px;margin-bottom:5px;color:var(--wn)" title="${_o.yalnizCatId ? 'Yalnız YouTube kategorisi (categoryId) işaret ediyor — tek başına ön seçim yapılmaz, kontrol edip seç' : 'Zayıf sinyal — kontrol edip seç'}">🤔 belki <b>${esc0(ktLbl)}</b> — emin değilim, kontrol et</div>`
         : `<div style="font-size:10.5px;margin-bottom:5px;color:var(--mt)">kategori sinyali yok — elle seç</div>`);
+    const kanalIpucu = channel + ((v._yt && v._yt.lisansli)
+      ? '\nYouTube licensedContent: video bir içerik ortağına bağlı kanala yüklenmiş ve o ortakça sahiplenilmiş. Kliplerin telif eşleşmesi alıp almadığı bu panelde ölçülmedi.' : '');
     let pub = '';
     if (v.publishedAt) { const d = new Date(v.publishedAt); if (!isNaN(d)) pub = d.toLocaleDateString('tr',{day:'2-digit',month:'short',year:'numeric'}); }
     return `<div class="card${already?' rd-done':''}" data-trvid="${esc0(vid)}" data-trguven="${ktGuven|0}" style="padding:0;overflow:hidden${already?';border-color:rgba(52,211,153,.55)':''}">
@@ -11740,17 +12976,20 @@ function trRenderPending() {
       </div>
       <div style="padding:10px 12px">
         <div style="font-size:14px;font-weight:600;color:var(--tx);line-height:1.3;min-height:28px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc0(v.title||vid)}</div>
-        ${channel ? `<div style="font-size:11px;color:var(--tx);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc0(channel)}">📺 ${esc0(channel)}</div>` : ''}
+        ${channel ? `<div style="font-size:11px;color:var(--tx);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc0(kanalIpucu)}">📺 ${esc0(channel)}</div>` : ''}
         <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--mt);margin:5px 0 8px">
           <span>👁 ${esc0(views)}${pub?` · 📅 ${esc0(pub)}`:''}</span>
           <a href="${guvenliUrl(v.youtubeLink)}" target="_blank" rel="noopener" style="color:var(--acc)">YouTube ↗</a>
         </div>
         ${already?rdDoneLbl(already):''}
         ${ktHint}
+        ${trDilSatiri(ds)}
+        ${trUyariSatiri(v)}
         <div style="display:flex;gap:6px;margin-bottom:6px;align-items:flex-start">
           <div class="tr-cats cat-chips" style="flex:1;display:flex;flex-wrap:wrap;gap:3px" title="Birden fazla kategori seçebilirsin — her kategori için ayrı gönderim yapılır">${trChip(ktSel)}</div>
-          <select class="tr-dil" title="Dil (yalnız Genel için etkili)" style="width:60px;font-size:12px;flex-shrink:0"><option value="tr">TR</option><option value="en">EN</option></select>
+          <select class="tr-dil" title="Dil — Genel seçiliyken profil havuzunu belirler (EN → genel-1-en / genel-2-en; öteki kategorilerde EN profil yok). Her kategoride YouTube yüklemesinin dil beyanını belirler (tr/tr-TR ya da en/en-US)." style="width:60px;font-size:12px;flex-shrink:0"><option value="tr"${ds.on==='en'?'':' selected'}>TR</option><option value="en"${ds.on==='en'?' selected':''}>EN</option></select>
         </div>
+        <div class="tr-dil-uyum" style="display:none;font-size:10.5px;color:var(--wn);margin-bottom:6px"></div>
         <input class="tr-desc" type="text" placeholder="Açıklama / not (isteğe bağlı)" style="width:100%;font-size:12px;margin-bottom:8px"/>
         <div class="tr-actions" style="display:flex;gap:6px">
           <button class="btn bp bsm" style="flex:1" onclick="trApprove('${jsStr(vid)}')">✓ Onayla ve Gönder</button>
@@ -11765,10 +13004,12 @@ function trRenderPending() {
       alt:'Kuyruktaki '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'})
       + islenmisNotu(_ay.gizlenen);
   }
-  trKartDurumUygula(grid, TR.kartDurum);
+  trKartDurumUygula(grid, TR.kartDurum);   // operatörün elle seçimi ön seçimi EZER (sıra önemli)
+  try{ trDilUyumGuncelle(grid); }catch(e){}   // geri uygulanan durumdan SONRA hesaplanır
   // Kart çipleri yeni çizildi: stok (plan bitiyor) işaretleri yalnız sayfa
   // açılışında konuyordu, yeniden çizimde kayboluyordu.
   try{ stokChipIsaretle(); }catch(e){}
+  try{ trHavuzSeridiCiz(); }catch(e){}
   trImlecCiz(false);   // yeniden çizimde klavye imleci kaybolmasın
 }
 // Operatör bir kartta çip/dil/not değiştirdiğinde o kartın TAM durumunu kaydet.
@@ -11790,6 +13031,7 @@ function trKartDurumDinle(grid){
       dil: dilEl ? dilEl.value : null,
       not: notEl ? notEl.value : null
     };
+    try{ trDilUyumGuncelle(c); }catch(e){}
   };
   grid.addEventListener('click', kaydet);
   grid.addEventListener('change', kaydet);
@@ -11811,6 +13053,183 @@ function trKartDurumUygula(grid, durum){
     const notEl = c.querySelector('.tr-desc');
     if (notEl && s.not != null) notEl.value = s.not;
   });
+}
+
+// Ses dili sinyali. EN YALNIZ defaultAudioLanguage ile: başlık heuristiği (rdIngilizceMi) Türkçe
+// videoyu İngilizce başlık yüzünden EN havuza taşıyabilirdi (K38 risk hükmü) → yalnız İPUCU.
+function trDilSinyal(v){
+  const y = v._yt || {};
+  let ses = String(y.sesDili||'').trim().toLowerCase();
+  if (TR_SES_BILINMEZ.test(ses)) ses = '';
+  if (ses){
+    if (/^en(-|$)/.test(ses)) return { on:'en', tur:'ses-en', kod:ses };
+    if (/^tr(-|$)/.test(ses)) return { on:'tr', tur:'ses-tr', kod:ses };
+    return { on:'tr', tur:'ses-diger', kod:ses };
+  }
+  let baslikEn = false;
+  try { baslikEn = rdIngilizceMi({ snippet:{ title:v.title||'', defaultLanguage:y.metinDili||'' } }); } catch(e){}
+  return { on:'tr', tur: baslikEn ? 'en-olabilir' : '', kod:'' };
+}
+// Kartın VERİDEN önerisi (operatör dokunmadıysa gidecek değerler).
+// catId: 22/24 genel kova sayılmaz; öğrenilmiş kayıt ya da başlık kelimesi yoksa catId TEK BAŞINA
+// ön seçim yapmaz (güven 39 → '🤔 belki'). Etiket/açıklama VERİLMEZ (eşitlikte %40 yanlış seçim).
+// Ses EN ise ön seçim Genel: EN profil yalnız genel_en havuzunda (n8n poolKey).
+function trKartOneri(v){
+  const y = v._yt || {};
+  const catId = (y.catId && !TR_KAT_KOVA_CATID[y.catId]) ? y.catId : '';
+  const kt = katTahmin({ title:v.title, channel:v.channelTitle||'', channelId:v.channelId||'', catId });
+  let guven = kt.guven || 0, yalnizCatId = false;
+  if (catId && YT_CAT_MAP[catId] && kt.neden !== 'senin geçmiş seçimin'
+      && !Object.keys(KEYWORD_MAP).some(k => KEYWORD_MAP[k].test(String(v.title||'')))) {
+    yalnizCatId = true; guven = Math.min(guven, 39);
+  }
+  const dil = trDilSinyal(v);
+  const enZorla = dil.on === 'en' && guven >= 40 && kt.kategori !== 'genel';
+  const kat = dil.on === 'en' ? 'genel' : (guven >= 40 ? kt.kategori : 'genel');
+  return { kt, guven, kat, dil, yalnizCatId, enZorla };
+}
+function trDilSatiri(ds){
+  if (!ds || !ds.tur || ds.tur === 'ses-tr') return '';
+  const kod = /^[a-z]{2,3}(-[a-z0-9]{1,8})*$/i.test(ds.kod||'') ? ds.kod : '?';
+  if (ds.tur === 'ses-en')
+    return `<div style="font-size:10.5px;margin-bottom:5px;color:var(--acc3)" title="${esc0('YouTube snippet.defaultAudioLanguage = '+kod+' (videonun konuşulan dili). Karta dokunulmadıysa EN ve Genel ön seçilir.')}">🇬🇧 Ses dili İngilizce (YouTube: ${esc0(kod)})</div>`;
+  if (ds.tur === 'en-olabilir')
+    return `<div style="font-size:10.5px;margin-bottom:5px;color:var(--wn)" title="Ses dili alanı boş. Başlık ya da YouTube metin dili (defaultLanguage) İngilizce görünüyor; bu tahmin yanılabilir. Dil seçimi DEĞİŞTİRİLMEDİ, videoyu açıp kontrol et.">🇬🇧? EN olabilir — seçim değişmedi</div>`;
+  return `<div style="font-size:10.5px;margin-bottom:5px;color:var(--mt)">🌐 Ses dili: ${esc0(kod)} (TR/EN değil)</div>`;
+}
+// Müzik / canlı / çok uzun. Yalnız doğrulanmış bilgi; licensedContent burada YOK (kanal satırı ipucu).
+function trUyariSatiri(v){
+  const y = v._yt || null;
+  const sure = (y && y.sureSn) || (parseInt(v.durationSec)||0);
+  const parca = [], ipucu = [];
+  if (y && y.catId === '10'){
+    parca.push('🎵 Müzik kategorisi');
+    ipucu.push('YouTube kategorisi Müzik (10). Trend Radar bu kategoriyi eliyor, onay kuyruğu elemiyor. Telif etkisi bu panelde ölçülmedi.');
+  }
+  if (y && (y.canli === 'live' || y.canli === 'upcoming')){
+    parca.push(y.canli === 'live' ? '🔴 canlı yayın sürüyor' : '⏳ planlanmış yayın');
+    ipucu.push('YouTube liveBroadcastContent = '+y.canli+': video henüz tamamlanmış bir yükleme değil.');
+  }
+  if (sure >= TR_UZUN_SN){
+    parca.push('⏱ çok uzun ('+rdSure(sure)+')');
+    ipucu.push('3 saatten uzun: çoğunlukla yayın kaydı ya da derleme. Bu eşik panelin yargısı; OpusClip ya da YouTube sınırı değil.');
+  }
+  if (!parca.length) return '';
+  return `<div class="tr-uyari" style="font-size:10.5px;margin-bottom:5px;color:var(--wn)" title="${esc0(ipucu.join('\n'))}">${esc0(parca.join(' · '))}</div>`;
+}
+// Operatör EN + Genel dışı çip seçerse: o kategoride EN profil yok, n8n TR profile en/en-US beyanıyla yükler.
+function trDilUyumGuncelle(kapsam){
+  const kartlar = (kapsam && kapsam.matches && kapsam.matches('[data-trvid]'))
+    ? [kapsam] : Array.from((kapsam||document).querySelectorAll('[data-trvid]'));
+  kartlar.forEach(c => {
+    const u = c.querySelector('.tr-dil-uyum'); if (!u) return;
+    const dil = (c.querySelector('.tr-dil')||{}).value || 'tr';
+    const disari = Array.from(c.querySelectorAll('.tr-cats .cat-chip.sel'))
+      .map(x => x.getAttribute('data-cat')).filter(k => k && k !== 'genel');
+    if (dil === 'en' && disari.length){
+      u.textContent = '⚠ EN + ' + disari.map(katLabel).join(', ')
+        + ': bu kategoride EN profil yok — video TR profile YouTube dil beyanı en/en-US ile gider. EN profiller için yalnız Genel seç.';
+      u.style.display = 'block';
+    } else { u.textContent = ''; u.style.display = 'none'; }
+  });
+}
+// n8n _profilBagliHaritasi'nın BİREBİR kopyası (phCompute DEĞİL: o her platformu sayıyor, page_id'yi saymıyor).
+// Dönüş: { profil: ['ig','yt',…] } ya da veri yoksa null.
+function trBagliHarita(raw){
+  const profs = raw && (Array.isArray(raw.profiles) ? raw.profiles : (Array.isArray(raw.data) ? raw.data : null));
+  if (!profs || !profs.length) return null;
+  const h = {};
+  profs.forEach(p => {
+    const u = String((p && (p.username || p.user)) || ''); if (!u) return;
+    const sa = p.social_accounts || p.socialAccounts || {}, bagli = [];
+    Object.keys(sa).forEach(k => {
+      const arr = Array.isArray(sa[k]) ? sa[k] : [sa[k]];
+      const varMi = arr.some(a => a && typeof a === 'object' && (a.username || a.handle || a.id || a.display_name || a.page_id));
+      const kod = TR_N8N_PLAT[String(k).toLowerCase()];
+      if (varMi && kod && bagli.indexOf(kod) < 0) bagli.push(kod);
+    });
+    h[u] = bagli;
+  });
+  return h;
+}
+// HAVUZ PLAN ŞERİDİ — YENİ İSTEK YOK. STOK (5 dk önbellek) + bellekteki /users kopyası.
+// n8n kuralı: listede OLMAYAN profil aday kalır; havuzun hepsi bağsızsa TÜM havuz kullanılır.
+function trHavuzOzeti(){
+  if (!STOK.data) return null;
+  const raw = S.uploadPostAccounts || (S._panelCache && S._panelCache.accounts) || null;
+  let har = null; try { har = trBagliHarita(raw); } catch(e){}
+  const havuzlar = Object.keys(KATEGORI_PROFIL_POOL).map(k => {
+    const profiller = KATEGORI_PROFIL_POOL[k].map(p => {
+      const n = parseInt(STOK.data[p]||0) || 0;
+      return { p, n, gun: n ? stokGun(p) : 0,
+        bagsiz: !!har && Array.isArray(har[p]) && har[p].length === 0,
+        listedeYok: !!har && !Array.isArray(har[p]) };
+    });
+    const bagli = profiller.filter(x => !x.bagsiz);
+    const tumuBagsiz = !bagli.length;
+    const aday = tumuBagsiz ? profiller : bagli;
+    const gunler = aday.map(x => x.gun).filter(g => g != null);
+    return { kat:k, label:katLabel(k), profiller, tumuBagsiz, enErken: gunler.length ? Math.min.apply(null, gunler) : null };
+  });
+  return { bagVerisi: !!har, havuzlar };
+}
+function trHavuzSeridiCiz(){
+  const el = document.getElementById('tr-havuz'); if (!el) return;
+  const oz = trHavuzOzeti();
+  if (!oz){ el.style.display = 'none'; el.textContent = ''; return; }
+  const dk = STOK.t ? Math.max(0, Math.round((Date.now()-STOK.t)/60000)) : null;
+  const bas = 'Havuz başına, planı EN ERKEN biten profilin kalan günü (n8n sıradaki klibi planı en erken biten profile yönlendirir). '
+    + 'Kaynak: Upload-Post planlı gönderileri (okunamazsa n8n panel-data yedeği)' + (dk != null ? ', ' + dk + ' dk önce okundu' : '') + '.\n'
+    + 'TAHMİNİ: panelden kuyruğa eklenen (add_to_queue) gönderiler bu listede olmayabilir; n8n son saatlerde gönderip henüz planlanmamış klipleri de içermez. Profil olduğundan boş görünebilir.\n'
+    + 'Bu şerit kategori önerisi değildir: kategori videonun içeriğine göre seçilmeli.'
+    + (oz.bagVerisi ? '' : '\nHesap bağlantı verisi bellekte yok (Platformlar yüklenmedi): bağlı hesabı olmayan profiller işaretlenemedi.');
+  const parca = oz.havuzlar.map(g => {
+    const renk = g.tumuBagsiz ? 'var(--er)' : (g.enErken == null ? 'var(--mt)'
+      : (g.enErken < 1 ? 'var(--er)' : (g.enErken < STOK_GUN_ESIK ? 'var(--wn)' : 'var(--tx)')));
+    const deger = (g.enErken == null ? '?' : g.enErken + ' g') + (g.tumuBagsiz ? ' ⚠ bağlı hesap yok' : '');
+    const ipucu = g.profiller.map(x => '• ' + x.p + ': '
+      + (x.bagsiz ? (g.tumuBagsiz ? 'bağlı ig/yt/tt/fb/x hesabı yok (havuzun tamamı böyle: n8n yine bu havuza gönderir, yükleme başarısız olur) · '
+                                  : 'bağlı ig/yt/tt/fb/x hesabı yok, n8n bu profili eler, sayılmadı · ')
+         : (x.listedeYok ? 'panelin profil listesinde yok, n8n yine aday sayar · ' : ''))
+      + x.n + ' zamanlanmış · ' + stokGunMetni(x)).join('\n');
+    const bagsizNot = (!g.tumuBagsiz && g.profiller.some(x => x.bagsiz)) ? ' <span style="color:var(--mt)">(bağsız profil sayılmadı)</span>' : '';
+    return '<span style="white-space:nowrap;color:' + renk + '" title="' + esc0(ipucu) + '">'
+      + esc0(g.label) + ' <b>' + esc0(deger) + '</b>' + bagsizNot + '</span>';
+  });
+  el.innerHTML = '<span title="' + esc0(bas) + '" style="cursor:help">📅 Plan sonu:</span> ' + parca.join(' · ');
+  el.style.display = 'block';
+}
+// Ölçüm (depolama yok): üstveri gerçekte neyi değiştiriyor + gölge (etiket/ham catId verilseydi).
+function trOneriOzetLogla(){
+  const zengin = TR.pending.filter(v => v._yt);
+  if (!zengin.length) return;
+  const say = { sesVar:0, sesEn:0, enGenel:0, enOlabilir:0, muzik:0, uzun:0, canli:0, lisansli:0, kova:0, yalnizCat:0, golge:0 };
+  const degisim = {};
+  zengin.forEach(v => {
+    const y = v._yt, o = trKartOneri(v);
+    if (o.dil.tur.indexOf('ses') === 0) say.sesVar++;
+    if (o.dil.tur === 'ses-en') say.sesEn++; else if (o.dil.tur === 'en-olabilir') say.enOlabilir++;
+    if (o.enZorla) say.enGenel++;
+    if (y.catId === '10') say.muzik++;
+    if ((y.sureSn||0) >= TR_UZUN_SN) say.uzun++;
+    if (y.canli === 'live' || y.canli === 'upcoming') say.canli++;
+    if (y.lisansli) say.lisansli++;
+    if (TR_KAT_KOVA_CATID[y.catId]) say.kova++;
+    if (o.yalnizCatId) say.yalnizCat++;
+    const eski = katTahmin({ title:v.title, channel:v.channelTitle||'' });   // bugünkü çağrı
+    const eskiKat = (eski.guven||0) >= 40 ? eski.kategori : 'genel';
+    if (eskiKat !== o.kat){ const k = eskiKat + '→' + o.kat; degisim[k] = (degisim[k]||0) + 1; }
+    const g = katTahmin({ title:v.title, channel:v.channelTitle||'', channelId:v.channelId||'', catId:y.catId, tags:y.tags });
+    const gKat = o.dil.on === 'en' ? 'genel' : ((g.guven||0) >= 40 ? g.kategori : 'genel');
+    if (gKat !== o.kat) say.golge++;
+  });
+  const dokum = Object.entries(degisim).sort((a,b)=>b[1]-a[1]).map(([k,n])=>k+' '+n).join(', ');
+  const degisen = Object.values(degisim).reduce((s,n)=>s+n, 0);
+  addLog('info','sistem','Trend Onay üstveri: '+zengin.length+'/'+TR.pending.length+' video · ses dili dolu '+say.sesVar
+    +' · EN (ses) '+say.sesEn+' (kategori önerisi Genel yapılan '+say.enGenel+') · EN olabilir '+say.enOlabilir
+    +' · müzik '+say.muzik+' · ≥3 sa '+say.uzun+' · canlı/planlı '+say.canli+' · licensedContent '+say.lisansli
+    +' · catId 22/24 yok sayılan '+say.kova+' · yalnız catId ipucu '+say.yalnizCat
+    +' · ön seçimi değişen '+degisen+(dokum ? ' ('+dokum+')' : '')+' · etiket+ham catId verilseydi farklı '+say.golge);
 }
 
 async function trApprove(videoId) {
@@ -12005,19 +13424,29 @@ async function trBulkApprove() {
         // çizimde göstereceği öneri (güven ≥40) — görünür kartla aynı sonuç.
         const d = TR.kartDurum[v.videoId];
         if (d){ kats = (d.cats||[]).slice(); dil = d.dil || 'tr'; aciklama = d.not || ''; }
-        else {
-          const kt = katTahmin({ title:v.title, channel:v.channelTitle||'' });
-          if ((kt.guven||0) >= 40) kats = [kt.kategori];
-        }
+        else { const o = trKartOneri(v); kats = [o.kat]; dil = o.dil.on; }   // görünür kartla AYNI öneri
       }
     }
     if(!kats.length) kats=['genel'];
     return { v, kats, dil, aciklama };
   });
 
-  // Öğrenme yalnız kart bazlı modda: araç çubuğuyla 20 videoyu tek kategoriye
-  // ezmek "bu kanal bu kategoridir" demek DEĞİL, hafızayı kirletirdi.
-  if(!ezme) isler.forEach(i=>{ try{ katOgren(i.v.channelId, i.v.channelTitle, i.kats[0]); }catch(e){} });
+  // DİL GÜVENLİĞİ (yalnız ezme): araç çubuğu ezmesi dili 'tr' yapar. Kartında dil EN olan (ses EN
+  // ön seçimi ya da operatörün elle seçimi) video TR profillere tr/tr-TR beyanıyla gider.
+  if (ezme){
+    const enKart = isler.filter(i => {
+      const c = kartlar.get(i.v.videoId), s = c && c.querySelector('.tr-dil');
+      if (s) return s.value === 'en';
+      const d = TR.kartDurum[i.v.videoId];
+      return (d && d.dil) ? d.dil === 'en' : trDilSinyal(i.v).on === 'en';
+    }).length;
+    if (enKart && !confirm(enKart + ' videonun kartında dil EN, ama araç çubuğunda kategori seçili olduğu için hepsi TR gider: TR profillere YouTube dil beyanı tr/tr-TR ile yüklenir.'
+        + '\n\nKartların kendi kategori ve diliyle göndermek için İptal et ve üstteki çipleri boşalt.\n\nYine de TR olarak gönderilsin mi?')){
+      toast('Toplu onay iptal edildi','warn'); return;
+    }
+  }
+  // Öğrenme ARTIK burada değil: send() başarısında (aşağıda) — araç çubuğuyla 20 videoyu tek
+  // kategoriye ezmek "bu kanal bu kategoridir" demek DEĞİL; iptal edilen/ulaşmayan onay da öğretmesin.
 
   const tasks=isler.map(({v,kats,dil,aciklama})=>({
     label:(v.title||v.videoId).slice(0,42), badge:kats.join(','), send: async()=>{
@@ -12027,7 +13456,11 @@ async function trBulkApprove() {
     // kapısı da (!Array.isArray(p)||p.length===0) ? true : p.includes(..)
     // yaptığı için boş dizi ile ['ig','yt','tt','fb','x'] AYNI sonucu veriyor.
     const r=await faf(base+mcPath(kats),{'Youtube linki':v.youtubeLink, channelTitle:v.channelTitle||'', kaynak:'kworb-onay', ...mcFields(kats), dil, platformlar:[], aciklama_notu:aciklama});
-    if(r&&r.ok===true){ recordSend(v.youtubeLink,kats.join(',')); await faf(base+'/webhook/kworb-pending-sil',{videoId:v.videoId,durum:'onaylandı'}); TR.pending=TR.pending.filter(x=>x.videoId!==v.videoId); TR.selected.delete(v.videoId); return true; }
+    if(r&&r.ok===true){
+      // Öğrenme yalnız kart modunda ve yalnız GÖNDERİLEN videoda: sqRunBatch'in >15 onayında iptal
+      // edilen ya da n8n'e ulaşmayan onay kanal hafızasını kirletmesin.
+      if(!ezme){ try{ katOgren(v.channelId, v.channelTitle, kats[0]); }catch(e){} }
+      recordSend(v.youtubeLink,kats.join(',')); await faf(base+'/webhook/kworb-pending-sil',{videoId:v.videoId,durum:'onaylandı'}); TR.pending=TR.pending.filter(x=>x.videoId!==v.videoId); TR.selected.delete(v.videoId); return true; }
     return false;
   }}));
 
@@ -12205,7 +13638,10 @@ const OPC = {
   // projectId -> o projeye ait tüm clip id listesi (proje açıldığında cache'lenir)
   projClips: JSON.parse(localStorage.getItem('op_opc_projclips')||'{}'),
   // işlenmiş (gönderilmiş) clip id'leri — sınırsız, kalıcı (geçmiş 50 ile sınırlı olduğu için ayrı tutulur)
-  processed: new Set(JSON.parse(localStorage.getItem('op_opc_processed')||'[]'))
+  processed: new Set(JSON.parse(localStorage.getItem('op_opc_processed')||'[]')),
+  // Yalnız GÖRÜNÜM sırası (bellek içi). OPC.clips'in kendisi asla sıralanmaz:
+  // opcSendSelected gönderim ve yuva sırasını OPC.clips.filter ile kuruyor.
+  sira: 'api'
 };
 
 // İşlenmiş clip id'lerinin Set'i (kalıcı set + geçmiş birleşimi)
@@ -12460,6 +13896,84 @@ async function opcSearchById() {
   }
 }
 
+// Skor okuması üretim hattındaki n8n 'Clips Parse Et' _skor ile BİREBİR: score || viralScore ||
+// virality_score, 0 = bilinmiyor. Galeri gönderim yükü virality_score'u OKUMAZ; resmî CLI
+// yalnız c.score okuduğu için gerçek fark beklenmiyor, bilinçli olarak dokunulmadı.
+function opcSkorDegeri(c){
+  if (!c) return 0;
+  const n = Number(c.score || c.viralScore || c.virality_score || 0);
+  return (Number.isFinite(n) && n > 0) ? n : 0;
+}
+// judgeResult resmî OpenAPI'de YOK, yalnız opus-skills CLI şemasında var. Alan gelmezse
+// boş dizi döner ve kartta HİÇBİR ŞEY çizilmez.
+const OPC_JR_ALAN = [
+  ['hookScore',       'K', 'kanca (hookScore)'],
+  ['coherenceScore',  'A', 'akış/tutarlılık (coherenceScore)'],
+  ['connectionScore', 'B', 'bağlantı (connectionScore)'],
+  ['trendScore',      'T', 'trend (trendScore)']
+];
+function opcJudgeDegerleri(c){
+  const j = (c && c.judgeResult && typeof c.judgeResult === 'object') ? c.judgeResult : null;
+  if (!j) return [];
+  const out = [];
+  OPC_JR_ALAN.forEach(([alan, kisa, ad]) => {
+    const v = j[alan];
+    // Yalnız sayı ya da boş olmayan metin: Number(null)=0, Number([5])=5 gibi tuzaklar
+    // olmayan bir "0 puan" ya da uydurma değer üretmesin.
+    if (!(typeof v === 'number' || (typeof v === 'string' && v.trim() !== ''))) return;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return;
+    out.push({ alan, kisa, ad, n: Math.round(n * 10) / 10 });
+  });
+  return out;
+}
+function opcProjeSayac(clips){
+  const l = Array.isArray(clips) ? clips : [];
+  let skor = 0, kanca = 0, alt = 0, bonus = 0;
+  l.forEach(c => {
+    if (opcSkorDegeri(c) > 0) skor++;
+    const d = opcJudgeDegerleri(c);
+    if (d.length) alt++;            // dört alt skordan en az biri: "alan geliyor mu" sorusunun cevabı
+    if (d.some(x => x.alan === 'hookScore')) kanca++;
+    if (c && c.isBonusClip === true) bonus++;
+  });
+  return { n: l.length, skor, kanca, alt, bonus };
+}
+const OPC_SIRA_GECERLI = ['api', 'skor', 'kanca', 'sure'];
+// {c, i} KOPYASI döner: i özgün indeks ('Clip N' yedek başlığı sıralamayla değişmesin).
+// Değeri olmayanlar sona; eşitlikte özgün sıra korunur (kararlı).
+function opcSiraliKopya(clips, sira){
+  const l = (Array.isArray(clips) ? clips : []).map((c, i) => ({ c, i }));
+  if (!sira || sira === 'api' || OPC_SIRA_GECERLI.indexOf(sira) < 0) return l;
+  const deger = c => {
+    if (sira === 'skor')  { const s = opcSkorDegeri(c); return s > 0 ? s : null; }
+    if (sira === 'kanca') { const h = opcJudgeDegerleri(c).find(y => y.alan === 'hookScore'); return h ? h.n : null; }
+    const d = Number(c && c.durationMs); return (Number.isFinite(d) && d > 0) ? d : null;   // 'sure'
+  };
+  l.forEach(x => { x.v = deger(x.c); });
+  return l.sort((a, b) => {
+    if (a.v == null && b.v == null) return a.i - b.i;
+    if (a.v == null) return 1;
+    if (b.v == null) return -1;
+    return (sira === 'sure' ? a.v - b.v : b.v - a.v) || (a.i - b.i);
+  });
+}
+function opcSiraDegis(v){
+  OPC.sira = OPC_SIRA_GECERLI.indexOf(v) >= 0 ? v : 'api';
+  opcRenderClips();   // seçim id tabanlı — yeniden çizimde korunur; kutu render'da eşitlenir
+}
+function opcJudgeRozet(c){
+  const d = opcJudgeDegerleri(c);
+  const bonus = !!(c && c.isBonusClip === true);
+  if (!d.length && !bonus) return '';
+  const IPUCU = 'OpusClip tahmini, izlenmeyle ilişkisi ölçülmedi';
+  const parca = d.map(x => `<span class="badge opc-jr" title="${esc0(x.ad + ' — ' + IPUCU)}">${esc0(x.kisa)} ${esc0(x.n)}</span>`);
+  // isBonusClip'in anlamı belgelenmemiş: yalnız bilgi. Eleme, gönderim ya da kapıya BAĞLANMAZ.
+  if (bonus) parca.push(`<span class="badge opc-jr" title="${esc0('isBonusClip: OpusClip bu klibi bonus olarak işaretledi (anlamı belgelenmemiş; yalnız bilgi). ' + IPUCU)}">bonus</span>`);
+  return `<div style="margin-top:4px;display:flex;gap:3px;flex-wrap:wrap">${parca.join('')}</div>`;
+}
+window.opcSiraDegis = opcSiraDegis;
+
 async function opcOpenProject(projectId) {
   const st = document.getElementById('opc-status');
   const clipPanel = document.getElementById('opc-clip-panel');
@@ -12492,7 +14006,19 @@ async function opcOpenProject(projectId) {
     const subEl = document.getElementById('opc-clip-sub');
     const proj = OPC.projects.find(p => (p.id||p.projectId) === projectId);
     if (titleEl) titleEl.textContent = proj ? (proj.title||proj.name||proj.videoTitle||proj.sourceVideoTitle||projectId) : projectId;
-    if (subEl) subEl.textContent = `${clips.length} clip · ${projectId}`;
+    if (subEl) {
+      const sy = opcProjeSayac(clips);
+      subEl.textContent = `${clips.length} clip · ${projectId}`
+        + (sy.n ? ` · skor ${sy.skor}/${sy.n} · kanca ${sy.kanca}/${sy.n}`
+                  + (sy.alt !== sy.kanca ? ` · alt skor ${sy.alt}/${sy.n}` : '')
+                  + (sy.bonus ? ` · bonus ${sy.bonus}` : '') : '');
+      subEl.title = sy.n
+        ? 'OpusClip tahmini, izlenmeyle ilişkisi ölçülmedi.\n'
+          + 'skor: score/viralScore/virality_score > 0 olan klip (üretim hattındaki n8n skor kapısıyla aynı okuma; Galeri gönderimi o kapıdan geçmez).\n'
+          + 'kanca: judgeResult.hookScore sayı olan klip. alt skor: dört alt skordan en az biri sayı olan klip (kancadan farklıysa gösterilir).\n'
+          + 'Kanca ve alt skor 0 ise bu yanıtta alt skor alanı yok; resmî API belgesinde de tanımlı değil.'
+        : '';
+    }
 
     opcRenderClips();
     if (st) st.innerHTML = `✓ ${clips.length} clip yüklendi`;
@@ -12658,13 +14184,17 @@ function opcSheetGerekli(){
 function opcRenderClips() {
   const grid = document.getElementById('opc-clip-grid');
   if (!grid) return;
+  // Tarayıcı form durumunu geri yüklediyse kutu ile gerçek görünüm ayrışmasın.
+  const siraEl = document.getElementById('opc-sira');
+  if (siraEl && siraEl.value !== OPC.sira) siraEl.value = OPC.sira;
   opcUpdateSelCount();
   opcSheetGerekli();
   opcDurumGerekli();
   const yayinHarita = opcYayinHaritasi();
   const durumHarita = OPC_DURUM.harita;      // hazır değilse null → yalnız Sheet1 rozeti
   const processed = opcProcessedIds();
-  grid.innerHTML = OPC.clips.map((c, i) => {
+  // Görünüm sırası KOPYA üzerinde (OPC.clips gönderim sırasıdır, dokunulmaz)
+  grid.innerHTML = opcSiraliKopya(OPC.clips, OPC.sira).map(({ c, i }) => {
     const id = c.id || c.clipId || '';
     const sel = OPC.selectedClips.has(id);
     const done = processed.has(id);
@@ -12674,7 +14204,7 @@ function opcRenderClips() {
     const durMs = c.durationMs || 0;
     const durSec = Math.round(durMs / 1000);
     const durFmt = durSec >= 60 ? Math.floor(durSec/60) + ':' + String(durSec%60).padStart(2,'0') : durSec + 's';
-    const score = c.score || c.viralScore || '';
+    const score = opcSkorDegeri(c) || '';   // n8n skor kapısıyla aynı okuma (virality_score dahil)
     const previewThumb = thumb || (preview ? preview.replace(/\.mp4$/, '.jpg') : '');
     // Perde önceliği: seçili (mavi) > işlendi (yeşil)
     const state = sel ? 'sel' : (done ? 'done' : '');
@@ -12690,7 +14220,7 @@ function opcRenderClips() {
         ${scrim}
       </div>
       <div style="padding:8px 10px">
-        <div class="opc-ctitle" style="font-size:13px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc0(title)}</div>
+        <div class="opc-ctitle" style="font-size:13px;font-weight:500;color:${sel?'var(--acc)':'var(--tx)'};line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc0(title)}</div>${opcJudgeRozet(c)}
         ${(() => {
           const y = opcKlipYayini(c, yayinHarita);
           if (!y) return '';
@@ -13083,6 +14613,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Yalniz setTimeout birakmak, panel acik kaldiginda turun bir daha HIC
     // kosmamasi demekti — seri buyumezdi. ciftOtoKur ile ayni desen.
     setInterval(function(){ try { klipSeriOtoTur(); } catch(e){} }, 3600000);
+    // YouTube görünürlük turu: klip turundan (90 sn) ÖNCE. 20 sa kapısı, sekme jetonu ve bayat
+    // sekme kapısı fonksiyonun içinde.
+    setTimeout(function(){ ytGorTur().catch(function(){}); }, 40000);
+    setInterval(function(){ ytGorTur().catch(function(){}); }, 3600000);
     toggleAutoLog(true);   // acilis — toast yok
     // YENİ: hızlı gönder, servis durumu, rozetler
     try { renderUretimTabs(); } catch(e){}
@@ -13108,6 +14642,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let _cerAtlananImza = null;
     const cerPeriyodik = () => {
       try{
+        // BAYAT SEKME: daha yeni sürümlü sekme son 15 dk'da nabız attıysa bu sekme ne n8n'e ESKİ yük
+        // biçimini göndersin ne de aşağıdaki uzlaştırmada cerYaz ile diske kendi alan kümesini geri
+        // koysun — bu yüzden disk okumasından ÖNCE. Tek başına bayat sekme durmaz.
+        if (bayatDongu()) return;
         // CER açılışta cerOku() ile dolduruldu (yukarıda). KAPALI sistem ve kaldırılmış köprü
         // de yeniden gönderilir — kaybolması en tehlikeli ayarlar tam da bunlar (n8n açık
         // sanıp çerçeve basmaya devam eder). 'sessiz': toast/alert yok, yalnız log.
@@ -13128,14 +14666,27 @@ document.addEventListener('DOMContentLoaded', function() {
           if (_diskRev > (CER.ayarRev || 0)){
             // Diskteki ayar GERÇEKTEN daha yeni (başka sekmede değiştirildi): benimse
             if (_sayfa && _sayfa.classList.contains('active')){
-              if (_cerAtlananImza !== _disk){    // aynı durum için 10 dk'da bir log basma
-                _cerAtlananImza = _disk;
-                addLog('info','cerceve','Çerçeve ayarı başka sekmede değişmiş — bu sekmede Çerçeve sayfası açık, periyodik gönderim atlandı (eski ayar geri yazılmasın)');
+              // Eskiden sayfa açık kaldıkça bu tur hep dönüyordu; değişikliği yapan sekme bayatsa
+              // (kapılı) HİÇBİR sekme yeniden göndermiyordu. Şimdi yalnız operatör şu an sayfada bir
+              // alana YAZIYORSA atlanır; değilse disk benimsenir, göstergeler tazelenir. Editör açık
+              // olsa da güvenli: kaydet formu okuyup CER.p[CER._sec]'e taze birleştirir (cerKaydet).
+              const _odak = document.activeElement;
+              const _yaziyor = !document.hidden && document.hasFocus() && _odak && _sayfa.contains(_odak) && /^(INPUT|TEXTAREA|SELECT)$/.test(_odak.tagName);
+              if (_yaziyor){
+                if (_cerAtlananImza !== _disk){    // aynı durum için 10 dk'da bir log basma
+                  _cerAtlananImza = _disk;
+                  addLog('info','cerceve','Çerçeve ayarı başka sekmede değişmiş — bu sekmede Çerçeve sayfasında bir alan düzenleniyor, bu tur atlandı (sonraki turda benimsenir)');
+                }
+                return;
               }
-              return;
+              const _eski = cerSayfaDegerleri();
+              cerOku();
+              cerSayfaTazele(_eski);
+              addLog('info','cerceve','Çerçeve ayarı başka sekmede değişmiş — güncel ayar diskten okundu (açık Çerçeve sayfasının göstergeleri tazelendi), gönderim onunla yapılıyor');
+            } else {
+              cerOku();
+              addLog('info','cerceve','Çerçeve ayarı başka sekmede değişmiş — güncel ayar diskten okundu, gönderim onunla yapılıyor');
             }
-            cerOku();
-            addLog('info','cerceve','Çerçeve ayarı başka sekmede değişmiş — güncel ayar diskten okundu, gönderim onunla yapılıyor');
           } else {
             // Disk farklı ama DAHA YENİ DEĞİL: eski kodla açık kalmış bir sekme ya da
             // uçuştaki eski bir gönderimin sonundaki yazım. Bu sekmenin ayarı geçerli —
@@ -13162,10 +14713,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // 15 dk: her tur n8n webhook'larına gerçek istek atıyor ve n8n cloud'da
     // her istek 1 çalıştırma sayılıyor — 5 dk'lık yoklama panel açıkken
     // günde ~288 çalıştırma yakıyordu (kota şikayeti üzerine uzatıldı).
-    setInterval(()=>{ try{ notifCheck(false); }catch(e){} }, 15*60*1000);
+    // BAYAT SEKME: yalnız PERİYODİK tur kapılanır; açılış derin taraması ve zil tıklaması etkilenmez.
+    setInterval(()=>{ try{ if (bayatDongu()) return; notifCheck(false); }catch(e){} }, 15*60*1000);
     // Otomatik çift temizliği — açıksa saatlik döngüyü kurar. Sayfa
     // görünürlüğünden bağımsız çalışsın diye açılışta bir kez kurulur.
     setTimeout(()=>{ try{ ciftOtoKur(); }catch(e){ console.warn('[boot] ciftOtoKur:', e.message); } }, 2500);
+    // BAYAT SEKME. Nabız TÜM periyodik zamanlayıcılar kurulduktan SONRA başlar: aradaki bir açılış
+    // satırı hata atsaydı bu sekme nabız atıp döngü koşturmaz, eski sekmeyi boşuna durdururdu.
+    // Hâlâ senkron: ciftOtoKur'un 2,5 sn'lik ilk turundan önce diskte.
+    if (yapiSayi(PANEL_YAPI) < 0) addLog('warn','sistem','Yapı damgası okunamadı ya da geçersiz (head: opus-yapi meta) — sürüm kontrolü ve sekme nabzı kapalı');
+    try{ sekmeNabizTur(); }catch(e){ console.warn('[boot] sekmeNabizTur:', e.message); }
+    setInterval(()=>{ try{ sekmeNabizTur(); }catch(e){} }, SEKME_NABIZ_ARALIK);
+    setTimeout(()=>{ panelSurumKontrol(true).catch(()=>{}); }, 60000);
+    // Gizli sekmede istek atma: şeridi kimse görmez; görünür olunca visibilitychange yakalar.
+    setInterval(()=>{ if (!document.hidden) panelSurumKontrol(true).catch(()=>{}); }, PANEL_SURUM_ARALIK);
+    document.addEventListener('visibilitychange', ()=>{
+      if (document.visibilityState !== 'visible') return;
+      try{ sekmeNabizTur(); }catch(e){}
+      panelSurumKontrol(false).catch(()=>{});          // 5 dk kapısı fonksiyonun içinde
+    });
     // Tüm global fonksiyonları window'a bağla
     const globals = [go,showTab,goUretim,renderUretimTabs,trTabCount,refreshDash,sendSingle,sendBulkURLs,
       loadDriveSheet,sendDriveURLs,clearSentURLs,
@@ -13466,6 +15032,25 @@ function cerFontYukle(){
   return cerFontSoz;
 }
 
+// Açık Çerçeve sayfasında diskten benimseme (cerPeriyodik): sayfa alanlarının CER'den gelen değerleri.
+function cerSayfaDegerleri(){
+  return { bant: String(CER.ust + 400), mod: CER.mod, wm: String(CER_SPEC.wmAlt), ghRepo: CER.ghRepo || '',
+           ghPat: CER.ghPat || '', arsivUrl: CER.arsivUrl || '', arsivSir: CER.arsivSir || '' };
+}
+// Bir alan YALNIZ hâlâ eski CER değerini gösteriyorsa güncellenir — operatörün yazıp kaydetmediği değer ezilmez.
+function cerSayfaTazele(eski){
+  const yeni = cerSayfaDegerleri();
+  [['cer-bant','bant'], ['cer-mod','mod'], ['cer-wm','wm'], ['cer-gh-repo','ghRepo'], ['cer-gh-pat','ghPat'],
+   ['cer-arsiv-url','arsivUrl'], ['cer-arsiv-sir','arsivSir']].forEach(([id, k]) => {
+    const el = document.getElementById(id);
+    if (el && String(el.value) === String(eski[k]) && eski[k] !== yeni[k]) el.value = yeni[k];
+  });
+  const t = document.getElementById('cer-genel-tg'); if (t) t.classList.toggle('on', CER.aktif);
+  setEl('cer-sync-son', CER.syncSon ? new Date(CER.syncSon).toLocaleString('tr') : '—');
+  try { cerWmOzet(); cerUstOzet(); } catch(e){}
+  try { cerProfilRender(); } catch(e){}
+  try { cerDurumSerit(); } catch(e){}
+}
 async function initCerceve(){
   cerOku();
   const g = document.getElementById('cer-gh-repo'); if (g && !g.value) g.value = CER.ghRepo;
@@ -13632,9 +15217,9 @@ function cerUstOzet(){
 function cerDurumSerit(){
   const el = document.getElementById('cer-durum-serit'); if (!el) return;
   const esc = esc0;
-  const kutu = (renk, ikon, metin) =>
-    '<div style="padding:8px 10px;border:1px solid '+renk+';border-left:3px solid '+renk+';border-radius:6px;'
-    + 'background:color-mix(in srgb, '+renk+' 7%, transparent);font-size:12px;margin-bottom:5px">'+ikon+' '+metin+'</div>';
+  // Biçim tek kaynakta (bayat sekme şeridi de kullanıyor) — çıktı birebir aynı.
+  // KIRMIZI sistem kutusu eklenir/değişirse cerEngelSayisi'ni (Aksiyon Merkezi) de güncelle.
+  const kutu = seritKutu;
   if (!CER.aktif){
     // KAPALI + senkron düşmüşse gerçek tehlikeyi söyle: n8n hâlâ AÇIK
     // sanıyor ve çerçeve BASMAYA devam ediyor olabilir (denetim bulgusu).
@@ -13715,6 +15300,25 @@ function cerDurumSerit(){
   if (!parcalar.length)
     parcalar.push(kutu('var(--wn)','⚠','Sistem açık ama hiçbir profil hazır değil.'));
   el.innerHTML = parcalar.join('');
+}
+// Durum kutusu — eskiden cerDurumSerit'in yerel kutu'su; bayat sekme şeridi de aynı biçimi kullanıyor.
+// metin HTML'dir: çağıran değişkenleri esc0 ile kaçırır.
+function seritKutu(renk, ikon, metin){
+  return '<div style="padding:8px 10px;border:1px solid '+renk+';border-left:3px solid '+renk+';border-radius:6px;'
+    + 'background:color-mix(in srgb, '+renk+' 7%, transparent);font-size:12px;margin-bottom:5px">'+ikon+' '+metin+'</div>';
+}
+// Aksiyon Merkezi için ÇERÇEVE SİSTEM ENGELİ: cerDurumSerit'in KIRMIZI SİSTEM kutularıyla aynı koşullar
+// ve aynı else-if zinciri (şeridin DOM'una dokunmadan). Banner/token/profil kutuları sayılmaz (profil
+// listesine bağlı, açılışta tutarsız). cerWorkerCanli yalnız Çerçeve sayfası açılınca ölçülür.
+// ŞERİTTE kırmızı sistem kutusu eklenir/değişirse BURAYI da güncelle.
+function cerEngelSayisi(){
+  if (!CER.aktif) return CER.syncKirli ? 1 : 0;
+  let n = 0;
+  if (!cerArsivVar() && ['public','query','query2'].indexOf(CER.urlModu) < 0) n++;   // köprü yok / yarım
+  if (!CER.syncSon || CER.syncKirli) n++;                                             // hiç gönderilmedi / ulaşmadı
+  else if (cerArsivVar() && (CER.arsivTeyit === 'yok' || CER.arsivTeyit === 'eski')) n++;
+  if (cerArsivVar() && cerWorkerCanli !== undefined && !cerWorkerYeterli(cerWorkerCanli)) n++;
+  return n;
 }
 async function cerGenelToggle(){
   CER.aktif = !CER.aktif;
@@ -16867,12 +18471,14 @@ async function stokBildir(){
           + 'bu kategoriye yeni video gönder · eşik '+esik+' short / '+STOK_GUN_ESIK+' gün', 'video');
     });
     stokChipIsaretle();
+    try{ trHavuzSeridiCiz(); }catch(e){}
   }catch(e){ console.warn('[Stok/NOTIF]', e.message); }
 }
 // Şeridi tazele (sayfa açılışında ve veri yenilendiğinde)
 async function stokTazele(zorla){
   await stokVeri(zorla);
   stokChipIsaretle();
+  try{ trHavuzSeridiCiz(); }catch(e){}   // Trend Onay havuz plan şeridi (0 istek)
 }
 window.stokTazele = stokTazele;
 
@@ -16886,9 +18492,16 @@ function viralEsik(plat){
 const NOTIF = {
   items: (()=>{ try{ return JSON.parse(localStorage.getItem('op_notif')||'[]'); }catch(e){ return []; } })(),
   seen:  new Set((()=>{ try{ return JSON.parse(localStorage.getItem('op_notif_seen')||'[]'); }catch(e){ return []; } })()),
-  checking:false, lastViral:0
+  checking:false, lastViral:0,
+  // 'Üretilemedi' yeni-video sürümü: bu sekmenin UYGULADIĞI son yeniT (op_notif_uretim_bilinen.yeniT).
+  // Açılışta diskten başlar — anahtar sabiti burada henüz tanımlı değil (TDZ), adı elle yazıldı.
+  uretimYeniT: (()=>{ try{ const o=JSON.parse(localStorage.getItem('op_notif_uretim_bilinen')||'null'); return (o&&Number(o.yeniT))||0; }catch(e){ return 0; } })()
 };
-function notifKaydet(){ try{ localStorage.setItem('op_notif',JSON.stringify(NOTIF.items.slice(0,60))); localStorage.setItem('op_notif_seen',JSON.stringify([...NOTIF.seen].slice(-200))); }catch(e){} }
+// 'Üretilemedi' sürümü (op_notif_uretim_bilinen.yeniT) bu sekmede uygulanmadıysa görüldü işaretini kaldır.
+// Görüldü yazan HER yolda yazımdan (ve operatörün yeni işaretinden) ÖNCE: başka sekmenin bulduğu yeni
+// başarısızlıktan sonra bu sekmenin eski kümesini diske yazması, yenilenen sekmede zili kalıcı susturuyordu.
+function notifUretimSurum(){ try{ const o=JSON.parse(localStorage.getItem('op_notif_uretim_bilinen')||'null'); const y=(o&&Number(o.yeniT))||0; if(y>NOTIF.uretimYeniT){ NOTIF.uretimYeniT=y; NOTIF.seen.delete('uretim-basarisiz'); } }catch(e){} }
+function notifKaydet(){ notifUretimSurum(); try{ localStorage.setItem('op_notif',JSON.stringify(NOTIF.items.slice(0,60))); localStorage.setItem('op_notif_seen',JSON.stringify([...NOTIF.seen].slice(-200))); }catch(e){} }
 function notifEkle(id,icon,text,sub,page){
   const v=NOTIF.items.find(x=>x.id===id);
   if(v){ v.icon=icon; v.text=text; v.sub=sub; v.page=page; }
@@ -16910,12 +18523,12 @@ function notifRender(){
 }
 function notifPanelAc(e){ if(e) e.stopPropagation(); const p=document.getElementById('notif-panel'); if(!p) return; if(p.classList.toggle('on')){ notifRender(); notifCheck(true); } }
 function notifPanelKapat(){ const p=document.getElementById('notif-panel'); if(p) p.classList.remove('on'); }
-function notifTikla(id){ NOTIF.seen.add(id); const it=NOTIF.items.find(x=>x.id===id); notifKaydet(); notifRender(); notifPanelKapat();
+function notifTikla(id){ notifUretimSurum(); NOTIF.seen.add(id); const it=NOTIF.items.find(x=>x.id===id); notifKaydet(); notifRender(); notifPanelKapat();
   // acGo hem kenar çubuğunu hem hub sekmelerini biliyor; goUretim(it.page)
   // yedeği doğru sayfayı açıyordu ama çapayı 'video' varsayıp menüde YANLIŞ
   // öğeyi vurguluyordu. Tek yoldan gitmek ikisini de düzeltir.
   if(it&&it.page){ try{ acGo(it.page); }catch(e){ console.warn('[NOTIF] gidilemedi:', it.page, e.message); } } }
-function notifTumunuOku(){ NOTIF.items.forEach(x=>NOTIF.seen.add(x.id)); notifKaydet(); notifRender(); }
+function notifTumunuOku(){ notifUretimSurum(); NOTIF.items.forEach(x=>NOTIF.seen.add(x.id)); notifKaydet(); notifRender(); }
 function notifTemizle(){ NOTIF.items=[]; notifKaydet(); notifRender(); }
 document.addEventListener('click', e=>{ const p=document.getElementById('notif-panel'); if(p&&p.classList.contains('on')&&!p.contains(e.target)&&!e.target.closest('#bell-btn')) notifPanelKapat(); });
 
@@ -16937,12 +18550,54 @@ async function notifCheck(derin){
       // BAŞARISIZ ÜRETİM ayrı bildirim: acIsStuck bunları terminal sayıp
       // eliyor, yani 'takılı' sayısına hiç girmiyorlar. Ayrı sayılmazsa
       // OpusClip'in düşürdüğü videolar panelde hiçbir yerde görünmüyor.
-      const bsz=urls.filter(r=>durBasarisizMi(satirDurumu(r))).length;
-      if(bsz>0) notifEkle('uretim-basarisiz','✖',bsz+' video üretilemedi','OpusClip klip döndürmedi — yeniden gönderilebilir','urltakip'); else notifSil('uretim-basarisiz'); }catch(e){}
+      // Aksiyon Merkezi ile AYNI ölçüt (uretimBasarisizlar: video başına, son 72 sa, süren
+      // deneme hariç). urls BOŞSA (ölçülemedi) bildirime DOKUNMA: eskiden silinip veri gelince
+      // sessizce yeniden ekleniyordu.
+      if(urls.length){
+        const bsz=uretimBasarisizlar(urls);
+        // Görüldü işareti YALNIZ yeni bir başarısızlık düşünce kalkar: 72 sa penceresi bildirimi
+        // düzenli siler/geri getirir; sabit id NOTIF.seen'de kaldığı için ikinci geliş SESSİZ
+        // olurdu (stokBildir'deki aynı tuzak). Sayı dalgalanması zili yeniden çaldırmaz.
+        // Bilinen videolar bildirim ÖĞESİNDE DEĞİL ayrı anahtarda { v:{video → {g: son görülme,
+        // t: deneme damgası}}, yeniT }: zildeki 'Temizle' ve op_notif 60 sınırı öğeyi silince aynı
+        // videolar 'yeni' sayılıp yeniden çalıyordu. Kırpma yok; 96 sa görülmeyen budanır.
+        //  • DENEME DAMGASI t = videonun en yeni URL-Takip satır tarihi (uretimBasarisizlar x.t). Her
+        //    yeniden gönderim yeni 'rezerve' satırı ekler → t büyür → deneme yine düşünce video 'yeni'
+        //    sayılır. t yalnız max ile ilerler: denemenin ara aşaması ('işlemde') hiç görülmese de
+        //    çalışır; tazelenmemiş eski görüntülü sekme kaydı geri düşüremez (silme yaklaşımı iki
+        //    sekme arasında 15 dk'da bir yeniden çalan döngü üretiyordu).
+        //  • "Yeni video" TÜKETİLEN bir olay değil SÜRÜM (yeniT): ilk bulan sekme damgayı yazar, her
+        //    sekme uygulamadığı daha büyük damgayı görünce kendi görüldü işaretini kaldırır.
+        const simdiU=Date.now(), bilinen=uretimBilinenOku(), ilkKurulum=!bilinen;
+        if(bsz.length || !ilkKurulum){
+          const bk=(bilinen&&bilinen.v)||{};
+          Object.keys(bk).forEach(k=>{ if(!(simdiU-uretimBilinenG(bk[k])<URETIM_BILINEN_SURE_MS)) delete bk[k]; });
+          let yeniT=(bilinen&&Number(bilinen.yeniT))||0;
+          const yeniler=bsz.filter(x=>!Object.prototype.hasOwnProperty.call(bk,x.anahtar) || uretimBilinenT(bk[x.anahtar]) < x.t);
+          // İlk kurulumda önceki sürümün öğesi varsa görüldü durumu korunur (sürüm geçişi zil çalmasın)
+          const eskiOge=NOTIF.items.some(x=>x.id==='uretim-basarisiz');
+          if(yeniler.length && !(ilkKurulum && eskiOge)) yeniT=Math.max(simdiU, yeniT+1);
+          // g = SON görülme (pencerede kalan video budanmaz), t yalnız ileri
+          bsz.forEach(x=>{ bk[x.anahtar]={ g:simdiU, t:Math.max(x.t, uretimBilinenT(bk[x.anahtar])) }; });
+          try{ localStorage.setItem(URETIM_BILINEN_ANAHTAR, JSON.stringify({ s:1, v:bk, yeniT })); }catch(e){}
+          if(yeniT>NOTIF.uretimYeniT){
+            NOTIF.uretimYeniT=yeniT;
+            NOTIF.seen.delete('uretim-basarisiz');
+            // Hemen diske: bilinen kaydı yazıldı; tur sonundaki notifKaydet'e kadar sekme kapanırsa
+            // (açılış taramasında onlarca sn sürebilir) görüldü işareti diskte kalıp algı kaybolurdu.
+            try{ localStorage.setItem('op_notif_seen',JSON.stringify([...NOTIF.seen].slice(-200))); }catch(e){}
+          }
+        }
+        if(bsz.length) notifEkle('uretim-basarisiz','✖',bsz.length+' video üretilemedi (son 72 sa)',`OpusClip klip döndürmedi — URL-Takip'te kontrol et, sonra yeniden gönder`,'urltakip');
+        else notifSil('uretim-basarisiz');
+      } }catch(e){}
     // Hesap değişimi: tespit loadPlatforms'ta yapılır, burada yalnız
     // bekleyen kayıt bildirime çevrilir (panel açılışında da görünsün).
     try{ const hd=hdBekleyenler();
       if(hd.length) notifEkle('hesap-degisim','🔁',hd.length+' hesapta değişim tespit edildi','Eski short\'lar yeni hesaba yeniden planlanabilir','platformlar'); else notifSil('hesap-degisim'); }catch(e){}
+    // YouTube görünürlük: zil DİSKTEN türetilir — başka sekmenin notifKaydet'i op_notif'i bütün
+    // yazdığında kayıt 15 dk içinde geri gelir; tur sonrası açılan değişim susturulur.
+    try{ ytGorBildir(); }catch(e){}
     // Derin kaynaklar (panel açılınca / ilk yükleme)
     if(derin && (S.cfg.blot||getN8N())){
       try{
@@ -16964,6 +18619,9 @@ async function notifCheck(derin){
     else if (S.cfg.blot || getN8N()) await stokBildir();
   }catch(e){ console.warn('[NOTIF]',e.message); }
   notifKaydet(); notifRender(); NOTIF.checking=false;
+  // Aksiyon Merkezi'nin yerel kutuları ve zil sayısı zil turundan sonra güncellensin — AĞ YOK:
+  // AC_SON'daki son ölçümle yeniden çizilir, tazelik damgası (ac-dmg) değişmez.
+  try{ acCiz(); }catch(e){}
 }
 // Son 48 saatte yayınlanan postların canlı izlenmesini çek; eşik üstünü bir kez bildir
 async function notifViralTara(items){
@@ -18495,6 +20153,71 @@ function durBasarisizMi(d){
 }
 function satirDurumu(r){ return r['durum']||r['status']||r['Durum']||r['yayin-durumu']||''; }
 
+// ── ÜRETİLEMEDİ SAYIMI (Aksiyon Merkezi + zil ORTAK) ──────────────────
+// Satır değil VİDEO, yalnız son 72 saat. URL-Takip semantiği (n8n JSON + n8n kaynağı):
+//  • 'Üretim Rezerve' her denemede YENİ satır ekler (durum 'rezerve') — OpusClip projesi
+//    açılmadan ÖNCE. 'Video Analiz Et3' 5 dk aralıklı, sonra 'Üretim Defteri Aç'.
+//  • Aç youtube-url ile, Kapat/Başarısız proje-id ile GÜNCELLER; n8n Sheets update eşleşen
+//    İLK satırı günceller. Aynı URL ile yeniden denenen videonun son durumu EN ESKİ satıra
+//    yazılır, yeni satır 'rezerve' kalır → satır tarihleri denemeleri SIRALAMAZ.
+//  • Üretim Kapısı yalnız başarısız satırları olan videoyu _zorla olmadan geçirir.
+// Kurallar: aynı videonun (urlVideoAnahtar — Kapı ile aynı anahtar) herhangi bir satırı
+// işlemde/tamamlandı/direkt ise ya da 6 saatten GENÇ 'rezerve' satırı varsa (süren deneme;
+// acIsStuck ile aynı eşik) video sayılmaz — yoksa operatör süren denemeyi zorla yeniden
+// gönderip ikinci OpusClip projesi açardı. Daha eski 'rezerve' nötr. Pencere videonun EN YENİ
+// tarihine göre. Tarihi çözülemeyen video SAYILMAZ (kalıcı kırmızı temiz sinyalini öldürmesin).
+const URETIM_BASARISIZ_PENCERE_MS = 72 * 3600000;
+const URETIM_REZERVE_SUREN_MS = 6 * 3600000;
+function durSurenVeyaBittiMi(d){
+  const s = String(d||'').toLowerCase().replace(/i̇/g,'i').replace(/ı/g,'i').replace(/ş/g,'s');
+  return /islem|islen|tamam|direkt|yayin/.test(s);
+}
+// URL-Takip tarih hücresi → ms (0 = bilinmiyor). gcZaman'a doğrudan VERİLEMEZ: Date.parse('46281')
+// Chrome'da 46.000'li YILLARI döndürüyor (ölçüldü) → her eski satır pencerede kalırdı.
+function urlTakipZaman(v, simdi){
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return 0;
+  let t;
+  if (/^[0-9]{5}(?:[.][0-9]+)?$/.test(s)){
+    // Sheets tarih seri sayısı: 1899-12-30'dan gün, tarayıcının yerel saati varsayılır
+    t = Math.round((Number(s) - 25569) * 864e5 + new Date().getTimezoneOffset() * 6e4);
+  } else t = gcZaman({ t: s });                    // ISO + 'GG.AA.YYYY SS:DD[:SS]'
+  if (!(t > 946684800000) || t > (simdi || Date.now()) + 864e5) return 0;   // 2000 öncesi / gelecek → bilinmiyor
+  return t;
+}
+function uretimBasarisizlar(urls, simdi){
+  const now = simdi || Date.now(), sinir = now - URETIM_BASARISIZ_PENCERE_MS;
+  const g = new Map();
+  for (const r of (urls || [])){
+    if (!r || typeof r !== 'object') continue;
+    const u = String(r['youtube-url'] || r['youtube_url'] || r['url'] || '').trim();
+    const k = u ? urlVideoAnahtar(u) : '';
+    if (!k) continue;
+    let x = g.get(k);
+    if (!x){ x = { anahtar:k, url:u, basarisiz:false, suren:false, t:0 }; g.set(k, x); }
+    const d = satirDurumu(r);
+    const t = urlTakipZaman(r['istek-tarihi'] || r['tarih'] || r['created-at'] || r['date'] || '', now);
+    if (t > x.t) x.t = t;
+    if (durBasarisizMi(d)) x.basarisiz = true;
+    else if (durSurenVeyaBittiMi(d)) x.suren = true;
+    else if (/rezerve/i.test(String(d)) && t && now - t < URETIM_REZERVE_SUREN_MS) x.suren = true;
+  }
+  return [...g.values()].filter(x => x.basarisiz && !x.suren && x.t >= sinir);
+}
+// Zilin "bilinen başarısız videolar" kaydı { s:1, v:{ anahtar: {g: son görülme ms, t: deneme damgası ms} }, yeniT }.
+// null = hiç kurulmamış. Sayısal değer (erken biçim) {g:n, t:n} okunur — geçişte zil çalmasın.
+function uretimBilinenG(x){ return (x && typeof x === 'object') ? (Number(x.g) || 0) : (Number(x) || 0); }
+function uretimBilinenT(x){ return (x && typeof x === 'object') ? (Number(x.t) || 0) : (Number(x) || 0); }
+const URETIM_BILINEN_ANAHTAR = 'op_notif_uretim_bilinen';
+const URETIM_BILINEN_SURE_MS = 96 * 3600000;
+function uretimBilinenOku(){
+  try {
+    const o = JSON.parse(localStorage.getItem(URETIM_BILINEN_ANAHTAR) || 'null');
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+    return { v: (o.v && typeof o.v === 'object' && !Array.isArray(o.v)) ? o.v : {}, yeniT: Number(o.yeniT) || 0 };
+  } catch(e){ return null; }
+}
+
 // ── #4 AKSİYON MERKEZİ ─────────────────────────────────────
 // URL-Takip: OpusClip'e gidip belli sürede (>6s) short dönmeyen takılı video
 function acIsStuck(r){
@@ -18526,6 +20249,93 @@ function acTileClick(target){
   else if (target==='health'){ acGo('platformlar'); }
   else if (target==='stuck'){ acGo('urltakip'); }
   else if (target==='trend'){ acGo('trendonay'); }
+  else if (target==='uretim'){ acGo('urltakip'); }
+  else if (target==='hesap'){ acGo('platformlar'); }
+  else if (target==='cerceve'){ acGo('cerceve'); }
+}
+// Aksiyon Merkezi: AĞ turu (loadActionCenter) + AĞSIZ çizim (acCiz). notifCheck sonunda acCiz
+// son ağ ölçümüyle yeniden çizer; yerel kutular ve zil sayısı her çizimde yeniden hesaplanır.
+// ESKİ HÂLİ yalnız dört ağ değerine bakıp 'tümü temiz ✓' diyordu: başarısız üretim, bekleyen
+// hesap değişimi ya da çerçeve engeli varken bile.
+// AC_BITEN_TUR: sonucu AC_SON'a yazılmış EN SON tur. acCiz yalnız en yeni başlayan tur bitmişse çizer —
+// sayaç (uçuştaki tur SAYISI) kapısında yeni tur eskisinden önce bitince kimse çizmiyor, kart iskelette kalıyordu.
+let AC_SON = null, AC_URLS = null, AC_YUKLENIYOR = 0, AC_TUR = 0, AC_BITEN_TUR = 0;
+const AC_TEMEL = [
+  { k:'fail',   zil:'fails',         target:'failed', icon:'❌', label:'Başarısız gönderim',   hint:'yeniden gönder',         sev:'var(--er)' },
+  { k:'health', zil:'health',        target:'health', icon:'⚠',  label:'Profil sağlık sorunu', hint:'süresi dolmuş/hesapsız', sev:'var(--er)' },
+  { k:'stuck',  zil:'stuck',         target:'stuck',  icon:'⏳', label:'Takılı video (>6s)',   hint:'short dönmedi',          sev:'var(--gld)' },
+  { k:'trend',  zil:'trend-pending', target:'trend',  icon:'🔥', label:'Onay bekleyen trend',  hint:'kararını ver',           sev:'var(--acc)' }
+];
+// İlk BOŞ OLMAYAN liste: `a || b` boş diziyi ([] truthy) seçip yedeğe hiç düşmezdi.
+function acUrlListesi(yedekli){
+  const adaylar = [S._panelCache && S._panelCache.urls, S.sheetData && S.sheetData.urls];
+  if (yedekli) adaylar.push(AC_URLS);
+  for (const u of adaylar) if (Array.isArray(u) && u.length) return u;
+  return [];
+}
+// Yerel (ağsız) ek kontroller. n=null → ölçülemedi. Yalnız n>0 olanlar kutu olur.
+function acEkOlc(){
+  const say = f => { try { const v = f(); return (typeof v === 'number' && isFinite(v)) ? v : null; } catch(e){ return null; } };
+  const urls = acUrlListesi(true);
+  return [
+    { n: say(() => urls.length ? uretimBasarisizlar(urls).length : null), zil:'uretim-basarisiz', target:'uretim', icon:'✖', label:'Üretilemedi (son 72 sa)', hint:'OpusClip klip döndürmedi', sev:'var(--er)' },
+    { n: say(() => hdBekleyenler().length), zil:'hesap-degisim', target:'hesap', icon:'🔁', label:'Hesap değişimi bekliyor', hint:`Platformlar'da incele`, sev:'var(--wn)' },
+    { n: say(() => cerEngelSayisi()), zil:'', target:'cerceve', icon:'🖼', label:'Çerçeve engeli', hint:'Çerçeve sayfasındaki kırmızı kutu', sev:'var(--er)' }
+  ];
+}
+// Zilde koşulu SÜREN durum — görüldü işaretinden BAĞIMSIZ. viral-* iyi haber; bu çizimde ÖLÇÜLMÜŞ
+// kutuların zil karşılıkları da sayılmaz (fails/health yalnız derin turda tazeleniyor: temiz ölçülmüş
+// kontrolün eski zil öğesi 'temiz ✓ · zilde 1 durum' çelişkisi üretirdi).
+function acZildeCozulmemis(olculen){
+  return NOTIF.items.filter(x => { const id = String((x && x.id) || ''); return !id.startsWith('viral-') && !olculen.has(id); }).length;
+}
+// Ağsız çizim. Dönüş: null = çizilmedi, { known, kurulum }.
+function acCiz(){
+  const listEl = document.getElementById('ac-list');
+  if (!listEl || !AC_SON || AC_BITEN_TUR !== AC_TUR) return null;   // en yeni tur sürerken iskeleti ezme
+  const stEl = document.getElementById('ac-status');
+  const temel = AC_TEMEL.map(t => Object.assign({}, t, { n: typeof AC_SON[t.k] === 'number' ? AC_SON[t.k] : null }));
+  const ekTum = acEkOlc();
+  const ek = ekTum.filter(t => t.n > 0);
+  const known = temel.filter(t => t.n !== null).length;
+  if (known === 0 && !ek.length){
+    // Hiçbir kaynak cevap vermedi → dört boş kutu yerine tek net kurulum mesajı
+    const bant = document.getElementById('dash-kurulum');
+    listEl.innerHTML = durumHTML('kurulum',{
+      kompakt: !!(bant && bant.style.display !== 'none'),
+      alt:'n8n ya da Upload-Post/Sheets anahtarı olmadan kontrol yapılamıyor.'});
+    if (stEl) stEl.textContent = 'yapılandırma eksik';
+    return { known:0, kurulum:true };
+  }
+  const tum = temel.concat(ek);
+  listEl.innerHTML = tum.map(t => {
+    const unknown = (t.n == null);
+    const has = (typeof t.n === 'number' && t.n > 0);
+    const col = unknown ? 'var(--mt)' : (has ? t.sev : 'var(--ok)');
+    const val = unknown ? '–' : t.n;
+    const sub = unknown ? 'veri yok' : (has ? t.hint : 'temiz ✓');
+    return `<div onclick="acTileClick('${t.target}')" title="${esc0(t.label)}" style="cursor:pointer;border:1px solid ${has?col:'var(--brd)'};border-left:3px solid ${col};border-radius:6px;padding:10px 12px;background:var(--sur);display:flex;align-items:center;gap:10px">
+      <span style="font-size:17px;flex-shrink:0">${t.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:19px;font-weight:800;color:${col};font-family:var(--fh);line-height:1">${val}</div>
+        <div style="font-size:12px;color:var(--mt);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc0(t.label)} · ${esc0(sub)}</div>
+      </div>
+    </div>`;
+  }).join('');
+  const totalAct = tum.reduce((s,t) => s + (t.n > 0 ? t.n : 0), 0);
+  if (stEl){
+    if (totalAct > 0) stEl.textContent = totalAct + ' aksiyon bekliyor';
+    else {
+      // 'tümü temiz' DENMEZ: ölçülemeyen kontroller ve zilde başka kaynaklar (plan bitişi, sistem
+      // hatası) olabilir; Worker sürümü yalnız Çerçeve sayfasında ölçülür.
+      const olculen = new Set(temel.concat(ekTum).filter(t => t.n !== null && t.zil).map(t => t.zil));
+      const bilinmeyen = temel.length - known, zil = acZildeCozulmemis(olculen);
+      stEl.textContent = 'bu kontroller temiz ✓'
+        + (bilinmeyen ? ' · ' + bilinmeyen + ' kontrol ölçülemedi' : '')
+        + (zil ? ' · zilde çözülmemiş ' + zil + ' durum' : '');
+    }
+  }
+  return { known, kurulum:false };
 }
 async function loadActionCenter(){
   const listEl = document.getElementById('ac-list'); if (!listEl) return;
@@ -18536,64 +20346,45 @@ async function loadActionCenter(){
     '<div style="border:1px solid var(--brd);border-radius:6px;padding:10px 12px;background:var(--sur)">'
     + '<div class="isk isk-sat" style="width:34px;height:17px;margin-bottom:6px"></div>'
     + '<div class="isk isk-sat" style="width:86%"></div></div>').join('');
-  const pFail = (async()=>{ try { if(!S.cfg.blot && !getN8N()) return null; const items = await ydFetchItems(); return ydBekleyenHata(items); } catch(e){ return null; } })();
-  const pHealth = (async()=>{ try {
-    const shorts = (S.sheetData&&S.sheetData.shorts)||(S._panelCache&&S._panelCache.shorts)||[];
-    const sp = new Set(shorts.map(r=>String(r['profil']||r['Profil']||'').trim()).filter(Boolean));
-    const by = phCompute(await phFetchAccounts(), sp);
-    if (!Object.keys(by).length) return null;
-    return Object.values(by).filter(h=>h.status!=='live').length;
-  } catch(e){ return null; } })();
-  const pStuck = (async()=>{ try {
-    let urls = (S._panelCache&&S._panelCache.urls)||(S.sheetData&&S.sheetData.urls)||[];
-    if (!urls.length){ const base=getN8N(); if(base){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos) urls=d.urls||[]; } }
-    return urls.length ? urls.filter(acIsStuck).length : null;
-  } catch(e){ return null; } })();
-  const pTrend = (async()=>{ try { const base=getN8N(); if(!base) return null; const d=await n8nGetCached('/webhook/kworb-bekleyenler'); return (d&&!d._bos)?(d.count!=null?d.count:(d.pending?d.pending.length:0)):null; } catch(e){ return null; } })();
-
-  const [fail, health, stuck, trend] = await Promise.all([pFail,pHealth,pStuck,pTrend]);
+  // Üst üste çağrı (go('dashboard') + Tümünü Yenile): sayaç + tur belirteci. Boolean bayrakta ilk
+  // turun finally'si kilidi açıp ikinci turun iskeletini notifCheck'in çizimine ezdirirdi.
+  const tur = ++AC_TUR;
+  AC_YUKLENIYOR++;
+  let sonuc = [null, null, null, null];
+  try {
+    const pFail = (async()=>{ try { if(!S.cfg.blot && !getN8N()) return null; const items = await ydFetchItems(); return ydBekleyenHata(items); } catch(e){ return null; } })();
+    const pHealth = (async()=>{ try {
+      const shorts = (S.sheetData&&S.sheetData.shorts)||(S._panelCache&&S._panelCache.shorts)||[];
+      const sp = new Set(shorts.map(r=>String(r['profil']||r['Profil']||'').trim()).filter(Boolean));
+      const by = phCompute(await phFetchAccounts(), sp);
+      if (!Object.keys(by).length) return null;
+      return Object.values(by).filter(h=>h.status!=='live').length;
+    } catch(e){ return null; } })();
+    const pStuck = (async()=>{ try {
+      let urls = acUrlListesi(false);             // AC_URLS yedeği YOK: Tümünü Yenile taze çeksin
+      if (!urls.length){ const base=getN8N(); if(base){ const d=await n8nGetCached('/webhook/panel-data'); if(d&&!d._bos) urls=d.urls||[]; } }
+      if (urls.length) AC_URLS = urls;           // acCiz ağsız yeniden çizimde Üretilemedi için kullanır
+      return urls.length ? urls.filter(acIsStuck).length : null;
+    } catch(e){ return null; } })();
+    const pTrend = (async()=>{ try { const base=getN8N(); if(!base) return null; const d=await n8nGetCached('/webhook/kworb-bekleyenler'); return (d&&!d._bos)?(d.count!=null?d.count:(d.pending?d.pending.length:0)):null; } catch(e){ return null; } })();
+    sonuc = await Promise.all([pFail,pHealth,pStuck,pTrend]);
+  } finally {
+    AC_YUKLENIYOR = Math.max(0, AC_YUKLENIYOR - 1);
+    // Beklenmeyen hatada da kapı açılsın: yoksa kart bir sonraki tura kadar iskelette kalır
+    if (tur === AC_TUR) AC_BITEN_TUR = tur;
+  }
+  if (tur !== AC_TUR) return;                     // daha yeni tur başladı — o çizer
+  const [fail, health, stuck, trend] = sonuc;
   // Kenar çubuğundaki kırmızı "başarısız gönderim" rozetini AÇILIŞTA doldur.
   // Önceden yalnız renderYayinDurumu çağırıyordu — yani o sayfaya gitmenin
   // SEBEBİ olan işaret, ancak oraya gidince beliriyordu.
   // null ile 0 AYRI: null = ölçüm yapılamadı (rozete dokunma, yoksa "0 hata"
   // diye yanlış temiz izlenimi verir), 0 = gerçekten hata yok (rozeti temizle).
   if (typeof fail === 'number') ydRozetYaz('gecmis', fail);
-  const tiles = [
-    { n:fail,   target:'failed', icon:'❌', label:'Başarısız gönderim', hint:'yeniden gönder',       sev:'var(--er)' },
-    { n:health, target:'health', icon:'⚠',  label:'Profil sağlık sorunu', hint:'süresi dolmuş/hesapsız', sev:'var(--er)' },
-    { n:stuck,  target:'stuck',  icon:'⏳', label:'Takılı video (>6s)',   hint:'short dönmedi',        sev:'var(--gld)' },
-    { n:trend,  target:'trend',  icon:'🔥', label:'Onay bekleyen trend',  hint:'kararını ver',         sev:'var(--acc)' }
-  ];
-  listEl.innerHTML = tiles.map(t=>{
-    const unknown = (t.n==null);
-    const has = (typeof t.n==='number' && t.n>0);
-    const col = unknown ? 'var(--mt)' : (has ? t.sev : 'var(--ok)');
-    const val = unknown ? '–' : t.n;
-    const sub = unknown ? 'veri yok' : (has ? t.hint : 'temiz ✓');
-    return `<div onclick="acTileClick('${t.target}')" title="${t.label}" style="cursor:pointer;border:1px solid ${has?col:'var(--brd)'};border-left:3px solid ${col};border-radius:6px;padding:10px 12px;background:var(--sur);display:flex;align-items:center;gap:10px">
-      <span style="font-size:17px;flex-shrink:0">${t.icon}</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:19px;font-weight:800;color:${col};font-family:var(--fh);line-height:1">${val}</div>
-        <div style="font-size:12px;color:var(--mt);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.label} · ${sub}</div>
-      </div>
-    </div>`;
-  }).join('');
-  const vals=[fail,health,stuck,trend];
-  const known=vals.filter(v=>typeof v==='number').length;
-  const totalAct=vals.reduce((s,v)=>s+(typeof v==='number'?v:0),0);
-  if (known===0){
-    // Hiçbir kaynak cevap vermedi → dört boş kutu yerine tek net kurulum mesajı
-    // Sayfa üstündeki kurulum bandı görünüyorsa burada tek satır yeter
-    const bant = document.getElementById('dash-kurulum');
-    listEl.innerHTML = durumHTML('kurulum',{
-      kompakt: !!(bant && bant.style.display !== 'none'),
-      alt:'n8n ya da Upload-Post/Sheets anahtarı olmadan kontrol yapılamıyor.'});
-    if (stEl) stEl.textContent = 'yapılandırma eksik';
-    setEl('ac-dmg','');
-  } else {
-    if (stEl) stEl.textContent = totalAct>0 ? (totalAct+' aksiyon bekliyor') : 'tümü temiz ✓';
-    dmgYaz('ac-dmg');
-  }
+  AC_SON = { fail, health, stuck, trend };
+  const c = acCiz();
+  // Tazelik damgası YALNIZ ağ turunda: notifCheck'in ağsız yeniden çizimi veriyi taze göstermesin.
+  if (c && c.kurulum) setEl('ac-dmg',''); else if (c) dmgYaz('ac-dmg');
 }
 window.n8nCacheClear=n8nCacheClear; window.loadActionCenter=loadActionCenter; window.acTileClick=acTileClick;
 
@@ -18680,42 +20471,121 @@ async function loadRadar(force){
 
 // YouTube API'den canlı hesap (mostPopular + son 48 saat + kanal aboneleri)
 // ── Outlier: kanal medyanı (24 sa önbellek) ──────────────────
-// Her kanalın son 20 videosunun izlenme MEDYANI. Ortalama yerine medyan:
-// tek bir viral video ortalamayı bozar, medyan kanalın gerçek normalini verir.
-function rdMedCacheGet(){ try{ return JSON.parse(localStorage.getItem('op_radar_chmed')||'{}'); }catch(e){ return {}; } }
+// Kanalın son 50 yüklemesinden 3 dk'dan UZUN olanların (en çok 20) izlenme MEDYANI. ≤180 sn videolar
+// (Shorts kuralının SÜRE vekili; en-boy oranı API'de yok) medyana KARIŞMAZ: radar adayları ≥15 dk ve
+// karışık medyan outlier'ı bozuyordu (12 kısa 300 B + 8 uzun 40 B → medyan 300 B; 120 B'lik uzun video
+// 0,4× görünüyordu, doğrusu 3×). Maliyet aynı: playlistItems.list + videos.list ÇAĞRI başına 1 birim.
+const RD_MED_SURUM = 2;                  // ver'siz (karışık) kayıt KULLANILMAZ, yeniden çekilir
+const RD_MED_TTL = 24*3600*1000;
+const RD_MED_BUDAMA_MS = 7*24*3600*1000;
+const RD_MED_KANAL_TAVAN = 150;          // ≈0,52 KB/kanal → ≈77 KB tavan (localStorage baskısı)
+const RD_MED_UZUN_TAVAN = 20;            // eski örnek büyüklüğü (kıyas temiz kalır)
+const RD_SHORT_MAX_SN = 180;
+let RD_MED_YAZ_HATA_GOSTERILDI = false;  // kalıcı kota hatası her turda kırmızı tost basmasın
+function rdMedCacheGet(){
+  try{ const c = JSON.parse(localStorage.getItem('op_radar_chmed')||'{}');
+       return (c && typeof c === 'object' && !Array.isArray(c)) ? c : {}; }catch(e){ return {}; }
+}
+function rdMedGecerli(e){ return !!(e && e.ver === RD_MED_SURUM && e.v && typeof e.v === 'object' && !Array.isArray(e.v)); }
 function rdMedian(nums){
   const a=nums.filter(n=>n>0).sort((x,y)=>x-y);
   if(a.length<5) return 0;                       // 5'ten az veri = güvenilmez
   const m=a.length>>1;
   return a.length%2 ? a[m] : Math.round((a[m-1]+a[m])/2);
 }
+function rdMedBuda(c, tavan, now){
+  const out = {};
+  Object.keys(c||{})
+    .filter(id => rdMedGecerli(c[id]) && (now - (+c[id].t||0)) < RD_MED_BUDAMA_MS)
+    .sort((a,b) => (+c[b].t||0) - (+c[a].t||0))
+    .slice(0, tavan)
+    .forEach(id => { out[id] = c[id]; });
+  return out;
+}
+// Oku-birleştir-yaz (lsNesneYaz deseni) + yazmadan ÖNCE budama; aynı kanalda t'si büyük kazanır.
+// Değişiklik yoksa YAZMAZ: Radar yüklemesinde 3 çağıran var; gereksiz yazım çok sekmede kayıp güncelleme penceresini büyütür.
+function rdMedCacheYaz(yeni, now){
+  const disk = rdMedCacheGet();
+  const birlesik = Object.assign({}, disk);
+  Object.keys(yeni).forEach(id => { const d = birlesik[id];
+    if (!(rdMedGecerli(d) && (+d.t||0) > yeni[id].t)) birlesik[id] = yeni[id]; });
+  let kayit = rdMedBuda(birlesik, RD_MED_KANAL_TAVAN, now);
+  if (!Object.keys(yeni).length && Object.keys(kayit).length === Object.keys(disk).length)
+    return { kayit, bayt: 0, hata: '' };
+  let metin = JSON.stringify(kayit), hata = '';
+  try { localStorage.setItem('op_radar_chmed', metin); }
+  catch(e){
+    kayit = rdMedBuda(kayit, 50, now); metin = JSON.stringify(kayit);
+    try { localStorage.setItem('op_radar_chmed', metin); hata = '50 kanala düşürüldü';
+          addLog('warn','sistem','op_radar_chmed yazılamadı ('+(e.message||e.name)+') — 50 kanalla yazıldı'); }
+    catch(e2){ hata = 'yazılamadı';
+      addLog(RD_MED_YAZ_HATA_GOSTERILDI ? 'warn' : 'err', 'sistem',
+        'Depolama yazılamadı (op_radar_chmed) — kanal medyanları yalnız bu oturumda: '+(e2.message||e2.name));
+      RD_MED_YAZ_HATA_GOSTERILDI = true; }
+  }
+  return { kayit, bayt: metin.length, hata };
+}
 async function rdChannelMedians(key, uploadsBy, chIds, st){
   const YT='https://www.googleapis.com/youtube/v3/';
-  const cache=rdMedCacheGet(), now=Date.now(), TTL=24*3600*1000;
-  const need=chIds.filter(id=>uploadsBy[id] && !(cache[id] && now-cache[id].t<TTL)).slice(0,25);
-  let done=0;
+  const cache=rdMedCacheGet(), now=Date.now();
+  const taze = e => rdMedGecerli(e) && now - (+e.t||0) < RD_MED_TTL;
+  const need=chIds.filter(id=>uploadsBy[id] && !taze(cache[id])).slice(0,25);
+  const yeni={}, kiyas={ n:0, fark:0, yetersiz:0 };
+  let done=0, kotaHata='';
   for(const id of need){
     try{
-      const pl=await ytkFetch(YT+'playlistItems?part=contentDetails&playlistId='+uploadsBy[id]+'&maxResults=20&key='+key);
+      const pl=await ytkFetch(YT+'playlistItems?part=contentDetails&playlistId='+uploadsBy[id]+'&maxResults=50&key='+key);
       const vids=(pl.items||[]).map(x=>x.contentDetails&&x.contentDetails.videoId).filter(Boolean);
-      if(!vids.length){ cache[id]={t:now,v:{}}; continue; }
-      const stt=await ytkFetch(YT+'videos?part=statistics&id='+vids.join(',')+'&key='+key);
-      const v={}; (stt.items||[]).forEach(x=>{ v[x.id]=parseInt((x.statistics||{}).viewCount||0); });
-      cache[id]={t:now,v};
-    }catch(e){ cache[id]={t:now,v:{}}; console.warn('[RD] medyan '+id+':',e.message); }
+      if(!vids.length){ yeni[id]={ver:RD_MED_SURUM,t:now,v:{},s:0,n:0}; }
+      else {
+        const stt=await ytkFetch(YT+'videos?part=statistics,contentDetails&id='+vids.join(',')+'&key='+key);
+        const byId={}; (stt.items||[]).forEach(x=>{ byId[x.id]=x; });
+        const v={}, eski20=[]; let s=0, n=0, uzun=0;
+        vids.forEach((vid,i)=>{
+          const x=byId[vid]; if(!x) return;                       // silinmiş/gizli: yanıtta yok
+          const izl=parseInt((x.statistics||{}).viewCount||0);
+          if(i<20) eski20.push(izl);                              // ESKİ yöntem (ilk 20, karışık) — yalnız kıyas logu
+          const sn=ytSureSn((x.contentDetails||{}).duration);
+          if(!sn) return;                                         // süre 0/okunamadı: ne kısa ne uzun
+          n++;
+          if(sn<=RD_SHORT_MAX_SN){ s++; return; }
+          if(uzun<RD_MED_UZUN_TAVAN){ v[vid]=izl; uzun++; }
+        });
+        yeni[id]={ver:RD_MED_SURUM,t:now,v,s,n};
+        const eM=rdMedian(eski20), yM=rdMedian(Object.values(v));
+        if(eM||yM){ kiyas.n++; if(!yM) kiyas.yetersiz++; else if(!eM || Math.max(eM,yM)/Math.min(eM,yM)>=1.5) kiyas.fark++; }
+      }
+    }catch(e){
+      const msg=String((e&&e.message)||'');
+      // Kota dolduysa kalanlar da düşer: denemeyi KES, 24 sa boş kayıt YAZMA (sıfırlanınca yeniden denensin)
+      if(/kota doldu/i.test(msg)){ kotaHata=msg; break; }
+      // Eski DOLU ver:2 kayıt boş kayıtla EZİLMEZ (en çok 7 gün kullanılmaya devam eder)
+      const eski=cache[id];
+      if(!(rdMedGecerli(eski) && Object.keys(eski.v).length)) yeni[id]={ver:RD_MED_SURUM,t:now,v:{},s:0,n:0};
+      console.warn('[RD] medyan '+id+':',msg);
+    }
     done++; if(st) st.textContent='⏳ kanal medyanları… '+done+'/'+need.length;
   }
-  try{ localStorage.setItem('op_radar_chmed',JSON.stringify(cache)); }catch(e){}
-  return cache;
+  const w=rdMedCacheYaz(yeni, now);
+  if(need.length) addLog(kotaHata?'warn':'info','sistem','Kanal medyanı (≤3 dk hariç): '+Object.keys(yeni).length+'/'+need.length+' kanal çekildi'
+    +(kotaHata?' · KOTA DOLDU, kalanlar sonraki turda':'')+' · eski/yeni medyanı ≥1,5× farklı '+kiyas.fark+'/'+kiyas.n
+    +' · uzun video yetersiz '+kiyas.yetersiz+' · op_radar_chmed '+Object.keys(w.kayit).length+' kanal'
+    +(w.bayt?', '+Math.round(w.bayt/1024)+' KB':'')+(w.hata?' ('+w.hata+')':''));
+  // Dönüş: tur başında okunan geçerli kayıtlar (150 budamasına takılsa da BU turda kullanılsın;
+  // rdClientCompute trend listesine de uyguluyor) + yeniler + yazılan disk (daha yeni olan kazanır).
+  const donus={};
+  Object.keys(cache).forEach(id=>{ if(rdMedGecerli(cache[id]) && now-(+cache[id].t||0)<RD_MED_BUDAMA_MS) donus[id]=cache[id]; });
+  return Object.assign(donus, yeni, w.kayit);
 }
 // Adayları outlier skoruyla zenginleştir (kendi videosunu medyandan çıkarır)
 function rdApplyOutlier(list, medCache){
   list.forEach(x=>{
     const ch=medCache[x.channelId];
-    if(!ch||!ch.v) return;
+    if(!rdMedGecerli(ch)) return;          // ver'siz (kısa videolarla karışık) kayıt KULLANILMAZ
     const vals=Object.keys(ch.v).filter(vid=>vid!==x.id).map(vid=>ch.v[vid]);
     const med=rdMedian(vals);
-    if(med>0){ x.chMed=med; x.outlier=+(x.views/med).toFixed(1); }
+    if(med>0){ x.chMed=med; x.outlier=+(x.views/med).toFixed(1); x.medSurum=RD_MED_SURUM; }
+    if((ch.n||0)>=10){ x.shortOran=Math.round(100*(ch.s||0)/ch.n); x.shortN=ch.n; }
   });
 }
 // n8n GÜNLÜK RADAR verisi outlier/chMed İÇERMEZ (ana Radar Hesapla üretmiyor).
@@ -19057,6 +20927,7 @@ function rdRenderKat(){
           +'<div class="rd-body"><div class="rd-title">'+rdEsc(x.title)+'</div>'+rdDoneLbl(_dn)
           +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span>'+rdAge(x.ageH)+'</span></div>'
           +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
+          +rdShortSatiri(x)
           +(x.katTahmin?rdKatSatiri(x):'')
           +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+guvenliUrl(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
           +'</div></div>';
@@ -19199,6 +21070,12 @@ function rdDoneLbl(rec){
   return '<div class="rd-done-lbl" title="' + rdEsc('İşleme alındı: ' + (rec.t || '')) + '">✓ işleme alındı'
     + (rec.kategori ? ' <span style="color:var(--mt)">· ' + rdEsc(rec.kategori) + '</span>' : '') + '</div>';
 }
+// Nötr bilgi: kanalın kısa video payının bu videodan alınacak klibe etkisi ÖLÇÜLMEDİ → uyarı/filtre yok.
+function rdShortSatiri(x){
+  if(!(x && x.shortOran>0 && x.shortN)) return '';
+  return '<div style="font-size:10.5px;color:var(--mt);margin-top:2px" title="Kanalın son yüklemelerinde süresi 3 dakika ve altı olanların payı. Süre vekili: en-boy oranı API yanıtında yok, yatay kısa videolar da sayılır. Bilgi amaçlı.">kanal: son '
+    +(x.shortN|0)+' yüklemede ≤3 dk oranı %'+(x.shortOran|0)+'</div>';
+}
 function rdSure(sec){
   const s=parseInt(sec)||0; if(!s) return '';
   const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sn=s%60;
@@ -19255,7 +21132,16 @@ function renderRadar(){
         +'<div class="rd-body">'
         +'<div class="rd-title">'+rdEsc(x.title)+'</div>'+rdDoneLbl(_dn)
         +(x.keyword?'<div style="font-size:10.5px;color:var(--acc);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Bu videoyu bulduran arama kelimesi (Google Trends veya Wikipedia gündemi)">🔍 '+rdEsc(x.keyword)+'</div>':'')
-        +(x.outlier>=2&&x.chMed?'<div style="font-size:10.5px;color:var(--acc3);margin-top:2px" title="Kanalın son 20 video medyanı">💥 '+x.outlier+'x · kanal medyanı '+ytkFmt(x.chMed)+'</div>':'')
+        +(x.outlier>=2&&x.chMed?'<div style="font-size:10.5px;color:var(--acc3);margin-top:2px" title="'
+          +(x.medSurum===RD_MED_SURUM
+            ?'Kanalın son 50 yüklemesinden 3 dakikadan uzun olanların (en çok 20) izlenme medyanı; 3 dk ve altı hariç'
+            // Keşif / Erken Sinyal satırlarını n8n kendi hesaplıyor (rdEnrichN8N yalnız trend/rising/
+            // potential'ı işler) — panel önbelleği değil, panel taraması da güncellemez.
+            :((elId==='rd-kesif'||elId==='rd-gtrend')
+              ?'Kanal medyanı: n8n günlük radarının kendi hesabı (yöntem panelden farklı, kısa videolar dahil olabilir)'
+              :'Kanal medyanı: önbellekteki eski hesap (son 20 yükleme, kısa videolar dahil); yeni taramada güncellenir'))
+          +'">💥 '+x.outlier+'x · kanal medyanı '+ytkFmt(x.chMed)+'</div>':'')
+        +rdShortSatiri(x)
         +(x.katTahmin?rdKatSatiri(x):'')
         +(x.ivme>0?'<div style="font-size:10.5px;margin-top:2px;color:'+(x.ivme>=1.2?'var(--ok)':(x.ivme<0.8?'var(--mt)':'var(--wn)'))+'" title="Son '+x.deltaH+' saatteki hız ÷ ömür boyu ortalama hız. >1 hızlanıyor, <1 yavaşlıyor">'+(x.ivme>=1.2?'📈 hızlanıyor':(x.ivme<0.8?'📉 yavaşlıyor':'➡ sabit'))+' ×'+x.ivme+'</div>':'')
         +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+rdEsc(x.channel)+(x.subs?' · '+ytkFmt(x.subs):'')+'</span><span style="flex-shrink:0">'+rdAge(x.ageH)+'</span></div>'
