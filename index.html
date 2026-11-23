@@ -7,7 +7,7 @@
      artir (git revert bu satiri da geri alir, damga ASLA kuculmez). Bicim yYYYY.AA.GG-N, N genel sayac.
      Nitelik sirasini ve bicimi DEGISTIRME: acik kalan eski sekmeler sayfanin yalniz ilk 4 KB'ini
      okuyup bu satiri duzenli ifadeyle ariyor. -->
-<meta name="opus-yapi" content="y2026.09.17-101">
+<meta name="opus-yapi" content="y2026.11.23-102">
 <!-- Sayfanin adresi ucuncu taraflara (Google Fonts, YouTube, ytimg) sizmasin.
      API anahtarlarini sizdirmiyordu - anahtar giden istegin URL'sinde, Referer'da
      degil - ama IP + tam adres yine de gereksiz yere paylasiliyordu. -->
@@ -1474,6 +1474,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <button class="btn bg bsm" id="plat-sifirla-btn" onclick="hsAc()" title="Bir sosyal medya hesabı engellenip yerine yenisi bağlandıysa: o profil+platformda eski yayınlar 'yayınlanmış' sayılmaz olur, böylece short'lar yeni hesaba tekrar gönderilebilir. Hiçbir kayıt silinmez, geri alınabilir.">🔄 Hesap Sıfırlama</button>
     <button class="btn bg bsm" id="plat-kaynak-btn" onclick="ksAc()" title="Üretilmiş short'ların kaç tanesinin mp4 kaynağına hâlâ ulaşılabiliyor? Yeniden yayın yapabilmenin ön şartı bu — ölçer ve ölü linklerin OpusClip'ten tazelenip tazelenemediğine bakar.">🎬 Kaynak Sağlığı</button>
     <button class="btn bg bsm" id="plat-eksik-btn" onclick="eksikDenetimi()" title="Her profilde, HERHANGİ bir platformda var olup diğerlerinde OLMAYAN short'ları sayar (yayınlanmış + planlı + kuyruk birlikte). Takvimden yanlışlıkla silinen planlar burada 'eksik' olarak görünür; onarım profil satırındaki ⚖ Eşitle ile yapılır.">🧩 Eksik Denetimi</button>
+    <button class="btn bg bsm" id="plat-esleme-btn" onclick="eslemeDokumu()" title="Her Upload-Post profili × platform için kullanıcı adı, görünen ad ve bağlantı durumunu kopyalanabilir tek tabloya döker. Salt okunur: hiçbir ayarı değiştirmez, istek atmaz — önce ↻ Yenile'ye bas.">🗂 Eşleme Dökümü</button>
     <span id="plat-cift-oto-durum" style="font-size:11.5px;color:var(--mt);align-self:center"
           title="Çift kontrolü saatte bir kendiliğinden çalışır: kuyruktaki çift kopyalar silinir (her short'un EN ERKEN kopyası kalır), yayınlanmış gönderilere dokunulmaz, birden çok platforma bağlı işler otomatik silinmez. Çift bulunursa liste aşağıda kendiliğinden açılır. Panel AÇIKKEN çalışır — kapalıyken temizlik yapılmaz."></span>
     <span id="plat-last" style="font-size:12px;color:var(--mt);align-self:center"></span>
@@ -1482,6 +1483,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
     <span id="plat-src" style="font-size:12px;color:var(--acc);align-self:center;margin-left:auto"></span>
   </div>
   <div id="hd-uyari" style="margin-bottom:12px"></div>
+  <div id="plat-esleme" style="margin-bottom:12px"></div>
   <div id="yt-gor" style="margin-bottom:12px"></div>
   <div id="plat-eksik" style="margin-bottom:12px"></div>
   <div id="plat-kapsama" style="margin-bottom:12px"></div>
@@ -7388,6 +7390,8 @@ async function loadPlatforms(zorla) {
     } catch(e) { addLog('warn','uploadpost','Doğrudan API başarısız (muhtemelen CORS): '+e.message); }
   }
   S.uploadPostAccounts = raw;
+  // Eşleme Dökümü verinin nereden ve ne zaman geldiğini yazabilsin diye
+  S._platKaynak = raw ? { kaynak: kaynak, taze: taze, zaman: Date.now() } : null;
   // HESAP DEĞİŞİMİ TESPİTİ: her yüklemede çalışır. Önbellekten gelen veri
   // eski handle taşır → temel ile aynıdır → yanlış alarm ÜRETMEZ; değişim
   // ancak taze veride görünür. İlk görüşte yalnız temel yazılır.
@@ -10902,6 +10906,121 @@ function renderPlatformsGrid(byPlat) {
 
 function platAccName(a, p) {
   return a.display_name || a.displayName || a.name || a.username || a.handle || a.vanity_url || a.id || (p.label + ' Hesabı');
+}
+
+// ── EŞLEME DÖKÜMÜ (futbol geçişi, Faz 0.2) ─────────────────────────────
+// Profil → kanal eşlemesini onaya sunabilmek için her Upload-Post profili ×
+// platform hücresine kullanıcı adı, görünen ad ve bağlantı durumu yazılır;
+// kopyalanabilir tek bir metin tablosu çıkar. SALT OKUR: localStorage'a
+// yazmaz, yeni ağ isteği atmaz — yalnız son "↻ Yenile"nin bellekteki
+// verisini (S.uploadPostAccounts, YT_CANLI, PLAT_SON_AD) kullanır.
+const ESLEME_PLAT = [['instagram','IG'],['youtube','YT'],['tiktok','TT'],['facebook','FB'],['twitter','X']];
+function eslemeHucre(liste, platKey){
+  if (!liste || !liste.length) return '—';
+  const p = PLAT_MAP[platKey];
+  return liste.map(a => {
+    if (!phAcctConnected(a)) return '— (kimlik yok)';
+    let ad = String(platAccName(a, p) || '').trim();
+    let kul = cleanHandle(a.username || a.handle || a.custom_url || a.customUrl || '');
+    const not = [];
+    if (platKey === 'youtube'){
+      // platOpenModal gibi burada da yeniden normalize edildiği için handle'dan
+      // çözülen kimlik (a._ytKanalId) kaybolur — YT_HANDLE_ID önbelleğinden alınır.
+      const hk = ytHandleBul(a).toLowerCase();
+      const id = ytKanalIdBul(a) || (hk && YT_HANDLE_ID[hk]) || '';
+      const c = id ? YT_CANLI[id] : null;
+      if (c && (c.ad || c.handle)){
+        const eAd = ad, eKul = kul;
+        if (c.ad) ad = c.ad;
+        if (c.handle) kul = c.handle;
+        not.push('canlı');
+        if ((eAd && eAd !== ad) || (eKul && kul && eKul.toLowerCase() !== kul.toLowerCase()))
+          not.push('UP kaydı: ' + eAd + (eKul ? ' @' + eKul : ''));
+      } else not.push('canlı okunamadı, UP kaydı');
+    } else {
+      const s = PLAT_SON_AD[phAnahtar(a._profile, platKey)];
+      if (s && s.handle && (!kul || s.handle.toLowerCase() !== kul.toLowerCase()))
+        not.push('son yayında @' + s.handle);
+    }
+    const sorun = platHesapSorun(a);
+    if (sorun) not.push('⚠ ' + sorun.kisa);
+    const bas = (kul ? '@' + kul : '') + (ad && ad.replace(/^@/,'').toLowerCase() !== kul.toLowerCase() ? (kul ? ' · ' : '') + ad : '');
+    return (bas || '(adsız)') + (not.length ? ' [' + not.join('; ') + ']' : '');
+  }).join(' + ');
+}
+function eslemeMetni(){
+  const raw = S.uploadPostAccounts;
+  if (!raw) return '';
+  const byPlat = normalizePlatforms(raw);
+  const md = s => String(s == null ? '' : s).replace(/[\r\n\t]+/g, ' ').replace(/\|/g, '\\|').trim();
+  const profAd = {};
+  ((raw && raw.profiles) || []).forEach(pr => {
+    if (!pr || !pr.username) return;
+    const d = String(pr.display_name || pr.displayName || pr.name || '').trim();
+    if (d && d !== pr.username) profAd[pr.username] = d;
+  });
+  const gruplar = platProfilGrupla(byPlat).slice().sort((a,b) => a.profil.localeCompare(b.profil, 'tr'));
+  const anaKeys = ESLEME_PLAT.map(x => x[0]);
+  const digerPlat = PLAT_LIST.filter(p => !anaKeys.includes(p.key) && (byPlat[p.key] || []).length);
+  let bagli = 0;
+  const satirlar = gruplar.map(g => {
+    const pp = {};
+    g.hesaplar.forEach(h => { (pp[h.p.key] = pp[h.p.key] || []).push(h.a); if (phAcctConnected(h.a)) bagli++; });
+    const kat = profilKategori(g.profil);
+    const hucreler = [
+      g.profil + (profAd[g.profil] ? ' (' + profAd[g.profil] + ')' : '') + (g.eksik ? ' [Upload-Post\'ta YOK]' : ''),
+      kat ? kat + ' / ' + katLabel(kat) : '(kategorisiz)'
+    ].concat(ESLEME_PLAT.map(([k]) => eslemeHucre(pp[k], k)));
+    if (digerPlat.length)
+      hucreler.push(digerPlat.filter(p => pp[p.key]).map(p => p.label + ': ' + eslemeHucre(pp[p.key], p.key)).join(' / ') || '—');
+    return '| ' + hucreler.map(md).join(' | ') + ' |';
+  });
+  const bas = ['Profil', 'Panel kategorisi (eski)'].concat(ESLEME_PLAT.map(x => x[1]));
+  if (digerPlat.length) bas.push('Diğer');
+  const pk = S._platKaynak || {};
+  const ytN = Object.keys(YT_CANLI).length;
+  const zaman = pk.zaman ? new Date(pk.zaman).toLocaleString('tr') : '?';
+  return [
+    'EŞLEME DÖKÜMÜ — ' + new Date().toLocaleString('tr') + ' · panel ' + PANEL_YAPI,
+    'Kaynak: ' + (pk.kaynak || '?') + (pk.taze ? '' : ' (TAZE DEĞİL — önce ↻ Yenile)') + ' · veri zamanı: ' + zaman,
+    gruplar.length + ' profil · ' + bagli + ' bağlı hesap · YouTube canlı ad: ' + (ytN ? ytN + ' kanal' : 'okunamadı (' + (YT_CANLI_DURUM || 'henüz denenmedi') + ')'),
+    'Not: IG/TT/FB/X adları Upload-Post\'un BAĞLAMA ANINDAKİ kaydıdır; platformda ad sonradan değiştiyse burada eski görünür. "son yayında" = son başarılı yayının bağlantısındaki ad.',
+    '',
+    '| ' + bas.join(' | ') + ' |',
+    '|' + bas.map(() => '---').join('|') + '|'
+  ].concat(satirlar).join('\n');
+}
+function eslemeDokumu(){
+  const kutu = document.getElementById('plat-esleme'); if (!kutu) return;
+  if (kutu.innerHTML){ kutu.innerHTML = ''; return; }           // ikinci basış kapatır
+  if (!S.uploadPostAccounts){
+    kutu.innerHTML = durumHTML('bos', {kompakt:true, alt:'Önce ↻ Yenile\'ye bas — döküm yalnız bellekteki son veriyi okur, kendisi istek atmaz'});
+    return;
+  }
+  const metin = eslemeMetni();
+  const satir = metin.split('\n').length;
+  kutu.innerHTML = '<div class="card" style="padding:12px 14px;margin-bottom:0">'
+    + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'
+    +   '<b style="font-size:13px">🗂 Eşleme Dökümü</b>'
+    +   '<span style="font-size:11.5px;color:var(--mt)">salt okunur — hiçbir ayarı değiştirmez. Kopyalayıp sohbete yapıştır.</span>'
+    +   '<button class="btn bp bsm" style="margin-left:auto" onclick="eslemeKopyala()">⧉ Kopyala</button>'
+    +   '<button class="btn bg bsm" onclick="document.getElementById(\'plat-esleme\').innerHTML=\'\'">✕ Kapat</button>'
+    + '</div>'
+    + '<textarea id="plat-esleme-metin" readonly spellcheck="false" style="width:100%;box-sizing:border-box;min-height:160px;height:'
+    +   Math.min(560, 40 + satir * 17) + 'px;font-family:var(--fm);font-size:11.5px;line-height:17px;white-space:pre;overflow:auto;background:var(--bg);color:var(--tx);border:1px solid var(--brd);border-radius:4px;padding:8px">'
+    +   esc0(metin) + '</textarea>'
+    + '</div>';
+}
+function eslemeKopyala(){
+  const ta = document.getElementById('plat-esleme-metin'); if (!ta) return;
+  const yedek = () => {
+    try { ta.focus(); ta.select(); const ok = document.execCommand('copy');
+          toast(ok ? 'Döküm kopyalandı' : 'Kopyalanamadı — metni seçip Ctrl+C yap', ok ? 'ok' : 'warn'); }
+    catch(e){ toast('Kopyalanamadı — metni seçip Ctrl+C yap', 'warn'); }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText)
+    navigator.clipboard.writeText(ta.value).then(() => toast('Döküm kopyalandı', 'ok'), yedek);
+  else yedek();
 }
 
 // platAccCard KALDIRILDI: hiç çağrılmıyordu (window'a da bağlı değildi).
