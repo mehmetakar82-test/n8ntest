@@ -7,7 +7,7 @@
      artir (git revert bu satiri da geri alir, damga ASLA kuculmez). Bicim yYYYY.AA.GG-N, N genel sayac.
      Nitelik sirasini ve bicimi DEGISTIRME: acik kalan eski sekmeler sayfanin yalniz ilk 4 KB'ini
      okuyup bu satiri duzenli ifadeyle ariyor. -->
-<meta name="opus-yapi" content="y2026.11.24-103">
+<meta name="opus-yapi" content="y2026.11.24-104">
 <!-- Sayfanin adresi ucuncu taraflara (Google Fonts, YouTube, ytimg) sizmasin.
      API anahtarlarini sizdirmiyordu - anahtar giden istegin URL'sinde, Referer'da
      degil - ama IP + tam adres yine de gereksiz yere paylasiliyordu. -->
@@ -34,7 +34,7 @@
   /* Dark tema (varsayılan) — mt (muted text) kontrastı arttırıldı */
   --bg:#07090e;--sur:#0c1018;--sur2:#111822;--brd:#243247;
   --acc:#00e5ff;--acc2:#ff3566;--acc3:#a78bfa;--gld:#fbbf24;
-  --tx:#f6f9fc;--mt:#d7dfe9;--ok:#34d399;--wn:#fbbf24;--er:#f87171;
+  --tx:#f6f9fc;--mt:#d7dfe9;--ok:#34d399;--wn:#fbbf24;--er:#f87171;--yh-bg:#b91c1c;
   --grid-line:rgba(0,229,255,.03);
   --input-bg:#0d131c;--input-brd:#2a3a52;
   --shadow-lg:0 8px 40px rgba(0,229,255,.15);
@@ -44,7 +44,7 @@
 html.light-theme{
   --bg:#f4f6fb;--sur:#ffffff;--sur2:#eef1f7;--brd:#d4dbe6;
   --acc:#0284c7;--acc2:#dc2626;--acc3:#7c3aed;--gld:#d97706;
-  --tx:#0f172a;--mt:#475569;--ok:#059669;--wn:#d97706;--er:#dc2626;
+  --tx:#0f172a;--mt:#475569;--ok:#059669;--wn:#d97706;--er:#dc2626;--yh-bg:#b91c1c;
   --grid-line:rgba(0,132,199,.04);
   --input-bg:#ffffff;--input-brd:#cbd3e0;
   --shadow-lg:0 8px 40px rgba(0,132,199,.15);
@@ -406,7 +406,19 @@ tbody td{line-height:1.5}
 .fa-kchip{cursor:pointer;font-size:10px;padding:1px 6px;border-radius:4px;background:var(--sur);border:1px solid var(--brd);color:var(--tx)}
 .fa-kchip.sel{border-color:var(--acc);color:var(--acc);font-weight:700}
 .fa-kchip.oneri{border-style:dashed;border-color:var(--wn)}
-.rd-ch-card{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:11px 13px}
+/* Yayın hakkı sahibi (ENGEL) etiketi — küçük resmin SOL ÜST köşesi (24 Kas 2026). Resmin üstünde
+   durduğu için zemin iki temada da koyu kırmızı (#b91c1c, beyaz yazıyla kontrast ≈6,5:1); çerçeve
+   tema değişkeni --er. pointer-events AÇIK: title ipucu (ad · neden · gönderilemez) çalışsın. */
+.fa-yh{position:absolute;top:3px;left:3px;z-index:6;max-width:calc(100% - 6px);box-sizing:border-box;padding:1px 4px;border-radius:4px;background:var(--yh-bg,#b91c1c);border:1px solid var(--er);color:#fff;font-size:10.5px;font-weight:700;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.rd-card .fa-yh ~ .rd-done-tick{top:27px}
+/* Sağ üst rozet (💥 outlier / ▲ artış / ×abone / ♥ / 🔎) ENGEL kartında etiketin ALTINA iner: uzun ya da
+   orta uzunluktaki ad (operatör adı, '⛔ yayın hakkı sahibi' yedeği) rozeti örtüp sayıyı yanlış okutuyordu. */
+.rd-card.yh > .rd-badge-ratio,.rd-card.yh > .rd-badge-delta{top:27px}
+.rd-card.yh{cursor:not-allowed}
+.fa-yh-not{font-size:10.5px;margin-top:4px;color:var(--er)}
+.rd-ch-card{background:var(--sur2);border:1px solid var(--brd);border-radius:8px;padding:11px 13px;position:relative}
+/* Yükselen Kanallar: yayın hakkı sahibi kanal kartı — etiket kartın sol üstünde, kanal adı altında kalır */
+.rd-ch-card.yh{padding-top:30px;border-color:var(--er)}
 .rd-ch-name{font-size:13px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rd-ch-meta{font-size:11px;color:var(--mt);margin:3px 0 7px;font-variant-numeric:tabular-nums}
 /* ═══ YENİ: Komut paleti ═══ */
@@ -864,7 +876,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
         </div>
       </div>
       <div class="card" id="kl-kart">
-        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>⚽ Kaynak Listesi<button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Futbol keşfinin kaynak sınıfları. Anahtar her zaman &lt;b&gt;kanal kimliği&lt;/b&gt; (UC…), handle değil.&lt;br&gt;&lt;br&gt;&lt;b&gt;İZİN&lt;/b&gt;: bağımsız yorum/canlı yayın — Kaynak Akışı tarar, 14 günden sonra önseçilebilir.&lt;br&gt;&lt;b&gt;KULÜP&lt;/b&gt;: kulüp resmî kanalı — taranır ama önseçilmez, gönderimde elle onay.&lt;br&gt;&lt;b&gt;UYARI&lt;/b&gt;: lisanslı görüntü içerebilen yayıncı — önseçilmez, elle onay.&lt;br&gt;&lt;b&gt;ENGEL&lt;/b&gt;: yayın hakkı sahibi — adaylardan çıkar, gönderilemez. Gömülü ENGEL satırları değiştirilemez.&lt;br&gt;&lt;br&gt;Senin eklediğin/değiştirdiğin satırlar bu tarayıcıda (op_kaynak_liste) gömülü listenin üstüne biner.">ⓘ</button></span><span id="kl-ozet" style="font-size:11px;color:var(--mt);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
+        <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span>⚽ Kaynak Listesi<button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Futbol keşfinin kaynak sınıfları. Anahtar her zaman &lt;b&gt;kanal kimliği&lt;/b&gt; (UC…), handle değil.&lt;br&gt;&lt;br&gt;&lt;b&gt;İZİN&lt;/b&gt;: bağımsız yorum/canlı yayın — Kaynak Akışı tarar, 14 günden sonra önseçilebilir.&lt;br&gt;&lt;b&gt;KULÜP&lt;/b&gt;: kulüp resmî kanalı — taranır ama önseçilmez, gönderimde elle onay.&lt;br&gt;&lt;b&gt;UYARI&lt;/b&gt;: lisanslı görüntü içerebilen yayıncı — önseçilmez, elle onay.&lt;br&gt;&lt;b&gt;ENGEL&lt;/b&gt;: yayın hakkı sahibi — videoları listelerde görünür (küçük resmin sol üstünde yayın hakkı sahibinin adı yazar) ama seçilemez ve gönderilemez; Kaynak Akışı bu kanalları taramaz. Gömülü ENGEL satırları değiştirilemez.&lt;br&gt;&lt;br&gt;Senin eklediğin/değiştirdiğin satırlar bu tarayıcıda (op_kaynak_liste) gömülü listenin üstüne biner.">ⓘ</button></span><span id="kl-ozet" style="font-size:11px;color:var(--mt);font-weight:400;letter-spacing:0;text-transform:none"></span></div>
         <div id="kl-liste" style="max-height:300px;overflow-y:auto;border:1px solid var(--brd);border-radius:4px"></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
           <input id="kl-cid" type="text" placeholder="UC… kanal kimliği" style="flex:2;min-width:190px;margin:0"/>
@@ -1236,7 +1248,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
   <div class="g2">
     <div class="card">
       <div class="ct">Arama</div>
-      <div class="alert ai"><span>ℹ</span><span>Anahtar kelime + süre + dil + yayın tarihi ile YouTube'da (Türkiye bölgesi) video ara; sonuçlar modalda listelenir. Her videoda futbol sınıflandırıcı ve kaynak sınıfı rozeti var: futbol dışı (red) ve ENGEL kaynaklı videolar gizlenir, sayısı yazar. Min. süre 4–19 dk ise (varsayılan 10 dk) 2 arama çağrısı harcar (medium + long bandı); 20 dk ve üstü ya da Tümü seçiliyse 1 (günde 100'lük kova; panel tavanı 40).</span></div>
+      <div class="alert ai"><span>ℹ</span><span>Anahtar kelime + süre + dil + yayın tarihi ile YouTube'da (Türkiye bölgesi) video ara; sonuçlar modalda listelenir. Her videoda futbol sınıflandırıcı ve kaynak sınıfı rozeti var: futbol dışı (red) videolar gizlenir, sayısı yazar. Yayın hakkı sahibi (ENGEL) videoları gösterilir — küçük resmin sol üstünde yayın hakkı sahibinin adı yazar — ama seçilemez ve gönderilemez; kullanılabilir 10 sonuçtan yer yemez (en çok 10 tane ayrıca listelenir). Min. süre 4–19 dk ise (varsayılan 10 dk) 2 arama çağrısı harcar (medium + long bandı); 20 dk ve üstü ya da Tümü seçiliyse 1 (günde 100'lük kova; panel tavanı 40).</span></div>
       <div class="fg"><label>YouTube API Key <span style="color:var(--mt)">(YT Kanal Ara ile aynı)</span></label>
         <input id="ya-apikey" type="text" placeholder="AIza..." oninput="if(S.cfg.ytApiKey!==this.value){S.cfg.ytApiKey=this.value;localStorage.setItem('op_cfg',JSON.stringify(S.cfg));}"/>
       </div>
@@ -1742,7 +1754,7 @@ html.light-theme .viz-bilesim b{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.45)
 
   <div class="card" style="border-color:rgba(52,211,153,.35)">
     <div class="ct" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
-      <span style="color:var(--ok)">⚽ Kaynak Akışı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— izin listesi + kulüp kanallarının son 72 saati · <b style="color:var(--ok)">0 arama çağrısı</b></span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Kaynak Listesi'ndeki (YT Kanal sayfası) &lt;b&gt;İZİN&lt;/b&gt; ve &lt;b&gt;KULÜP&lt;/b&gt; kanallarının resmî yükleme listesi (canlı yayın kayıtları dahil) okunur; arama kovası HİÇ kullanılmaz.&lt;br&gt;&lt;br&gt;&lt;b&gt;Süzgeçler:&lt;/b&gt; son 72 saat · 10 dk – 3 saat · Shorts değil · Türkçe · futbol sınıflandırıcı red değil · ENGEL kaynak yok · işlenmemiş. Her elemenin sayısı üstte yazar.&lt;br&gt;&lt;br&gt;&lt;b&gt;Maliyet:&lt;/b&gt; kanal başına 1 + her 50 yeni video için 1 (+ ilk çalıştırmada kanal kimlikleri için 1) birim, 10.000'lik ortak kotadan.&lt;br&gt;&lt;br&gt;Kategori = karttaki seçimin. Seçmezsen: ilk 14 gün (8 Ara'ya kadar) öneri KULLANILMAZ, üstteki çipler kullanılır; sonrasında yalnız kabul + İZİN + özet değilse öneri kullanılır, değilse yine üstteki çipler. Üst çip öneriden farklıysa gönderimden önce sorulur. Üst çipler de boşsa video gönderilmez. KULÜP kaynağı önseçilmez ve gönderimde elle onay ister. İlk 14 gün hiçbir video kendiliğinden seçilmez.">ⓘ</button></span>
+      <span style="color:var(--ok)">⚽ Kaynak Akışı <span style="letter-spacing:0;text-transform:none;font-weight:400;color:var(--mt)">— izin listesi + kulüp kanallarının son 72 saati · <b style="color:var(--ok)">0 arama çağrısı</b></span><button class="ipuc" type="button" aria-label="Ayrıntı" onclick="ipucAc(event,this)" data-ip="Kaynak Listesi'ndeki (YT Kanal sayfası) &lt;b&gt;İZİN&lt;/b&gt; ve &lt;b&gt;KULÜP&lt;/b&gt; kanallarının resmî yükleme listesi (canlı yayın kayıtları dahil) okunur; arama kovası HİÇ kullanılmaz.&lt;br&gt;&lt;br&gt;&lt;b&gt;Süzgeçler:&lt;/b&gt; son 72 saat · 10 dk – 3 saat · Shorts değil · Türkçe · futbol sınıflandırıcı red değil · işlenmemiş. Her elemenin sayısı üstte yazar. Video yayın hakkı sahibi (ENGEL) bir kanala aitse gizlenmez: küçük resmin sol üstünde adı yazar, seçilemez ve gönderilemez (ENGEL kanallar taranmaz).&lt;br&gt;&lt;br&gt;&lt;b&gt;Maliyet:&lt;/b&gt; kanal başına 1 + her 50 yeni video için 1 (+ ilk çalıştırmada kanal kimlikleri için 1) birim, 10.000'lik ortak kotadan.&lt;br&gt;&lt;br&gt;Kategori = karttaki seçimin. Seçmezsen: ilk 14 gün (8 Ara'ya kadar) öneri KULLANILMAZ, üstteki çipler kullanılır; sonrasında yalnız kabul + İZİN + özet değilse öneri kullanılır, değilse yine üstteki çipler. Üst çip öneriden farklıysa gönderimden önce sorulur. Üst çipler de boşsa video gönderilmez. KULÜP kaynağı önseçilmez ve gönderimde elle onay ister. İlk 14 gün hiçbir video kendiliğinden seçilmez.">ⓘ</button></span>
       <span style="display:flex;gap:8px;align-items:center">
         <span id="rd-kaynak-n" style="letter-spacing:0;text-transform:none;font-weight:400"></span>
         <button class="btn bg bsm" onclick="rdKaynakAkisi()" title="İZİN + KULÜP kanallarının son 72 saatini getir (0 arama çağrısı)">⚽ Kaynak Akışını Getir</button>
@@ -3127,7 +3139,7 @@ function kaynakRozet(ks){
   const r = FA_KS_ROZET[ks.sinif];
   const ipucu = 'Kaynak sınıfı: ' + r.ad + (ks.ad ? ' · ' + ks.ad : '') + (ks.neden ? '\n' + ks.neden : '')
     + (ks.sinif === 'KULUP' || ks.sinif === 'UYARI' ? '\nÖnceden seçilmez; gönderimde elle onay istenir.' : '')
-    + (ks.sinif === 'ENGEL' ? '\nGönderilemez (yayın hakkı sahibi).' : '');
+    + (ks.sinif === 'ENGEL' ? '\nYayın hakkı sahibi: video listede görünür (küçük resmin sol üstünde adı yazar) ama seçilemez ve gönderilemez.' : '');
   return '<span class="fa-rz ' + r.s + '" title="' + esc0(ipucu) + '">' + r.ic + ' ' + r.ad + '</span>';
 }
 function futbolRozet(fs){
@@ -3171,18 +3183,65 @@ function faOtoKategori(fs, channelId){
   return { kat: (!engel && oneri) ? oneri : '', oneri, engel };
 }
 window.faOtoKategori = faOtoKategori;
-// ENGEL kaynaklı öğeleri listeden çıkarır (sessiz kırpma yok: sayı döner, nota basılır)
-function faEngelAyikla(list, secim, idAl, cidAl){
-  const kalan = []; let gizlenen = 0;
+// ── YAYIN HAKKI SAHİBİ (ENGEL) VİDEOLARI: GÖRÜNÜR, SEÇİLEMEZ (24 Kas 2026, kullanıcı isteği) ──
+// Eskiden faEngelAyikla ENGEL öğeleri listeden ÇIKARIYORDU. Artık hiçbir liste gizlemez: kart
+// görünür, küçük resmin SOL ÜST köşesinde yayın hakkı sahibinin adı yazar (faYayinciEtiket).
+// SEÇİLEMEZ: kart tıklaması / kutucuk / toplu seçim / önseçim ENGEL eklemez (faEngelUyar);
+// eski kayıttan kalmış seçim çizimde düşer (faEngelIsaretle). Gönderim politikası DEĞİŞMEDİ:
+// kaynakKapisi ENGEL'i yine sert durdurur (güvenlik ağı). Futbol dışı (red) ve işlenmiş gizlemesi aynen.
+function faEngelMi(cid){ return kaynakSinif(cid).sinif === 'ENGEL'; }
+// Listeyi DEĞİŞTİRMEZ: ENGEL öğe sayısını döner ve onları seçimden düşürür.
+function faEngelIsaretle(list, secim, idAl, cidAl){
+  let n = 0;
   (list || []).forEach(x => {
-    if (kaynakSinif(cidAl ? cidAl(x) : (x && x.channelId)).sinif === 'ENGEL') {
-      gizlenen++; if (secim && idAl) secim.delete(idAl(x));
-    } else kalan.push(x);
+    if (faEngelMi(cidAl ? cidAl(x) : (x && x.channelId))) { n++; if (secim && idAl) secim.delete(idAl(x)); }
   });
-  return { liste: kalan, gizlenen };
+  return n;
+}
+// Toplu seçim için: ENGEL OLMAYAN öğeler (Tümünü Seç ENGEL'i dahil etmez)
+function faSecilebilir(list, cidAl){
+  return (list || []).filter(x => !faEngelMi(cidAl ? cidAl(x) : (x && x.channelId)));
+}
+// KONTENJAN: SIRALI listeden ENGEL olmayan ilk n + ENGEL olan en çok n (sıra korunur) — yayın hakkı
+// sahibi videoları kullanılabilir sonuç sayısını AZALTMAZ. Yeni API çağrısı yok (yalnız eldeki liste).
+function faKontenjan(list, n, cidAl){
+  let k = 0, e = 0; const out = [];
+  (list || []).forEach(x => {
+    if (faEngelMi(cidAl ? cidAl(x) : (x && x.channelId))) { if (e < n) { out.push(x); e++; } }
+    else if (k < n) { out.push(x); k++; }
+  });
+  return out;
+}
+// Yayın hakkı sahibinin GÖRÜNEN ADI: kaynak listesindeki ad; operatörün ENGEL satırı adsızsa videonun
+// KANAL ADI (ENGEL kanal düzeyinde → kanal adı = yayın hakkı sahibi). İkisi de boşsa '' (çağıran yedek yazar).
+function faYhAd(ks, kanalAdi){ return String((ks && ks.ad) || '').trim() || String(kanalAdi || '').trim(); }
+// ENGEL ks'nin adı boşsa kanal adıyla doldurulmuş KOPYASI (kaynakSinif sonucu değiştirilmez).
+// trEngelKs / rdEngelKs bunu döner → faEngelUyar(ks) kanal adını ayrıca almadan doğru adı söyler.
+function faYhKs(ks, kanalAdi){
+  if (!ks || ks.sinif !== 'ENGEL' || String(ks.ad || '').trim()) return ks;
+  const ad = faYhAd(ks, kanalAdi);
+  return ad ? Object.assign({}, ks, { ad }) : ks;
+}
+// Küçük resmin sol üst etiketi (kap position:relative olmalı). ENGEL değilse ''.
+// KAÇIŞ: ad/neden operatör metni, kanal adı YouTube metni olabilir → esc0.
+function faYayinciEtiket(ks, kanalAdi){
+  if (!ks || ks.sinif !== 'ENGEL') return '';
+  const ad = faYhAd(ks, kanalAdi);
+  const ipucu = 'Yayın hakkı sahibi' + (ad ? ': ' + ad : ' (adı kayıtlı değil)') + (ks.neden ? ' · ' + ks.neden : '') + ' · Gönderilemez (seçilemez)';
+  return '<span class="fa-yh" title="' + esc0(ipucu) + '">⛔ ' + esc0(ad || 'yayın hakkı sahibi') + '</span>';
+}
+// Seçim reddi uyarısı (toast textContent kullanır). Dönen metin res alanına da yazılabilir.
+function faEngelUyarMetni(ks, kanalAdi){
+  const ad = faYhAd(ks, kanalAdi);
+  return '⛔ ' + (ad ? ad + ': yayın hakkı sahibi' : 'Yayın hakkı sahibi videosu') + ' — gönderilemez';
+}
+function faEngelUyar(ks, kanalAdi){
+  const m = faEngelUyarMetni(ks, kanalAdi);
+  try { toast(m, 'warn', 3500); } catch(e){}
+  return m;
 }
 function faEngelNotu(n){
-  return n ? '<div class="fa-not" title="KAYNAK_SINIF: yayın hakkı sahibi kanallar adaylardan çıkarılır (YT Kanal → Kaynak Listesi)">⛔ ' + n + ' yayıncı videosu gizlendi (ENGEL kaynak)</div>' : '';
+  return n ? '<div class="fa-not" title="KAYNAK_SINIF: yayın hakkı sahibi kanalların videoları listede görünür (küçük resmin sol üstünde yayın hakkı sahibinin adı), seçilemez ve gönderilemez (YT Kanal → Kaynak Listesi)">⛔ ' + n + ' video yayın hakkı sahibinden — gösteriliyor, seçilemez</div>' : '';
 }
 
 // Genel onay penceresi (dupeChoiceModal deseni; native confirm sekmeyi kilitler).
@@ -4278,7 +4337,8 @@ function yarSinifla(v) {
 // YouTube Data API v3 ile canli arama, sonra videoya detay istatistigi çeker
 // 24 Kas 2026: regionCode=TR, dil varsayılanı tr, publishedAfter (3/7/30 gün/hepsi; ek maliyet yok),
 // maxResults 50 (ek maliyet yok). Maliyet: min. süre 4–19 dk ise (varsayılan 10 dk) 2 arama çağrısı
-// (medium + long bandı); 20 dk+ ya da Tümü ise 1. Futbol dışı (red) ve ENGEL kaynak gizlenir, sayılır.
+// (medium + long bandı); 20 dk+ ya da Tümü ise 1. Futbol dışı (red) gizlenir, sayılır. Yayın hakkı
+// sahibi (ENGEL) GİZLENMEZ: ENGEL olmayan ilk 10 + ENGEL en çok 10 gösterilir, seçilemez (faKontenjan).
 // Bir bant ya da videos.list partisi düşerse diğerinin sonuçları ATILMAZ: kısmi sonuç uyarıyla gösterilir.
 async function searchYARVideos() {
   const kw   = ((document.getElementById('ya-kw')||{}).value||'').trim();
@@ -4336,25 +4396,29 @@ async function searchYARVideos() {
     if (!items.length && partiHata.length) throw new Error(partiHata[0].mesaj);
     const eksikHata = bantHata.concat(partiHata);
     const eksikMetin = eksikHata.length ? ' · ⚠ ' + eksikHata.map(h => h.ad + ': ' + ytkErrMsg(h.mesaj)).join('; ') + ' (sonuçlar eksik)' : '';
-    // Süre filtresi → ENGEL kaynak ve futbol dışı (red) GİZLENİR, sayılır → izlenmeye göre ilk 10
+    // Süre filtresi → futbol dışı (red) GİZLENİR, sayılır → izlenmeye göre sırala → KONTENJAN:
+    // ENGEL olmayanlardan ilk 10 + ENGEL (yayın hakkı sahibi) olanlardan en çok 10. ENGEL artık
+    // gizlenmez (gösterilir, seçilemez) ve kullanılabilir sonuç sayısını azaltmaz. gizli.engel yalnız
+    // ESKİ geçmiş kayıtlarında dolu (o zaman gizlenip kayda yazılmamış videolar); yeni kayıtta hep 0.
     const gizli = { red: 0, engel: 0 };
     const kalan = items.filter(v => ytkParseDur(v.contentDetails.duration) >= durSec).filter(v => {
-      if (kaynakSinif((v.snippet||{}).channelId).sinif === 'ENGEL') { gizli.engel++; return false; }
       if (yarSinifla(v).karar === 'red') { gizli.red++; return false; }
       return true;
     });
-    YAR.videos = kalan
-      .sort((a,b) => parseInt(b.statistics.viewCount||0) - parseInt(a.statistics.viewCount||0))
-      .slice(0, 10);
+    YAR.videos = faKontenjan(kalan.sort((a,b) => parseInt(b.statistics.viewCount||0) - parseInt(a.statistics.viewCount||0)),
+      10, v => (v.snippet||{}).channelId);
     YAR.gizli = gizli;
     YAR.selected.clear();
-    // Önseçim: ilk 14 gün YOK; sonra yalnız kabul + İZİN kaynak + özet değil (faOtoKategori — ortak kural)
+    // Önseçim: ilk 14 gün YOK; sonra yalnız kabul + İZİN kaynak + özet değil (faOtoKategori — ortak kural;
+    // ENGEL'de kat hep '' → yayın hakkı sahibi videosu önseçilmez)
     YAR.videos.forEach(v => { if (faOtoKategori(yarSinifla(v), (v.snippet||{}).channelId).kat) YAR.selected.add(v.id); });
+    const yhSay = YAR.videos.filter(v => faEngelMi((v.snippet||{}).channelId)).length;
     yarOpenModal(kw, durSec);
-    const gizliMetin = (gizli.engel ? ' · ⛔ ' + gizli.engel + ' yayıncı videosu gizlendi' : '') + (gizli.red ? ' · ✕ ' + gizli.red + ' futbol dışı gizlendi' : '');
-    showRes('ya-res', (eksikMetin ? '⚠ ' : '✓ ') + `${YAR.videos.length} video bulundu — modal olarak açıldı` + gizliMetin + eksikMetin, eksikMetin ? 'warn' : 'ok');
-    addLog(eksikMetin ? 'warn' : 'ok', 'webhook', `YouTube arama "${kw}": ${YAR.videos.length} video` + gizliMetin + eksikMetin);
-    // Geçmişe küçültülmüş video listesini de ekle (localStorage'a sığsın)
+    const gizliMetin = (yhSay ? ' · ⛔ ' + yhSay + ' yayın hakkı sahibi videosu (gösteriliyor, gönderilemez)' : '') + (gizli.red ? ' · ✕ ' + gizli.red + ' futbol dışı gizlendi' : '');
+    showRes('ya-res', (eksikMetin ? '⚠ ' : '✓ ') + `${YAR.videos.length - yhSay} video bulundu` + gizliMetin + ' — modal olarak açıldı' + eksikMetin, eksikMetin ? 'warn' : 'ok');
+    addLog(eksikMetin ? 'warn' : 'ok', 'webhook', `YouTube arama "${kw}": ${YAR.videos.length - yhSay} video` + gizliMetin + eksikMetin);
+    // Geçmişe küçültülmüş video listesini de ekle (localStorage'a sığsın). ENGEL videoları da girer
+    // (geçmişten açınca etiketle görünsünler); kayıt başına en çok 20 video.
     const compactVideos = YAR.videos.map(v => yarNormalizeVideo(v));
     S.searchHist.unshift({ kw, kat:'', t:new Date().toLocaleString('tr'), durSec, videos: compactVideos, gizli });
     S.searchHist = S.searchHist.slice(0, 20);
@@ -4395,17 +4459,21 @@ function renderYARVideos() {
   const el = document.getElementById('ya-video-list');
   if (!el) return;
   const cnt = document.getElementById('ya-sel-count');
-  if (cnt) cnt.textContent = `(${YAR.selected.size} seçili)`;
   const g = YAR.gizli || {};
-  const gizliNot = (g.engel ? faEngelNotu(g.engel) : '')
+  // gizli.engel YALNIZ eski (24 Kas öncesi) geçmiş kaydında dolu: o videolar o zaman gizlenip kayda
+  // YAZILMAMIŞTI → burada gösterilemez; "gösteriliyor" denmez, aramayı yenile denir.
+  const gizliNot = (g.engel ? '<div class="fa-not" style="color:var(--mt)" title="Eski kayıt: yayın hakkı sahibi videoları o zaman listeden çıkarılıp geçmişe yazılmıyordu. Aynı aramayı yeniden yaparsan etiketle (sol üst) görünürler.">⛔ Bu eski aramada ' + g.engel + ' yayın hakkı sahibi videosu o zaman gizlenmişti, kayıtta yok — aramayı yenile</div>' : '')
     + (g.red ? '<div class="fa-not" style="color:var(--mt)" title="Futbol sınıflandırıcı (futbolSinif) red: basketbol/voleybol/oyun/bahis ya da Türk futbolu sinyali yok">✕ ' + g.red + ' futbol dışı video gizlendi</div>' : '');
-  if (!YAR.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Video yok</div>' + gizliNot; return; }
-  // ENGEL kaynak (geçmiş kaydı sonradan ENGEL olduysa) + daha önce işleme alınmış videolar çıkmasın
-  const _en = faEngelAyikla(YAR.videos, YAR.selected, raw => yarNormalizeVideo(raw).id, raw => yarNormalizeVideo(raw).channelId);
-  const _ay = islenmisAyikla(_en.liste,
+  if (!YAR.videos.length) { if (cnt) cnt.textContent = `(${YAR.selected.size} seçili)`; el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Video yok</div>' + gizliNot; return; }
+  // Yayın hakkı sahibi (ENGEL) videoları GÖRÜNÜR ama seçilemez: eski kayıttan kalmış seçim düşer.
+  // Daha önce işleme alınmış videolar çıkmasın (aynen).
+  faEngelIsaretle(YAR.videos, YAR.selected, raw => yarNormalizeVideo(raw).id, raw => yarNormalizeVideo(raw).channelId);
+  if (cnt) cnt.textContent = `(${YAR.selected.size} seçili)`;
+  const _ay = islenmisAyikla(YAR.videos,
     raw => 'https://www.youtube.com/watch?v=' + yarNormalizeVideo(raw).id,
     YAR.selected, raw => yarNormalizeVideo(raw).id);
-  const sonNot = islenmisNotu(_ay.gizlenen) + (_en.gizlenen ? faEngelNotu(_en.gizlenen) : '') + gizliNot;
+  const yhSay = _ay.liste.filter(raw => faEngelMi(yarNormalizeVideo(raw).channelId)).length;
+  const sonNot = islenmisNotu(_ay.gizlenen) + faEngelNotu(yhSay) + gizliNot;
   if (!_ay.liste.length) {
     el.innerHTML = (_ay.gizlenen ? durumHTML('bos',{ic:'✓',bas:'Hepsi işleme alınmış',
       alt:'Bulunan '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'}) : '') + sonNot;
@@ -4416,13 +4484,16 @@ function renderYARVideos() {
     const sel = YAR.selected.has(v.id);
     const durS = ytkParseDur(v.duration);
     const pubDate = (v.publishedAt||'').slice(0,10);
-    const rozet = futbolRozet(v.fs) + kaynakRozet(kaynakSinif(v.channelId)) + faUzunRozet(durS)
+    const ks = kaynakSinif(v.channelId), yh = ks.sinif === 'ENGEL';
+    const rozet = futbolRozet(v.fs) + kaynakRozet(ks) + faUzunRozet(durS)
       + (v.channelId ? '' : '<span class="fa-rz wn" title="Eski geçmiş kaydı: kanal kimliği saklanmamış, kaynak sınıfı (ENGEL/KULÜP) bilinmiyor. Gönderimde kimlik YouTube\'dan tamamlanır; alınamazsa gönderim durur.">❔ kaynak bilinmiyor</span>');
     // KAÇIŞ: başlık, kanal adı ve küçük resim YouTube Data API'den — yani
     // videoyu yükleyen üçüncü tarafın yazdığı metin.
-    return `<div onclick="yarToggle('${jsStr(v.id)}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s">
-      <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();yarToggle('${jsStr(v.id)}')">
+    // ENGEL: kart görünür, sol üstte yayın hakkı sahibinin adı; kutucuk devre dışı, tıklama seçmez (yarToggle uyarır)
+    return `<div onclick="yarToggle('${jsStr(v.id)}')" style="display:flex;gap:8px;padding:8px;border-bottom:1px solid var(--brd);cursor:${yh?'not-allowed':'pointer'};background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':(yh?'var(--er)':'transparent')};transition:all .15s">
+      <input type="checkbox" style="flex-shrink:0;margin-top:4px;accent-color:var(--acc)" ${sel?'checked':''}${yh?' disabled title="Yayın hakkı sahibi — seçilemez, gönderilemez"':''} onclick="event.stopPropagation();yarToggle('${jsStr(v.id)}')">
       <div style="position:relative;flex-shrink:0">
+        ${faYayinciEtiket(ks, v.channelTitle)}
         ${v.thumb?`<img src="${guvenliUrl(v.thumb)}" style="width:100px;height:60px;object-fit:cover;border-radius:3px">` : '<div style="width:100px;height:60px;background:var(--brd);border-radius:3px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
         <span style="position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.8);color:var(--tx);font-size:11px;padding:1px 4px;border-radius:2px">${ytkDurFmt(durS)}</span>
       </div>
@@ -4441,7 +4512,8 @@ function yarOpenModal(kw, durSec) {
   const t = document.getElementById('ya-modal-title');
   const s = document.getElementById('ya-modal-sub');
   if (t) t.textContent = kw ? '"' + kw + '" için sonuçlar' : 'Arama Sonuçları';
-  if (s) s.textContent = `${YAR.videos.length} video · ${durSec ? Math.round(durSec/60)+'dk+' : 'tüm süreler'} · izlenmeye göre sıralı`;
+  const yh = YAR.videos.filter(raw => faEngelMi(yarNormalizeVideo(raw).channelId)).length;
+  if (s) s.textContent = `${YAR.videos.length - yh} video${yh ? ' + ⛔ ' + yh + ' yayın hakkı sahibi (seçilemez)' : ''} · ${durSec ? Math.round(durSec/60)+'dk+' : 'tüm süreler'} · izlenmeye göre sıralı`;
   const m = document.getElementById('ya-modal');
   if (m) m.style.display = 'block';
   renderYARVideos();
@@ -4464,10 +4536,21 @@ function yarOpenHistory(idx) {
   yarOpenModal(h.kw + ' (geçmiş)', h.durSec);
 }
 
-function yarToggle(id) { if (YAR.selected.has(id)) YAR.selected.delete(id); else YAR.selected.add(id); renderYARVideos(); }
-// Gizlenen (daha önce işlenmiş ya da ENGEL) videolar toplu seçime dahil edilmez
+// Yayın hakkı sahibi (ENGEL) videosu SEÇİLEMEZ: seçim eklenmez, uyarı verilir (seçimden çıkarmak serbest)
+function yarToggle(id) {
+  if (YAR.selected.has(id)) YAR.selected.delete(id);
+  else {
+    const raw = (YAR.videos || []).find(x => x && x.id === id);
+    const nv = raw ? yarNormalizeVideo(raw) : null;
+    const ks = kaynakSinif(nv ? nv.channelId : '');
+    if (ks.sinif === 'ENGEL') { faEngelUyar(ks, nv && nv.channelTitle); renderYARVideos(); return; }
+    YAR.selected.add(id);
+  }
+  renderYARVideos();
+}
+// Gizlenen (daha önce işlenmiş) ve yayın hakkı sahibi (ENGEL, görünür ama seçilemez) videolar toplu seçime dahil edilmez
 function yarSelectAll() {
-  const gor = faEngelAyikla(YAR.videos, null, null, raw => yarNormalizeVideo(raw).channelId).liste;
+  const gor = faSecilebilir(YAR.videos, raw => yarNormalizeVideo(raw).channelId);
   islenmisAyikla(gor, raw=>'https://www.youtube.com/watch?v='+yarNormalizeVideo(raw).id).liste.forEach(v => YAR.selected.add(yarNormalizeVideo(v).id)); renderYARVideos();
 }
 function yarClearAll()  { YAR.selected.clear(); renderYARVideos(); }
@@ -4578,12 +4661,13 @@ function renderSearchHist() {
   el.innerHTML = S.searchHist.map((s,idx)=>{
     const vidCnt = Array.isArray(s.videos) ? s.videos.length : 0;
     const canOpen = vidCnt > 0;
+    const yhCnt = canOpen ? s.videos.filter(v => v && faEngelMi(v.channelId)).length : 0;
     return `<div class="ya-hist-item" data-idx="${idx}" style="padding:8px;border-bottom:1px solid var(--brd);font-size:13px;cursor:pointer" title="${canOpen?'Tıkla → geçmiş sonuçları modal olarak aç':'Bu kaydın video listesi saklı değil, tıklayınca sadece anahtar kelime dolar'}">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <span style="color:${canOpen?'var(--acc)':'#dde4f0'};font-weight:${canOpen?'600':'400'};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.kw)}</span>
         <span style="color:var(--mt);font-size:11px;white-space:nowrap">${esc(s.t)}</span>
       </div>
-      <div style="font-size:11px;color:var(--mt);margin-top:2px">${canOpen ? '🎬 '+vidCnt+' video sonuç • tıkla modalda aç' : 'sonuç saklı değil (anahtar kelime doldurulur)'}</div>
+      <div style="font-size:11px;color:var(--mt);margin-top:2px">${canOpen ? '🎬 '+(vidCnt-yhCnt)+' video sonuç'+(yhCnt?' + ⛔ '+yhCnt+' yayın hakkı sahibi':'')+' • tıkla modalda aç' : 'sonuç saklı değil (anahtar kelime doldurulur)'}</div>
     </div>`;
   }).join('');
   // Event delegation — inline onclick'in HTML kırılma sorununu bypass eder
@@ -13376,13 +13460,15 @@ function ytvOpenModal(vid) {
         <div style="background:var(--bg);padding:8px 10px;border-radius:4px;border:1px solid var(--brd)"><div style="font-size:11px;color:var(--mt);text-transform:uppercase">Süre</div><div style="font-size:14px;font-weight:700;color:var(--tx)">${ytkDurFmt(ytkParseDur(duration))}</div></div>
       </div>
       <div style="font-size:13px;color:var(--mt);margin-bottom:10px">
-        📺 <b style="color:var(--tx)">${channelTitle||''}</b> &nbsp; 📅 ${(publishedAt||'').slice(0,10)}
+        📺 <b style="color:var(--tx)">${esc0(channelTitle||'')}</b> &nbsp; 📅 ${esc0((publishedAt||'').slice(0,10))}
       </div>
       ${description ? `<div style="font-size:13px;color:#dde4f0;background:var(--bg);border:1px solid var(--brd);border-radius:4px;padding:10px;max-height:180px;overflow-y:auto;white-space:pre-wrap;margin-bottom:10px">${description.replace(/[<>&]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</div>` : ''}
       ${tags.length ? `<div style="margin-bottom:12px"><div style="font-size:12px;color:var(--mt);margin-bottom:4px">Etiketler</div><div style="display:flex;gap:4px;flex-wrap:wrap">${tags.slice(0,15).map(t=>`<span class="badge bi" style="font-size:11px">${t.replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</span>`).join('')}</div></div>` : ''}
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a href="https://www.youtube.com/watch?v=${v.id}" target="_blank" class="btn bg bsm" style="text-decoration:none">↗ YouTube'da Aç</a>
-        <button class="btn ${YTK.selected.has(v.id)?'bs':'bp'} bsm" onclick="ytkToggle('${v.id}');ytvOpenModal('${v.id}')">${YTK.selected.has(v.id)?'✓ Seçili — kaldır':'+ Seçime Ekle'}</button>
+        <a href="https://www.youtube.com/watch?v=${encodeURIComponent(v.id)}" target="_blank" rel="noopener" class="btn bg bsm" style="text-decoration:none">↗ YouTube'da Aç</a>
+        ${faEngelMi(isCompact ? v.channelId : ytkKanalId(v)) && !YTK.selected.has(v.id)
+          ? `<button class="btn bg bsm" disabled title="${esc0(faEngelUyarMetni(kaynakSinif(isCompact ? v.channelId : ytkKanalId(v)), isCompact ? channelTitle : ytkKanalAdi(v)))}">⛔ Yayın hakkı sahibi — seçilemez</button>`
+          : `<button class="btn ${YTK.selected.has(v.id)?'bs':'bp'} bsm" onclick="ytkToggle('${jsStr(v.id)}');ytvOpenModal('${jsStr(v.id)}')">${YTK.selected.has(v.id)?'✓ Seçili — kaldır':'+ Seçime Ekle'}</button>`}
       </div>`;
   }
   if (m) m.style.display = 'block';
@@ -13455,16 +13541,18 @@ function renderYTKVideos() {
   let list = ytkFilteredVideos();
   if (!YTK.videos.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Kanal seçin</div>'; return; }
   if (!list.length) { el.innerHTML = '<div style="color:var(--mt);font-size:12px;text-align:center;padding:16px">Süre filtresine uyan video yok — filtreyi "Tüm süreler" yapın veya daha fazla yükleyin</div>'; return; }
-  // ENGEL kaynak (yayın hakkı sahibi kanal) videoları listelenmez — sayısı notla görünür
-  const _en = faEngelAyikla(list, YTK.selected, v => v.id, v => (v.snippet && v.snippet.channelId) || (YTK.channelInfo && YTK.channelInfo.channelId) || '');
+  // Yayın hakkı sahibi (ENGEL) kanal videoları GÖRÜNÜR (sol üst etiket) ama seçilemez: kalmış seçim düşer
+  faEngelIsaretle(list, YTK.selected, v => v.id, ytkKanalId);
+  if (selCount) selCount.textContent = `(${YTK.selected.size} seçili)`;
   // Daha önce işleme alınmış videolar kanal listesinde çıkmasın
-  const _ay = islenmisAyikla(_en.liste, v => 'https://www.youtube.com/watch?v=' + v.id, YTK.selected, v => v.id);
+  const _ay = islenmisAyikla(list, v => 'https://www.youtube.com/watch?v=' + v.id, YTK.selected, v => v.id);
   list = _ay.liste;
+  const yhSay = list.filter(v => faEngelMi(ytkKanalId(v))).length;
   const vidCount = document.getElementById('ytk-vid-count');
-  if (vidCount) vidCount.textContent = `${list.length} gösteriliyor${_ay.gizlenen?` · ${_ay.gizlenen} işlenmiş gizli`:''}${_en.gizlenen?` · ⛔ ${_en.gizlenen} ENGEL gizli`:''} / ${YTK.videos.length} yüklü / kanalda ${ytkFmt(YTK.channelInfo ? YTK.channelInfo.videoCount : 0)}`;
+  if (vidCount) vidCount.textContent = `${list.length} gösteriliyor${_ay.gizlenen?` · ${_ay.gizlenen} işlenmiş gizli`:''}${yhSay?` · ⛔ ${yhSay} yayın hakkı sahibi (seçilemez)`:''} / ${YTK.videos.length} yüklü / kanalda ${ytkFmt(YTK.channelInfo ? YTK.channelInfo.videoCount : 0)}`;
   if (!list.length) {
     el.innerHTML = (_ay.gizlenen ? durumHTML('bos',{ic:'✓',bas:'Hepsi işleme alınmış',
-      alt:'Bu kanaldan listelenen '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'}) : '') + islenmisNotu(_ay.gizlenen) + faEngelNotu(_en.gizlenen);
+      alt:'Bu kanaldan listelenen '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'}) : '') + islenmisNotu(_ay.gizlenen);
     return;
   }
   el.innerHTML = list.map(v => {
@@ -13474,10 +13562,12 @@ function renderYTKVideos() {
     const durS = ytkParseDur(v.contentDetails.duration);
     const pubDate = (v.snippet.publishedAt||'').slice(0,10);
     const fs = yarSinifla(v);   // aynı nesne başına bir kez (WeakMap)
-    const rozet = futbolRozet(fs) + kaynakRozet(kaynakSinif(v.snippet.channelId || (YTK.channelInfo && YTK.channelInfo.channelId))) + faUzunRozet(durS);
-    return `<div onclick="ytvOpenModal('${jsStr(v.id)}')" style="display:flex;gap:10px;padding:10px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':'transparent'};transition:all .15s;align-items:center">
-      <input type="checkbox" style="flex-shrink:0;accent-color:var(--acc)" ${sel?'checked':''} onclick="event.stopPropagation();ytkToggle('${jsStr(v.id)}');renderYTKVideos()">
+    const ks = kaynakSinif(ytkKanalId(v)), yh = ks.sinif === 'ENGEL';
+    const rozet = futbolRozet(fs) + kaynakRozet(ks) + faUzunRozet(durS);
+    return `<div onclick="ytvOpenModal('${jsStr(v.id)}')" style="display:flex;gap:10px;padding:10px;border-bottom:1px solid var(--brd);cursor:pointer;background:${sel?'rgba(0,229,255,.06)':'transparent'};border-left:3px solid ${sel?'var(--acc)':(yh?'var(--er)':'transparent')};transition:all .15s;align-items:center">
+      <input type="checkbox" style="flex-shrink:0;accent-color:var(--acc)" ${sel?'checked':''}${yh?' disabled title="Yayın hakkı sahibi — seçilemez, gönderilemez"':''} onclick="event.stopPropagation();ytkToggle('${jsStr(v.id)}');renderYTKVideos()">
       <div style="position:relative;flex-shrink:0">
+        ${faYayinciEtiket(ks, ytkKanalAdi(v))}
         ${thumb?`<img src="${guvenliUrl(thumb)}" style="width:120px;height:72px;object-fit:cover;border-radius:4px">` : '<div style="width:120px;height:72px;background:var(--brd);border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--mt)">▶</div>'}
         <span style="position:absolute;right:3px;bottom:3px;background:rgba(0,0,0,.85);color:var(--tx);font-size:12px;padding:2px 5px;border-radius:2px">${ytkDurFmt(durS)}</span>
       </div>
@@ -13488,18 +13578,34 @@ function renderYTKVideos() {
       </div>
       <span style="flex-shrink:0;color:var(--acc);font-size:12px;padding:4px 8px;border:1px solid var(--acc);border-radius:3px">Detay ▶</span>
     </div>`;
-  }).join('') + islenmisNotu(_ay.gizlenen) + faEngelNotu(_en.gizlenen);
+  }).join('') + islenmisNotu(_ay.gizlenen) + faEngelNotu(yhSay);
+}
+// YT Kanal videosunun kanal kimliği (snippet yoksa açık kanalın kimliği)
+function ytkKanalId(v){ return (v && v.snippet && v.snippet.channelId) || (YTK.channelInfo && YTK.channelInfo.channelId) || ''; }
+// Kanal ADI (etiket yedeği): snippet.channelTitle; yoksa açık kanalın adı — yalnız kimlik onunla aynıysa
+function ytkKanalAdi(v){
+  const sn = (v && v.snippet) || {}, ci = YTK.channelInfo;
+  if (sn.channelTitle) return sn.channelTitle;
+  return (ci && (!sn.channelId || sn.channelId === ci.channelId)) ? (ci.channelTitle || '') : '';
 }
 
+// Yayın hakkı sahibi (ENGEL) videosu SEÇİLEMEZ: seçim eklenmez, uyarı verilir (seçimden çıkarmak serbest)
 function ytkToggle(id) {
   if (YTK.selected.has(id)) YTK.selected.delete(id);
-  else YTK.selected.add(id);
+  else {
+    const v = YTK.videos.find(x => x && x.id === id);
+    const raw = v ? null : (YAR.videos || []).find(x => x && x.id === id);   // ytvOpenModal YouTube Ara videosunu da açar
+    const nv = raw ? yarNormalizeVideo(raw) : null;
+    const ks = kaynakSinif(v ? ytkKanalId(v) : (nv ? nv.channelId : ''));
+    if (ks.sinif === 'ENGEL') { faEngelUyar(ks, v ? ytkKanalAdi(v) : (nv && nv.channelTitle)); renderYTKVideos(); return; }
+    YTK.selected.add(id);
+  }
   renderYTKVideos();
 }
 
-// Gizlenen (daha önce işlenmiş) videolar toplu seçime dahil edilmez
+// Gizlenen (daha önce işlenmiş) ve yayın hakkı sahibi (ENGEL, görünür ama seçilemez) videolar toplu seçime dahil edilmez
 function ytkSelectAll() {
-  const gor = faEngelAyikla(ytkFilteredVideos(), null, null, v => (v.snippet && v.snippet.channelId) || (YTK.channelInfo && YTK.channelInfo.channelId) || '').liste;
+  const gor = faSecilebilir(ytkFilteredVideos(), ytkKanalId);
   islenmisAyikla(gor, v=>'https://www.youtube.com/watch?v='+v.id).liste.forEach(v => YTK.selected.add(v.id)); renderYTKVideos();
 }
 function ytkClearAll()  { YTK.selected.clear(); renderYTKVideos(); }
@@ -14169,6 +14275,8 @@ function trRenderPending() {
   list.sort((a,b) => sort==='date' ? (new Date(b.publishedAt||0)-new Date(a.publishedAt||0))
                     : sort==='dur' ? ((parseInt(b.durationSec)||0)-(parseInt(a.durationSec)||0))
                     : ((parseInt(b.viewCount)||0)-(parseInt(a.viewCount)||0)));
+  // Yayın hakkı sahibi (ENGEL) kartı görünür ama seçilemez: eski seçim düşer
+  faEngelIsaretle(list, TR.selected, v=>v.videoId, trKanalId);
   // Daha önce işleme alınmış videoları kuyruktan düşür (seçiliyse seçimden de)
   const _ay = islenmisAyikla(list, v=>v.youtubeLink||'', TR.selected, v=>v.videoId);
   list = _ay.liste;
@@ -14211,12 +14319,18 @@ function trRenderPending() {
       ? '\nYouTube licensedContent: video bir içerik ortağına bağlı kanala yüklenmiş ve o ortakça sahiplenilmiş. Kliplerin telif eşleşmesi alıp almadığı bu panelde ölçülmedi.' : '');
     let pub = '';
     if (v.publishedAt) { const d = new Date(v.publishedAt); if (!isNaN(d)) pub = d.toLocaleDateString('tr',{day:'2-digit',month:'short',year:'numeric'}); }
-    return `<div class="card${already?' rd-done':''}" data-trvid="${esc0(vid)}" data-trguven="${ktSel ? (ktGuven|0) : 0}" style="padding:0;overflow:hidden${already?';border-color:rgba(52,211,153,.55)':''}">
-      <div class="opc-thumb" style="border-radius:8px 8px 0 0">
-        <img src="${guvenliUrl(v.thumbnail)}" style="width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in" onerror="this.style.display='none'" onmouseenter="hoverPrev(event,'${jsStr(v.thumbnail)}','${jsStr(v.title||'')}')" onmouseleave="hidePrev()">
+    // Yayın hakkı sahibi (ENGEL): kart görünür, sol üstte adı; kutucuk ve Onayla devre dışı (Reddet serbest)
+    const yh = _o.ks && _o.ks.sinif === 'ENGEL';
+    const ksY = yh ? faYhKs(_o.ks, channel) : _o.ks;   // operatör satırı adsızsa kanal adı
+    // Küçük resim düşerse (boş adres, silinmiş video, ağ): ENGEL kartında kutu KORUNUR (visibility) ve
+    // yer tutucu zemin görünür — display:none kabı 0 px'e indiriyor, overflow:hidden etiketi kırpıyordu.
+    return `<div class="card${already?' rd-done':''}" data-trvid="${esc0(vid)}" data-trguven="${(ktSel && !yh) ? (ktGuven|0) : 0}"${yh?' data-yh="1"':''} style="padding:0;overflow:hidden${already?';border-color:rgba(52,211,153,.55)':(yh?';border-color:var(--er)':'')}">
+      <div class="opc-thumb" style="border-radius:8px 8px 0 0${yh?';background:var(--brd)':''}">
+        ${faYayinciEtiket(ksY)}
+        <img src="${guvenliUrl(v.thumbnail)}" style="width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in" onerror="${yh?"this.style.visibility='hidden'":"this.style.display='none'"}" onmouseenter="hoverPrev(event,'${jsStr(v.thumbnail)}','${jsStr(v.title||'')}')" onmouseleave="hidePrev()">
         <span class="opc-dur">${trDur(v.durationSec)}</span>
         ${deltaBadge}
-        <label onclick="event.stopPropagation()" title="Toplu işlem için seç — Shift+tık ile aralık seçilir" style="position:absolute;top:6px;right:6px;z-index:5;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;cursor:pointer;display:flex"><input type="checkbox" class="tr-selbox" ${selChk?'checked':''} onclick="trSecTikla(event,'${jsStr(vid)}')" style="width:16px;height:16px;margin:0;accent-color:var(--acc);cursor:pointer"></label>
+        <label onclick="event.stopPropagation()" title="Toplu işlem için seç — Shift+tık ile aralık seçilir" style="position:absolute;top:6px;right:6px;z-index:5;background:rgba(0,0,0,.6);border-radius:4px;padding:3px;cursor:pointer;display:flex"><input type="checkbox" class="tr-selbox" ${selChk?'checked':''}${yh?' disabled title="Yayın hakkı sahibi — seçilemez, gönderilemez"':''} onclick="trSecTikla(event,'${jsStr(vid)}')" style="width:16px;height:16px;margin:0;accent-color:var(--acc);cursor:pointer"></label>
         ${already?rdDoneTik(already):''}
       </div>
       <div style="padding:10px 12px">
@@ -14235,7 +14349,9 @@ function trRenderPending() {
         </div>
         <input class="tr-desc" type="text" placeholder="Açıklama / not (isteğe bağlı)" style="width:100%;font-size:12px;margin-bottom:8px"/>
         <div class="tr-actions" style="display:flex;gap:6px">
-          <button class="btn bp bsm" style="flex:1" onclick="trApprove('${jsStr(vid)}')">✓ Onayla ve Gönder</button>
+          ${yh
+            ? `<button class="btn bg bsm" style="flex:1" disabled title="${esc0(faEngelUyarMetni(ksY))}">⛔ Gönderilemez</button>`
+            : `<button class="btn bp bsm" style="flex:1" onclick="trApprove('${jsStr(vid)}')">✓ Onayla ve Gönder</button>`}
           <button class="btn bg bsm" onclick="trReject('${jsStr(vid)}')">✗ Reddet</button>
         </div>
       </div>
@@ -14458,9 +14574,15 @@ function trOneriOzetLogla(){
     +' · üstveri kararı/kategoriyi değiştirdi '+say.golge);
 }
 
+// Trend Onay kartının kanal kimliği (üstveriden de)
+function trKanalId(v){ return (v && (v.channelId || (v._yt || {}).channelId)) || ''; }
+function trEngelKs(vid){ const v = TR.pending.find(x => x.videoId === vid); const ks = kaynakSinif(trKanalId(v)); return ks.sinif === 'ENGEL' ? faYhKs(ks, v && v.channelTitle) : null; }
 async function trApprove(videoId) {
   const v = TR.pending.find(x=>x.videoId===videoId);
   if (!v) return;
+  // Çift güvence: kimliği BİLİNEN yayın hakkı sahibi kartı burada durur (kart düğmesi zaten devre dışı;
+  // kimliksiz kart aşağıda tamamlanır ve kaynakKapisi durdurur).
+  { const ksY = trEngelKs(videoId); if (ksY) return showRes('tr-status', faEngelUyar(ksY), 'err'); }
   const base = getN8N();
   if (!base) return showRes('tr-status','Ayarlar\'dan n8n URL girin','warn');
   const card = document.querySelector('[data-trvid="'+videoId+'"]');
@@ -14546,11 +14668,18 @@ function trUpdateSelCount(){
   const el=document.getElementById('tr-selcount'); if(el) el.textContent=TR.selected.size;
   // P6: "Tümünü Seç" hepsi seçiliyken "Seçimi Kaldır"a döner (tek buton, iki iş)
   const btn=document.getElementById('tr-selall');
-  if(btn){ const hepsi=(TR.gorunen||[]).length>0 && (TR.gorunen||[]).every(id=>TR.selected.has(id));
+  // "hepsi" yalnız SEÇİLEBİLİR kartlar üzerinden: yayın hakkı sahibi kartı hiç seçilemediği için sayılmaz
+  if(btn){ const secilebilir=(TR.gorunen||[]).filter(id=>!trEngelKs(id));
+    const hepsi=secilebilir.length>0 && secilebilir.every(id=>TR.selected.has(id));
     btn.textContent = hepsi ? 'Seçimi Kaldır' : 'Tümünü Seç';
     btn.setAttribute('onclick', hepsi ? 'trClearSel()' : 'trSelectAll()'); }
 }
-function trToggleSel(vid){ if(TR.selected.has(vid)) TR.selected.delete(vid); else TR.selected.add(vid); trUpdateSelCount(); }
+// Yayın hakkı sahibi (ENGEL) kartı SEÇİLEMEZ: eklenmez, uyarı verilir (seçimden çıkarmak serbest)
+function trToggleSel(vid){
+  if(TR.selected.has(vid)) TR.selected.delete(vid);
+  else { const ks=trEngelKs(vid); if(ks){ faEngelUyar(ks); trUpdateSelCount(); return; } TR.selected.add(vid); }
+  trUpdateSelCount();
+}
 
 // P6: Shift+tık ile ARALIK seçimi. Önceden 12 video seçmek 12 tıklamaydı;
 // artık ilkine tık + sonuncusuna Shift+tık yetiyor.
@@ -14563,9 +14692,10 @@ function trSecTikla(ev, vid){
     const [a,b] = TR.sonSecim < i ? [TR.sonSecim,i] : [i,TR.sonSecim];
     // Aralığın tamamı çapa öğenin YENİ durumuna eşitlenir (tabloların standart davranışı)
     const hedef = kutu.checked;
-    for (let n=a; n<=b; n++){ if(hedef) TR.selected.add(sira[n]); else TR.selected.delete(sira[n]); }
+    let atlanan = 0;   // aralıktaki yayın hakkı sahibi (ENGEL) kartları seçilmez
+    for (let n=a; n<=b; n++){ if(hedef){ if(trEngelKs(sira[n])) atlanan++; else TR.selected.add(sira[n]); } else TR.selected.delete(sira[n]); }
     trRenderPending();
-    toast((b-a+1)+' video '+(hedef?'seçildi':'seçimden çıkarıldı'),'info',2200);
+    toast((b-a+1-atlanan)+' video '+(hedef?'seçildi':'seçimden çıkarıldı')+(atlanan?' · ⛔ '+atlanan+' yayın hakkı sahibi videosu seçilemez':''),'info',2200);
   } else {
     trToggleSel(vid);
   }
@@ -14573,7 +14703,8 @@ function trSecTikla(ev, vid){
 }
 // Yalnız EKRANDA GÖRÜNENLERİ seçer. TR.pending üzerinden gitseydi filtreye
 // takılan ya da işlenmiş olduğu için gizlenen videolar da toplu gönderime girerdi.
-function trSelectAll(){ (TR.gorunen||[]).forEach(id=>TR.selected.add(id)); trRenderPending(); }
+// Yayın hakkı sahibi (ENGEL) kartları dahil edilmez (görünür ama seçilemez).
+function trSelectAll(){ (TR.gorunen||[]).forEach(id=>{ if(!trEngelKs(id)) TR.selected.add(id); }); trRenderPending(); }
 function trClearSel(){ TR.selected.clear(); TR.sonSecim=null; trRenderPending(); }
 
 // ── P4: KLAVYE KISAYOLLARI ─────────────────────────────────────────
@@ -14628,7 +14759,7 @@ document.addEventListener('keydown', ev => {
 // (trKartOneri: kat = güven≥40 ve öneri 5 anahtara çözülüyorsa; değilse data-trguven 0).
 function trOneriliSec(){
   const kartlar=[...document.querySelectorAll('[data-trvid][data-trguven]')];
-  const uygun=kartlar.filter(el=>(parseInt(el.dataset.trguven,10)||0)>=40);
+  const uygun=kartlar.filter(el=>(parseInt(el.dataset.trguven,10)||0)>=40 && !trEngelKs(el.dataset.trvid));
   if(!uygun.length) return toast('Güvenilir kategori önerisi olan kart yok','warn');
   uygun.forEach(el=>TR.selected.add(el.dataset.trvid));
   trRenderPending();
@@ -21953,8 +22084,8 @@ async function rdEnrichN8N(data, key){
   rdApplyOutlier(all, medCache);
   // n8n outlier bölümünü vermediyse, hesaplananlardan kur
   if(!(data.outlier&&data.outlier.length)){
-    data.outlier=all.filter(x=>x.outlier>=2 && x.views>=1000)
-      .sort((a,b)=>b.outlier-a.outlier).slice(0,12);
+    data.outlier=faKontenjan(all.filter(x=>x.outlier>=2 && x.views>=1000)
+      .sort((a,b)=>b.outlier-a.outlier), 12);   // ENGEL olmayan 12 + yayın hakkı sahibi en çok 12
   }
 }
 
@@ -22080,7 +22211,8 @@ async function rdHaftaTara(zorla){
   }).filter(x=>x.views>=1000 && rdKesifOk(x));
   // Futbol olmayanları sınıflandırıcı eler — sayısı görünür (sessiz kırpma yok)
   const red=list.filter(x=>x.fs.karar==='red').length;
-  const kalan=list.filter(x=>x.fs.karar!=='red').sort((a,b)=>b.views-a.views).slice(0,12);
+  // Kontenjan: ENGEL olmayan ilk 12 + yayın hakkı sahibi (ENGEL) en çok 12 — ENGEL yer yemez (gösterilir, seçilemez)
+  const kalan=faKontenjan(list.filter(x=>x.fs.karar!=='red').sort((a,b)=>b.views-a.views), 12);
   RD.hafta=kalan; RD.haftaRed=red;
   try{ localStorage.setItem('op_radar_hafta',JSON.stringify({gun:rdHaftaGun(),v:RD_ONBELLEK_SURUM,red,veri:kalan})); }catch(e){}
   if(st) st.textContent='son 7 gün'+(red?' · ✕ '+red+' futbol dışı elendi':'');
@@ -22228,18 +22360,26 @@ async function rdKategoriTaraCalistir(){
     const red=list.filter(x=>x.fs.karar==='red').length; redTop+=red;
     const kalan=list.filter(x=>x.fs.karar!=='red');
     rdApplyOutlier(kalan, medCache);
-    sonuc[k]=kalan.sort((a,b)=>(b.outlier||1)*b.vph-(a.outlier||1)*a.vph).slice(0,5);
+    // Kontenjan: kovada ENGEL olmayan en iyi 5 + yayın hakkı sahibi (ENGEL) en çok 5 (gösterilir, seçilemez)
+    sonuc[k]=faKontenjan(kalan.sort((a,b)=>(b.outlier||1)*b.vph-(a.outlier||1)*a.vph), 5);
   });
   RD.kat=sonuc; RD.katRed=redTop;
   try{ localStorage.setItem('op_radar_kat',JSON.stringify({gun:rdKatGunKey(),v:RD_ONBELLEK_SURUM,red:redTop,veri:sonuc})); }catch(e){}
-  const toplam=Object.values(sonuc).reduce((s,a)=>s+a.length,0);
-  if(st) st.textContent='✓ '+toplam+' video · '+kats.length+' kova · her kovada en iyi 5 (Türkçe filtresi)'+(redTop?' · ✕ '+redTop+' futbol dışı elendi':'')+' · '+aramaHata.top+' arama';
+  const tumu=Object.values(sonuc).flat();
+  const yhTop=tumu.filter(x=>faEngelMi(x.channelId)).length, toplam=tumu.length-yhTop;
+  if(st) st.textContent='✓ '+toplam+' video · '+kats.length+' kova · her kovada en iyi 5 (Türkçe filtresi)'+(yhTop?' · ⛔ +'+yhTop+' yayın hakkı sahibi (gösteriliyor, seçilemez)':'')+(redTop?' · ✕ '+redTop+' futbol dışı elendi':'')+' · '+aramaHata.top+' arama';
   rdRenderKat();
   addLog('ok','sistem','Kategori avı: '+toplam+' video · '+aramaHata.top+' arama çağrısı'+(redTop?' · '+redTop+' futbol dışı elendi':''));
 }
 // Kova öğesinin kategori satırı: senin seçimin > kova anahtarı. Sınıflandırıcı kovadan
 // ayrışırsa uyarı rozeti + tek tıkla önerisine geçiş çipi.
+// Yayın hakkı sahibi (ENGEL) öğede kategori seçimi anlamsız (gönderilemez): çipler yerine tek satır
+function rdYhSatiri(x){
+  const ks=kaynakSinif(x && x.channelId);
+  return ks.sinif==='ENGEL' ? '<div class="fa-yh-not" title="'+esc0(faEngelUyarMetni(ks, x && x.channel))+'">⛔ yayın hakkı sahibi — seçilemez, gönderilemez</div>' : '';
+}
 function rdKovaSatiri(x){
+  { const yh=rdYhSatiri(x); if(yh) return yh; }
   const lbl=k=>((getCats()[k]||{}).label||k);
   const sec=RD.katSecim&&RD.katSecim[x.id];
   const fs=x.fs||{};
@@ -22257,17 +22397,18 @@ function rdRenderKat(){
   const el=document.getElementById('rd-kat'); if(!el||!RD.kat) return;
   let engelTop=0;
   const html=Object.keys(RD.kat).map(k=>{
-    const _en=faEngelAyikla(RD.kat[k], RD.selected, x=>x.id);
-    engelTop+=_en.gizlenen;
-    const list=_en.liste; if(!list.length) return '';
+    // Yayın hakkı sahibi (ENGEL) öğe GÖRÜNÜR (sol üst etiket), seçilemez: kalmış seçim düşer
+    engelTop+=faEngelIsaretle(RD.kat[k], RD.selected, x=>x.id);
+    const list=RD.kat[k]||[]; if(!list.length) return '';
     list.forEach(x=>{ if(!x.kova) x.kova=katNormPanel(x.kategori||k)||k; rdSinifla(x); });
     const lbl=(getCats()[k]||{}).label||k;
     return '<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:700;color:var(--gld);margin-bottom:6px">'+esc0(lbl)+'</div>'
       +'<div class="rd-grid">'+list.map(x=>{
         const sel=RD.selected.has(x.id)?' sel':'';
         const _dn=rdDone(x);
-        return '<div class="rd-card'+sel+(_dn?' done':'')+'" onclick="rdToggle(\''+jsStr(x.id)+'\')">'
-          +'<span class="rd-sel-tick">✓</span>'+rdDoneTik(_dn)
+        const ks=kaynakSinif(x.channelId);
+        return '<div class="rd-card'+sel+(_dn?' done':'')+(ks.sinif==='ENGEL'?' yh':'')+'" onclick="rdToggle(\''+jsStr(x.id)+'\')">'
+          +faYayinciEtiket(ks, x.channel)+'<span class="rd-sel-tick">✓</span>'+rdDoneTik(_dn)
           +(x.outlier>=2?'<span class="rd-badge-ratio" style="background:rgba(167,139,250,.95);color:#150c2e">💥 '+esc0(x.outlier)+'x</span>':'')
           +(x.durSec?'<span class="rd-dur">'+rdSure(x.durSec)+'</span>':'')+'<img class="rd-thumb" src="'+guvenliUrl(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
           +'<div class="rd-body"><div class="rd-title">'+esc0(x.title)+'</div>'+rdDoneLbl(_dn)
@@ -22369,13 +22510,16 @@ async function rdClientCompute(key, st){
     return it;
   };
   // Trend: müzik (categoryId 10) hariç + 15 dk altı hariç (rdKesifOk zaten uygular)
-  const trend=(trendRaw.items||[]).map(norm).filter(x=>x.catId!=='10'&&x.durSec>=RD_SURE_MIN&&rdKesifOk(x)).slice(0,12);
+  // KONTENJAN (24 Kas 2026): her bölümde ENGEL olmayan ilk N + yayın hakkı sahibi (ENGEL) en çok N
+  // (faKontenjan) — ENGEL gösterilir, seçilemez ve kullanılabilir sayıyı azaltmaz. Yeni çağrı yok.
+  const trend=faKontenjan((trendRaw.items||[]).map(norm).filter(x=>x.catId!=='10'&&x.durSec>=RD_SURE_MIN&&rdKesifOk(x)), 12);
   const freshAll=(freshRaw.items||[]).map(norm).filter(x=>x.views>=1000&&rdSureOk(x));   // ≤1sa her yerde
   // İvme bilinen videolarda hızı ivmeyle ağırlıklandır → hızlanan üste çıkar
   const risingSkor=x=>x.vph*(x.ivme>0?Math.min(3,x.ivme):1);
-  const rising=[...freshAll].filter(rdKesifOk).sort((a,b)=>risingSkor(b)-risingSkor(a)).slice(0,12);
-  const potential=freshAll.filter(x=>x.subs>0&&x.subs<=250000&&x.ratio>=1.5&&x.ageH<=72).sort((a,b)=>(b.ratio*b.vph)-(a.ratio*a.vph)).slice(0,8);
-  // 💥 OUTLIER — en umutlu adayların kanal medyanını çek, skoru hesapla
+  const rising=faKontenjan([...freshAll].filter(rdKesifOk).sort((a,b)=>risingSkor(b)-risingSkor(a)), 12);
+  const potential=faKontenjan(freshAll.filter(x=>x.subs>0&&x.subs<=250000&&x.ratio>=1.5&&x.ageH<=72).sort((a,b)=>(b.ratio*b.vph)-(a.ratio*a.vph)), 8);
+  // 💥 OUTLIER — en umutlu adayların kanal medyanını çek, skoru hesapla. Aday havuzu (30) BİLEREK
+  // kontenjansız: medyan çağrısı kanal başına birim harcar, ENGEL için ek aday = ek API maliyeti.
   const aday=[...freshAll].sort((a,b)=>b.vph-a.vph).slice(0,30);
   const adayCh=[...new Set(aday.map(x=>x.channelId).filter(Boolean))];
   let outlier=[];
@@ -22383,11 +22527,14 @@ async function rdClientCompute(key, st){
     const medCache=await rdChannelMedians(key, uploadsBy, adayCh, st);
     rdApplyOutlier(aday, medCache);
     rdApplyOutlier(trend, medCache);
-    outlier=aday.filter(x=>x.outlier>=2 && x.views>=1000).sort((a,b)=>b.outlier-a.outlier).slice(0,12);
+    outlier=faKontenjan(aday.filter(x=>x.outlier>=2 && x.views>=1000).sort((a,b)=>b.outlier-a.outlier), 12);
   }catch(e){ console.warn('[RD] outlier:', e.message); }
   const byCh={};
   [...trend,...rising].forEach(x=>{ if(!x.channelId) return; if(!byCh[x.channelId]) byCh[x.channelId]={channelId:x.channelId,channel:x.channel,subs:x.subs,count:0,sumVph:0,best:x}; const c=byCh[x.channelId]; c.count++; c.sumVph+=x.vph; if(x.vph>c.best.vph) c.best=x; });
-  const channels=Object.values(byCh).sort((a,b)=>(b.count*b.sumVph)-(a.count*a.sumVph)).slice(0,8)
+  // KONTENJAN (kanal düzeyi): trend/rising'e kontenjanla eklenen yayın hakkı sahibi (ENGEL) videoları
+  // byCh'de ENGEL kanalların sayısını/hızını şişirip slice(0,8)'de nötr kanal yerlerini yiyordu.
+  // ENGEL olmayan ilk 8 kanal + ENGEL kanal en çok 8 (kartta ⛔ etiketi, sıra korunur). Yeni çağrı yok.
+  const channels=faKontenjan(Object.values(byCh).sort((a,b)=>(b.count*b.sumVph)-(a.count*a.sumVph)), 8, c=>c.channelId)
     .map(c=>({channelId:c.channelId,channel:c.channel,subs:c.subs,count:c.count,sumVph:Math.round(c.sumVph),bestTitle:c.best.title,bestId:c.best.id}));
   if(!snap||snapAgeH>=20){
     const v={}; [...trend,...freshAll].forEach(x=>{ v[x.id]=x.views; });
@@ -22447,17 +22594,18 @@ function renderRadar(){
   if(st) st.textContent='Kaynak: '+RD.src;
   [['rd-trend',d.trend],['rd-hafta',RD.hafta],['rd-outlier',d.outlier],['rd-rising',d.rising],['rd-potential',d.potential],['rd-gtrend',d.gtrend],['rd-kesif',d.kesif]].forEach(([elId,list])=>{
     const el=document.getElementById(elId); if(!el) return;
-    // ENGEL kaynak (yayın hakkı sahibi) adaylardan çıkar — sayısı notla görünür
-    const _en=faEngelAyikla(list, RD.selected, x=>x.id);
+    // Yayın hakkı sahibi (ENGEL) öğe GÖRÜNÜR (sol üst etiket), seçilemez: kalmış seçim düşer
+    faEngelIsaretle(list, RD.selected, x=>x.id);
     // İşleme alınmış videoları bölümden düşür (seçiliyse seçimden de)
-    const _ay=islenmisAyikla(_en.liste, x=>x.url||'', RD.selected, x=>x.id);
+    const _ay=islenmisAyikla(list, x=>x.url||'', RD.selected, x=>x.id);
     list=_ay.liste;
-    setEl(elId+'-n',(list||[]).length+' video'+(_ay.gizlenen?' · '+_ay.gizlenen+' gizli':'')+(_en.gizlenen?' · ⛔ '+_en.gizlenen:''));
+    const yhSay=(list||[]).filter(x=>faEngelMi(x && x.channelId)).length;
+    setEl(elId+'-n',(list||[]).length+' video'+(_ay.gizlenen?' · '+_ay.gizlenen+' gizli':'')+(yhSay?' · ⛔ '+yhSay+' yayın hakkı sahibi':''));
     if(!(list||[]).length){
-      if(_ay.gizlenen || _en.gizlenen){
-        el.innerHTML=(_ay.gizlenen ? durumHTML('bos',{ic:'✓',bas:'Hepsi işleme alınmış',
-          alt:'Bu bölümdeki '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'}) : '')
-          +islenmisNotu(_ay.gizlenen)+faEngelNotu(_en.gizlenen);
+      if(_ay.gizlenen){
+        el.innerHTML=durumHTML('bos',{ic:'✓',bas:'Hepsi işleme alınmış',
+          alt:'Bu bölümdeki '+_ay.gizlenen+' videonun tamamı daha önce gönderilmiş.'})
+          +islenmisNotu(_ay.gizlenen);
         return;
       }
       el.innerHTML='<div class="rd-empty">'+(elId==='rd-hafta'
@@ -22484,8 +22632,9 @@ function renderRadar(){
         ? '<span class="rd-badge-ratio" style="background:rgba(52,211,153,.95);color:#052e21" title="Kanalin kendi medyanina gore kac kat">🔎 '+(x.outlier||0)+'x</span>'
         : (x.delta>0?'<span class="rd-badge-delta">▲ +'+ytkFmt(x.delta)+' / '+x.deltaH+'sa</span>':'');
       const _dn=rdDone(x);
-      return '<div class="rd-card'+sel+(_dn?' done':'')+'" onclick="rdToggle(\''+jsStr(x.id)+'\')">'
-        +'<span class="rd-sel-tick">✓</span>'+rdDoneTik(_dn)+badge
+      const ks=kaynakSinif(x.channelId);
+      return '<div class="rd-card'+sel+(_dn?' done':'')+(ks.sinif==='ENGEL'?' yh':'')+'" onclick="rdToggle(\''+jsStr(x.id)+'\')">'
+        +faYayinciEtiket(ks, x.channel)+'<span class="rd-sel-tick">✓</span>'+rdDoneTik(_dn)+badge
         +(x.durSec?'<span class="rd-dur">'+rdSure(x.durSec)+'</span>':'')+'<img class="rd-thumb" src="'+guvenliUrl(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
         +'<div class="rd-body">'
         +'<div class="rd-title">'+rdEsc(x.title)+'</div>'+rdDoneLbl(_dn)
@@ -22508,15 +22657,18 @@ function renderRadar(){
         +'<div class="prog"><div class="pf" style="background:var(--acc);width:'+Math.max(3,Math.round((x.vph||0)/maxVph*100))+'%"></div></div>'
         +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+guvenliUrl(x.url)+'" target="_blank" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
         +'</div></div>';
-    }).join('') + islenmisNotu(_ay.gizlenen) + faEngelNotu(_en.gizlenen);
+    }).join('') + islenmisNotu(_ay.gizlenen) + faEngelNotu(yhSay);
   });
   const chEl=document.getElementById('rd-channels');
   if(chEl){
-    setEl('rd-channels-n',(d.channels||[]).length+' kanal');
+    // Yayın hakkı sahibi (ENGEL) kanal kartı görünür, sol üstte adı (n8n listesinden gelen de)
+    const chYh=(d.channels||[]).filter(c=>faEngelMi(c && c.channelId)).length;
+    setEl('rd-channels-n',(d.channels||[]).length+' kanal'+(chYh?' · ⛔ '+chYh+' yayın hakkı sahibi':''));
     if(!(d.channels||[]).length){ chEl.innerHTML='<div class="rd-empty">Bugün öne çıkan kanal yok</div>'; }
     else{
       const maxV=Math.max(1,...d.channels.map(c=>c.sumVph||0));
-      chEl.innerHTML=d.channels.map(c=>'<div class="rd-ch-card">'
+      chEl.innerHTML=d.channels.map(c=>{ const cks=kaynakSinif(c.channelId); return '<div class="rd-ch-card'+(cks.sinif==='ENGEL'?' yh':'')+'">'
+        +faYayinciEtiket(cks, c.channel)
         +'<div class="rd-ch-name" title="'+rdEsc(c.channel)+'">'+rdEsc(c.channel)+'</div>'
         +'<div class="rd-ch-meta">'+(c.subs?ytkFmt(c.subs)+' abone · ':'')+c.count+' sıcak video · <b style="color:var(--acc)">'+ytkFmt(c.sumVph)+'/sa</b></div>'
         +'<div class="prog" style="margin-bottom:8px"><div class="pf" style="background:var(--acc3);width:'+Math.max(4,Math.round((c.sumVph||0)/maxV*100))+'%"></div></div>'
@@ -22524,7 +22676,7 @@ function renderRadar(){
         +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
         +'<a class="btn bg bsm" style="text-decoration:none" href="https://www.youtube.com/channel/'+rdEsc(c.channelId)+'" target="_blank">↗ Kanal</a>'
         +'<button class="btn bg bsm" onclick="rdOpenChannel(this.dataset.ch)" data-ch="'+rdEsc(c.channel)+'">⊕ Kanal Ara&#39;da incele</button>'
-        +'</div></div>').join('');
+        +'</div></div>'; }).join('');
     }
   }
   rdUpdateSelCount();
@@ -22538,6 +22690,7 @@ function renderRadar(){
 // İZİN) ve senin seçimin de karttan DEĞİŞTİRİLEBİLİR — eskiden önerili kartta çip yoktu, üst çipler de
 // öneriyi ezmediği için (videoKat sırası: insan > kova > öneri > üst) yanlış öneri düzeltilemiyordu.
 function rdKatSatiri(x){
+  { const yh=rdYhSatiri(x); if(yh) return yh; }
   const lbl=k=>((getCats()[k]||{}).label||k);
   rdSinifla(x);
   const sec=katNormPanel(RD.katSecim&&RD.katSecim[x.id]);
@@ -22566,13 +22719,24 @@ function rdKatSatiri(x){
 function rdKatSec(id,kategori){
   kategori=katNormPanel(kategori);
   if(!kategori) return;
+  { const ks=rdEngelKs(id); if(ks){ faEngelUyar(ks); return; } }   // yayın hakkı sahibi: gönderilemez, kategori anlamsız
   if(!RD.katSecim) RD.katSecim={};
   RD.katSecim[id]=kategori;
   toast('🏷 '+((getCats()[kategori]||{}).label||kategori)+' seçildi — gönderim başarılı olursa bu kanalda hatırlanır','ok');
   renderRadar(); if(RD.kat) rdRenderKat(); rdRenderKaynak();
 }
+// Kimliği bu id olan Radar öğelerinden (Kaynak Akışı, kova, hafta, trend… — rdSendSelected ile aynı
+// listeler) herhangi biri yayın hakkı sahibiyse (ENGEL) onun kaynak sınıfı, değilse null.
+function rdEngelKs(id){
+  const d=RD.data||{};
+  const all=[...(RD.kaynak||[]),...(RD.kat?Object.values(RD.kat).flat():[]),...(RD.hafta||[]),...(d.trend||[]),...(d.outlier||[]),...(d.rising||[]),...(d.potential||[]),...(d.gtrend||[]),...(d.kesif||[])];
+  for(const x of all){ if(x && x.id===id){ const ks=kaynakSinif(x.channelId); if(ks.sinif==='ENGEL') return faYhKs(ks, x.channel); } }
+  return null;
+}
+// Yayın hakkı sahibi (ENGEL) kartı SEÇİLEMEZ: tıklama seçim eklemez, uyarı verir (seçimden çıkarmak serbest)
 function rdToggle(id){
-  if(RD.selected.has(id)) RD.selected.delete(id); else RD.selected.add(id);
+  if(RD.selected.has(id)) RD.selected.delete(id);
+  else { const ks=rdEngelKs(id); if(ks){ faEngelUyar(ks); return; } RD.selected.add(id); }
   renderRadar();
   if(RD.kat) rdRenderKat();
   rdRenderKaynak();
@@ -22707,7 +22871,9 @@ async function rdSendSelected(){
 //   videos.list    : 72 saat içindeki n video için ⌈n/50⌉
 //   TOPLAM = N + ek sayfalar + ⌈n/50⌉ + ⌈m/50⌉  (16 kanal, ~100 yeni video: 16 + 2 + 1 = 19)
 // Süzgeçler (her elemenin sayısı görünür): son 72 saat · 600 ≤ süre ≤ 10800 sn ·
-//   Shorts değil (≤180 sn de atılır) · rdTurkceMi · futbolSinif red değil · ENGEL yok · işlenmiş değil.
+//   Shorts değil (≤180 sn de atılır) · rdTurkceMi · futbolSinif red değil · işlenmiş değil. Videonun kanalı
+//   yayın hakkı sahibiyse (ENGEL; ör. listedeki kanalın oynatma listesinde yayıncı yüklemesi) ELENMEZ:
+//   gösterilir, seçilemez (24 Kas 2026). ENGEL kanallar zaten taranmaz (yalnız İZİN/KULÜP).
 // Sıralama: izlenme/saat. Gönderim: rdSendSelected (kategori = karttaki çip seçimin; seçmediysen
 //   öneri YALNIZ faOtoKategori izin verirse — ilk 14 gün hiç —, yoksa üstteki çipler, onlar da
 //   boşsa gönderilmez). Kilit faf'ta zaten durdurur.
@@ -22849,6 +23015,7 @@ function rdKaynakKart(x){
   rdSinifla(x);
   const sel = RD.selected.has(x.id) ? ' sel' : '';
   const _dn = rdDone(x);
+  const ks = kaynakSinif(x.channelId), yh = ks.sinif === 'ENGEL';
   const lbl = k => ((getCats()[k] || {}).label || k);
   const secim = RD.katSecim && RD.katSecim[x.id];
   // Etkin çip: senin seçimin ya da KENDİLİĞİNDEN kullanılabilir öneri (faOtoKategori — ilk 14 gün
@@ -22859,16 +23026,17 @@ function rdKaynakKart(x){
     '<span class="fa-kchip'+(k === etkin ? ' sel' : (!etkin && k === oto.oneri ? ' oneri' : ''))+'" onclick="event.stopPropagation();rdKatSec(\''+jsStr(x.id)+'\',\''+jsStr(k)+'\')" title="'
     +esc0(k === etkin ? (secim ? 'Senin seçimin' : 'Öneri (kabul + İZİN) — seçmezsen gönderimde bu kullanılır')
       : (!etkin && k === oto.oneri ? 'Sınıflandırıcı önerisi ('+oto.engel+') — kendiliğinden kullanılmaz, tıklayıp seç' : 'Bu kategoriyle gönder'))+'">'+esc0(lbl(k))+'</span>').join('');
-  return '<div class="rd-card'+sel+(_dn ? ' done' : '')+'" onclick="rdToggle(\''+jsStr(x.id)+'\')">'
-    +'<span class="rd-sel-tick">✓</span>'+rdDoneTik(_dn)
+  return '<div class="rd-card'+sel+(_dn ? ' done' : '')+(yh ? ' yh' : '')+'" onclick="rdToggle(\''+jsStr(x.id)+'\')">'
+    +faYayinciEtiket(ks, x.channel)+'<span class="rd-sel-tick">✓</span>'+rdDoneTik(_dn)
     +(x.durSec ? '<span class="rd-dur">'+rdSure(x.durSec)+'</span>' : '')
     +'<img class="rd-thumb" src="'+guvenliUrl(x.thumb)+'" loading="lazy" onerror="this.style.display=\'none\'"/>'
     +'<div class="rd-body"><div class="rd-title">'+esc0(x.title)+'</div>'+rdDoneLbl(_dn)
     +'<div class="rd-meta"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc0(x.channel)+'</span><span style="flex-shrink:0">'+rdAge(x.ageH)+'</span></div>'
     +'<div class="rd-meta"><span>'+ytkFmt(x.views)+' izlenme</span><span style="color:var(--acc);font-weight:600">'+ytkFmt(x.vph)+'/sa</span></div>'
     +rdFaSatiri(x)
-    +'<div style="font-size:10px;color:'+(etkin ? 'var(--mt)' : 'var(--wn)')+';margin-top:5px">Kategori'+(secim ? ' (senin seçimin)' : (etkin ? ' (öneri)' : ' — seçim gerekli'+(oto.oneri ? ' ('+esc0(oto.engel)+')' : '')+' · seçmezsen üstteki çipler'))+':</div>'
-    +'<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">'+cipler+'</div>'
+    +(yh ? rdYhSatiri(x)
+      : '<div style="font-size:10px;color:'+(etkin ? 'var(--mt)' : 'var(--wn)')+';margin-top:5px">Kategori'+(secim ? ' (senin seçimin)' : (etkin ? ' (öneri)' : ' — seçim gerekli'+(oto.oneri ? ' ('+esc0(oto.engel)+')' : '')+' · seçmezsen üstteki çipler'))+':</div>'
+      +'<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px">'+cipler+'</div>')
     +'<div style="margin-top:7px;display:flex;justify-content:flex-end"><a href="'+guvenliUrl(x.url)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-size:11px;color:var(--mt);text-decoration:none">↗ YouTube</a></div>'
     +'</div></div>';
 }
@@ -22883,19 +23051,22 @@ function rdRenderKaynak(){
     return;
   }
   const say = RD.kaynakSay || {};
-  const _en = faEngelAyikla(RD.kaynak, RD.selected, x => x.id);
-  const _ay = islenmisAyikla(_en.liste, x => x.url || '', RD.selected, x => x.id);
+  // Yayın hakkı sahibi (ENGEL) videosu ELENMEZ: görünür (sol üst etiket), seçilemez; kalmış seçim düşer
+  faEngelIsaretle(RD.kaynak, RD.selected, x => x.id);
+  const _ay = islenmisAyikla(RD.kaynak, x => x.url || '', RD.selected, x => x.id);
   const list = _ay.liste;
+  const yhSay = list.filter(x => faEngelMi(x && x.channelId)).length;
   const c = RD.kaynakCagri || {};
   const top = (c.channels || 0) + (c.playlistItems || 0) + (c.videos || 0);
-  // Elek sayıları — her aşamada kaç video düştü (sessiz kırpma yok)
+  // Elek sayıları — her aşamada kaç video düştü (sessiz kırpma yok). Yayın hakkı sahibi eleme DEĞİL:
+  // sonuçta gösterilir, kaçının seçilemeyeceği ayrıca yazılır.
   const elek = 'ham '+(say.ham || 0)+' → 72 sa dışı −'+(say.eski || 0)+' · süre/Shorts −'+(say.sure || 0)+' · dil −'+(say.dil || 0)
-    +' · futbol dışı (red) −'+(say.red || 0)+' · ENGEL −'+_en.gizlenen+' · işlenmiş −'+_ay.gizlenen+(say.kayip ? ' · ayrıntısız −'+say.kayip : '')
-    +' → sonuç '+list.length
+    +' · futbol dışı (red) −'+(say.red || 0)+' · işlenmiş −'+_ay.gizlenen+(say.kayip ? ' · ayrıntısız −'+say.kayip : '')
+    +' → sonuç '+list.length+(yhSay ? ' (⛔ '+yhSay+' yayın hakkı sahibi: gösteriliyor, seçilemez)' : '')
     +(say.kesik ? ' · ⚠ '+say.kesik+' kanalda 72 saatin tamamı okunamadı ('+(KA_SAYFA_MAX*50)+'+ yükleme)' : '');
   if (st) st.textContent = elek+' · '+top+' API çağrısı (arama 0) · '+new Date(RD.kaynakT || Date.now()).toLocaleTimeString('tr', {hour:'2-digit', minute:'2-digit'})
     + (RD.kaynakHata && RD.kaynakHata.length ? ' · ⚠ '+RD.kaynakHata.length+' hata (Loglar)' : '') + bayat;
-  setEl('rd-kaynak-n', list.length+' video');
+  setEl('rd-kaynak-n', list.length+' video'+(yhSay ? ' · ⛔ '+yhSay+' yayın hakkı sahibi' : ''));
   // Kanal başına yeni video sayısı (sonuç / 72 saatte yüklenen)
   const ks = Object.values(RD.kaynakKanal || {}).sort((a, b) => (b.sonuc - a.sonuc) || (b.yeni - a.yeni));
   const kanalSatiri = ks.length ? '<div style="grid-column:1/-1;font-size:11px;color:var(--mt);line-height:1.9;margin-bottom:4px">'
@@ -22906,7 +23077,7 @@ function rdRenderKaynak(){
       + esc0(k.ad)+' <b>'+k.sonuc+'</b>/'+k.yeni+(k.kesik ? '+' : '')+(k.hata || k.kesik ? ' ⚠' : '')+'</span>').join('') + '</div>' : '';
   el.innerHTML = kanalSatiri
     + (list.length ? list.map(rdKaynakKart).join('') : '<div class="rd-empty">Süzgeçlerden geçen video yok</div>')
-    + islenmisNotu(_ay.gizlenen) + faEngelNotu(_en.gizlenen);
+    + islenmisNotu(_ay.gizlenen) + faEngelNotu(yhSay);
   rdUpdateSelCount();
 }
 window.initRadar=initRadar; window.loadRadar=loadRadar; window.rdKatSec=rdKatSec; window.rdKatSatiri=rdKatSatiri; window.rdKategoriTara=rdKategoriTara; window.rdRenderKat=rdRenderKat; window.rdToggle=rdToggle; window.rdSendSelected=rdSendSelected; window.rdOpenChannel=rdOpenChannel;
